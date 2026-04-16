@@ -116,7 +116,7 @@ export async function createPlan(name: string, goal: string, days: Omit<Training
       await client.query(
         `INSERT INTO training_days (plan_id, date, title, type, duration_min, tss_target, description, segments)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-        [plan.id, day.date, day.title, day.type, day.duration_min, day.tss_target ?? null, day.description, JSON.stringify(day.segments)]
+        [plan.id, day.date, day.title ?? '', day.type ?? 'rest', day.duration_min ?? 0, day.tss_target ?? null, day.description ?? '', JSON.stringify(day.segments ?? [])]
       );
     }
 

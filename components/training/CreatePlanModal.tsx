@@ -33,22 +33,26 @@ export default function CreatePlanModal({ onClose, onCreated }: Props) {
 
       // Generate all weeks in parallel — each call handles 1 week (~2s per call)
       const weekResults = await Promise.all(
-        Array.from({ length: weeks }, (_, i) =>
-          fetch('/api/training/generate', {
+        Array.from({ length: weeks }, async (_, i) => {
+          const r = await fetch('/api/training/generate', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ goal, notes, weekIndex: i, planStartDate, totalWeeks: weeks, planName, planGoal }),
-          }).then(r => r.json())
-        )
+          });
+          const text = await r.text();
+          let data: Record<string, unknown>;
+          try {
+            data = JSON.parse(text);
+          } catch {
+            throw new Error(`Week ${i + 1} failed (HTTP ${r.status}): ${text.slice(0, 200)}`);
+          }
+          if (data.error) throw new Error(`Week ${i + 1}: ${data.error}`);
+          return data;
+        })
       );
 
-      // Check for errors
-      for (const result of weekResults) {
-        if (result.error) throw new Error(result.error);
-      }
-
       // Combine all days in order
-      const allDays = weekResults.flatMap((r: { days: TrainingDay[] }) => r.days ?? []);
+      const allDays = weekResults.flatMap(r => (r.days as TrainingDay[]) ?? []);
 
       setStatus('saving');
       const saveRes = await fetch('/api/training/plans', {
