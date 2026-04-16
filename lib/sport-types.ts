@@ -31,12 +31,12 @@ export function sportLabel(type: string): string {
 
 export function sportColor(type: string): string {
   const map: Record<string, string> = {
-    Ride:                  '#f97316', // orange
-    VirtualRide:           '#fb923c',
-    GravelRide:            '#fb923c',
+    Ride:                  '#38bdf8', // sky blue
+    VirtualRide:           '#38bdf8', // sky blue
+    GravelRide:            '#1e40af', // navy blue
+    MountainBikeRide:      '#f97316', // orange
     EBikeRide:             '#22c55e', // green
-    EMountainBikeRide:     '#16a34a',
-    MountainBikeRide:      '#15803d',
+    EMountainBikeRide:     '#22c55e', // green
   };
   return map[type] ?? '#6b7280';
 }
