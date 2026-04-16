@@ -148,37 +148,37 @@ export default function ActivityDetail({ id }: { id: string }) {
             <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">
               Laps <span className="text-gray-600 font-normal">({laps.length})</span>
             </h3>
-            <div className="bg-gray-800 rounded-xl overflow-hidden">
-              <table className="w-full text-sm">
+            <div className="bg-gray-800 rounded-xl overflow-x-auto scroll-touch">
+              <table className="text-xs sm:text-sm whitespace-nowrap">
                 <thead>
                   <tr className="border-b border-gray-700">
-                    <th className="text-left px-4 py-3 text-gray-400 font-medium">#</th>
-                    <th className="text-right px-4 py-3 text-gray-400 font-medium">Distance</th>
-                    <th className="text-right px-4 py-3 text-gray-400 font-medium">Time</th>
-                    <th className="text-right px-4 py-3 text-gray-400 font-medium hidden sm:table-cell">Avg W</th>
-                    <th className="text-right px-4 py-3 text-gray-400 font-medium hidden sm:table-cell">NP</th>
-                    <th className="text-right px-4 py-3 text-gray-400 font-medium hidden sm:table-cell">Avg HR</th>
-                    <th className="text-right px-4 py-3 text-gray-400 font-medium hidden sm:table-cell">Max HR</th>
+                    <th className="text-left px-3 py-2.5 text-gray-400 font-medium">#</th>
+                    <th className="text-right px-3 py-2.5 text-gray-400 font-medium">Dist</th>
+                    <th className="text-right px-3 py-2.5 text-gray-400 font-medium">Time</th>
+                    <th className="text-right px-3 py-2.5 text-gray-400 font-medium">Avg W</th>
+                    <th className="text-right px-3 py-2.5 text-gray-400 font-medium">NP</th>
+                    <th className="text-right px-3 py-2.5 text-gray-400 font-medium">Avg HR</th>
+                    <th className="text-right px-3 py-2.5 text-gray-400 font-medium">Max HR</th>
                   </tr>
                 </thead>
                 <tbody>
                   {laps.map((lap, i) => (
                     <tr key={lap.id} className={`border-b border-gray-700/50 ${i % 2 === 0 ? '' : 'bg-gray-800/50'}`}>
-                      <td className="px-4 py-2.5 text-gray-400">{lap.lap_index + 1}</td>
-                      <td className="px-4 py-2.5 text-right text-gray-300">
-                        {lap.distance > 0 ? `${(lap.distance / 1000).toFixed(2)} km` : '—'}
+                      <td className="px-3 py-2 text-gray-400">{lap.lap_index + 1}</td>
+                      <td className="px-3 py-2 text-right text-gray-300">
+                        {lap.distance > 0 ? `${(lap.distance / 1000).toFixed(2)}` : '—'}
                       </td>
-                      <td className="px-4 py-2.5 text-right text-gray-300">{fmt(lap.moving_time)}</td>
-                      <td className="px-4 py-2.5 text-right text-gray-300 hidden sm:table-cell">
-                        {lap.average_watts ? `${Math.round(lap.average_watts)}W` : '—'}
+                      <td className="px-3 py-2 text-right text-gray-300">{fmt(lap.moving_time)}</td>
+                      <td className="px-3 py-2 text-right text-gray-300">
+                        {lap.average_watts ? `${Math.round(lap.average_watts)}` : '—'}
                       </td>
-                      <td className="px-4 py-2.5 text-right text-gray-300 hidden sm:table-cell">
-                        {lap.normalized_power ? `${Math.round(lap.normalized_power)}W` : '—'}
+                      <td className="px-3 py-2 text-right text-gray-300">
+                        {lap.normalized_power ? `${Math.round(lap.normalized_power)}` : '—'}
                       </td>
-                      <td className="px-4 py-2.5 text-right text-gray-300 hidden sm:table-cell">
+                      <td className="px-3 py-2 text-right text-gray-300">
                         {lap.average_heartrate ? Math.round(lap.average_heartrate) : '—'}
                       </td>
-                      <td className="px-4 py-2.5 text-right text-gray-300 hidden sm:table-cell">
+                      <td className="px-3 py-2 text-right text-gray-300">
                         {lap.max_heartrate ? Math.round(lap.max_heartrate) : '—'}
                       </td>
                     </tr>
