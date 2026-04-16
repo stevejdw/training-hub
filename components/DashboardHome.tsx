@@ -27,10 +27,10 @@ interface ChartResponse {
 const TYPE_FILTERS = SPORT_FILTER_LABELS.filter(f => f !== 'All') as SportFilter[];
 
 const METRIC_OPTS: { key: Metric; label: string; unit: string; color: string }[] = [
-  { key: 'tss',        label: 'TSS',       unit: '',   color: '#f97316' },
   { key: 'km',         label: 'Distance',  unit: 'km', color: '#fb923c' },
   { key: 'hours',      label: 'Time',      unit: 'h',  color: '#fdba74' },
   { key: 'activities', label: 'Rides',     unit: '',   color: '#fed7aa' },
+  { key: 'tss',        label: 'TSS',       unit: '',   color: '#f97316' },
 ];
 
 function SummaryCard({ label, value }: { label: string; value: string }) {
@@ -57,7 +57,7 @@ function CustomTooltip({ active, payload, label, unit }: any) {
 export default function DashboardHome() {
   const [period, setPeriod]   = useState<Period>('week');
   const [offset, setOffset]   = useState(0);
-  const [metric, setMetric]   = useState<Metric>('tss');
+  const [metric, setMetric]   = useState<Metric>('km');
   const [selected, setSelected] = useState<SportFilter[]>([]);
   const [data, setData]       = useState<ChartResponse | null>(null);
   const [loading, setLoading] = useState(true);

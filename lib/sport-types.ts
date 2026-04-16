@@ -15,7 +15,7 @@ export const SPORT_FILTERS = {
 
 export type SportFilter = keyof typeof SPORT_FILTERS;
 
-export const SPORT_FILTER_LABELS: SportFilter[] = ['All', 'Ride', 'Gravel', 'eMTB', 'MTB'];
+export const SPORT_FILTER_LABELS: SportFilter[] = ['All', 'Ride', 'Gravel', 'MTB', 'eMTB'];
 
 export function sportLabel(type: string): string {
   const map: Record<string, string> = {
