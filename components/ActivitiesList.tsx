@@ -20,93 +20,244 @@ interface Activity {
   trainer: boolean;
 }
 
+type SortCol = 'start_date' | 'distance' | 'moving_time' | 'average_watts' | 'average_heartrate' | 'tss';
+type SortDir = 'ASC' | 'DESC';
+type TimeOfDay = 'any' | 'morning' | 'afternoon' | 'evening';
+
 function fmt(seconds: number): string {
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
   return h > 0 ? `${h}:${m.toString().padStart(2, '0')}h` : `${m}m`;
 }
 
-// Filter labels excluding 'All'
 const TYPE_FILTERS = SPORT_FILTER_LABELS.filter(f => f !== 'All') as SportFilter[];
+
+const TIME_OF_DAY_OPTS: { key: TimeOfDay; label: string }[] = [
+  { key: 'any',       label: 'Any time' },
+  { key: 'morning',   label: 'Morning' },
+  { key: 'afternoon', label: 'Afternoon' },
+  { key: 'evening',   label: 'Evening' },
+];
+
+function SortArrow({ col, sortBy, sortDir }: { col: SortCol; sortBy: SortCol; sortDir: SortDir }) {
+  if (sortBy !== col) return <span className="text-gray-700 ml-0.5">↕</span>;
+  return <span className="text-orange-400 ml-0.5">{sortDir === 'ASC' ? '↑' : '↓'}</span>;
+}
 
 export default function ActivitiesList() {
   const searchParams = useSearchParams();
 
-  // Initialise from URL params (set when navigating from dashboard tiles)
-  const [selected, setSelected] = useState<Set<SportFilter>>(() => {
+  // Initialise type filters from URL params (set when navigating from dashboard tiles)
+  const [selected, setSelected] = useState<SportFilter[]>(() => {
     const f = searchParams.get('filters');
-    if (!f || f === 'All') return new Set();
-    return new Set(f.split(',').filter(Boolean) as SportFilter[]);
+    if (!f || f === 'All') return [];
+    return f.split(',').filter(Boolean) as SportFilter[];
   });
-  const [from] = useState<string | null>(() => searchParams.get('from'));
-  const [activities, setActivities] = useState<Activity[]>([]);
-  const [page, setPage] = useState(1);
+
+  // Date filter — seed from URL if present (dashboard tile navigation)
+  const [dateFrom, setDateFrom] = useState<string>(() => searchParams.get('from') ?? '');
+  const [dateTo,   setDateTo]   = useState<string>('');
+
+  // Duration filters
+  const [minMins, setMinMins] = useState('');
+  const [maxMins, setMaxMins] = useState('');
+
+  // Time of day
+  const [timeOfDay, setTimeOfDay] = useState<TimeOfDay>('any');
+
+  // Sort
+  const [sortBy,  setSortBy]  = useState<SortCol>('start_date');
+  const [sortDir, setSortDir] = useState<SortDir>('DESC');
+
+  // Pagination
+  const [page, setPage]   = useState(1);
   const [pages, setPages] = useState(1);
   const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
 
-  function toggleFilter(f: SportFilter) {
-    setSelected(prev => {
-      const next = new Set(prev);
-      if (next.has(f)) {
-        next.delete(f);
-      } else {
-        next.add(f);
-      }
-      return next;
-    });
+  // Data
+  const [activities, setActivities] = useState<Activity[]>([]);
+  const [loading,    setLoading]    = useState(true);
+
+  // Filter panel visibility
+  const [showFilters, setShowFilters] = useState(false);
+
+  function toggleType(f: SportFilter) {
+    setSelected(prev => prev.includes(f) ? prev.filter(x => x !== f) : [...prev, f]);
     setPage(1);
   }
 
-  function clearFilters() {
-    setSelected(new Set());
+  function clearAll() {
+    setSelected([]);
+    setDateFrom('');
+    setDateTo('');
+    setMinMins('');
+    setMaxMins('');
+    setTimeOfDay('any');
     setPage(1);
   }
+
+  function handleSort(col: SortCol) {
+    if (sortBy === col) {
+      setSortDir(d => d === 'DESC' ? 'ASC' : 'DESC');
+    } else {
+      setSortBy(col);
+      setSortDir('DESC');
+    }
+    setPage(1);
+  }
+
+  const hasActiveFilters = selected.length > 0 || dateFrom || dateTo || minMins || maxMins || timeOfDay !== 'any';
 
   useEffect(() => {
     setLoading(true);
-    const filtersParam = selected.size > 0 ? [...selected].join(',') : 'All';
-    const fromParam = from ? `&from=${from}` : '';
-    fetch(`/api/activities?filters=${filtersParam}&page=${page}${fromParam}`)
-      .then((r) => r.json())
-      .then((d) => {
-        setActivities(d.activities);
-        setPages(d.pages);
-        setTotal(d.total);
+    const filtersParam = selected.length > 0 ? selected.join(',') : 'All';
+    const params = new URLSearchParams({
+      filters: filtersParam,
+      page:    String(page),
+      sortBy,
+      sortDir,
+    });
+    if (dateFrom)        params.set('from',      dateFrom);
+    if (dateTo)          params.set('dateTo',    dateTo);
+    if (minMins)         params.set('minMins',   minMins);
+    if (maxMins)         params.set('maxMins',   maxMins);
+    if (timeOfDay !== 'any') params.set('timeOfDay', timeOfDay);
+
+    fetch(`/api/activities?${params}`)
+      .then(r => r.json())
+      .then(d => {
+        setActivities(d.activities ?? []);
+        setPages(d.pages ?? 1);
+        setTotal(d.total ?? 0);
         setLoading(false);
       })
       .catch(() => setLoading(false));
-  }, [selected, page]);
+  }, [selected, page, sortBy, sortDir, dateFrom, dateTo, minMins, maxMins, timeOfDay]);
 
   return (
     <div className="h-full flex flex-col">
-      {/* Header */}
-      <div className="border-b border-gray-800 px-4 py-3 flex items-center gap-3 flex-wrap flex-shrink-0">
-        <div className="flex gap-2 flex-wrap">
-          {TYPE_FILTERS.map((f) => (
-            <button
-              key={f}
-              onClick={() => toggleFilter(f)}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                selected.has(f)
-                  ? 'bg-orange-500 text-white'
-                  : 'bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700'
-              }`}
-            >
-              {f}
-            </button>
-          ))}
-          {selected.size > 0 && (
-            <button
-              onClick={clearFilters}
-              className="px-3 py-1.5 rounded-lg text-sm font-medium text-gray-500 hover:text-white transition-colors"
-            >
-              Clear
-            </button>
+
+      {/* Top bar: type filters + filter toggle */}
+      <div className="border-b border-gray-800 px-4 py-3 flex-shrink-0 space-y-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Type chips */}
+          <div className="flex gap-2 flex-wrap flex-1">
+            {TYPE_FILTERS.map(f => (
+              <button
+                key={f}
+                onClick={() => toggleType(f)}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  selected.includes(f)
+                    ? 'bg-orange-500 text-white'
+                    : 'bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700'
+                }`}
+              >
+                {f}
+              </button>
+            ))}
+          </div>
+
+          {/* Filter toggle button */}
+          <button
+            onClick={() => setShowFilters(v => !v)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex-shrink-0 ${
+              showFilters || hasActiveFilters
+                ? 'bg-orange-500/20 text-orange-400 border border-orange-500/50'
+                : 'bg-gray-800 text-gray-400 hover:text-white'
+            }`}
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 4h18M6 8h12M9 12h6M11 16h2" />
+            </svg>
+            Filters{hasActiveFilters ? ' ●' : ''}
+          </button>
+
+          {/* Total count */}
+          {!loading && (
+            <span className="text-sm text-gray-500 flex-shrink-0">{total.toLocaleString()}</span>
           )}
         </div>
-        {!loading && (
-          <span className="text-sm text-gray-500 ml-auto">{total.toLocaleString()} activities</span>
+
+        {/* Expanded filter panel */}
+        {showFilters && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+            {/* Date range */}
+            <div className="space-y-1">
+              <p className="text-xs text-gray-500 uppercase tracking-wider">Date range</p>
+              <div className="flex gap-2">
+                <input
+                  type="date"
+                  value={dateFrom}
+                  onChange={e => { setDateFrom(e.target.value); setPage(1); }}
+                  className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-2 py-1.5 text-sm text-gray-300 focus:outline-none focus:border-orange-500"
+                  placeholder="From"
+                />
+                <input
+                  type="date"
+                  value={dateTo}
+                  onChange={e => { setDateTo(e.target.value); setPage(1); }}
+                  className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-2 py-1.5 text-sm text-gray-300 focus:outline-none focus:border-orange-500"
+                  placeholder="To"
+                />
+              </div>
+            </div>
+
+            {/* Duration */}
+            <div className="space-y-1">
+              <p className="text-xs text-gray-500 uppercase tracking-wider">Duration (minutes)</p>
+              <div className="flex gap-2 items-center">
+                <input
+                  type="number"
+                  value={minMins}
+                  onChange={e => { setMinMins(e.target.value); setPage(1); }}
+                  className="w-20 bg-gray-800 border border-gray-700 rounded-lg px-2 py-1.5 text-sm text-gray-300 focus:outline-none focus:border-orange-500"
+                  placeholder="Min"
+                  min="0"
+                />
+                <span className="text-gray-600">–</span>
+                <input
+                  type="number"
+                  value={maxMins}
+                  onChange={e => { setMaxMins(e.target.value); setPage(1); }}
+                  className="w-20 bg-gray-800 border border-gray-700 rounded-lg px-2 py-1.5 text-sm text-gray-300 focus:outline-none focus:border-orange-500"
+                  placeholder="Max"
+                  min="0"
+                />
+              </div>
+            </div>
+
+            {/* Time of day */}
+            <div className="space-y-1 sm:col-span-2">
+              <p className="text-xs text-gray-500 uppercase tracking-wider">Time of day</p>
+              <div className="flex gap-2 flex-wrap">
+                {TIME_OF_DAY_OPTS.map(opt => (
+                  <button
+                    key={opt.key}
+                    onClick={() => { setTimeOfDay(opt.key); setPage(1); }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                      timeOfDay === opt.key
+                        ? 'bg-orange-500 text-white'
+                        : 'bg-gray-800 text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Clear all */}
+            {hasActiveFilters && (
+              <div className="sm:col-span-2">
+                <button
+                  onClick={clearAll}
+                  className="text-xs text-gray-500 hover:text-white transition-colors"
+                >
+                  Clear all filters
+                </button>
+              </div>
+            )}
+          </div>
         )}
       </div>
 
@@ -115,13 +266,38 @@ export default function ActivitiesList() {
         <table className="w-full text-sm">
           <thead className="sticky top-0 bg-gray-900 border-b border-gray-800">
             <tr>
-              <th className="text-left px-4 py-3 text-gray-400 font-medium">Date</th>
+              <th
+                className="text-left px-4 py-3 text-gray-400 font-medium cursor-pointer hover:text-white select-none whitespace-nowrap"
+                onClick={() => handleSort('start_date')}
+              >
+                Date <SortArrow col="start_date" sortBy={sortBy} sortDir={sortDir} />
+              </th>
               <th className="text-left px-4 py-3 text-gray-400 font-medium hidden sm:table-cell">Type</th>
               <th className="text-left px-4 py-3 text-gray-400 font-medium">Name</th>
-              <th className="text-right px-4 py-3 text-gray-400 font-medium">Dist</th>
-              <th className="text-right px-4 py-3 text-gray-400 font-medium">Time</th>
-              <th className="text-right px-4 py-3 text-gray-400 font-medium hidden md:table-cell">Avg W</th>
-              <th className="text-right px-4 py-3 text-gray-400 font-medium hidden md:table-cell">Avg HR</th>
+              <th
+                className="text-right px-4 py-3 text-gray-400 font-medium cursor-pointer hover:text-white select-none whitespace-nowrap"
+                onClick={() => handleSort('distance')}
+              >
+                Dist <SortArrow col="distance" sortBy={sortBy} sortDir={sortDir} />
+              </th>
+              <th
+                className="text-right px-4 py-3 text-gray-400 font-medium cursor-pointer hover:text-white select-none whitespace-nowrap"
+                onClick={() => handleSort('moving_time')}
+              >
+                Time <SortArrow col="moving_time" sortBy={sortBy} sortDir={sortDir} />
+              </th>
+              <th
+                className="text-right px-4 py-3 text-gray-400 font-medium cursor-pointer hover:text-white select-none whitespace-nowrap hidden md:table-cell"
+                onClick={() => handleSort('average_watts')}
+              >
+                Avg W <SortArrow col="average_watts" sortBy={sortBy} sortDir={sortDir} />
+              </th>
+              <th
+                className="text-right px-4 py-3 text-gray-400 font-medium cursor-pointer hover:text-white select-none whitespace-nowrap hidden md:table-cell"
+                onClick={() => handleSort('average_heartrate')}
+              >
+                Avg HR <SortArrow col="average_heartrate" sortBy={sortBy} sortDir={sortDir} />
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -135,7 +311,7 @@ export default function ActivitiesList() {
                     ))}
                   </tr>
                 ))
-              : activities.map((a) => {
+              : activities.map(a => {
                   const date = new Date(a.start_date);
                   const color = sportColor(a.sport_type);
                   return (
@@ -174,13 +350,19 @@ export default function ActivitiesList() {
                 })}
           </tbody>
         </table>
+
+        {!loading && activities.length === 0 && (
+          <div className="flex items-center justify-center h-32 text-gray-500 text-sm">
+            No activities match your filters
+          </div>
+        )}
       </div>
 
       {/* Pagination */}
       {pages > 1 && (
         <div className="border-t border-gray-800 px-4 py-3 flex items-center justify-between flex-shrink-0">
           <button
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            onClick={() => setPage(p => Math.max(1, p - 1))}
             disabled={page === 1}
             className="px-3 py-1.5 rounded-lg text-sm bg-gray-800 text-gray-400 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
           >
@@ -188,7 +370,7 @@ export default function ActivitiesList() {
           </button>
           <span className="text-sm text-gray-500">Page {page} of {pages}</span>
           <button
-            onClick={() => setPage((p) => Math.min(pages, p + 1))}
+            onClick={() => setPage(p => Math.min(pages, p + 1))}
             disabled={page === pages}
             className="px-3 py-1.5 rounded-lg text-sm bg-gray-800 text-gray-400 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
           >

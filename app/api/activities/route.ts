@@ -2,12 +2,32 @@ import pool from '@/lib/db';
 import { SPORT_FILTERS, CYCLING_TYPES, SportFilter } from '@/lib/sport-types';
 import { NextRequest } from 'next/server';
 
+export const runtime = 'nodejs';
+
+// Whitelist of sortable columns → SQL expression
+const SORT_COLS: Record<string, string> = {
+  start_date:       'start_date',
+  distance:         'distance',
+  moving_time:      'moving_time',
+  average_watts:    'average_watts',
+  average_heartrate:'average_heartrate',
+  tss:              'tss',
+};
+
 export async function GET(req: NextRequest) {
-  const filtersParam = req.nextUrl.searchParams.get('filters') ?? req.nextUrl.searchParams.get('filter') ?? 'All';
-  const from = req.nextUrl.searchParams.get('from'); // ISO date e.g. 2026-04-14
-  const page = parseInt(req.nextUrl.searchParams.get('page') ?? '1', 10);
-  const limit = 30;
-  const offset = (page - 1) * limit;
+  const sp = req.nextUrl.searchParams;
+
+  const filtersParam  = sp.get('filters') ?? sp.get('filter') ?? 'All';
+  const from          = sp.get('from');       // ISO date
+  const dateTo        = sp.get('dateTo');     // ISO date
+  const minMins       = parseInt(sp.get('minMins') ?? '0', 10);
+  const maxMins       = parseInt(sp.get('maxMins') ?? '0', 10);
+  const timeOfDay     = sp.get('timeOfDay') ?? 'any'; // morning|afternoon|evening|any
+  const sortBy        = SORT_COLS[sp.get('sortBy') ?? ''] ?? 'start_date';
+  const sortDir       = sp.get('sortDir') === 'asc' ? 'ASC' : 'DESC';
+  const page          = Math.max(1, parseInt(sp.get('page') ?? '1', 10));
+  const limit         = 30;
+  const offset        = (page - 1) * limit;
 
   const selectedLabels = filtersParam.split(',').map(s => s.trim()) as SportFilter[];
   const types: string[] = [];
@@ -18,35 +38,41 @@ export async function GET(req: NextRequest) {
 
   const client = await pool.connect();
   try {
-    let activities, count;
-    const hasTypes = types.length > 0;
-    const hasFrom = !!from;
-
-    // Build WHERE conditions — always restrict to cycling types
     const conditions: string[] = [];
-    const queryParams: (string | number | string[])[] = [];
+    const queryParams: unknown[] = [];
     let p = 1;
 
-    const activeSportTypes = hasTypes ? types : CYCLING_TYPES;
+    // Always cycling only
     conditions.push(`sport_type = ANY($${p++}::text[])`);
-    queryParams.push(activeSportTypes);
-    if (hasFrom) { conditions.push(`start_date >= $${p++}`); queryParams.push(from); }
+    queryParams.push(types.length > 0 ? types : CYCLING_TYPES);
 
-    const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+    // Date filters
+    if (from)    { conditions.push(`(start_date AT TIME ZONE 'Australia/Sydney')::date >= $${p++}`); queryParams.push(from); }
+    if (dateTo)  { conditions.push(`(start_date AT TIME ZONE 'Australia/Sydney')::date <= $${p++}`); queryParams.push(dateTo); }
 
-    activities = await client.query(
-      `SELECT id, name, sport_type, start_date, distance, moving_time,
-              average_watts, normalized_power, average_heartrate, tss,
-              total_elevation_gain, trainer
-       FROM activities ${where}
-       ORDER BY start_date DESC
-       LIMIT $${p++} OFFSET $${p++}`,
-      [...queryParams, limit, offset]
-    );
-    count = await client.query(
-      `SELECT COUNT(*) AS total FROM activities ${where}`,
-      queryParams
-    );
+    // Duration filters (in minutes → seconds)
+    if (minMins > 0) { conditions.push(`moving_time >= $${p++}`); queryParams.push(minMins * 60); }
+    if (maxMins > 0) { conditions.push(`moving_time <= $${p++}`); queryParams.push(maxMins * 60); }
+
+    // Time of day (Sydney local hour)
+    if (timeOfDay === 'morning')   { conditions.push(`EXTRACT(HOUR FROM start_date AT TIME ZONE 'Australia/Sydney') >= 5  AND EXTRACT(HOUR FROM start_date AT TIME ZONE 'Australia/Sydney') < 12`); }
+    if (timeOfDay === 'afternoon') { conditions.push(`EXTRACT(HOUR FROM start_date AT TIME ZONE 'Australia/Sydney') >= 12 AND EXTRACT(HOUR FROM start_date AT TIME ZONE 'Australia/Sydney') < 17`); }
+    if (timeOfDay === 'evening')   { conditions.push(`EXTRACT(HOUR FROM start_date AT TIME ZONE 'Australia/Sydney') >= 17`); }
+
+    const where = `WHERE ${conditions.join(' AND ')}`;
+
+    const [activities, count] = await Promise.all([
+      client.query(
+        `SELECT id, name, sport_type, start_date, distance, moving_time,
+                average_watts, normalized_power, average_heartrate, tss,
+                total_elevation_gain, trainer
+         FROM activities ${where}
+         ORDER BY ${sortBy} ${sortDir} NULLS LAST
+         LIMIT $${p++} OFFSET $${p++}`,
+        [...queryParams, limit, offset]
+      ),
+      client.query(`SELECT COUNT(*) AS total FROM activities ${where}`, queryParams),
+    ]);
 
     return Response.json({
       activities: activities.rows,
