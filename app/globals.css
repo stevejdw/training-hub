@@ -46,10 +46,12 @@ body {
 
 @media (max-width: 767px) {
   .content-area {
-    /* On mobile: full height minus bottom nav and home indicator */
-    height: calc(100dvh - var(--bottom-nav-h) - var(--sab));
+    /* flex: none prevents flex-1 from overriding the explicit height */
+    flex: none;
+    /* On mobile: full height minus bottom nav + home indicator */
+    height: calc(100dvh - 56px - env(safe-area-inset-bottom, 0px));
     /* Top: leave room for status bar in standalone mode */
-    padding-top: var(--sat);
+    padding-top: env(safe-area-inset-top, 0px);
   }
 }
 
