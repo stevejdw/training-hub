@@ -1,13 +1,13 @@
 import os
 import requests
-from datetime import datetime
-from supabase import create_client
+from datetime import datetime, timezone
+import psycopg2
+from psycopg2.extras import execute_values
 
 STRAVA_CLIENT_ID = os.environ["STRAVA_CLIENT_ID"]
 STRAVA_CLIENT_SECRET = os.environ["STRAVA_CLIENT_SECRET"]
 STRAVA_REFRESH_TOKEN = os.environ["STRAVA_REFRESH_TOKEN"]
-SUPABASE_URL = os.environ["SUPABASE_URL"]
-SUPABASE_SERVICE_KEY = os.environ["SUPABASE_SERVICE_KEY"]
+DATABASE_URL = os.environ["DATABASE_URL"]
 
 FTP = 340
 
@@ -37,17 +37,14 @@ def fetch_activities(token, page=1):
 
 def sync():
     token = get_access_token()
-    supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+    conn = psycopg2.connect(DATABASE_URL)
+    cur = conn.cursor()
 
-    result = supabase.table("activities")\
-        .select("start_date")\
-        .order("start_date", desc=True)\
-        .limit(1)\
-        .execute()
+    cur.execute("SELECT start_date FROM activities ORDER BY start_date DESC LIMIT 1")
+    row = cur.fetchone()
+    last_date = row[0] if row else None
 
-    last_date = None
-    if result.data:
-        last_date = datetime.fromisoformat(result.data[0]["start_date"].replace("Z", "+00:00"))
+    if last_date:
         print(f"Syncing activities after {last_date}")
     else:
         print("Full sync - no existing data")
@@ -75,31 +72,45 @@ def sync():
             tss = calculate_tss(moving, npower, FTP)
             if_val = round(npower / FTP, 3) if npower and FTP else None
 
-            rows.append({
-                "id": a["id"],
-                "name": a["name"],
-                "sport_type": a.get("sport_type", a.get("type")),
-                "start_date": a["start_date"],
-                "elapsed_time": a.get("elapsed_time"),
-                "moving_time": moving,
-                "distance": a.get("distance"),
-                "total_elevation_gain": a.get("total_elevation_gain"),
-                "average_watts": a.get("average_watts"),
-                "weighted_average_watts": npower,
-                "max_watts": a.get("max_watts"),
-                "kilojoules": a.get("kilojoules"),
-                "average_heartrate": a.get("average_heartrate"),
-                "max_heartrate": a.get("max_heartrate"),
-                "suffer_score": a.get("suffer_score"),
-                "trainer": a.get("trainer", False),
-                "average_speed": a.get("average_speed"),
-                "tss": tss,
-                "intensity_factor": if_val,
-                "normalized_power": npower,
-            })
+            rows.append((
+                a["id"],
+                a["name"],
+                a.get("sport_type", a.get("type")),
+                a["start_date"],
+                a.get("elapsed_time"),
+                moving,
+                a.get("distance"),
+                a.get("total_elevation_gain"),
+                a.get("average_watts"),
+                npower,
+                a.get("max_watts"),
+                a.get("kilojoules"),
+                a.get("average_heartrate"),
+                a.get("max_heartrate"),
+                a.get("suffer_score"),
+                a.get("trainer", False),
+                a.get("average_speed"),
+                tss,
+                if_val,
+                npower,
+            ))
 
         if rows:
-            supabase.table("activities").upsert(rows).execute()
+            execute_values(cur, """
+                INSERT INTO activities (
+                    id, name, sport_type, start_date, elapsed_time,
+                    moving_time, distance, total_elevation_gain,
+                    average_watts, weighted_average_watts, max_watts,
+                    kilojoules, average_heartrate, max_heartrate,
+                    suffer_score, trainer, average_speed,
+                    tss, intensity_factor, normalized_power
+                ) VALUES %s
+                ON CONFLICT (id) DO UPDATE SET
+                    name = EXCLUDED.name,
+                    tss = EXCLUDED.tss,
+                    updated_at = now()
+            """, rows)
+            conn.commit()
             synced += len(rows)
             print(f"Synced {len(rows)} activities (page {page})")
 
@@ -108,6 +119,8 @@ def sync():
 
         page += 1
 
+    cur.close()
+    conn.close()
     print(f"Done. Total synced: {synced}")
 
 if __name__ == "__main__":
