@@ -140,20 +140,7 @@ export default function ActivityDetail({ id }: { id: string }) {
           {activity.intensity_factor && <Stat label="IF" value={activity.intensity_factor.toFixed(2)} />}
           {activity.max_watts && <Stat label="Peak Power" value={`${Math.round(activity.max_watts)}W`} />}
           {activity.kilojoules && <Stat label="Energy" value={`${Math.round(activity.kilojoules)} kJ`} />}
-          {activity.suffer_score && <Stat label="Suffer Score" value={activity.suffer_score} />}
         </div>
-
-        {/* Map */}
-        {activity.summary_polyline ? (
-          <div>
-            <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Route</h3>
-            <ActivityMap polyline={activity.summary_polyline} />
-          </div>
-        ) : (
-          <div className="bg-gray-800/50 border border-gray-700 border-dashed rounded-xl p-5 text-center">
-            <p className="text-gray-500 text-sm">Map unavailable — activity predates polyline sync</p>
-          </div>
-        )}
 
         {/* Laps */}
         {laps.length > 0 ? (
@@ -169,6 +156,7 @@ export default function ActivityDetail({ id }: { id: string }) {
                     <th className="text-right px-4 py-3 text-gray-400 font-medium">Distance</th>
                     <th className="text-right px-4 py-3 text-gray-400 font-medium">Time</th>
                     <th className="text-right px-4 py-3 text-gray-400 font-medium hidden sm:table-cell">Avg W</th>
+                    <th className="text-right px-4 py-3 text-gray-400 font-medium hidden sm:table-cell">NP</th>
                     <th className="text-right px-4 py-3 text-gray-400 font-medium hidden sm:table-cell">Avg HR</th>
                     <th className="text-right px-4 py-3 text-gray-400 font-medium hidden sm:table-cell">Max HR</th>
                   </tr>
@@ -185,6 +173,9 @@ export default function ActivityDetail({ id }: { id: string }) {
                         {lap.average_watts ? `${Math.round(lap.average_watts)}W` : '—'}
                       </td>
                       <td className="px-4 py-2.5 text-right text-gray-300 hidden sm:table-cell">
+                        {lap.normalized_power ? `${Math.round(lap.normalized_power)}W` : '—'}
+                      </td>
+                      <td className="px-4 py-2.5 text-right text-gray-300 hidden sm:table-cell">
                         {lap.average_heartrate ? Math.round(lap.average_heartrate) : '—'}
                       </td>
                       <td className="px-4 py-2.5 text-right text-gray-300 hidden sm:table-cell">
@@ -199,6 +190,18 @@ export default function ActivityDetail({ id }: { id: string }) {
         ) : (
           <div className="bg-gray-800/50 border border-gray-700 border-dashed rounded-xl p-5 text-center">
             <p className="text-gray-500 text-sm">Lap data unavailable — activity predates lap sync</p>
+          </div>
+        )}
+
+        {/* Map */}
+        {activity.summary_polyline ? (
+          <div>
+            <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Route</h3>
+            <ActivityMap polyline={activity.summary_polyline} />
+          </div>
+        ) : (
+          <div className="bg-gray-800/50 border border-gray-700 border-dashed rounded-xl p-5 text-center">
+            <p className="text-gray-500 text-sm">Map unavailable — activity predates polyline sync</p>
           </div>
         )}
       </div>
