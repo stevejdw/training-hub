@@ -18,13 +18,7 @@ interface DashboardData {
   ytd: PeriodStats;
 }
 
-const TARGET_EVENT = new Date('2026-05-02');
-const PEAKS_2027 = new Date('2027-03-01');
 const TYPE_FILTERS = SPORT_FILTER_LABELS.filter(f => f !== 'All') as SportFilter[];
-
-function daysUntil(date: Date): number {
-  return Math.ceil((date.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-}
 
 // Reliable Sydney-aware date for period start
 function periodStart(period: 'wtd' | 'mtd' | 'ytd'): string {
@@ -105,20 +99,6 @@ export default function DashboardHome() {
   return (
     <div className="h-[calc(100vh-64px)] overflow-y-auto">
       <div className="max-w-5xl mx-auto px-4 py-6 space-y-8">
-
-        {/* Event countdowns */}
-        <div className="grid grid-cols-2 gap-3">
-          <div className="bg-orange-500/10 border border-orange-500/30 rounded-xl p-4">
-            <div className="text-xs text-orange-400 uppercase tracking-wider mb-1">Target Event</div>
-            <div className="text-2xl font-bold text-orange-400">{daysUntil(TARGET_EVENT)}d</div>
-            <div className="text-xs text-gray-400 mt-0.5">May 2 2026</div>
-          </div>
-          <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-4">
-            <div className="text-xs text-gray-400 uppercase tracking-wider mb-1">Peaks Challenge 2027</div>
-            <div className="text-2xl font-bold text-gray-300">{daysUntil(PEAKS_2027)}d</div>
-            <div className="text-xs text-gray-500 mt-0.5">Target: sub 8:30</div>
-          </div>
-        </div>
 
         {/* Multi-select filters */}
         <div className="flex gap-2 flex-wrap items-center">
