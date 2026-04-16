@@ -12,14 +12,12 @@ export async function GET(req: NextRequest) {
 
   const client = await pool.connect();
   try {
-    // eslint-disable-next-line no-console
-    console.log('Dashboard API: filter=', filter, 'types=', types);
     // MTD
     const mtd = await client.query(`
       SELECT
         COUNT(*) AS activities,
-        ROUND(SUM(distance)/1000.0, 1) AS km,
-        ROUND(SUM(moving_time)/3600.0, 1) AS hours,
+        ROUND(SUM(distance)::numeric / 1000.0, 1) AS km,
+        ROUND(SUM(moving_time)::numeric / 3600.0, 1) AS hours,
         ROUND(SUM(COALESCE(tss,0))::numeric, 0) AS tss
       FROM activities
       WHERE date_trunc('month', start_date AT TIME ZONE 'Australia/Sydney')
@@ -31,8 +29,8 @@ export async function GET(req: NextRequest) {
     const wtd = await client.query(`
       SELECT
         COUNT(*) AS activities,
-        ROUND(SUM(distance)/1000.0, 1) AS km,
-        ROUND(SUM(moving_time)/3600.0, 1) AS hours,
+        ROUND(SUM(distance)::numeric / 1000.0, 1) AS km,
+        ROUND(SUM(moving_time)::numeric / 3600.0, 1) AS hours,
         ROUND(SUM(COALESCE(tss,0))::numeric, 0) AS tss
       FROM activities
       WHERE date_trunc('week', start_date AT TIME ZONE 'Australia/Sydney')
@@ -44,8 +42,8 @@ export async function GET(req: NextRequest) {
     const ytd = await client.query(`
       SELECT
         COUNT(*) AS activities,
-        ROUND(SUM(distance)/1000.0, 1) AS km,
-        ROUND(SUM(moving_time)/3600.0, 1) AS hours,
+        ROUND(SUM(distance)::numeric / 1000.0, 1) AS km,
+        ROUND(SUM(moving_time)::numeric / 3600.0, 1) AS hours,
         ROUND(SUM(COALESCE(tss,0))::numeric, 0) AS tss,
         ROUND(SUM(total_elevation_gain)::numeric, 0) AS elevation
       FROM activities
@@ -55,7 +53,6 @@ export async function GET(req: NextRequest) {
     `, params);
 
     // Power curve (best efforts approximation from activity-level data)
-    // Uses activities grouped by duration to find best power at each duration
     const powercurve = await client.query(`
       SELECT
         CASE
@@ -76,7 +73,7 @@ export async function GET(req: NextRequest) {
       ORDER BY MIN(moving_time)
     `);
 
-    // Also get absolute max power (1s peak)
+    // Absolute max power (1s peak)
     const maxPower = await client.query(`
       SELECT MAX(max_watts) AS peak
       FROM activities
@@ -85,7 +82,7 @@ export async function GET(req: NextRequest) {
 
     // eFTP: best NP from activities 18-25 min long × 0.95
     const eftp = await client.query(`
-      SELECT ROUND(MAX(COALESCE(normalized_power, weighted_average_watts)) * 0.95) AS eftp
+      SELECT ROUND((MAX(COALESCE(normalized_power, weighted_average_watts)) * 0.95)::numeric) AS eftp
       FROM activities
       WHERE moving_time BETWEEN 1080 AND 1500
         AND sport_type IN ('Ride','GravelRide','EMountainBikeRide','MountainBikeRide')
