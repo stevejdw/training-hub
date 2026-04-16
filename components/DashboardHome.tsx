@@ -61,6 +61,7 @@ export default function DashboardHome() {
   const [selected, setSelected] = useState<SportFilter[]>([]);
   const [data, setData]       = useState<ChartResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError]     = useState<string | null>(null);
 
   // Reset offset when period changes
   function changePeriod(p: Period) { setPeriod(p); setOffset(0); }
@@ -73,10 +74,15 @@ export default function DashboardHome() {
 
   const load = useCallback(() => {
     setLoading(true);
+    setError(null);
     fetch(`/api/dashboard/chart?period=${period}&offset=${offset}&filters=${encodeURIComponent(filtersParam)}`)
       .then(r => r.json())
-      .then(d => { setData(d); setLoading(false); })
-      .catch(() => setLoading(false));
+      .then(d => {
+        if (d.error) { setError(d.error); setData(null); }
+        else setData(d);
+        setLoading(false);
+      })
+      .catch(e => { setError(String(e)); setLoading(false); });
   }, [period, offset, filtersParam]);
 
   useEffect(() => { load(); }, [load]);
@@ -189,7 +195,11 @@ export default function DashboardHome() {
 
         {/* Bar chart */}
         <div className="bg-gray-800/60 rounded-xl p-3">
-          {loading && !data ? (
+          {error ? (
+            <div className="h-48 flex items-center justify-center">
+              <p className="text-red-400 text-xs text-center px-4">{error}</p>
+            </div>
+          ) : loading && !data ? (
             <div className="h-48 animate-pulse bg-gray-800 rounded-lg" />
           ) : (
             <ResponsiveContainer width="100%" height={200}>
