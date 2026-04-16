@@ -1,4 +1,4 @@
-name: Sync Strava to Supabase
+name: Sync Strava to Neon
 
 on:
   schedule:
@@ -17,13 +17,12 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: pip install requests supabase
+        run: pip install requests psycopg2-binary
 
       - name: Run sync
         env:
           STRAVA_CLIENT_ID: ${{ secrets.STRAVA_CLIENT_ID }}
           STRAVA_CLIENT_SECRET: ${{ secrets.STRAVA_CLIENT_SECRET }}
           STRAVA_REFRESH_TOKEN: ${{ secrets.STRAVA_REFRESH_TOKEN }}
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: python .github/scripts/sync_strava.py
