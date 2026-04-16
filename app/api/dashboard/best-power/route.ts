@@ -42,6 +42,7 @@ export async function GET(req: NextRequest) {
       ) bp ON bp.best_watts IS NOT NULL
       WHERE a.average_watts IS NOT NULL
         AND a.sport_type = ANY($2::text[])
+        AND array_length(s.watts, 1) >= $1::int
         ${dateClause}
       ORDER BY bp.best_watts DESC
       LIMIT 10
