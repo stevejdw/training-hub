@@ -21,7 +21,7 @@ const MAX_STORED = 50;
 const DEFAULT_QUESTIONS = [
   {
     label: 'Provide feedback on the last ride',
-    prompt: 'Provide feedback on the last ride. Include an analysis of key laps or efforts, correlation between heart rate and power, any observations on changes to fitness, and feedback on the session vs training plan.',
+    prompt: 'Provide detailed feedback on the last ride. Work through each lap individually using the lap data — reference the actual watts and HR for each lap, identify which laps were hard efforts vs recovery, comment on pacing strategy, and note any HR/power decoupling across the ride. Then give overall observations on how this session fits the training plan and any changes to fitness.',
   },
 ];
 
