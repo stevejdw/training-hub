@@ -27,6 +27,19 @@ def calculate_tss(moving_time, weighted_watts, ftp):
     tss = (moving_time * weighted_watts * intensity_factor) / (ftp * 3600) * 100
     return round(tss, 1)
 
+def calculate_np(power_values):
+    """Calculate Normalized Power from a list of per-second watts."""
+    clean = [p if p is not None else 0 for p in power_values]
+    if len(clean) < 30:
+        return None
+    window = 30
+    rolling = [
+        sum(clean[i:i+window]) / window
+        for i in range(len(clean) - window + 1)
+    ]
+    np_val = (sum(x**4 for x in rolling) / len(rolling)) ** 0.25
+    return round(np_val, 1)
+
 def fetch_activities(token, page=1):
     r = requests.get(
         "https://www.strava.com/api/v3/athlete/activities",
@@ -34,6 +47,17 @@ def fetch_activities(token, page=1):
         params={"per_page": 200, "page": page}
     )
     return r.json()
+
+def fetch_power_stream(token, activity_id):
+    r = requests.get(
+        f"https://www.strava.com/api/v3/activities/{activity_id}/streams",
+        headers={"Authorization": f"Bearer {token}"},
+        params={"keys": "watts", "key_by_type": "true"}
+    )
+    if r.status_code != 200:
+        return None
+    data = r.json()
+    return data.get("watts", {}).get("data")
 
 def fetch_laps(token, activity_id):
     r = requests.get(
@@ -82,27 +106,16 @@ def sync():
             polyline = a.get("map", {}).get("summary_polyline")
 
             rows.append((
-                a["id"],
-                a["name"],
+                a["id"], a["name"],
                 a.get("sport_type", a.get("type")),
                 a["start_date"],
-                a.get("elapsed_time"),
-                moving,
-                a.get("distance"),
-                a.get("total_elevation_gain"),
-                a.get("average_watts"),
-                npower,
-                a.get("max_watts"),
-                a.get("kilojoules"),
-                a.get("average_heartrate"),
-                a.get("max_heartrate"),
-                a.get("suffer_score"),
-                a.get("trainer", False),
-                a.get("average_speed"),
-                tss,
-                if_val,
-                npower,
-                polyline,
+                a.get("elapsed_time"), moving,
+                a.get("distance"), a.get("total_elevation_gain"),
+                a.get("average_watts"), npower, a.get("max_watts"),
+                a.get("kilojoules"), a.get("average_heartrate"),
+                a.get("max_heartrate"), a.get("suffer_score"),
+                a.get("trainer", False), a.get("average_speed"),
+                tss, if_val, npower, polyline,
             ))
             new_activity_ids.append(a["id"])
 
@@ -126,42 +139,50 @@ def sync():
             synced += len(rows)
             print(f"Synced {len(rows)} activities (page {page})")
 
-        # Fetch and store laps for each new activity
+        # Fetch laps + power stream for each new activity
         for activity_id in new_activity_ids:
             laps = fetch_laps(token, activity_id)
             if not laps:
                 continue
-            lap_rows = [(
-                lap["id"],
-                activity_id,
-                lap.get("name"),
-                lap.get("lap_index"),
-                lap.get("elapsed_time"),
-                lap.get("moving_time"),
-                lap.get("distance"),
-                lap.get("average_watts"),
-                lap.get("average_watts"),
-                lap.get("average_heartrate"),
-                lap.get("max_heartrate"),
-                lap.get("average_speed"),
-                lap.get("total_elevation_gain"),
-            ) for lap in laps]
-            execute_values(cur, """
-                INSERT INTO laps (
-                    id, activity_id, name, lap_index,
-                    elapsed_time, moving_time, distance,
-                    average_watts, normalized_power,
-                    average_heartrate, max_heartrate,
-                    average_speed, total_elevation_gain
-                ) VALUES %s
-                ON CONFLICT (id) DO NOTHING
-            """, lap_rows)
-            conn.commit()
-            print(f"  Stored {len(lap_rows)} laps for activity {activity_id}")
+
+            power_stream = fetch_power_stream(token, activity_id)
+
+            lap_rows = []
+            for lap in laps:
+                start_idx = lap.get("start_index")
+                end_idx = lap.get("end_index")
+                np_val = None
+                if power_stream and start_idx is not None and end_idx is not None:
+                    slice_ = power_stream[start_idx:end_idx + 1]
+                    np_val = calculate_np(slice_)
+
+                lap_rows.append((
+                    lap["id"], activity_id,
+                    lap.get("name"), lap.get("lap_index"),
+                    lap.get("elapsed_time"), lap.get("moving_time"),
+                    lap.get("distance"), lap.get("average_watts"), np_val,
+                    lap.get("average_heartrate"), lap.get("max_heartrate"),
+                    lap.get("average_speed"), lap.get("total_elevation_gain"),
+                    start_idx, end_idx,
+                ))
+
+            if lap_rows:
+                execute_values(cur, """
+                    INSERT INTO laps (
+                        id, activity_id, name, lap_index,
+                        elapsed_time, moving_time, distance,
+                        average_watts, normalized_power,
+                        average_heartrate, max_heartrate,
+                        average_speed, total_elevation_gain,
+                        start_index, end_index
+                    ) VALUES %s
+                    ON CONFLICT (id) DO NOTHING
+                """, lap_rows)
+                conn.commit()
+                print(f"  Stored {len(lap_rows)} laps for activity {activity_id}")
 
         if stop or len(activities) < 200:
             break
-
         page += 1
 
     cur.close()
