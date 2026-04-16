@@ -1,5 +1,5 @@
 import pool from '@/lib/db';
-import { SPORT_FILTERS, SportFilter } from '@/lib/sport-types';
+import { SPORT_FILTERS, CYCLING_TYPES, SportFilter } from '@/lib/sport-types';
 import { NextRequest } from 'next/server';
 
 export const runtime = 'nodejs';
@@ -135,8 +135,9 @@ export async function GET(req: NextRequest) {
       period === 'month' ? `CEIL(EXTRACT(DAY FROM start_date AT TIME ZONE 'Australia/Sydney') / 7.0)::int::text` :
                            `TO_CHAR(start_date AT TIME ZONE 'Australia/Sydney', 'YYYY-MM')`;
 
-    const typeClause = hasTypes ? 'AND sport_type = ANY($3::text[])' : '';
-    const params: unknown[] = [startStr, endStr, ...(hasTypes ? [types] : [])];
+    // Always restrict to cycling types; narrow further if a specific filter is active
+    const activeSportTypes = hasTypes ? types : CYCLING_TYPES;
+    const params: unknown[] = [startStr, endStr, activeSportTypes];
 
     const client = await pool.connect();
     try {
@@ -151,7 +152,7 @@ export async function GET(req: NextRequest) {
         FROM activities
         WHERE (start_date AT TIME ZONE 'Australia/Sydney')::date >= $1
           AND (start_date AT TIME ZONE 'Australia/Sydney')::date <  $2
-          ${typeClause}
+          AND sport_type = ANY($3::text[])
         GROUP BY key
         ORDER BY key
       `, params);

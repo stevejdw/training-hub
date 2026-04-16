@@ -95,7 +95,7 @@ export async function POST(req: NextRequest) {
           ROUND(AVG(COALESCE(tss, 0))::numeric, 0)::int AS avg_tss
         FROM activities
         WHERE start_date >= NOW() - INTERVAL '28 days'
-          AND sport_type IN ('Ride', 'VirtualRide', 'GravelRide')
+          AND sport_type = ANY(ARRAY['Ride','VirtualRide','GravelRide','MountainBikeRide','EBikeRide','EMountainBikeRide'])
       `);
       const r = res.rows[0];
       recentSummary = `Last 28d: ${r.total} rides, avg ${r.avg_hours}h, ${r.total_km}km, avg TSS ${r.avg_tss}`;

@@ -1,5 +1,5 @@
 import pool from '@/lib/db';
-import { SPORT_FILTERS, SportFilter } from '@/lib/sport-types';
+import { SPORT_FILTERS, CYCLING_TYPES, SportFilter } from '@/lib/sport-types';
 import { NextRequest } from 'next/server';
 
 export async function GET(req: NextRequest) {
@@ -22,13 +22,15 @@ export async function GET(req: NextRequest) {
     const hasTypes = types.length > 0;
     const hasFrom = !!from;
 
-    // Build WHERE conditions
+    // Build WHERE conditions — always restrict to cycling types
     const conditions: string[] = [];
     const queryParams: (string | number | string[])[] = [];
     let p = 1;
 
-    if (hasTypes) { conditions.push(`sport_type = ANY($${p++}::text[])`); queryParams.push(types); }
-    if (hasFrom)  { conditions.push(`start_date >= $${p++}`); queryParams.push(from); }
+    const activeSportTypes = hasTypes ? types : CYCLING_TYPES;
+    conditions.push(`sport_type = ANY($${p++}::text[])`);
+    queryParams.push(activeSportTypes);
+    if (hasFrom) { conditions.push(`start_date >= $${p++}`); queryParams.push(from); }
 
     const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
