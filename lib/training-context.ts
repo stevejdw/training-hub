@@ -80,7 +80,28 @@ export async function buildTrainingContext(): Promise<string> {
     }));
     const fitness = calculateFitness(dailyTss);
 
-    // 4. Annual totals
+    // 4. Laps for the most recent 10 activities that have lap data
+    const recentIds = recent.slice(0, 20).map(a => a.id);
+    const lapsResult: { rows: Record<string, unknown>[] } = recentIds.length > 0 ? await client.query(`
+      SELECT l.activity_id, l.lap_index, l.name,
+             l.moving_time, l.distance,
+             l.average_watts, l.normalized_power,
+             l.average_heartrate, l.max_heartrate,
+             l.total_elevation_gain
+      FROM laps l
+      WHERE l.activity_id = ANY($1::bigint[])
+      ORDER BY l.activity_id DESC, l.lap_index ASC
+    `, [recentIds]) : { rows: [] };
+
+    // Group laps by activity_id
+    const lapsByActivity = new Map<number, Record<string, unknown>[]>();
+    for (const lap of lapsResult.rows) {
+      const key = Number(lap.activity_id);
+      if (!lapsByActivity.has(key)) lapsByActivity.set(key, []);
+      lapsByActivity.get(key)!.push(lap);
+    }
+
+    // 5. Annual totals
     const annualResult = await client.query(`
       SELECT
         EXTRACT(YEAR FROM start_date) AS year,
@@ -138,6 +159,31 @@ Generated: ${today.toISOString().slice(0, 10)}
         a.trainer ? '[indoor]' : null,
       ].filter(Boolean);
       ctx += `- ${parts.join(' | ')}\n`;
+
+      const laps = lapsByActivity.get(a.id);
+      if (laps && laps.length > 1) {
+        ctx += `  Laps:\n`;
+        for (const lap of laps) {
+          const idx = Number(lap.lap_index);
+          const name = String(lap.name ?? '');
+          const dist = Number(lap.distance ?? 0);
+          const np = lap.normalized_power != null ? Number(lap.normalized_power) : null;
+          const avgW = lap.average_watts != null ? Number(lap.average_watts) : null;
+          const avgHr = lap.average_heartrate != null ? Number(lap.average_heartrate) : null;
+          const maxHr = lap.max_heartrate != null ? Number(lap.max_heartrate) : null;
+          const defaultName = `Lap ${idx + 1}`;
+          const lapParts = [
+            defaultName,
+            name && name !== defaultName ? `"${name}"` : null,
+            formatDuration(Number(lap.moving_time ?? 0)),
+            dist > 0 ? formatDistance(dist) : null,
+            np ? `NP ${Math.round(np)}W` : avgW ? `avg ${Math.round(avgW)}W` : null,
+            avgHr ? `HR ${Math.round(avgHr)}` : null,
+            maxHr ? `maxHR ${Math.round(maxHr)}` : null,
+          ].filter(Boolean);
+          ctx += `    - ${lapParts.join(' | ')}\n`;
+        }
+      }
     }
 
     return ctx;
