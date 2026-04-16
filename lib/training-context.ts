@@ -93,10 +93,10 @@ export async function buildTrainingContext(): Promise<string> {
       ORDER BY l.activity_id DESC, l.lap_index ASC
     `, [recentIds]) : { rows: [] };
 
-    // Group laps by activity_id
-    const lapsByActivity = new Map<number, Record<string, unknown>[]>();
+    // Group laps by activity_id — use string keys to avoid bigint/number mismatch
+    const lapsByActivity = new Map<string, Record<string, unknown>[]>();
     for (const lap of lapsResult.rows) {
-      const key = Number(lap.activity_id);
+      const key = String(lap.activity_id);
       if (!lapsByActivity.has(key)) lapsByActivity.set(key, []);
       lapsByActivity.get(key)!.push(lap);
     }
@@ -160,8 +160,8 @@ Generated: ${today.toISOString().slice(0, 10)}
       ].filter(Boolean);
       ctx += `- ${parts.join(' | ')}\n`;
 
-      const laps = lapsByActivity.get(a.id);
-      if (laps && laps.length > 1) {
+      const laps = lapsByActivity.get(String(a.id));
+      if (laps && laps.length > 0) {
         ctx += `  Laps:\n`;
         for (const lap of laps) {
           const idx = Number(lap.lap_index);
