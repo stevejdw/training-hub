@@ -54,48 +54,19 @@ export async function POST(req: NextRequest) {
     const planStartDate = startOfWeekSydney();
     const planEndDate = addDays(planStartDate, weeks * 7 - 1);
 
-    const systemPrompt = `You are an expert cycling coach creating a structured training plan.
-Athlete profile:
-- FTP: ${ftp}W
-- Weight: ${profile.weight_kg ? profile.weight_kg + 'kg' : 'unknown'}
-- Training goals: ${profile.training_goals || 'General fitness'}
-- Events: ${profile.events.length > 0 ? profile.events.map(e => `${e.name} on ${e.date} (goal: ${e.goal})`).join(', ') : 'None scheduled'}
-- Recent activity: ${recentSummary}
+    const systemPrompt = `You are an expert cycling coach. Output ONLY a JSON object — no markdown, no explanation, no code fences.
+Athlete: FTP=${ftp}W, ${profile.weight_kg ? profile.weight_kg + 'kg' : ''} ${profile.training_goals || 'general fitness'}. ${recentSummary}.
+Events: ${profile.events.length > 0 ? profile.events.map(e => `${e.name} ${e.date}`).join(', ') : 'none'}.
 
-Generate a ${weeks}-week training plan starting ${planStartDate} (Monday) through ${planEndDate}.
-Return ONLY valid JSON matching this exact structure — no markdown, no explanation:
-{
-  "name": "Plan name",
-  "goal": "Brief goal statement",
-  "days": [
-    {
-      "date": "YYYY-MM-DD",
-      "title": "Session title",
-      "type": "rest|endurance|tempo|threshold|vo2max|race|recovery",
-      "duration_min": 90,
-      "tss_target": 85,
-      "description": "Brief overview of the session",
-      "segments": [
-        {
-          "type": "warmup|main|cooldown|interval",
-          "duration_min": 15,
-          "description": "What to do",
-          "target_np_watts": 200,
-          "target_avg_hr": 130,
-          "zone": "Zone 2",
-          "notes": "Optional cues"
-        }
-      ]
-    }
-  ]
-}
+JSON structure (EXACTLY this shape, no extra fields):
+{"name":"…","goal":"…","days":[{"date":"YYYY-MM-DD","title":"…","type":"rest|endurance|tempo|threshold|vo2max|race|recovery","duration_min":0,"tss_target":0,"description":"…","segments":[{"type":"warmup|main|cooldown|interval","duration_min":0,"description":"…","target_np_watts":0,"target_avg_hr":0}]}]}
 
 Rules:
-- Include ALL ${weeks * 7} days. Rest days: type "rest", duration_min 0, tss_target 0, segments [].
-- FTP=${ftp}W: Z2=55-75%, Z3=76-87%, Threshold=88-95%, VO2=106-120%
-- Every session has warmup + main + cooldown segments. Keep descriptions brief (under 20 words).
-- Vary weekly load; recovery week every 4th week.
-- Be concise — short strings only. No extra fields.`;
+- ALL ${weeks * 7} days from ${planStartDate}. Rest days: type "rest", duration_min 0, tss_target 0, segments [], description "Rest".
+- Power zones from FTP ${ftp}W: Z2=56-75%, Tempo=76-87%, Threshold=88-95%, VO2=106-120%.
+- Non-rest days: 3 segments (warmup, main, cooldown). Descriptions max 8 words.
+- Build load across weeks; week 4/8/12 = recovery (~60% TSS).
+- Omit target_avg_hr if unknown. Use null for unknown numeric fields.`;
 
     const userPrompt = goal
       ? `Create a ${weeks}-week plan focused on: ${goal}${notes ? '\nAdditional notes: ' + notes : ''}`
@@ -103,21 +74,25 @@ Rules:
 
     const message = await client.messages.create({
       model: 'claude-sonnet-4-6',
-      max_tokens: 6000,
+      max_tokens: 8000,
       system: systemPrompt,
       messages: [{ role: 'user', content: userPrompt }],
     });
 
     const text = message.content[0].type === 'text' ? message.content[0].text : '';
 
-    // Strip markdown code fences if present
-    const jsonText = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim();
+    // Extract JSON: find first { to last } to handle any preamble/postamble
+    const firstBrace = text.indexOf('{');
+    const lastBrace = text.lastIndexOf('}');
+    const jsonText = firstBrace !== -1 && lastBrace > firstBrace
+      ? text.slice(firstBrace, lastBrace + 1)
+      : text.trim();
 
     let planData: { name: string; goal: string; days: unknown[] };
     try {
       planData = JSON.parse(jsonText);
     } catch {
-      return Response.json({ error: 'Claude returned invalid JSON', raw: text }, { status: 500 });
+      return Response.json({ error: 'Claude returned invalid JSON', raw: text.slice(0, 500) }, { status: 500 });
     }
 
     return Response.json(planData);
