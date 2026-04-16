@@ -22,7 +22,6 @@ interface Activity {
 
 type SortCol = 'start_date' | 'distance' | 'moving_time' | 'average_watts' | 'average_heartrate' | 'tss';
 type SortDir = 'ASC' | 'DESC';
-type TimeOfDay = 'any' | 'morning' | 'afternoon' | 'evening';
 
 function fmt(seconds: number): string {
   const h = Math.floor(seconds / 3600);
@@ -31,13 +30,6 @@ function fmt(seconds: number): string {
 }
 
 const TYPE_FILTERS = SPORT_FILTER_LABELS.filter(f => f !== 'All') as SportFilter[];
-
-const TIME_OF_DAY_OPTS: { key: TimeOfDay; label: string }[] = [
-  { key: 'any',       label: 'Any time' },
-  { key: 'morning',   label: 'Morning' },
-  { key: 'afternoon', label: 'Afternoon' },
-  { key: 'evening',   label: 'Evening' },
-];
 
 function SortArrow({ col, sortBy, sortDir }: { col: SortCol; sortBy: SortCol; sortDir: SortDir }) {
   if (sortBy !== col) return <span className="text-gray-700 ml-0.5">↕</span>;
@@ -62,8 +54,9 @@ export default function ActivitiesList() {
   const [minMins, setMinMins] = useState('');
   const [maxMins, setMaxMins] = useState('');
 
-  // Time of day
-  const [timeOfDay, setTimeOfDay] = useState<TimeOfDay>('any');
+  // Distance filters (km)
+  const [minKm, setMinKm] = useState('');
+  const [maxKm, setMaxKm] = useState('');
 
   // Sort
   const [sortBy,  setSortBy]  = useState<SortCol>('start_date');
@@ -92,7 +85,8 @@ export default function ActivitiesList() {
     setDateTo('');
     setMinMins('');
     setMaxMins('');
-    setTimeOfDay('any');
+    setMinKm('');
+    setMaxKm('');
     setPage(1);
   }
 
@@ -106,7 +100,7 @@ export default function ActivitiesList() {
     setPage(1);
   }
 
-  const hasActiveFilters = selected.length > 0 || dateFrom || dateTo || minMins || maxMins || timeOfDay !== 'any';
+  const hasActiveFilters = selected.length > 0 || dateFrom || dateTo || minMins || maxMins || minKm || maxKm;
 
   useEffect(() => {
     setLoading(true);
@@ -117,11 +111,12 @@ export default function ActivitiesList() {
       sortBy,
       sortDir,
     });
-    if (dateFrom)        params.set('from',      dateFrom);
-    if (dateTo)          params.set('dateTo',    dateTo);
-    if (minMins)         params.set('minMins',   minMins);
-    if (maxMins)         params.set('maxMins',   maxMins);
-    if (timeOfDay !== 'any') params.set('timeOfDay', timeOfDay);
+    if (dateFrom) params.set('from',    dateFrom);
+    if (dateTo)   params.set('dateTo',  dateTo);
+    if (minMins)  params.set('minMins', minMins);
+    if (maxMins)  params.set('maxMins', maxMins);
+    if (minKm)    params.set('minKm',   minKm);
+    if (maxKm)    params.set('maxKm',   maxKm);
 
     fetch(`/api/activities?${params}`)
       .then(r => r.json())
@@ -132,7 +127,7 @@ export default function ActivitiesList() {
         setLoading(false);
       })
       .catch(() => setLoading(false));
-  }, [selected, page, sortBy, sortDir, dateFrom, dateTo, minMins, maxMins, timeOfDay]);
+  }, [selected, page, sortBy, sortDir, dateFrom, dateTo, minMins, maxMins, minKm, maxKm]);
 
   return (
     <div className="h-full flex flex-col">
@@ -226,23 +221,27 @@ export default function ActivitiesList() {
               </div>
             </div>
 
-            {/* Time of day */}
-            <div className="space-y-1 sm:col-span-2">
-              <p className="text-xs text-gray-500 uppercase tracking-wider">Time of day</p>
-              <div className="flex gap-2 flex-wrap">
-                {TIME_OF_DAY_OPTS.map(opt => (
-                  <button
-                    key={opt.key}
-                    onClick={() => { setTimeOfDay(opt.key); setPage(1); }}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                      timeOfDay === opt.key
-                        ? 'bg-orange-500 text-white'
-                        : 'bg-gray-800 text-gray-400 hover:text-white'
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
+            {/* Distance */}
+            <div className="space-y-1">
+              <p className="text-xs text-gray-500 uppercase tracking-wider">Distance (km)</p>
+              <div className="flex gap-2 items-center">
+                <input
+                  type="number"
+                  value={minKm}
+                  onChange={e => { setMinKm(e.target.value); setPage(1); }}
+                  className="w-20 bg-gray-800 border border-gray-700 rounded-lg px-2 py-1.5 text-sm text-gray-300 focus:outline-none focus:border-orange-500"
+                  placeholder="Min"
+                  min="0"
+                />
+                <span className="text-gray-600">–</span>
+                <input
+                  type="number"
+                  value={maxKm}
+                  onChange={e => { setMaxKm(e.target.value); setPage(1); }}
+                  className="w-20 bg-gray-800 border border-gray-700 rounded-lg px-2 py-1.5 text-sm text-gray-300 focus:outline-none focus:border-orange-500"
+                  placeholder="Max"
+                  min="0"
+                />
               </div>
             </div>
 

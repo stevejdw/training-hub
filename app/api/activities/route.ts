@@ -22,7 +22,8 @@ export async function GET(req: NextRequest) {
   const dateTo        = sp.get('dateTo');     // ISO date
   const minMins       = parseInt(sp.get('minMins') ?? '0', 10);
   const maxMins       = parseInt(sp.get('maxMins') ?? '0', 10);
-  const timeOfDay     = sp.get('timeOfDay') ?? 'any'; // morning|afternoon|evening|any
+  const minKm         = parseFloat(sp.get('minKm') ?? '0');
+  const maxKm         = parseFloat(sp.get('maxKm') ?? '0');
   const sortBy        = SORT_COLS[sp.get('sortBy') ?? ''] ?? 'start_date';
   const sortDir       = sp.get('sortDir') === 'asc' ? 'ASC' : 'DESC';
   const page          = Math.max(1, parseInt(sp.get('page') ?? '1', 10));
@@ -54,10 +55,9 @@ export async function GET(req: NextRequest) {
     if (minMins > 0) { conditions.push(`moving_time >= $${p++}`); queryParams.push(minMins * 60); }
     if (maxMins > 0) { conditions.push(`moving_time <= $${p++}`); queryParams.push(maxMins * 60); }
 
-    // Time of day (Sydney local hour)
-    if (timeOfDay === 'morning')   { conditions.push(`EXTRACT(HOUR FROM start_date AT TIME ZONE 'Australia/Sydney') >= 5  AND EXTRACT(HOUR FROM start_date AT TIME ZONE 'Australia/Sydney') < 12`); }
-    if (timeOfDay === 'afternoon') { conditions.push(`EXTRACT(HOUR FROM start_date AT TIME ZONE 'Australia/Sydney') >= 12 AND EXTRACT(HOUR FROM start_date AT TIME ZONE 'Australia/Sydney') < 17`); }
-    if (timeOfDay === 'evening')   { conditions.push(`EXTRACT(HOUR FROM start_date AT TIME ZONE 'Australia/Sydney') >= 17`); }
+    // Distance filters (km → metres)
+    if (minKm > 0) { conditions.push(`distance >= $${p++}`); queryParams.push(minKm * 1000); }
+    if (maxKm > 0) { conditions.push(`distance <= $${p++}`); queryParams.push(maxKm * 1000); }
 
     const where = `WHERE ${conditions.join(' AND ')}`;
 
