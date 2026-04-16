@@ -4,6 +4,7 @@ import { getProfile, effectiveFtp } from '@/lib/profile';
 import pool from '@/lib/db';
 
 export const runtime = 'nodejs';
+export const maxDuration = 120;
 
 const client = new Anthropic();
 
