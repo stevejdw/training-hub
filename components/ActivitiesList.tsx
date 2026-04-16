@@ -25,21 +25,39 @@ function fmt(seconds: number): string {
   return h > 0 ? `${h}:${m.toString().padStart(2, '0')}h` : `${m}m`;
 }
 
+// Filter labels excluding 'All'
+const TYPE_FILTERS = SPORT_FILTER_LABELS.filter(f => f !== 'All') as SportFilter[];
+
 export default function ActivitiesList() {
-  const [filter, setFilter] = useState<SportFilter>('All');
+  const [selected, setSelected] = useState<Set<SportFilter>>(new Set());
   const [activities, setActivities] = useState<Activity[]>([]);
   const [page, setPage] = useState(1);
   const [pages, setPages] = useState(1);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  function toggleFilter(f: SportFilter) {
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(f)) {
+        next.delete(f);
+      } else {
+        next.add(f);
+      }
+      return next;
+    });
     setPage(1);
-  }, [filter]);
+  }
+
+  function clearFilters() {
+    setSelected(new Set());
+    setPage(1);
+  }
 
   useEffect(() => {
     setLoading(true);
-    fetch(`/api/activities?filter=${filter}&page=${page}`)
+    const filtersParam = selected.size > 0 ? [...selected].join(',') : 'All';
+    fetch(`/api/activities?filters=${filtersParam}&page=${page}`)
       .then((r) => r.json())
       .then((d) => {
         setActivities(d.activities);
@@ -48,19 +66,19 @@ export default function ActivitiesList() {
         setLoading(false);
       })
       .catch(() => setLoading(false));
-  }, [filter, page]);
+  }, [selected, page]);
 
   return (
     <div className="h-[calc(100vh-64px)] flex flex-col">
       {/* Header */}
-      <div className="border-b border-gray-800 px-4 py-3 flex items-center gap-4 flex-shrink-0">
-        <div className="flex gap-2">
-          {SPORT_FILTER_LABELS.map((f) => (
+      <div className="border-b border-gray-800 px-4 py-3 flex items-center gap-3 flex-wrap flex-shrink-0">
+        <div className="flex gap-2 flex-wrap">
+          {TYPE_FILTERS.map((f) => (
             <button
               key={f}
-              onClick={() => setFilter(f)}
+              onClick={() => toggleFilter(f)}
               className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                filter === f
+                selected.has(f)
                   ? 'bg-orange-500 text-white'
                   : 'bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700'
               }`}
@@ -68,6 +86,14 @@ export default function ActivitiesList() {
               {f}
             </button>
           ))}
+          {selected.size > 0 && (
+            <button
+              onClick={clearFilters}
+              className="px-3 py-1.5 rounded-lg text-sm font-medium text-gray-500 hover:text-white transition-colors"
+            >
+              Clear
+            </button>
+          )}
         </div>
         {!loading && (
           <span className="text-sm text-gray-500 ml-auto">{total.toLocaleString()} activities</span>
@@ -103,10 +129,7 @@ export default function ActivitiesList() {
                   const date = new Date(a.start_date);
                   const color = sportColor(a.sport_type);
                   return (
-                    <tr
-                      key={a.id}
-                      className="border-b border-gray-800/50 hover:bg-gray-800/40 transition-colors"
-                    >
+                    <tr key={a.id} className="border-b border-gray-800/50 hover:bg-gray-800/40 transition-colors">
                       <td className="px-4 py-3 text-gray-400 whitespace-nowrap">
                         {date.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: '2-digit' })}
                       </td>
@@ -115,8 +138,7 @@ export default function ActivitiesList() {
                           className="px-2 py-0.5 rounded text-xs font-medium"
                           style={{ background: color + '20', color }}
                         >
-                          {sportLabel(a.sport_type)}
-                          {a.trainer ? ' 🏠' : ''}
+                          {sportLabel(a.sport_type)}{a.trainer ? ' 🏠' : ''}
                         </span>
                       </td>
                       <td className="px-4 py-3">
@@ -154,9 +176,7 @@ export default function ActivitiesList() {
           >
             ← Prev
           </button>
-          <span className="text-sm text-gray-500">
-            Page {page} of {pages}
-          </span>
+          <span className="text-sm text-gray-500">Page {page} of {pages}</span>
           <button
             onClick={() => setPage((p) => Math.min(pages, p + 1))}
             disabled={page === pages}
