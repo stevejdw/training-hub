@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LabelList } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Customized } from 'recharts';
 import { SPORT_FILTER_LABELS, CYCLING_TYPES, SportFilter, sportColor, sportLabel } from '@/lib/sport-types';
 
 type Period = 'week' | 'month' | 'year';
@@ -268,15 +268,30 @@ export default function DashboardHome() {
                     radius={i === CYCLING_TYPES.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
                   />
                 ))}
-                {/* Phantom zero-height bar sits at the top of every stack so the label always renders correctly */}
-                <Bar dataKey={() => 0} stackId="a" fill="transparent" isAnimationActive={false} legendType="none">
-                  <LabelList
-                    dataKey={metric}
-                    position="top"
-                    formatter={(v: unknown) => barLabel(Number(v))}
-                    style={{ fill: '#d1d5db', fontSize: 10, fontWeight: 500 }}
-                  />
-                </Bar>
+                {/* Render total labels by finding the actual top-y of each stack */}
+                <Customized component={({ formattedGraphicalItems }: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
+                  if (!formattedGraphicalItems?.length) return null;
+                  return (
+                    <g>
+                      {flatBars.map((bar, idx) => {
+                        const total = Number(bar[metric]) || 0;
+                        if (!total) return null;
+                        let topY = Infinity, x = 0, w = 0;
+                        for (const item of formattedGraphicalItems) {
+                          const pt = item.props?.data?.[idx];
+                          if (!pt || Number(pt.height) <= 0) continue;
+                          if (Number(pt.y) < topY) { topY = Number(pt.y); x = Number(pt.x); w = Number(pt.width); }
+                        }
+                        if (topY === Infinity) return null;
+                        return (
+                          <text key={idx} x={x + w / 2} y={topY - 5} textAnchor="middle" fill="#d1d5db" fontSize={10} fontWeight={500}>
+                            {barLabel(total)}
+                          </text>
+                        );
+                      })}
+                    </g>
+                  );
+                }} />
               </BarChart>
             </ResponsiveContainer>
           )}
