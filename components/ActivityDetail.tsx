@@ -54,9 +54,9 @@ function fmt(seconds: number): string {
 function Stat({ label, value }: { label: string; value: string | number | null }) {
   if (value === null || value === undefined) return null;
   return (
-    <div className="bg-gray-800 rounded-xl p-4">
-      <div className="text-xs text-gray-400 uppercase tracking-wider mb-1">{label}</div>
-      <div className="text-xl font-bold text-white">{value}</div>
+    <div className="bg-gray-800 rounded-xl p-2.5">
+      <div className="text-[10px] text-gray-400 uppercase tracking-wider mb-0.5">{label}</div>
+      <div className="text-sm font-bold text-white leading-tight">{value}</div>
     </div>
   );
 }
@@ -126,20 +126,33 @@ export default function ActivityDetail({ id }: { id: string }) {
           </p>
         </div>
 
-        {/* Stats grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          {activity.distance > 0 && <Stat label="Distance" value={`${(activity.distance / 1000).toFixed(2)} km`} />}
-          <Stat label="Moving Time" value={fmt(activity.moving_time)} />
-          {activity.total_elevation_gain > 0 && <Stat label="Elevation" value={`${Math.round(activity.total_elevation_gain)} m`} />}
-          {activity.tss !== null && <Stat label="TSS" value={Math.round(activity.tss)} />}
-          {activity.average_watts && <Stat label="Avg Power" value={`${Math.round(activity.average_watts)}W`} />}
-          {np && <Stat label="NP" value={`${Math.round(np)}W`} />}
-          {eFTPEstimate && <Stat label="eFTP Est." value={`${eFTPEstimate}W`} />}
-          {activity.average_heartrate && <Stat label="Avg HR" value={`${Math.round(activity.average_heartrate)} bpm`} />}
-          {activity.max_heartrate && <Stat label="Max HR" value={`${Math.round(activity.max_heartrate)} bpm`} />}
-          {activity.intensity_factor && <Stat label="IF" value={activity.intensity_factor.toFixed(2)} />}
-          {activity.max_watts && <Stat label="Peak Power" value={`${Math.round(activity.max_watts)}W`} />}
-          {activity.kilojoules && <Stat label="Energy" value={`${Math.round(activity.kilojoules)} kJ`} />}
+        {/* Stats + Map side by side */}
+        <div className="flex gap-3 items-stretch">
+          {/* Compact stats grid */}
+          <div className="flex-1 grid grid-cols-2 gap-2 content-start">
+            {activity.distance > 0 && <Stat label="Distance" value={`${(activity.distance / 1000).toFixed(2)} km`} />}
+            <Stat label="Moving Time" value={fmt(activity.moving_time)} />
+            {activity.total_elevation_gain > 0 && <Stat label="Elevation" value={`${Math.round(activity.total_elevation_gain)} m`} />}
+            {activity.tss !== null && <Stat label="TSS" value={Math.round(activity.tss)} />}
+            {activity.average_watts && <Stat label="Avg Power" value={`${Math.round(activity.average_watts)}W`} />}
+            {np && <Stat label="NP" value={`${Math.round(np)}W`} />}
+            {eFTPEstimate && <Stat label="eFTP Est." value={`${eFTPEstimate}W`} />}
+            {activity.average_heartrate && <Stat label="Avg HR" value={`${Math.round(activity.average_heartrate)} bpm`} />}
+            {activity.max_heartrate && <Stat label="Max HR" value={`${Math.round(activity.max_heartrate)} bpm`} />}
+            {activity.intensity_factor && <Stat label="IF" value={activity.intensity_factor.toFixed(2)} />}
+            {activity.max_watts && <Stat label="Peak Power" value={`${Math.round(activity.max_watts)}W`} />}
+            {activity.kilojoules && <Stat label="Energy" value={`${Math.round(activity.kilojoules)} kJ`} />}
+          </div>
+
+          {/* Map — right column */}
+          {activity.summary_polyline && (
+            <div className="w-[45%] flex-shrink-0">
+              <ActivityMap
+                polyline={activity.summary_polyline}
+                className="w-full h-full min-h-[200px] rounded-xl overflow-hidden bg-gray-800"
+              />
+            </div>
+          )}
         </div>
 
         {/* Laps */}
@@ -193,13 +206,8 @@ export default function ActivityDetail({ id }: { id: string }) {
           </div>
         )}
 
-        {/* Map */}
-        {activity.summary_polyline ? (
-          <div>
-            <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Route</h3>
-            <ActivityMap polyline={activity.summary_polyline} />
-          </div>
-        ) : (
+        {/* No route notice (only shown when polyline is missing) */}
+        {!activity.summary_polyline && (
           <div className="bg-gray-800/50 border border-gray-700 border-dashed rounded-xl p-5 text-center">
             <p className="text-gray-500 text-sm">Map unavailable — activity predates polyline sync</p>
           </div>

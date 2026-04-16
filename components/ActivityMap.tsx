@@ -4,9 +4,10 @@ import { useEffect, useRef } from 'react';
 
 interface Props {
   polyline: string;
+  className?: string;
 }
 
-export default function ActivityMap({ polyline }: Props) {
+export default function ActivityMap({ polyline, className }: Props) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<unknown>(null);
 
@@ -58,6 +59,6 @@ export default function ActivityMap({ polyline }: Props) {
   }, [polyline]);
 
   return (
-    <div ref={mapRef} className="w-full h-72 rounded-xl overflow-hidden bg-gray-800" />
+    <div ref={mapRef} className={className ?? 'w-full h-72 rounded-xl overflow-hidden bg-gray-800'} />
   );
 }
