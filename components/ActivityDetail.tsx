@@ -2,7 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import { sportLabel, sportColor } from '@/lib/sport-types';
+
+const ActivityMap = dynamic(() => import('./ActivityMap'), { ssr: false });
 
 interface Activity {
   id: number;
@@ -21,10 +24,22 @@ interface Activity {
   max_heartrate: number | null;
   suffer_score: number | null;
   trainer: boolean;
-  average_speed: number | null;
   tss: number | null;
   intensity_factor: number | null;
   normalized_power: number | null;
+  summary_polyline: string | null;
+}
+
+interface Lap {
+  id: number;
+  lap_index: number;
+  name: string;
+  moving_time: number;
+  distance: number;
+  average_watts: number | null;
+  normalized_power: number | null;
+  average_heartrate: number | null;
+  max_heartrate: number | null;
 }
 
 function fmt(seconds: number): string {
@@ -50,25 +65,25 @@ const FTP = 340;
 
 export default function ActivityDetail({ id }: { id: string }) {
   const [activity, setActivity] = useState<Activity | null>(null);
+  const [laps, setLaps] = useState<Lap[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
   useEffect(() => {
     fetch(`/api/activities/${id}`)
-      .then((r) => {
-        if (!r.ok) throw new Error('Not found');
-        return r.json();
+      .then((r) => { if (!r.ok) throw new Error(); return r.json(); })
+      .then((d) => {
+        setActivity(d.activity);
+        setLaps(d.laps ?? []);
+        setLoading(false);
       })
-      .then((d) => { setActivity(d); setLoading(false); })
       .catch(() => { setError(true); setLoading(false); });
   }, [id]);
 
   if (loading) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-8 space-y-4">
-        {Array.from({ length: 3 }).map((_, i) => (
-          <div key={i} className="bg-gray-800 rounded-xl h-20 animate-pulse" />
-        ))}
+        {[1, 2, 3].map((i) => <div key={i} className="bg-gray-800 rounded-xl h-20 animate-pulse" />)}
       </div>
     );
   }
@@ -84,19 +99,14 @@ export default function ActivityDetail({ id }: { id: string }) {
 
   const date = new Date(activity.start_date);
   const color = sportColor(activity.sport_type);
-
-  // eFTP estimate from this activity (best 20-min proxy via IF × FTP)
-  const eFTPEstimate = activity.intensity_factor && activity.moving_time >= 1200
-    ? Math.round(activity.intensity_factor * FTP)
-    : null;
-
   const np = activity.normalized_power ?? activity.weighted_average_watts;
+  const eFTPEstimate = activity.intensity_factor && activity.moving_time >= 1200
+    ? Math.round(activity.intensity_factor * FTP) : null;
 
   return (
     <div className="h-[calc(100vh-64px)] overflow-y-auto">
       <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
 
-        {/* Back link */}
         <Link href="/activities" className="text-sm text-gray-500 hover:text-orange-400 transition-colors">
           ← Activities
         </Link>
@@ -104,74 +114,93 @@ export default function ActivityDetail({ id }: { id: string }) {
         {/* Header */}
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <span
-              className="px-2 py-0.5 rounded text-xs font-medium"
-              style={{ background: color + '20', color }}
-            >
-              {sportLabel(activity.sport_type)}
-              {activity.trainer ? ' · Indoor' : ''}
+            <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ background: color + '20', color }}>
+              {sportLabel(activity.sport_type)}{activity.trainer ? ' · Indoor' : ''}
             </span>
           </div>
           <h1 className="text-2xl font-bold text-white">{activity.name}</h1>
           <p className="text-gray-400 mt-1">
-            {date.toLocaleDateString('en-AU', {
-              weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
-            })}
+            {date.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
             {' · '}
             {date.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' })}
           </p>
         </div>
 
-        {/* Primary stats */}
+        {/* Stats grid */}
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          {activity.distance > 0 && (
-            <Stat label="Distance" value={`${(activity.distance / 1000).toFixed(2)} km`} />
-          )}
+          {activity.distance > 0 && <Stat label="Distance" value={`${(activity.distance / 1000).toFixed(2)} km`} />}
           <Stat label="Moving Time" value={fmt(activity.moving_time)} />
-          {activity.total_elevation_gain > 0 && (
-            <Stat label="Elevation" value={`${Math.round(activity.total_elevation_gain)} m`} />
-          )}
+          {activity.total_elevation_gain > 0 && <Stat label="Elevation" value={`${Math.round(activity.total_elevation_gain)} m`} />}
           {activity.tss !== null && <Stat label="TSS" value={Math.round(activity.tss)} />}
-          {activity.average_watts && (
-            <Stat label="Avg Power" value={`${Math.round(activity.average_watts)}W`} />
-          )}
+          {activity.average_watts && <Stat label="Avg Power" value={`${Math.round(activity.average_watts)}W`} />}
           {np && <Stat label="NP" value={`${Math.round(np)}W`} />}
           {eFTPEstimate && <Stat label="eFTP Est." value={`${eFTPEstimate}W`} />}
-          {activity.average_heartrate && (
-            <Stat label="Avg HR" value={`${Math.round(activity.average_heartrate)} bpm`} />
-          )}
-          {activity.max_heartrate && (
-            <Stat label="Max HR" value={`${Math.round(activity.max_heartrate)} bpm`} />
-          )}
-          {activity.intensity_factor && (
-            <Stat label="IF" value={activity.intensity_factor.toFixed(2)} />
-          )}
-          {activity.max_watts && (
-            <Stat label="Peak Power" value={`${Math.round(activity.max_watts)}W`} />
-          )}
-          {activity.kilojoules && (
-            <Stat label="Energy" value={`${Math.round(activity.kilojoules)} kJ`} />
-          )}
-          {activity.suffer_score && (
-            <Stat label="Suffer Score" value={activity.suffer_score} />
-          )}
+          {activity.average_heartrate && <Stat label="Avg HR" value={`${Math.round(activity.average_heartrate)} bpm`} />}
+          {activity.max_heartrate && <Stat label="Max HR" value={`${Math.round(activity.max_heartrate)} bpm`} />}
+          {activity.intensity_factor && <Stat label="IF" value={activity.intensity_factor.toFixed(2)} />}
+          {activity.max_watts && <Stat label="Peak Power" value={`${Math.round(activity.max_watts)}W`} />}
+          {activity.kilojoules && <Stat label="Energy" value={`${Math.round(activity.kilojoules)} kJ`} />}
+          {activity.suffer_score && <Stat label="Suffer Score" value={activity.suffer_score} />}
         </div>
 
-        {/* Laps placeholder */}
-        <div className="bg-gray-800/50 border border-gray-700 border-dashed rounded-xl p-6 text-center">
-          <p className="text-gray-500 text-sm font-medium">Lap data not yet synced</p>
-          <p className="text-gray-600 text-xs mt-1">
-            Add lap sync to the GitHub Actions workflow to enable this section
-          </p>
-        </div>
+        {/* Map */}
+        {activity.summary_polyline ? (
+          <div>
+            <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Route</h3>
+            <ActivityMap polyline={activity.summary_polyline} />
+          </div>
+        ) : (
+          <div className="bg-gray-800/50 border border-gray-700 border-dashed rounded-xl p-5 text-center">
+            <p className="text-gray-500 text-sm">Map unavailable — activity predates polyline sync</p>
+          </div>
+        )}
 
-        {/* Map placeholder */}
-        <div className="bg-gray-800/50 border border-gray-700 border-dashed rounded-xl p-6 text-center">
-          <p className="text-gray-500 text-sm font-medium">Map not yet available</p>
-          <p className="text-gray-600 text-xs mt-1">
-            Add <code className="bg-gray-800 px-1 rounded">summary_polyline</code> to the activities sync to enable the map
-          </p>
-        </div>
+        {/* Laps */}
+        {laps.length > 0 ? (
+          <div>
+            <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">
+              Laps <span className="text-gray-600 font-normal">({laps.length})</span>
+            </h3>
+            <div className="bg-gray-800 rounded-xl overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-700">
+                    <th className="text-left px-4 py-3 text-gray-400 font-medium">#</th>
+                    <th className="text-right px-4 py-3 text-gray-400 font-medium">Distance</th>
+                    <th className="text-right px-4 py-3 text-gray-400 font-medium">Time</th>
+                    <th className="text-right px-4 py-3 text-gray-400 font-medium hidden sm:table-cell">Avg W</th>
+                    <th className="text-right px-4 py-3 text-gray-400 font-medium hidden sm:table-cell">Avg HR</th>
+                    <th className="text-right px-4 py-3 text-gray-400 font-medium hidden sm:table-cell">Max HR</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {laps.map((lap, i) => (
+                    <tr key={lap.id} className={`border-b border-gray-700/50 ${i % 2 === 0 ? '' : 'bg-gray-800/50'}`}>
+                      <td className="px-4 py-2.5 text-gray-400">{lap.lap_index + 1}</td>
+                      <td className="px-4 py-2.5 text-right text-gray-300">
+                        {lap.distance > 0 ? `${(lap.distance / 1000).toFixed(2)} km` : '—'}
+                      </td>
+                      <td className="px-4 py-2.5 text-right text-gray-300">{fmt(lap.moving_time)}</td>
+                      <td className="px-4 py-2.5 text-right text-gray-300 hidden sm:table-cell">
+                        {lap.average_watts ? `${Math.round(lap.average_watts)}W` : '—'}
+                      </td>
+                      <td className="px-4 py-2.5 text-right text-gray-300 hidden sm:table-cell">
+                        {lap.average_heartrate ? Math.round(lap.average_heartrate) : '—'}
+                      </td>
+                      <td className="px-4 py-2.5 text-right text-gray-300 hidden sm:table-cell">
+                        {lap.max_heartrate ? Math.round(lap.max_heartrate) : '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : (
+          <div className="bg-gray-800/50 border border-gray-700 border-dashed rounded-xl p-5 text-center">
+            <p className="text-gray-500 text-sm">Lap data unavailable — activity predates lap sync</p>
+          </div>
+        )}
       </div>
     </div>
   );

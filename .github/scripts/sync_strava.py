@@ -35,6 +35,13 @@ def fetch_activities(token, page=1):
     )
     return r.json()
 
+def fetch_laps(token, activity_id):
+    r = requests.get(
+        f"https://www.strava.com/api/v3/activities/{activity_id}/laps",
+        headers={"Authorization": f"Bearer {token}"}
+    )
+    return r.json() if r.status_code == 200 else []
+
 def sync():
     token = get_access_token()
     conn = psycopg2.connect(DATABASE_URL)
@@ -58,6 +65,7 @@ def sync():
             break
 
         rows = []
+        new_activity_ids = []
         stop = False
 
         for a in activities:
@@ -71,6 +79,7 @@ def sync():
             moving = a.get("moving_time", 0)
             tss = calculate_tss(moving, npower, FTP)
             if_val = round(npower / FTP, 3) if npower and FTP else None
+            polyline = a.get("map", {}).get("summary_polyline")
 
             rows.append((
                 a["id"],
@@ -93,7 +102,9 @@ def sync():
                 tss,
                 if_val,
                 npower,
+                polyline,
             ))
+            new_activity_ids.append(a["id"])
 
         if rows:
             execute_values(cur, """
@@ -103,16 +114,50 @@ def sync():
                     average_watts, weighted_average_watts, max_watts,
                     kilojoules, average_heartrate, max_heartrate,
                     suffer_score, trainer, average_speed,
-                    tss, intensity_factor, normalized_power
+                    tss, intensity_factor, normalized_power, summary_polyline
                 ) VALUES %s
                 ON CONFLICT (id) DO UPDATE SET
                     name = EXCLUDED.name,
                     tss = EXCLUDED.tss,
+                    summary_polyline = EXCLUDED.summary_polyline,
                     updated_at = now()
             """, rows)
             conn.commit()
             synced += len(rows)
             print(f"Synced {len(rows)} activities (page {page})")
+
+        # Fetch and store laps for each new activity
+        for activity_id in new_activity_ids:
+            laps = fetch_laps(token, activity_id)
+            if not laps:
+                continue
+            lap_rows = [(
+                lap["id"],
+                activity_id,
+                lap.get("name"),
+                lap.get("lap_index"),
+                lap.get("elapsed_time"),
+                lap.get("moving_time"),
+                lap.get("distance"),
+                lap.get("average_watts"),
+                lap.get("average_watts"),
+                lap.get("average_heartrate"),
+                lap.get("max_heartrate"),
+                lap.get("average_speed"),
+                lap.get("total_elevation_gain"),
+            ) for lap in laps]
+            execute_values(cur, """
+                INSERT INTO laps (
+                    id, activity_id, name, lap_index,
+                    elapsed_time, moving_time, distance,
+                    average_watts, normalized_power,
+                    average_heartrate, max_heartrate,
+                    average_speed, total_elevation_gain
+                ) VALUES %s
+                ON CONFLICT (id) DO NOTHING
+            """, lap_rows)
+            conn.commit()
+            print(f"  Stored {len(lap_rows)} laps for activity {activity_id}")
 
         if stop or len(activities) < 200:
             break
