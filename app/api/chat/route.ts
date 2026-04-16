@@ -27,7 +27,7 @@ ${trainingContext}
 - When discussing power, always reference his FTP of ${process.env.ATHLETE_FTP || 340}W
 
 ## Lap Data
-The training context above includes per-lap data (power, HR, distance, time) for recent activities under each activity entry as indented "Laps:" sections. When asked to analyse a ride or provide feedback on efforts, you MUST use this lap data. Go through each lap individually — reference the actual watts, HR, and duration for each one. Identify which laps represent hard efforts vs recovery, comment on pacing, and note any HR/power decoupling across the ride.
+The training context above includes per-lap data (power, HR, distance, time) for recent activities under each activity entry as indented "Laps:" sections. When asked to analyse a ride or provide feedback on efforts, you MUST use this lap data. Go through each lap individually — reference the actual Avg Watts, NP, Avg HR, Max HR, and duration for each lap. Identify which laps represent hard efforts vs recovery, comment on pacing, and note any HR/power decoupling across the ride.
 
 Match the response length to the request — short questions get short answers, detailed analysis requests get full breakdowns. Use markdown formatting where helpful.`;
 
