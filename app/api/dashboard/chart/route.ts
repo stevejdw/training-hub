@@ -132,10 +132,10 @@ export async function GET(req: NextRequest) {
       SELECT
         ${groupExpr} AS key,
         COUNT(*)::int AS activities,
-        ROUND(SUM(distance)/1000.0, 1)::float AS km,
-        ROUND(SUM(moving_time)/3600.0, 2)::float AS hours,
-        ROUND(SUM(COALESCE(tss,0)))::int AS tss,
-        ROUND(SUM(total_elevation_gain))::int AS elevation
+        ROUND(SUM(distance)::numeric / 1000.0, 1)::float AS km,
+        ROUND(SUM(moving_time)::numeric / 3600.0, 2)::float AS hours,
+        ROUND(SUM(COALESCE(tss, 0))::numeric, 0)::int AS tss,
+        ROUND(SUM(total_elevation_gain)::numeric, 0)::int AS elevation
       FROM activities
       WHERE ${baseWhere}
       GROUP BY key
