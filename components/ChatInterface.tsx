@@ -8,11 +8,8 @@ interface Message {
 }
 
 const SUGGESTED_QUESTIONS = [
-  'How is my fitness trending over the last 4 weeks?',
-  'What was my biggest training week this year?',
-  'Am I ready to race on May 2?',
-  'What zones should I target in this week\'s long ride?',
-  'Compare my current CTL to this time last year.',
+  'Provide feedback on the last ride. Include an analysis of key laps or efforts, correlation between heart rate and power, any observations on changes to fitness, and feedback on the session vs training plan.',
+  'Provide feedback on my overall fitness.',
 ];
 
 function MessageBubble({ message }: { message: Message }) {
