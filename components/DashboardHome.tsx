@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, LabelList } from 'recharts';
 import { SPORT_FILTER_LABELS, SportFilter } from '@/lib/sport-types';
 
 type Period = 'week' | 'month' | 'year';
@@ -91,6 +91,13 @@ export default function DashboardHome() {
 
   const bars = data?.bars ?? [];
   const maxVal = Math.max(...bars.map(b => Number(b[metric]) || 0), 1);
+
+  function barLabel(value: number) {
+    if (!value) return '';
+    if (metric === 'km')    return value >= 100 ? Math.round(value).toString() : value.toFixed(1);
+    if (metric === 'hours') return value >= 10  ? Math.round(value).toString() : value.toFixed(1);
+    return Math.round(value).toString();
+  }
 
   return (
     <div className="h-full overflow-y-auto scroll-touch">
@@ -202,26 +209,26 @@ export default function DashboardHome() {
           ) : loading && !data ? (
             <div className="h-48 animate-pulse bg-gray-800 rounded-lg" />
           ) : (
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={bars} margin={{ top: 4, right: 4, left: -24, bottom: 0 }} barCategoryGap="25%">
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={bars} margin={{ top: 20, right: 4, left: 4, bottom: 0 }} barCategoryGap="25%">
                 <XAxis
                   dataKey="label"
                   tick={{ fill: '#9ca3af', fontSize: 11 }}
                   axisLine={false}
                   tickLine={false}
                 />
-                <YAxis
-                  tick={{ fill: '#6b7280', fontSize: 10 }}
-                  axisLine={false}
-                  tickLine={false}
-                  width={40}
-                  tickFormatter={v => v >= 1000 ? `${(v/1000).toFixed(1)}k` : String(v)}
-                />
+                <YAxis hide />
                 <Tooltip
                   content={<CustomTooltip unit={metricCfg.unit} />}
                   cursor={{ fill: 'rgba(255,255,255,0.04)' }}
                 />
                 <Bar dataKey={metric} radius={[4, 4, 0, 0]}>
+                  <LabelList
+                    dataKey={metric}
+                    position="top"
+                    formatter={(v: unknown) => barLabel(Number(v))}
+                    style={{ fill: '#d1d5db', fontSize: 10, fontWeight: 500 }}
+                  />
                   {bars.map((b, i) => {
                     const intensity = maxVal > 0 ? (Number(b[metric]) || 0) / maxVal : 0;
                     const alpha = Math.max(0.25, intensity);

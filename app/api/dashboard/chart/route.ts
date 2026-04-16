@@ -68,12 +68,6 @@ function periodLabel(period: Period, start: Date): string {
   return String(start.getUTCFullYear());
 }
 
-// For month grouping: find Monday on or before a given date
-function mondayOnOrBefore(d: Date): Date {
-  const dow = d.getUTCDay(); // 0=Sun
-  const daysFromMon = dow === 0 ? 6 : dow - 1;
-  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - daysFromMon));
-}
 
 function buildBars(period: Period, start: Date, end: Date, rawRows: Record<string, unknown>[]): BarRow[] {
   const byKey = new Map<string, Record<string, unknown>>();
@@ -92,15 +86,15 @@ function buildBars(period: Period, start: Date, end: Date, rawRows: Record<strin
   }
 
   if (period === 'month') {
-    // Walk Monday-aligned weeks that overlap this month
-    let cur = mondayOnOrBefore(start);
-    let weekNum = 1;
-    while (cur < end) {
-      const key = isoDate(cur);
+    // Keys are 1–5 (ceil of day/7), matching the SQL CEIL(DAY/7) grouping
+    const daysInMonth = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 0)).getUTCDate();
+    const numWeeks = Math.ceil(daysInMonth / 7);
+    for (let w = 1; w <= numWeeks; w++) {
+      const key = String(w);
       const r   = byKey.get(key);
-      rows.push({ label: `W${weekNum}`, date: key, ...ZERO, ...(r ?? {}) as Partial<BarRow> });
-      cur = new Date(cur.getTime() + 7 * 86400000);
-      weekNum++;
+      const dayStart = (w - 1) * 7 + 1;
+      const dayEnd   = Math.min(w * 7, daysInMonth);
+      rows.push({ label: `${dayStart}–${dayEnd}`, date: key, ...ZERO, ...(r ?? {}) as Partial<BarRow> });
     }
     return rows;
   }
@@ -135,9 +129,10 @@ export async function GET(req: NextRequest) {
     const endStr   = isoDate(end);
 
     // Group-by expression per period
+    // For month: bucket by week-of-month (1–5) using day number
     const groupExpr =
       period === 'week'  ? `TO_CHAR(start_date AT TIME ZONE 'Australia/Sydney', 'YYYY-MM-DD')` :
-      period === 'month' ? `TO_CHAR(date_trunc('week', (start_date AT TIME ZONE 'Australia/Sydney')::date), 'YYYY-MM-DD')` :
+      period === 'month' ? `CEIL(EXTRACT(DAY FROM start_date AT TIME ZONE 'Australia/Sydney') / 7.0)::int::text` :
                            `TO_CHAR(start_date AT TIME ZONE 'Australia/Sydney', 'YYYY-MM')`;
 
     const typeClause = hasTypes ? 'AND sport_type = ANY($3::text[])' : '';
