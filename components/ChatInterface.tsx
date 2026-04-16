@@ -8,8 +8,10 @@ interface Message {
 }
 
 const SUGGESTED_QUESTIONS = [
-  'Provide feedback on the last ride. Include an analysis of key laps or efforts, correlation between heart rate and power, any observations on changes to fitness, and feedback on the session vs training plan.',
-  'Provide feedback on my overall fitness.',
+  {
+    label: 'Provide feedback on the last ride',
+    prompt: 'Provide feedback on the last ride. Include an analysis of key laps or efforts, correlation between heart rate and power, any observations on changes to fitness, and feedback on the session vs training plan.',
+  },
 ];
 
 function MessageBubble({ message }: { message: Message }) {
@@ -136,11 +138,11 @@ export default function ChatInterface() {
             <div className="grid grid-cols-1 gap-2 w-full max-w-lg">
               {SUGGESTED_QUESTIONS.map((q) => (
                 <button
-                  key={q}
-                  onClick={() => sendMessage(q)}
+                  key={q.label}
+                  onClick={() => sendMessage(q.prompt)}
                   className="text-left text-sm text-gray-300 bg-gray-800 hover:bg-gray-700 border border-gray-700 hover:border-orange-500 rounded-xl px-4 py-2.5 transition-colors"
                 >
-                  {q}
+                  {q.label}
                 </button>
               ))}
             </div>
