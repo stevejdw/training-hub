@@ -46,12 +46,14 @@ body {
 
 @media (max-width: 767px) {
   .content-area {
-    /* flex: none prevents flex-1 from overriding the explicit height */
-    flex: none;
-    /* On mobile: full height minus bottom nav + home indicator */
-    height: calc(100dvh - 56px - env(safe-area-inset-bottom, 0px));
-    /* Top: leave room for status bar in standalone mode */
-    padding-top: env(safe-area-inset-top, 0px);
+    /* Pin content area precisely between status bar and bottom nav.
+       Fixed positioning avoids dvh measurement issues on iOS PWA. */
+    position: fixed;
+    top: env(safe-area-inset-top, 0px);
+    left: 0;
+    right: 0;
+    bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+    height: auto;
   }
 }
 
