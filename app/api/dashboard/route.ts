@@ -12,6 +12,8 @@ export async function GET(req: NextRequest) {
 
   const client = await pool.connect();
   try {
+    // eslint-disable-next-line no-console
+    console.log('Dashboard API: filter=', filter, 'types=', types);
     // MTD
     const mtd = await client.query(`
       SELECT
@@ -108,6 +110,9 @@ export async function GET(req: NextRequest) {
       powerCurve: pcData,
       eFTP: Number(eftp.rows[0]?.eftp ?? 0),
     });
+  } catch (err) {
+    console.error('Dashboard API error:', err);
+    return Response.json({ error: String(err) }, { status: 500 });
   } finally {
     client.release();
   }
