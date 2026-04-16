@@ -1,16 +1,17 @@
 // Maps user-facing filter labels to Strava sport_type values
 export const SPORT_FILTERS = {
-  All:   [] as string[], // empty = no filter
-  Walk:  ['Walk', 'Hike'],
-  Ride:  ['Ride', 'GravelRide'],
-  eMTB:  ['EMountainBikeRide', 'EBikeRide'],
-  MTB:   ['MountainBikeRide'],
-  Run:   ['Run'],
+  All:    [] as string[], // empty = no filter
+  Walk:   ['Walk', 'Hike'],
+  Ride:   ['Ride'],
+  Gravel: ['GravelRide'],
+  eMTB:   ['EMountainBikeRide', 'EBikeRide'],
+  MTB:    ['MountainBikeRide'],
+  Run:    ['Run'],
 } as const;
 
 export type SportFilter = keyof typeof SPORT_FILTERS;
 
-export const SPORT_FILTER_LABELS: SportFilter[] = ['All', 'Walk', 'Ride', 'eMTB', 'MTB'];
+export const SPORT_FILTER_LABELS: SportFilter[] = ['All', 'Walk', 'Ride', 'Gravel', 'eMTB', 'MTB', 'Run'];
 
 export function sportLabel(type: string): string {
   const map: Record<string, string> = {
