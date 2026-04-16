@@ -266,17 +266,17 @@ export default function DashboardHome() {
                     stackId="a"
                     fill={sportColor(type)}
                     radius={i === CYCLING_TYPES.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
-                  >
-                    {i === CYCLING_TYPES.length - 1 && (
-                      <LabelList
-                        dataKey={metric}
-                        position="top"
-                        formatter={(v: unknown) => barLabel(Number(v))}
-                        style={{ fill: '#d1d5db', fontSize: 10, fontWeight: 500 }}
-                      />
-                    )}
-                  </Bar>
+                  />
                 ))}
+                {/* Phantom zero-height bar sits at the top of every stack so the label always renders correctly */}
+                <Bar dataKey={() => 0} stackId="a" fill="transparent" isAnimationActive={false} legendType="none">
+                  <LabelList
+                    dataKey={metric}
+                    position="top"
+                    formatter={(v: unknown) => barLabel(Number(v))}
+                    style={{ fill: '#d1d5db', fontSize: 10, fontWeight: 500 }}
+                  />
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           )}
