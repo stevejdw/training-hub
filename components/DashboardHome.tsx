@@ -49,7 +49,6 @@ function StatCard({ label, value, href }: { label: string; value: string | numbe
     <div className={`bg-gray-800 rounded-xl p-4 h-full ${href ? 'hover:bg-gray-700 transition-colors cursor-pointer' : ''}`}>
       <div className="text-xs text-gray-400 uppercase tracking-wider mb-1">{label}</div>
       <div className="text-2xl font-bold text-white">{value}</div>
-      {href && <div className="text-xs text-orange-500 mt-1.5">View →</div>}
     </div>
   );
   return href ? <Link href={href} className="block">{inner}</Link> : <div>{inner}</div>;
@@ -72,10 +71,10 @@ function PeriodBlock({ title, stats, filtersParam, period }: {
     <div>
       <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">{title}</h3>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <StatCard label="Activities" value={stats.activities} href={href} />
-        <StatCard label="Distance" value={`${stats.km} km`} href={href} />
-        <StatCard label="Time" value={`${stats.hours} h`} href={href} />
-        <StatCard label="TSS" value={stats.tss} href={href} />
+        <StatCard label="Activities" value={stats.activities ?? 0} href={href} />
+        <StatCard label="Distance" value={`${stats.km ?? 0} km`} href={href} />
+        <StatCard label="Time" value={`${stats.hours ?? 0} h`} href={href} />
+        <StatCard label="TSS" value={stats.tss ?? 0} href={href} />
       </div>
     </div>
   );
@@ -172,10 +171,10 @@ export default function DashboardHome() {
                   ].filter(Boolean).join('&');
                   const href = `/activities?${qs}`;
                   return <>
-                    <StatCard label="Activities" value={data.ytd.activities} href={href} />
-                    <StatCard label="Distance" value={`${data.ytd.km} km`} href={href} />
-                    <StatCard label="Time" value={`${data.ytd.hours} h`} href={href} />
-                    <StatCard label="TSS" value={data.ytd.tss} href={href} />
+                    <StatCard label="Activities" value={data.ytd.activities ?? 0} href={href} />
+                    <StatCard label="Distance" value={`${data.ytd.km ?? 0} km`} href={href} />
+                    <StatCard label="Time" value={`${data.ytd.hours ?? 0} h`} href={href} />
+                    <StatCard label="TSS" value={data.ytd.tss ?? 0} href={href} />
                     <StatCard label="Elevation" value={`${data.ytd.elevation ?? 0} m`} href={href} />
                   </>;
                 })()}
