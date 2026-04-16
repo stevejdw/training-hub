@@ -1,0 +1,32 @@
+name: Backfill Laps
+
+on:
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: 'Number of recent activities to backfill laps for'
+        required: false
+        default: '10'
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install requests psycopg2-binary
+
+      - name: Run lap backfill
+        env:
+          STRAVA_CLIENT_ID: ${{ secrets.STRAVA_CLIENT_ID }}
+          STRAVA_CLIENT_SECRET: ${{ secrets.STRAVA_CLIENT_SECRET }}
+          STRAVA_REFRESH_TOKEN: ${{ secrets.STRAVA_REFRESH_TOKEN }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          BACKFILL_LIMIT: ${{ github.event.inputs.limit }}
+        run: python .github/scripts/backfill_laps.py
