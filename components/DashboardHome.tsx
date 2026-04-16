@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { SPORT_FILTER_LABELS, CYCLING_TYPES, SportFilter, sportColor, sportLabel } from '@/lib/sport-types';
+import DashboardBestPower from './DashboardBestPower';
 
 type Period = 'week' | 'month' | 'year';
 type Metric = 'tss' | 'km' | 'hours' | 'activities';
@@ -308,6 +309,12 @@ export default function DashboardHome() {
               <span className="text-xs text-gray-400">{sportLabel(type)}</span>
             </div>
           ))}
+        </div>
+
+        {/* Best Power */}
+        <div>
+          <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Best Power</h3>
+          <DashboardBestPower />
         </div>
 
       </div>
