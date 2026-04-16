@@ -1,0 +1,147 @@
+import pool from './db';
+import { calculateFitness } from './fitness';
+
+const FTP = Number(process.env.ATHLETE_FTP) || 340;
+
+export interface Activity {
+  id: number;
+  name: string;
+  sport_type: string;
+  start_date: string;
+  elapsed_time: number;
+  moving_time: number;
+  distance: number;
+  total_elevation_gain: number;
+  average_watts: number | null;
+  weighted_average_watts: number | null;
+  max_watts: number | null;
+  kilojoules: number | null;
+  average_heartrate: number | null;
+  max_heartrate: number | null;
+  suffer_score: number | null;
+  trainer: boolean;
+  average_speed: number | null;
+  tss: number | null;
+  intensity_factor: number | null;
+  normalized_power: number | null;
+}
+
+function formatDuration(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  return h > 0 ? `${h}h${m.toString().padStart(2, '0')}m` : `${m}m`;
+}
+
+function formatDistance(meters: number): string {
+  return (meters / 1000).toFixed(1) + 'km';
+}
+
+export async function buildTrainingContext(): Promise<string> {
+  const client = await pool.connect();
+  try {
+    // 1. Recent 90 days — full detail
+    const recentResult = await client.query<Activity>(`
+      SELECT * FROM activities
+      WHERE start_date >= NOW() - INTERVAL '90 days'
+      ORDER BY start_date DESC
+    `);
+    const recent = recentResult.rows;
+
+    // 2. Weekly summaries for the past year
+    const weeklySummaryResult = await client.query(`
+      SELECT
+        date_trunc('week', start_date)::date AS week_start,
+        COUNT(*) AS activity_count,
+        ROUND(SUM(moving_time) / 3600.0, 1) AS hours,
+        ROUND(SUM(COALESCE(tss, 0))::numeric, 0) AS total_tss,
+        ROUND(SUM(distance / 1000.0)::numeric, 0) AS total_km,
+        ROUND(SUM(total_elevation_gain)::numeric, 0) AS total_elevation,
+        STRING_AGG(DISTINCT sport_type, ', ') AS sports
+      FROM activities
+      WHERE start_date >= NOW() - INTERVAL '52 weeks'
+        AND start_date < NOW() - INTERVAL '90 days'
+      GROUP BY week_start
+      ORDER BY week_start DESC
+    `);
+    const weeklySummaries = weeklySummaryResult.rows;
+
+    // 3. All-time daily TSS for CTL/ATL/TSB
+    const dailyTssResult = await client.query(`
+      SELECT
+        TO_CHAR(start_date AT TIME ZONE 'Australia/Sydney', 'YYYY-MM-DD') AS date,
+        SUM(COALESCE(tss, 0)) AS tss
+      FROM activities
+      GROUP BY 1
+      ORDER BY 1
+    `);
+    const dailyTss = dailyTssResult.rows.map((r) => ({
+      date: String(r.date),
+      tss: Number(r.tss),
+    }));
+    const fitness = calculateFitness(dailyTss);
+
+    // 4. Annual totals
+    const annualResult = await client.query(`
+      SELECT
+        EXTRACT(YEAR FROM start_date) AS year,
+        COUNT(*) AS activities,
+        ROUND(SUM(moving_time) / 3600.0, 0) AS hours,
+        ROUND(SUM(distance / 1000.0)::numeric, 0) AS km,
+        ROUND(SUM(total_elevation_gain)::numeric, 0) AS elevation
+      FROM activities
+      GROUP BY year
+      ORDER BY year DESC
+      LIMIT 5
+    `);
+
+    // Build context string
+    const today = new Date();
+    const targetEvent = new Date('2026-05-02');
+    const daysToEvent = Math.ceil((targetEvent.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+    let ctx = `# Athlete Training Context
+Generated: ${today.toISOString().slice(0, 10)}
+
+## Athlete Profile
+- FTP: ${FTP}W
+- Target Event: May 2 2026 (${daysToEvent} days away)
+- Big Goal: Sub 8:30 Peaks Challenge 2027
+
+## Current Fitness (CTL/ATL/TSB)
+- CTL (fitness, 42-day): ${fitness.ctl}
+- ATL (fatigue, 7-day): ${fitness.atl}
+- TSB (form): ${fitness.tsb} ${fitness.tsb >= 5 ? '(fresh)' : fitness.tsb <= -20 ? '(fatigued)' : '(neutral)'}
+
+## Annual Training Volumes
+`;
+    for (const yr of annualResult.rows) {
+      ctx += `- ${yr.year}: ${yr.activities} activities, ${yr.hours}h, ${yr.km}km, ${yr.elevation}m gain\n`;
+    }
+
+    ctx += `\n## Weekly Summaries (last 52 weeks, excluding recent 90 days)\n`;
+    for (const w of weeklySummaries) {
+      ctx += `- Week of ${w.week_start}: ${w.hours}h, TSS ${w.total_tss}, ${w.total_km}km, ${w.total_elevation}m (${w.sports})\n`;
+    }
+
+    ctx += `\n## Recent Activities (last 90 days, ${recent.length} activities)\n`;
+    for (const a of recent) {
+      const date = new Date(a.start_date).toISOString().slice(0, 10);
+      const parts = [
+        `${date} [${a.sport_type}] "${a.name}"`,
+        formatDuration(a.moving_time),
+        a.distance > 0 ? formatDistance(a.distance) : null,
+        a.total_elevation_gain > 0 ? `${Math.round(a.total_elevation_gain)}m gain` : null,
+        a.normalized_power ? `NP ${Math.round(a.normalized_power)}W` : a.average_watts ? `avg ${Math.round(a.average_watts)}W` : null,
+        a.tss ? `TSS ${Math.round(a.tss)}` : null,
+        a.intensity_factor ? `IF ${a.intensity_factor.toFixed(2)}` : null,
+        a.average_heartrate ? `HR ${Math.round(a.average_heartrate)}` : null,
+        a.trainer ? '[indoor]' : null,
+      ].filter(Boolean);
+      ctx += `- ${parts.join(' | ')}\n`;
+    }
+
+    return ctx;
+  } finally {
+    client.release();
+  }
+}
