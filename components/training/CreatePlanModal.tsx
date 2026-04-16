@@ -8,12 +8,21 @@ interface Props {
   onCreated: (planId: number) => void;
 }
 
+const DOW_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
 export default function CreatePlanModal({ onClose, onCreated }: Props) {
   const [goal, setGoal] = useState('');
   const [notes, setNotes] = useState('');
   const [weeks, setWeeks] = useState(4);
+  const [trainingDays, setTrainingDays] = useState<number[]>([1, 2, 4, 5, 6]); // Tue/Wed/Fri/Sat/Sun
   const [status, setStatus] = useState<'idle' | 'generating' | 'saving' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState('');
+
+  function toggleDay(d: number) {
+    setTrainingDays(prev =>
+      prev.includes(d) ? (prev.length > 1 ? prev.filter(x => x !== d) : prev) : [...prev, d].sort()
+    );
+  }
 
   async function handleGenerate() {
     if (status !== 'idle') return;
@@ -37,7 +46,7 @@ export default function CreatePlanModal({ onClose, onCreated }: Props) {
           const r = await fetch('/api/training/generate', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ goal, notes, weekIndex: i, planStartDate, totalWeeks: weeks, planName, planGoal }),
+            body: JSON.stringify({ goal, notes, trainingDays, weekIndex: i, planStartDate, totalWeeks: weeks, planName, planGoal }),
           });
           const text = await r.text();
           let data: Record<string, unknown>;
@@ -110,6 +119,25 @@ export default function CreatePlanModal({ onClose, onCreated }: Props) {
                   }`}
                 >
                   {w}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="text-xs text-gray-400 uppercase tracking-wider block mb-2">Training days</label>
+            <div className="flex gap-1.5">
+              {DOW_LABELS.map((label, i) => (
+                <button
+                  key={i}
+                  onClick={() => toggleDay(i)}
+                  disabled={busy}
+                  className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                    trainingDays.includes(i)
+                      ? 'bg-orange-500 text-white'
+                      : 'bg-gray-800 text-gray-400 hover:text-white'
+                  }`}
+                >
+                  {label}
                 </button>
               ))}
             </div>

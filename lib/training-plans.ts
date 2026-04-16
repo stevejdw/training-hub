@@ -139,3 +139,34 @@ export async function deletePlan(id: number): Promise<void> {
     client.release();
   }
 }
+
+export async function replacePlanDays(
+  id: number,
+  goal: string,
+  days: Omit<TrainingDay, 'id' | 'plan_id'>[],
+): Promise<void> {
+  await ensureTables();
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query(
+      'UPDATE training_plans SET goal = $1 WHERE id = $2',
+      [goal, id],
+    );
+    await client.query('DELETE FROM training_days WHERE plan_id = $1', [id]);
+    for (const day of days) {
+      await client.query(
+        `INSERT INTO training_days (plan_id, date, title, type, duration_min, tss_target, description, segments)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+        [id, day.date, day.title ?? '', day.type ?? 'rest', day.duration_min ?? 0,
+          day.tss_target ?? null, day.description ?? '', JSON.stringify(day.segments ?? [])],
+      );
+    }
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}

@@ -4,11 +4,11 @@ import { useEffect, useState, useCallback } from 'react';
 import { TrainingPlan, TrainingDay } from '@/lib/training-plans';
 import PlanSelector from './training/PlanSelector';
 import BlockView from './training/BlockView';
-import WeekView from './training/WeekView';
 import DayView from './training/DayView';
 import CreatePlanModal from './training/CreatePlanModal';
+import EditPlanModal from './training/EditPlanModal';
 
-type View = { type: 'block' } | { type: 'week'; index: number } | { type: 'day'; day: TrainingDay };
+type View = { type: 'block' } | { type: 'day'; day: TrainingDay };
 
 interface PlanMeta {
   id: number;
@@ -33,45 +33,48 @@ interface ActivitySummary {
 }
 
 export default function TrainingPlanner() {
-  const [plans, setPlans]           = useState<PlanMeta[]>([]);
+  const [plans, setPlans]             = useState<PlanMeta[]>([]);
   const [activePlanId, setActivePlanId] = useState<number | null>(null);
-  const [plan, setPlan]             = useState<TrainingPlan | null>(null);
-  const [activities, setActivities] = useState<ActivitySummary[]>([]);
-  const [view, setView]             = useState<View>({ type: 'block' });
-  const [showModal, setShowModal]   = useState(false);
+  const [plan, setPlan]               = useState<TrainingPlan | null>(null);
+  const [activities, setActivities]   = useState<ActivitySummary[]>([]);
+  const [view, setView]               = useState<View>({ type: 'block' });
+  const [showCreate, setShowCreate]   = useState(false);
+  const [showEdit, setShowEdit]       = useState(false);
   const [loadingPlan, setLoadingPlan] = useState(false);
 
-  // Load plan list on mount
-  useEffect(() => {
+  const fetchPlans = useCallback(() =>
     fetch('/api/training/plans')
       .then(r => r.json())
       .then((data: PlanMeta[]) => {
         setPlans(data);
-        if (data.length > 0 && !activePlanId) {
-          setActivePlanId(data[0].id);
-        }
+        return data;
       })
-      .catch(console.error);
+      .catch(console.error), []);
+
+  useEffect(() => {
+    fetchPlans().then(data => {
+      if (data && data.length > 0 && !activePlanId) setActivePlanId(data[0].id);
+    });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Load full plan when activePlanId changes
-  useEffect(() => {
-    if (!activePlanId) { setPlan(null); return; }
+  const loadPlan = useCallback((id: number) => {
     setLoadingPlan(true);
-    fetch(`/api/training/plans/${activePlanId}`)
+    fetch(`/api/training/plans/${id}`)
       .then(r => r.json())
       .then((data: TrainingPlan) => { setPlan(data); setView({ type: 'block' }); })
       .catch(console.error)
       .finally(() => setLoadingPlan(false));
-  }, [activePlanId]);
+  }, []);
 
-  // Fetch activities for the plan's date range
+  useEffect(() => {
+    if (!activePlanId) { setPlan(null); return; }
+    loadPlan(activePlanId);
+  }, [activePlanId, loadPlan]);
+
   const loadActivities = useCallback((days: TrainingDay[]) => {
     if (!days.length) return;
-    const from = days[0].date;
-    const to   = days[days.length - 1].date;
-    fetch(`/api/training/activities?from=${from}&to=${to}`)
+    fetch(`/api/training/activities?from=${days[0].date}&to=${days[days.length - 1].date}`)
       .then(r => r.json())
       .then(setActivities)
       .catch(console.error);
@@ -83,27 +86,25 @@ export default function TrainingPlanner() {
 
   function handleDeletePlan(id: number) {
     fetch(`/api/training/plans/${id}`, { method: 'DELETE' })
-      .then(() => {
-        const remaining = plans.filter(p => p.id !== id);
-        setPlans(remaining);
+      .then(() => fetchPlans())
+      .then(data => {
+        const remaining = (data as PlanMeta[] | undefined) ?? [];
         setActivePlanId(remaining.length > 0 ? remaining[0].id : null);
-        setPlan(null);
+        if (!remaining.length) setPlan(null);
       })
       .catch(console.error);
   }
 
   function handlePlanCreated(planId: number) {
-    setShowModal(false);
-    fetch('/api/training/plans')
-      .then(r => r.json())
-      .then((data: PlanMeta[]) => {
-        setPlans(data);
-        setActivePlanId(planId);
-      })
-      .catch(console.error);
+    setShowCreate(false);
+    fetchPlans().then(() => setActivePlanId(planId));
   }
 
-  // Activities indexed by date for child components
+  function handlePlanUpdated() {
+    setShowEdit(false);
+    if (activePlanId) loadPlan(activePlanId);
+  }
+
   const actsByDate = new Map<string, ActivitySummary[]>();
   for (const a of activities) {
     const arr = actsByDate.get(a.date) ?? [];
@@ -111,35 +112,43 @@ export default function TrainingPlanner() {
     actsByDate.set(a.date, arr);
   }
 
-  const weeks: TrainingDay[][] = [];
-  if (plan?.days) {
-    for (let i = 0; i < plan.days.length; i += 7) {
-      weeks.push(plan.days.slice(i, i + 7));
-    }
-  }
-
   return (
     <div className="h-full overflow-y-auto scroll-touch">
       <div className="max-w-2xl mx-auto px-4 py-4 space-y-4">
 
-        {/* Plan selector */}
-        <PlanSelector
-          plans={plans}
-          activePlanId={activePlanId}
-          onSelect={id => { setActivePlanId(id); setView({ type: 'block' }); }}
-          onNew={() => setShowModal(true)}
-          onDelete={handleDeletePlan}
-        />
+        {/* Plan selector + edit */}
+        <div className="flex items-center gap-2">
+          <div className="flex-1 min-w-0">
+            <PlanSelector
+              plans={plans}
+              activePlanId={activePlanId}
+              onSelect={id => { setActivePlanId(id); setView({ type: 'block' }); }}
+              onNew={() => setShowCreate(true)}
+              onDelete={handleDeletePlan}
+            />
+          </div>
+          {plan && (
+            <button
+              onClick={() => setShowEdit(true)}
+              className="flex-shrink-0 w-9 h-9 flex items-center justify-center rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white transition-colors"
+              title="Edit plan"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+            </button>
+          )}
+        </div>
 
         {/* Plan goal */}
-        {plan && (
-          <div className="text-sm text-gray-400">
+        {plan && view.type === 'block' && (
+          <p className="text-sm text-gray-400">
             <span className="font-medium text-white">{plan.name}</span>
             {plan.goal && <> · {plan.goal}</>}
-          </div>
+          </p>
         )}
 
-        {/* Loading */}
+        {/* Loading skeleton */}
         {loadingPlan && (
           <div className="space-y-3">
             {[1, 2, 3, 4].map(i => (
@@ -155,7 +164,7 @@ export default function TrainingPlanner() {
             <h3 className="text-lg font-semibold text-white">No training plans yet</h3>
             <p className="text-sm text-gray-400">Generate a personalised plan with AI based on your profile and goals</p>
             <button
-              onClick={() => setShowModal(true)}
+              onClick={() => setShowCreate(true)}
               className="mt-2 px-5 py-2.5 bg-orange-500 hover:bg-orange-400 text-white rounded-xl text-sm font-medium transition-colors"
             >
               Generate a plan
@@ -170,19 +179,7 @@ export default function TrainingPlanner() {
               <BlockView
                 days={plan.days}
                 activities={activities}
-                onSelectWeek={wi => setView({ type: 'week', index: wi })}
-              />
-            )}
-
-            {view.type === 'week' && (
-              <WeekView
-                days={weeks[view.index] ?? []}
-                activities={activities.filter(a =>
-                  (weeks[view.index] ?? []).some(d => d.date === a.date)
-                )}
                 onSelectDay={day => setView({ type: 'day', day })}
-                onBack={() => setView({ type: 'block' })}
-                weekIndex={view.index}
               />
             )}
 
@@ -190,11 +187,7 @@ export default function TrainingPlanner() {
               <DayView
                 day={view.day}
                 activities={actsByDate.get(view.day.date) ?? []}
-                onBack={() => {
-                  // Go back to the week that contains this day
-                  const wi = weeks.findIndex(w => w.some(d => d.date === view.day.date));
-                  setView({ type: 'week', index: wi >= 0 ? wi : 0 });
-                }}
+                onBack={() => setView({ type: 'block' })}
               />
             )}
           </>
@@ -202,10 +195,18 @@ export default function TrainingPlanner() {
 
       </div>
 
-      {showModal && (
+      {showCreate && (
         <CreatePlanModal
-          onClose={() => setShowModal(false)}
+          onClose={() => setShowCreate(false)}
           onCreated={handlePlanCreated}
+        />
+      )}
+
+      {showEdit && plan && (
+        <EditPlanModal
+          plan={plan}
+          onClose={() => setShowEdit(false)}
+          onUpdated={handlePlanUpdated}
         />
       )}
     </div>
