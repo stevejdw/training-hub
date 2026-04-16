@@ -7,6 +7,7 @@ const links = [
   { href: '/chat', label: 'Coach', icon: '💬' },
   { href: '/dashboard', label: 'Dashboard', icon: '📊' },
   { href: '/activities', label: 'Activities', icon: '🗂️' },
+  { href: '/profile', label: 'Profile', icon: '⚙️' },
 ];
 
 export default function Nav() {

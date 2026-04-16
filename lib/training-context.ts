@@ -1,7 +1,6 @@
 import pool from './db';
 import { calculateFitness } from './fitness';
-
-const FTP = Number(process.env.ATHLETE_FTP) || 340;
+import { getProfile, effectiveFtp } from './profile';
 
 export interface Activity {
   id: number;
@@ -37,7 +36,8 @@ function formatDistance(meters: number): string {
 }
 
 export async function buildTrainingContext(): Promise<string> {
-  const client = await pool.connect();
+  const [client, profile] = await Promise.all([pool.connect(), getProfile()]);
+  const FTP = effectiveFtp(profile);
   try {
     // 1. Recent 90 days — full detail
     const recentResult = await client.query<Activity>(`
@@ -117,17 +117,19 @@ export async function buildTrainingContext(): Promise<string> {
 
     // Build context string
     const today = new Date();
-    const targetEvent = new Date('2026-05-02');
-    const daysToEvent = Math.ceil((targetEvent.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 
     let ctx = `# Athlete Training Context
 Generated: ${today.toISOString().slice(0, 10)}
 
 ## Athlete Profile
-- FTP: ${FTP}W
-- Target Event: May 2 2026 (${daysToEvent} days away)
-- Big Goal: Sub 8:30 Peaks Challenge 2027
-
+- Name: ${profile.name}
+- FTP: ${FTP}W${profile.use_eftp && profile.eftp ? ` (eFTP-derived, raw FTP ${profile.ftp}W)` : ''}
+${profile.weight_kg ? `- Weight: ${profile.weight_kg}kg\n` : ''}\
+${profile.training_goals ? `- Training Goals: ${profile.training_goals}\n` : ''}\
+${profile.events.length > 0 ? profile.events.map(e => {
+  const days = Math.ceil((new Date(e.date).getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  return `- Event: ${e.name} on ${e.date} (${days} days away)${e.goal ? ` — Goal: ${e.goal}` : ''}`;
+}).join('\n') + '\n' : ''}
 ## Current Fitness (CTL/ATL/TSB)
 - CTL (fitness, 42-day): ${fitness.ctl}
 - ATL (fatigue, 7-day): ${fitness.atl}

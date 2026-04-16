@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { buildTrainingContext } from '@/lib/training-context';
+import { getProfile, effectiveFtp } from '@/lib/profile';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -12,9 +13,10 @@ export async function POST(req: Request) {
   try {
     const { messages } = await req.json();
 
-    const trainingContext = await buildTrainingContext();
+    const [trainingContext, profile] = await Promise.all([buildTrainingContext(), getProfile()]);
+    const ftp = effectiveFtp(profile);
 
-    const systemPrompt = `You are a personal cycling coach and training analyst for Steve. You have access to his complete training history and should use it to give specific, data-driven advice.
+    const systemPrompt = `You are a personal cycling coach and training analyst for ${profile.name}. You have access to his complete training history and should use it to give specific, data-driven advice.
 
 ${trainingContext}
 
@@ -24,7 +26,7 @@ ${trainingContext}
 - Give advice tailored to Steve's current fitness (CTL/ATL/TSB) and goals
 - Help with pacing, race strategy, training load management
 - Be direct and specific — use the actual numbers from his data
-- When discussing power, always reference his FTP of ${process.env.ATHLETE_FTP || 340}W
+- When discussing power, always reference his FTP of ${ftp}W
 
 ## Lap Data
 The training context above includes per-lap data (power, HR, distance, time) for recent activities under each activity entry as indented "Laps:" sections. When asked to analyse a ride or provide feedback on efforts, you MUST use this lap data. Go through each lap individually — reference the actual Avg Watts, NP, Avg HR, Max HR, and duration for each lap. Identify which laps represent hard efforts vs recovery, comment on pacing, and note any HR/power decoupling across the ride.
