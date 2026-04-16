@@ -1,0 +1,33 @@
+name: Backfill Power Streams
+
+on:
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: 'Number of recent activities to backfill (use 0 for all)'
+        required: false
+        default: '10'
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install requests psycopg2-binary
+
+      - name: Run power stream backfill
+        env:
+          STRAVA_CLIENT_ID: ${{ secrets.STRAVA_CLIENT_ID }}
+          STRAVA_CLIENT_SECRET: ${{ secrets.STRAVA_CLIENT_SECRET }}
+          STRAVA_REFRESH_TOKEN: ${{ secrets.STRAVA_REFRESH_TOKEN }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          BACKFILL_LIMIT: ${{ github.event.inputs.limit }}
+          BACKFILL_ALL: ${{ github.event.inputs.limit == '0' && '1' || '0' }}
+        run: python .github/scripts/backfill_power_streams.py

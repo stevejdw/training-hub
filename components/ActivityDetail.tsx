@@ -200,83 +200,87 @@ export default function ActivityDetail({ id }: { id: string }) {
           )}
         </div>
 
-        {/* Best Power */}
-        {activity.average_watts && (
-          <div>
-            <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Best Power</h3>
-            <div className="bg-gray-800 rounded-xl p-4 flex items-center gap-4">
-              <select
-                value={bpSeconds}
-                onChange={e => setBpSeconds(Number(e.target.value))}
-                className="bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-orange-500 flex-shrink-0"
-              >
-                {INTERVALS.map(iv => (
-                  <option key={iv.seconds} value={iv.seconds}>{iv.label}</option>
-                ))}
-              </select>
-              <div className="flex-1 text-right">
-                {bpLoading ? (
-                  <div className="h-8 w-24 bg-gray-700 rounded animate-pulse ml-auto" />
-                ) : bpWatts !== null && bpWatts !== undefined ? (
-                  <span className="text-2xl font-bold text-white">{bpWatts}<span className="text-sm font-normal text-gray-400 ml-1">W</span></span>
-                ) : (
-                  <span className="text-sm text-gray-500">No power data</span>
-                )}
+        {/* Laps + Best Power side by side */}
+        <div className="flex gap-3 items-start">
+
+          {/* Laps — left, scrollable */}
+          {laps.length > 0 ? (
+            <div className="flex-1 min-w-0">
+              <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">
+                Laps <span className="text-gray-600 font-normal">({laps.length})</span>
+              </h3>
+              <div className="bg-gray-800 rounded-xl overflow-x-auto scroll-touch">
+                <table className="text-xs whitespace-nowrap w-full">
+                  <thead>
+                    <tr className="border-b border-gray-700">
+                      <th className="text-left px-2 py-2 text-gray-400 font-medium">#</th>
+                      <th className="text-right px-2 py-2 text-gray-400 font-medium">Dist</th>
+                      <th className="text-right px-2 py-2 text-gray-400 font-medium">Time</th>
+                      <th className="text-right px-2 py-2 text-gray-400 font-medium">W</th>
+                      <th className="text-right px-2 py-2 text-gray-400 font-medium">NP</th>
+                      <th className="text-right px-2 py-2 text-gray-400 font-medium">HR</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {laps.map((lap, i) => (
+                      <tr key={lap.id} className={`border-b border-gray-700/50 ${i % 2 === 0 ? '' : 'bg-gray-900/40'}`}>
+                        <td className="px-2 py-1.5 text-gray-400">{lap.lap_index + 1}</td>
+                        <td className="px-2 py-1.5 text-right text-gray-300">
+                          {lap.distance > 0 ? `${(lap.distance / 1000).toFixed(1)}` : '—'}
+                        </td>
+                        <td className="px-2 py-1.5 text-right text-gray-300">{fmt(lap.moving_time)}</td>
+                        <td className="px-2 py-1.5 text-right text-gray-300">
+                          {lap.average_watts ? Math.round(lap.average_watts) : '—'}
+                        </td>
+                        <td className="px-2 py-1.5 text-right text-gray-300">
+                          {lap.normalized_power ? Math.round(lap.normalized_power) : '—'}
+                        </td>
+                        <td className="px-2 py-1.5 text-right text-gray-300">
+                          {lap.average_heartrate ? Math.round(lap.average_heartrate) : '—'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
-          </div>
-        )}
-
-        {/* Laps */}
-        {laps.length > 0 ? (
-          <div>
-            <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">
-              Laps <span className="text-gray-600 font-normal">({laps.length})</span>
-            </h3>
-            <div className="bg-gray-800 rounded-xl overflow-x-auto scroll-touch">
-              <table className="text-xs sm:text-sm whitespace-nowrap">
-                <thead>
-                  <tr className="border-b border-gray-700">
-                    <th className="text-left px-3 py-2.5 text-gray-400 font-medium">#</th>
-                    <th className="text-right px-3 py-2.5 text-gray-400 font-medium">Dist</th>
-                    <th className="text-right px-3 py-2.5 text-gray-400 font-medium">Time</th>
-                    <th className="text-right px-3 py-2.5 text-gray-400 font-medium">Avg W</th>
-                    <th className="text-right px-3 py-2.5 text-gray-400 font-medium">NP</th>
-                    <th className="text-right px-3 py-2.5 text-gray-400 font-medium">Avg HR</th>
-                    <th className="text-right px-3 py-2.5 text-gray-400 font-medium">Max HR</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {laps.map((lap, i) => (
-                    <tr key={lap.id} className={`border-b border-gray-700/50 ${i % 2 === 0 ? '' : 'bg-gray-800/50'}`}>
-                      <td className="px-3 py-2 text-gray-400">{lap.lap_index + 1}</td>
-                      <td className="px-3 py-2 text-right text-gray-300">
-                        {lap.distance > 0 ? `${(lap.distance / 1000).toFixed(2)}` : '—'}
-                      </td>
-                      <td className="px-3 py-2 text-right text-gray-300">{fmt(lap.moving_time)}</td>
-                      <td className="px-3 py-2 text-right text-gray-300">
-                        {lap.average_watts ? `${Math.round(lap.average_watts)}` : '—'}
-                      </td>
-                      <td className="px-3 py-2 text-right text-gray-300">
-                        {lap.normalized_power ? `${Math.round(lap.normalized_power)}` : '—'}
-                      </td>
-                      <td className="px-3 py-2 text-right text-gray-300">
-                        {lap.average_heartrate ? Math.round(lap.average_heartrate) : '—'}
-                      </td>
-                      <td className="px-3 py-2 text-right text-gray-300">
-                        {lap.max_heartrate ? Math.round(lap.max_heartrate) : '—'}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          ) : (
+            <div className="flex-1 bg-gray-800/50 border border-gray-700 border-dashed rounded-xl p-4 text-center">
+              <p className="text-gray-500 text-xs">Lap data unavailable</p>
             </div>
-          </div>
-        ) : (
-          <div className="bg-gray-800/50 border border-gray-700 border-dashed rounded-xl p-5 text-center">
-            <p className="text-gray-500 text-sm">Lap data unavailable — activity predates lap sync</p>
-          </div>
-        )}
+          )}
+
+          {/* Best Power — right column */}
+          {activity.average_watts && (
+            <div className="w-36 flex-shrink-0">
+              <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Best Power</h3>
+              <div className="bg-gray-800 rounded-xl p-3 flex flex-col gap-3">
+                <select
+                  value={bpSeconds}
+                  onChange={e => setBpSeconds(Number(e.target.value))}
+                  className="w-full bg-gray-700 border border-gray-600 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-orange-500"
+                >
+                  {INTERVALS.map(iv => (
+                    <option key={iv.seconds} value={iv.seconds}>{iv.label}</option>
+                  ))}
+                </select>
+                <div className="text-center">
+                  {bpLoading ? (
+                    <div className="h-8 bg-gray-700 rounded animate-pulse" />
+                  ) : bpWatts !== null && bpWatts !== undefined ? (
+                    <div>
+                      <span className="text-2xl font-bold text-white">{bpWatts}</span>
+                      <span className="text-xs text-gray-400 ml-1">W</span>
+                    </div>
+                  ) : (
+                    <span className="text-xs text-gray-500">No data</span>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+        </div>{/* end laps+power row */}
 
         {/* No route notice (only shown when polyline is missing) */}
         {!activity.summary_polyline && (
