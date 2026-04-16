@@ -4,7 +4,7 @@ import { getProfile, effectiveFtp } from '@/lib/profile';
 import pool from '@/lib/db';
 
 export const runtime = 'nodejs';
-export const maxDuration = 120;
+export const maxDuration = 60;
 
 const client = new Anthropic();
 
@@ -91,19 +91,19 @@ Return ONLY valid JSON matching this exact structure — no markdown, no explana
 }
 
 Rules:
-- Include ALL ${weeks * 7} days (rest days have type "rest", duration_min 0, empty segments)
-- Use athlete's FTP (${ftp}W) for power targets: Z2=55-75%, Z3=76-87%, Threshold=88-95%, VO2=106-120%
-- Include warmup and cooldown segments for every non-rest day
-- TSS targets should reflect the session type and athlete level
-- Vary load: build weeks should increase TSS, every 4th week is recovery`;
+- Include ALL ${weeks * 7} days. Rest days: type "rest", duration_min 0, tss_target 0, segments [].
+- FTP=${ftp}W: Z2=55-75%, Z3=76-87%, Threshold=88-95%, VO2=106-120%
+- Every session has warmup + main + cooldown segments. Keep descriptions brief (under 20 words).
+- Vary weekly load; recovery week every 4th week.
+- Be concise — short strings only. No extra fields.`;
 
     const userPrompt = goal
       ? `Create a ${weeks}-week plan focused on: ${goal}${notes ? '\nAdditional notes: ' + notes : ''}`
       : `Create a balanced ${weeks}-week base fitness plan${notes ? '\nNotes: ' + notes : ''}`;
 
     const message = await client.messages.create({
-      model: 'claude-opus-4-6',
-      max_tokens: 8192,
+      model: 'claude-sonnet-4-6',
+      max_tokens: 6000,
       system: systemPrompt,
       messages: [{ role: 'user', content: userPrompt }],
     });
