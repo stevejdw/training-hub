@@ -142,10 +142,20 @@ def sync():
         # Fetch laps + power stream for each new activity
         for activity_id in new_activity_ids:
             laps = fetch_laps(token, activity_id)
+            power_stream = fetch_power_stream(token, activity_id)
+
+            # Store power stream for best-power calculations
+            if power_stream:
+                cur.execute("""
+                    INSERT INTO activity_streams (activity_id, watts)
+                    VALUES (%s, %s)
+                    ON CONFLICT (activity_id) DO UPDATE SET watts = EXCLUDED.watts
+                """, (activity_id, power_stream))
+                conn.commit()
+                print(f"  Stored power stream ({len(power_stream)}pts) for activity {activity_id}")
+
             if not laps:
                 continue
-
-            power_stream = fetch_power_stream(token, activity_id)
 
             lap_rows = []
             for lap in laps:

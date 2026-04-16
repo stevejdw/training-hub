@@ -5,6 +5,38 @@ import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { sportLabel, sportColor } from '@/lib/sport-types';
 
+const INTERVALS: { label: string; seconds: number }[] = [
+  { label: '1 sec',   seconds: 1 },
+  { label: '3 sec',   seconds: 3 },
+  { label: '5 sec',   seconds: 5 },
+  { label: '10 sec',  seconds: 10 },
+  { label: '30 sec',  seconds: 30 },
+  { label: '1 min',   seconds: 60 },
+  { label: '2 min',   seconds: 120 },
+  { label: '3 min',   seconds: 180 },
+  { label: '5 min',   seconds: 300 },
+  { label: '8 min',   seconds: 480 },
+  { label: '10 min',  seconds: 600 },
+  { label: '15 min',  seconds: 900 },
+  { label: '20 min',  seconds: 1200 },
+  { label: '30 min',  seconds: 1800 },
+  { label: '45 min',  seconds: 2700 },
+  { label: '60 min',  seconds: 3600 },
+  { label: '90 min',  seconds: 5400 },
+  { label: '2 hr',    seconds: 7200 },
+  { label: '3 hr',    seconds: 10800 },
+  { label: '4 hr',    seconds: 14400 },
+  { label: '5 hr',    seconds: 18000 },
+  { label: '6 hr',    seconds: 21600 },
+  { label: '7 hr',    seconds: 25200 },
+  { label: '8 hr',    seconds: 28800 },
+  { label: '9 hr',    seconds: 32400 },
+  { label: '10 hr',   seconds: 36000 },
+  { label: '11 hr',   seconds: 39600 },
+  { label: '12 hr',   seconds: 43200 },
+  { label: '15 hr',   seconds: 54000 },
+];
+
 const ActivityMap = dynamic(() => import('./ActivityMap'), { ssr: false });
 
 interface Activity {
@@ -68,6 +100,9 @@ export default function ActivityDetail({ id }: { id: string }) {
   const [laps, setLaps] = useState<Lap[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [bpSeconds, setBpSeconds] = useState(300); // default 5 min
+  const [bpWatts, setBpWatts] = useState<number | null | undefined>(undefined); // undefined=not fetched, null=no data
+  const [bpLoading, setBpLoading] = useState(false);
 
   useEffect(() => {
     fetch(`/api/activities/${id}`)
@@ -79,6 +114,16 @@ export default function ActivityDetail({ id }: { id: string }) {
       })
       .catch(() => { setError(true); setLoading(false); });
   }, [id]);
+
+  useEffect(() => {
+    if (!activity) return;
+    setBpLoading(true);
+    setBpWatts(undefined);
+    fetch(`/api/activities/${id}/best-power?seconds=${bpSeconds}`)
+      .then(r => r.json())
+      .then(d => { setBpWatts(d.watts ?? null); setBpLoading(false); })
+      .catch(() => { setBpWatts(null); setBpLoading(false); });
+  }, [id, activity, bpSeconds]);
 
   if (loading) {
     return (
@@ -154,6 +199,33 @@ export default function ActivityDetail({ id }: { id: string }) {
             </div>
           )}
         </div>
+
+        {/* Best Power */}
+        {activity.average_watts && (
+          <div>
+            <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Best Power</h3>
+            <div className="bg-gray-800 rounded-xl p-4 flex items-center gap-4">
+              <select
+                value={bpSeconds}
+                onChange={e => setBpSeconds(Number(e.target.value))}
+                className="bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-orange-500 flex-shrink-0"
+              >
+                {INTERVALS.map(iv => (
+                  <option key={iv.seconds} value={iv.seconds}>{iv.label}</option>
+                ))}
+              </select>
+              <div className="flex-1 text-right">
+                {bpLoading ? (
+                  <div className="h-8 w-24 bg-gray-700 rounded animate-pulse ml-auto" />
+                ) : bpWatts !== null && bpWatts !== undefined ? (
+                  <span className="text-2xl font-bold text-white">{bpWatts}<span className="text-sm font-normal text-gray-400 ml-1">W</span></span>
+                ) : (
+                  <span className="text-sm text-gray-500">No power data</span>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Laps */}
         {laps.length > 0 ? (
