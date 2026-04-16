@@ -21,25 +21,40 @@ export default function CreatePlanModal({ onClose, onCreated }: Props) {
     setErrorMsg('');
 
     try {
-      const genRes = await fetch('/api/training/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ goal, notes, weeks }),
-      });
-      const genData = await genRes.json();
-      if (!genRes.ok || genData.error) {
-        throw new Error(genData.error ?? 'Generation failed');
+      // Compute plan start date (this Monday in Sydney time, UTC+10)
+      const now = new Date(Date.now() + 10 * 60 * 60 * 1000);
+      const dow = now.getUTCDay();
+      const daysFromMon = dow === 0 ? 6 : dow - 1;
+      const mon = new Date(now.getTime() - daysFromMon * 86400000);
+      const planStartDate = mon.toISOString().slice(0, 10);
+
+      const planName = `${weeks}-Week Plan${goal ? ': ' + goal.slice(0, 40) : ''}`;
+      const planGoal = goal || 'Base fitness';
+
+      // Generate all weeks in parallel — each call handles 1 week (~2s per call)
+      const weekResults = await Promise.all(
+        Array.from({ length: weeks }, (_, i) =>
+          fetch('/api/training/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ goal, notes, weekIndex: i, planStartDate, totalWeeks: weeks, planName, planGoal }),
+          }).then(r => r.json())
+        )
+      );
+
+      // Check for errors
+      for (const result of weekResults) {
+        if (result.error) throw new Error(result.error);
       }
+
+      // Combine all days in order
+      const allDays = weekResults.flatMap((r: { days: TrainingDay[] }) => r.days ?? []);
 
       setStatus('saving');
       const saveRes = await fetch('/api/training/plans', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: genData.name,
-          goal: genData.goal,
-          days: (genData.days as TrainingDay[]),
-        }),
+        body: JSON.stringify({ name: planName, goal: planGoal, days: allDays }),
       });
       const saved = await saveRes.json();
       if (!saveRes.ok || saved.error) {
