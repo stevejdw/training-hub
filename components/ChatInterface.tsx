@@ -15,14 +15,24 @@ interface ChatSession {
 }
 
 const STORAGE_KEY = 'training_hub_chats';
+const PROMPTS_KEY = 'training_hub_prompts';
 const MAX_STORED = 50;
 
-const SUGGESTED_QUESTIONS = [
+const DEFAULT_QUESTIONS = [
   {
     label: 'Provide feedback on the last ride',
     prompt: 'Provide feedback on the last ride. Include an analysis of key laps or efforts, correlation between heart rate and power, any observations on changes to fitness, and feedback on the session vs training plan.',
   },
 ];
+
+function loadPrompts(): Record<string, string> {
+  if (typeof window === 'undefined') return {};
+  try {
+    return JSON.parse(localStorage.getItem(PROMPTS_KEY) ?? '{}');
+  } catch {
+    return {};
+  }
+}
 
 function loadSessions(): ChatSession[] {
   if (typeof window === 'undefined') return [];
@@ -100,12 +110,16 @@ export default function ChatInterface() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [customPrompts, setCustomPrompts] = useState<Record<string, string>>({});
+  const [editingLabel, setEditingLabel] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  // Load sessions from localStorage on mount
+  // Load sessions and custom prompts from localStorage on mount
   useEffect(() => {
     setSessions(loadSessions());
+    setCustomPrompts(loadPrompts());
   }, []);
 
   useEffect(() => {
@@ -153,6 +167,27 @@ export default function ChatInterface() {
       setMessages([]);
       setCurrentId(null);
     }
+  }
+
+  function openEdit(label: string, currentPrompt: string) {
+    setEditingLabel(label);
+    setEditDraft(currentPrompt);
+  }
+
+  function saveEdit() {
+    if (!editingLabel) return;
+    const next = { ...customPrompts, [editingLabel]: editDraft };
+    setCustomPrompts(next);
+    localStorage.setItem(PROMPTS_KEY, JSON.stringify(next));
+    setEditingLabel(null);
+  }
+
+  function resetPrompt(label: string, defaultPrompt: string) {
+    const next = { ...customPrompts };
+    delete next[label];
+    setCustomPrompts(next);
+    localStorage.setItem(PROMPTS_KEY, JSON.stringify(next));
+    setEditDraft(defaultPrompt);
   }
 
   async function sendMessage(text: string) {
@@ -318,15 +353,65 @@ export default function ChatInterface() {
                 fitness trends, power data, and more.
               </p>
               <div className="grid grid-cols-1 gap-2 w-full max-w-lg">
-                {SUGGESTED_QUESTIONS.map((q) => (
-                  <button
-                    key={q.label}
-                    onClick={() => sendMessage(q.prompt)}
-                    className="text-left text-sm text-gray-300 bg-gray-800 hover:bg-gray-700 border border-gray-700 hover:border-orange-500 rounded-xl px-4 py-2.5 transition-colors"
-                  >
-                    {q.label}
-                  </button>
-                ))}
+                {DEFAULT_QUESTIONS.map((q) => {
+                  const prompt = customPrompts[q.label] ?? q.prompt;
+                  return (
+                    <div key={q.label} className="relative group">
+                      {editingLabel === q.label ? (
+                        <div className="bg-gray-800 border border-orange-500/50 rounded-xl p-3 space-y-2">
+                          <p className="text-xs text-gray-400 font-medium">{q.label} — edit prompt</p>
+                          <textarea
+                            value={editDraft}
+                            onChange={e => setEditDraft(e.target.value)}
+                            rows={5}
+                            className="w-full bg-gray-900 text-sm text-gray-200 rounded-lg p-2 outline-none resize-none border border-gray-700 focus:border-orange-500"
+                          />
+                          <div className="flex gap-2 justify-end">
+                            <button
+                              onClick={() => resetPrompt(q.label, q.prompt)}
+                              className="text-xs text-gray-500 hover:text-gray-300 px-2 py-1 transition-colors"
+                            >
+                              Reset to default
+                            </button>
+                            <button
+                              onClick={() => setEditingLabel(null)}
+                              className="text-xs text-gray-400 hover:text-white px-3 py-1 rounded-lg bg-gray-700 transition-colors"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              onClick={saveEdit}
+                              className="text-xs text-white px-3 py-1 rounded-lg bg-orange-500 hover:bg-orange-400 transition-colors"
+                            >
+                              Save
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => sendMessage(prompt)}
+                            className="w-full text-left text-sm text-gray-300 bg-gray-800 hover:bg-gray-700 border border-gray-700 hover:border-orange-500 rounded-xl px-4 py-2.5 transition-colors pr-10"
+                          >
+                            {q.label}
+                            {customPrompts[q.label] && (
+                              <span className="ml-2 text-xs text-orange-500/70">customised</span>
+                            )}
+                          </button>
+                          <button
+                            onClick={() => openEdit(q.label, prompt)}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 p-1.5 text-gray-500 hover:text-white transition-all rounded-lg hover:bg-gray-700"
+                            title="Edit prompt"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 012.828 2.828L11.828 15.828a2 2 0 01-1.414.586H7v-3.414a2 2 0 01.586-1.414z" />
+                            </svg>
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           ) : (
