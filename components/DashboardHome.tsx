@@ -97,7 +97,7 @@ export default function DashboardHome() {
   }, [filtersParam]);
 
   return (
-    <div className="h-[calc(100vh-64px)] overflow-y-auto">
+    <div className="h-full overflow-y-auto scroll-touch">
       <div className="max-w-5xl mx-auto px-4 py-6 space-y-8">
 
         {/* Multi-select filters */}

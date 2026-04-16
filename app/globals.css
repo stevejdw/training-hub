@@ -3,6 +3,12 @@
 :root {
   --background: #030712;
   --foreground: #f9fafb;
+  /* Safe area insets for iPhone notch / home indicator */
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  /* Nav heights */
+  --top-nav-h: 64px;
+  --bottom-nav-h: 56px;
 }
 
 @theme inline {
@@ -12,15 +18,43 @@
   --font-mono: var(--font-geist-mono);
 }
 
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html {
+  height: 100%;
+  /* Prevent elastic/bounce scroll at page level */
+  overscroll-behavior: none;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
-}
-
-* {
-  box-sizing: border-box;
-}
-
-html, body {
   height: 100%;
+  overscroll-behavior: none;
+  /* Prevent text size adjustment on rotation */
+  -webkit-text-size-adjust: 100%;
+}
+
+/* Content area: fills screen minus top nav on desktop, minus bottom nav on mobile */
+.content-area {
+  height: calc(100dvh - var(--top-nav-h));
+  overflow: hidden;
+}
+
+@media (max-width: 767px) {
+  .content-area {
+    /* On mobile: full height minus bottom nav and home indicator */
+    height: calc(100dvh - var(--bottom-nav-h) - var(--sab));
+    /* Top: leave room for status bar in standalone mode */
+    padding-top: var(--sat);
+  }
+}
+
+/* Smooth momentum scrolling on iOS for any scroll container */
+.scroll-touch {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
 }

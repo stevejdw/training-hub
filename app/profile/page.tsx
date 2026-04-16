@@ -4,7 +4,7 @@ export const metadata = { title: 'Profile | Training Hub' };
 
 export default function ProfilePage() {
   return (
-    <div className="h-[calc(100vh-64px)] overflow-y-auto">
+    <div className="h-full overflow-y-auto scroll-touch">
       <ProfileEditor />
     </div>
   );

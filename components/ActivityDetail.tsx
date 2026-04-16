@@ -104,7 +104,7 @@ export default function ActivityDetail({ id }: { id: string }) {
     ? Math.round(activity.intensity_factor * FTP) : null;
 
   return (
-    <div className="h-[calc(100vh-64px)] overflow-y-auto">
+    <div className="h-full overflow-y-auto scroll-touch">
       <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
 
         <Link href="/activities" className="text-sm text-gray-500 hover:text-orange-400 transition-colors">

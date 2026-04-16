@@ -79,7 +79,7 @@ export default function ActivitiesList() {
   }, [selected, page]);
 
   return (
-    <div className="h-[calc(100vh-64px)] flex flex-col">
+    <div className="h-full flex flex-col">
       {/* Header */}
       <div className="border-b border-gray-800 px-4 py-3 flex items-center gap-3 flex-wrap flex-shrink-0">
         <div className="flex gap-2 flex-wrap">
@@ -111,7 +111,7 @@ export default function ActivitiesList() {
       </div>
 
       {/* Table */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto scroll-touch">
         <table className="w-full text-sm">
           <thead className="sticky top-0 bg-gray-900 border-b border-gray-800">
             <tr>
