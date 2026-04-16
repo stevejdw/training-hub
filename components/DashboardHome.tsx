@@ -1,11 +1,19 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, LabelList } from 'recharts';
-import { SPORT_FILTER_LABELS, SportFilter } from '@/lib/sport-types';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LabelList } from 'recharts';
+import { SPORT_FILTER_LABELS, CYCLING_TYPES, SportFilter, sportColor, sportLabel } from '@/lib/sport-types';
 
 type Period = 'week' | 'month' | 'year';
 type Metric = 'tss' | 'km' | 'hours' | 'activities';
+
+interface TypeData {
+  activities: number;
+  km: number;
+  hours: number;
+  tss: number;
+  elevation: number;
+}
 
 interface BarData {
   label: string;
@@ -15,6 +23,11 @@ interface BarData {
   hours: number;
   tss: number;
   elevation: number;
+  byType: Record<string, TypeData>;
+}
+
+interface FlatBar extends BarData {
+  [key: string]: unknown;
 }
 
 interface ChartResponse {
@@ -26,11 +39,11 @@ interface ChartResponse {
 
 const TYPE_FILTERS = SPORT_FILTER_LABELS.filter(f => f !== 'All') as SportFilter[];
 
-const METRIC_OPTS: { key: Metric; label: string; unit: string; color: string }[] = [
-  { key: 'km',         label: 'Distance',  unit: 'km', color: '#fb923c' },
-  { key: 'hours',      label: 'Time',      unit: 'h',  color: '#fdba74' },
-  { key: 'activities', label: 'Rides',     unit: '',   color: '#fed7aa' },
-  { key: 'tss',        label: 'TSS',       unit: '',   color: '#f97316' },
+const METRIC_OPTS: { key: Metric; label: string; unit: string }[] = [
+  { key: 'km',         label: 'Distance',  unit: 'km' },
+  { key: 'hours',      label: 'Time',      unit: 'h'  },
+  { key: 'activities', label: 'Rides',     unit: ''   },
+  { key: 'tss',        label: 'TSS',       unit: ''   },
 ];
 
 function SummaryCard({ label, value }: { label: string; value: string }) {
@@ -43,13 +56,32 @@ function SummaryCard({ label, value }: { label: string; value: string }) {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function CustomTooltip({ active, payload, label, unit }: any) {
+function CustomTooltip({ active, payload, label, metric, unit }: any) {
   if (!active || !payload?.length) return null;
-  const val = payload[0].value;
+  const nonZero = (payload as { dataKey: string; value: number; fill: string }[])
+    .filter(p => Number(p.value) > 0);
+  const total = nonZero.reduce((s, p) => s + Number(p.value), 0);
+  const fmt = (v: number) => {
+    if (metric === 'km')    return v >= 100 ? Math.round(v).toString() : v.toFixed(1);
+    if (metric === 'hours') return v >= 10  ? Math.round(v).toString() : v.toFixed(1);
+    return Math.round(v).toString();
+  };
   return (
     <div className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-xs shadow-lg">
-      <p className="text-gray-400 mb-0.5">{label}</p>
-      <p className="text-white font-semibold">{val}{unit ? ` ${unit}` : ''}</p>
+      <p className="text-gray-400 mb-1">{label}</p>
+      {nonZero.map(p => {
+        const type = p.dataKey.slice(metric.length + 1);
+        return (
+          <p key={p.dataKey} style={{ color: p.fill }} className="font-medium">
+            {sportLabel(type)}: {fmt(Number(p.value))}{unit ? ` ${unit}` : ''}
+          </p>
+        );
+      })}
+      {nonZero.length > 1 && (
+        <p className="text-white font-semibold border-t border-gray-700 mt-1 pt-1">
+          Total: {fmt(total)}{unit ? ` ${unit}` : ''}
+        </p>
+      )}
     </div>
   );
 }
@@ -63,7 +95,6 @@ export default function DashboardHome() {
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState<string | null>(null);
 
-  // Reset offset when period changes
   function changePeriod(p: Period) { setPeriod(p); setOffset(0); }
 
   function toggleFilter(f: SportFilter) {
@@ -89,8 +120,14 @@ export default function DashboardHome() {
 
   const metricCfg = METRIC_OPTS.find(m => m.key === metric)!;
 
-  const bars = data?.bars ?? [];
-  const maxVal = Math.max(...bars.map(b => Number(b[metric]) || 0), 1);
+  // Flatten byType into recharts-friendly keys: `${metric}_${sportType}`
+  const flatBars: FlatBar[] = (data?.bars ?? []).map(b => {
+    const flat: FlatBar = { ...b };
+    for (const type of CYCLING_TYPES) {
+      flat[`${metric}_${type}`] = b.byType?.[type]?.[metric] ?? 0;
+    }
+    return flat;
+  });
 
   function barLabel(value: number) {
     if (!value) return '';
@@ -210,7 +247,7 @@ export default function DashboardHome() {
             <div className="h-48 animate-pulse bg-gray-800 rounded-lg" />
           ) : (
             <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={bars} margin={{ top: 20, right: 4, left: 4, bottom: 0 }} barCategoryGap="25%">
+              <BarChart data={flatBars} margin={{ top: 20, right: 4, left: 4, bottom: 0 }} barCategoryGap="25%">
                 <XAxis
                   dataKey="label"
                   tick={{ fill: '#9ca3af', fontSize: 11 }}
@@ -219,25 +256,40 @@ export default function DashboardHome() {
                 />
                 <YAxis hide />
                 <Tooltip
-                  content={<CustomTooltip unit={metricCfg.unit} />}
+                  content={<CustomTooltip metric={metric} unit={metricCfg.unit} />}
                   cursor={{ fill: 'rgba(255,255,255,0.04)' }}
                 />
-                <Bar dataKey={metric} radius={[4, 4, 0, 0]}>
-                  <LabelList
-                    dataKey={metric}
-                    position="top"
-                    formatter={(v: unknown) => barLabel(Number(v))}
-                    style={{ fill: '#d1d5db', fontSize: 10, fontWeight: 500 }}
-                  />
-                  {bars.map((b, i) => {
-                    const intensity = maxVal > 0 ? (Number(b[metric]) || 0) / maxVal : 0;
-                    const alpha = Math.max(0.25, intensity);
-                    return <Cell key={i} fill={`rgba(249,115,22,${alpha})`} />;
-                  })}
-                </Bar>
+                {CYCLING_TYPES.map((type, i) => (
+                  <Bar
+                    key={type}
+                    dataKey={`${metric}_${type}`}
+                    stackId="a"
+                    fill={sportColor(type)}
+                    radius={i === CYCLING_TYPES.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
+                  >
+                    {i === CYCLING_TYPES.length - 1 && (
+                      <LabelList
+                        dataKey={metric}
+                        position="top"
+                        formatter={(v: unknown) => barLabel(Number(v))}
+                        style={{ fill: '#d1d5db', fontSize: 10, fontWeight: 500 }}
+                      />
+                    )}
+                  </Bar>
+                ))}
               </BarChart>
             </ResponsiveContainer>
           )}
+        </div>
+
+        {/* Legend */}
+        <div className="flex gap-3 flex-wrap">
+          {CYCLING_TYPES.map(type => (
+            <div key={type} className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ background: sportColor(type) }} />
+              <span className="text-xs text-gray-400">{sportLabel(type)}</span>
+            </div>
+          ))}
         </div>
 
       </div>

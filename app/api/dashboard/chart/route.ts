@@ -6,6 +6,14 @@ export const runtime = 'nodejs';
 
 type Period = 'week' | 'month' | 'year';
 
+interface TypeData {
+  activities: number;
+  km: number;
+  hours: number;
+  tss: number;
+  elevation: number;
+}
+
 interface BarRow {
   label: string;
   date: string;
@@ -14,9 +22,10 @@ interface BarRow {
   hours: number;
   tss: number;
   elevation: number;
+  byType: Record<string, TypeData>;
 }
 
-const ZERO: Omit<BarRow, 'label' | 'date'> = { activities: 0, km: 0, hours: 0, tss: 0, elevation: 0 };
+const ZERO: TypeData = { activities: 0, km: 0, hours: 0, tss: 0, elevation: 0 };
 const DAY_LABELS   = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -68,52 +77,75 @@ function periodLabel(period: Period, start: Date): string {
   return String(start.getUTCFullYear());
 }
 
+function sumTypeData(byType: Record<string, TypeData>): TypeData {
+  return Object.values(byType).reduce(
+    (acc, t) => ({
+      activities: acc.activities + t.activities,
+      km:        +(acc.km    + t.km).toFixed(1),
+      hours:     +(acc.hours + t.hours).toFixed(1),
+      tss:        acc.tss       + t.tss,
+      elevation:  acc.elevation + t.elevation,
+    }),
+    { ...ZERO }
+  );
+}
 
 function buildBars(period: Period, start: Date, end: Date, rawRows: Record<string, unknown>[]): BarRow[] {
-  const byKey = new Map<string, Record<string, unknown>>();
-  for (const r of rawRows) byKey.set(String(r.key), r);
+  // Group raw rows by period key, then by sport type
+  const byKey = new Map<string, Record<string, TypeData>>();
+  for (const r of rawRows) {
+    const key  = String(r.key);
+    const type = String(r.sport_type);
+    if (!byKey.has(key)) byKey.set(key, {});
+    byKey.get(key)![type] = {
+      activities: Number(r.activities) || 0,
+      km:         Number(r.km)         || 0,
+      hours:      Number(r.hours)      || 0,
+      tss:        Number(r.tss)        || 0,
+      elevation:  Number(r.elevation)  || 0,
+    };
+  }
 
   const rows: BarRow[] = [];
 
   if (period === 'week') {
     for (let i = 0; i < 7; i++) {
-      const dt  = new Date(start.getTime() + i * 86400000);
-      const key = isoDate(dt);
-      const r   = byKey.get(key);
-      rows.push({ label: DAY_LABELS[i], date: key, ...ZERO, ...(r ?? {}) as Partial<BarRow> });
+      const dt     = new Date(start.getTime() + i * 86400000);
+      const key    = isoDate(dt);
+      const byType = byKey.get(key) ?? {};
+      rows.push({ label: DAY_LABELS[i], date: key, ...sumTypeData(byType), byType });
     }
     return rows;
   }
 
   if (period === 'month') {
-    // Keys are 1–5 (ceil of day/7), matching the SQL CEIL(DAY/7) grouping
     const daysInMonth = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 0)).getUTCDate();
     const numWeeks = Math.ceil(daysInMonth / 7);
     for (let w = 1; w <= numWeeks; w++) {
-      const key = String(w);
-      const r   = byKey.get(key);
+      const key      = String(w);
+      const byType   = byKey.get(key) ?? {};
       const dayStart = (w - 1) * 7 + 1;
       const dayEnd   = Math.min(w * 7, daysInMonth);
-      rows.push({ label: `${dayStart}–${dayEnd}`, date: key, ...ZERO, ...(r ?? {}) as Partial<BarRow> });
+      rows.push({ label: `${dayStart}–${dayEnd}`, date: key, ...sumTypeData(byType), byType });
     }
     return rows;
   }
 
-  // year — 12 month buckets
+  // year
   const yr = start.getUTCFullYear();
   for (let i = 0; i < 12; i++) {
-    const key = `${yr}-${String(i + 1).padStart(2, '0')}`;
-    const r   = byKey.get(key);
-    rows.push({ label: MONTH_LABELS[i], date: key, ...ZERO, ...(r ?? {}) as Partial<BarRow> });
+    const key    = `${yr}-${String(i + 1).padStart(2, '0')}`;
+    const byType = byKey.get(key) ?? {};
+    rows.push({ label: MONTH_LABELS[i], date: key, ...sumTypeData(byType), byType });
   }
   return rows;
 }
 
 export async function GET(req: NextRequest) {
   try {
-    const sp          = req.nextUrl.searchParams;
-    const period      = (sp.get('period') ?? 'week') as Period;
-    const offset      = parseInt(sp.get('offset') ?? '0', 10);
+    const sp           = req.nextUrl.searchParams;
+    const period       = (sp.get('period') ?? 'week') as Period;
+    const offset       = parseInt(sp.get('offset') ?? '0', 10);
     const filtersParam = sp.get('filters') ?? 'All';
 
     const selectedLabels = filtersParam.split(',').map(s => s.trim()) as SportFilter[];
@@ -122,48 +154,43 @@ export async function GET(req: NextRequest) {
       if (label === 'All' || !SPORT_FILTERS[label]) continue;
       types.push(...SPORT_FILTERS[label]);
     }
-    const hasTypes = types.length > 0;
+    const activeSportTypes = types.length > 0 ? types : CYCLING_TYPES;
 
     const { start, end } = getPeriodRange(period, offset);
     const startStr = isoDate(start);
     const endStr   = isoDate(end);
 
-    // Group-by expression per period
-    // For month: bucket by week-of-month (1–5) using day number
     const groupExpr =
       period === 'week'  ? `TO_CHAR(start_date AT TIME ZONE 'Australia/Sydney', 'YYYY-MM-DD')` :
       period === 'month' ? `CEIL(EXTRACT(DAY FROM start_date AT TIME ZONE 'Australia/Sydney') / 7.0)::int::text` :
                            `TO_CHAR(start_date AT TIME ZONE 'Australia/Sydney', 'YYYY-MM')`;
 
-    // Always restrict to cycling types; narrow further if a specific filter is active
-    const activeSportTypes = hasTypes ? types : CYCLING_TYPES;
-    const params: unknown[] = [startStr, endStr, activeSportTypes];
-
     const client = await pool.connect();
     try {
       const res = await client.query(`
         SELECT
-          ${groupExpr} AS key,
-          COUNT(*)::int                                           AS activities,
-          ROUND(SUM(distance)::numeric         / 1000.0, 1)      AS km,
-          ROUND(SUM(moving_time)::numeric      / 3600.0, 1)      AS hours,
-          ROUND(SUM(COALESCE(tss, 0))::numeric, 0)::int          AS tss,
-          ROUND(SUM(total_elevation_gain)::numeric, 0)::int      AS elevation
+          ${groupExpr}                                               AS key,
+          sport_type,
+          COUNT(*)::int                                              AS activities,
+          ROUND(SUM(distance)::numeric         / 1000.0, 1)         AS km,
+          ROUND(SUM(moving_time)::numeric      / 3600.0, 1)         AS hours,
+          ROUND(SUM(COALESCE(tss, 0))::numeric, 0)::int             AS tss,
+          ROUND(SUM(total_elevation_gain)::numeric, 0)::int         AS elevation
         FROM activities
         WHERE (start_date AT TIME ZONE 'Australia/Sydney')::date >= $1
           AND (start_date AT TIME ZONE 'Australia/Sydney')::date <  $2
           AND sport_type = ANY($3::text[])
-        GROUP BY key
+        GROUP BY key, sport_type
         ORDER BY key
-      `, params);
+      `, [startStr, endStr, activeSportTypes]);
 
       const bars = buildBars(period, start, end, res.rows);
 
       const summary = bars.reduce(
         (acc, b) => ({
           activities: acc.activities + (Number(b.activities) || 0),
-          km:         +(acc.km    + (Number(b.km)    || 0)).toFixed(1),
-          hours:      +(acc.hours + (Number(b.hours) || 0)).toFixed(1),
+          km:        +(acc.km    + (Number(b.km)    || 0)).toFixed(1),
+          hours:     +(acc.hours + (Number(b.hours) || 0)).toFixed(1),
           tss:        acc.tss       + (Number(b.tss)       || 0),
           elevation:  acc.elevation + (Number(b.elevation) || 0),
         }),
