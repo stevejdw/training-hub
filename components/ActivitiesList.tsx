@@ -262,8 +262,8 @@ export default function ActivitiesList() {
       </div>
 
       {/* Table */}
-      <div className="flex-1 overflow-y-auto scroll-touch">
-        <table className="w-full text-sm">
+      <div className="flex-1 overflow-auto scroll-touch">
+        <table className="min-w-[600px] w-full text-sm">
           <thead className="sticky top-0 bg-gray-900 border-b border-gray-800">
             <tr>
               <th
@@ -272,7 +272,7 @@ export default function ActivitiesList() {
               >
                 Date <SortArrow col="start_date" sortBy={sortBy} sortDir={sortDir} />
               </th>
-              <th className="text-left px-4 py-3 text-gray-400 font-medium hidden sm:table-cell">Type</th>
+              <th className="text-left px-4 py-3 text-gray-400 font-medium">Type</th>
               <th className="text-left px-4 py-3 text-gray-400 font-medium">Name</th>
               <th
                 className="text-right px-4 py-3 text-gray-400 font-medium cursor-pointer hover:text-white select-none whitespace-nowrap"
@@ -287,13 +287,13 @@ export default function ActivitiesList() {
                 Time <SortArrow col="moving_time" sortBy={sortBy} sortDir={sortDir} />
               </th>
               <th
-                className="text-right px-4 py-3 text-gray-400 font-medium cursor-pointer hover:text-white select-none whitespace-nowrap hidden md:table-cell"
+                className="text-right px-4 py-3 text-gray-400 font-medium cursor-pointer hover:text-white select-none whitespace-nowrap"
                 onClick={() => handleSort('average_watts')}
               >
                 Avg W <SortArrow col="average_watts" sortBy={sortBy} sortDir={sortDir} />
               </th>
               <th
-                className="text-right px-4 py-3 text-gray-400 font-medium cursor-pointer hover:text-white select-none whitespace-nowrap hidden md:table-cell"
+                className="text-right px-4 py-3 text-gray-400 font-medium cursor-pointer hover:text-white select-none whitespace-nowrap"
                 onClick={() => handleSort('average_heartrate')}
               >
                 Avg HR <SortArrow col="average_heartrate" sortBy={sortBy} sortDir={sortDir} />
@@ -319,7 +319,7 @@ export default function ActivitiesList() {
                       <td className="px-4 py-3 text-gray-400 whitespace-nowrap">
                         {date.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: '2-digit' })}
                       </td>
-                      <td className="px-4 py-3 hidden sm:table-cell">
+                      <td className="px-4 py-3">
                         <span
                           className="px-2 py-0.5 rounded text-xs font-medium"
                           style={{ background: color + '20', color }}
@@ -339,10 +339,10 @@ export default function ActivitiesList() {
                         {a.distance > 0 ? `${(a.distance / 1000).toFixed(1)}` : '—'}
                       </td>
                       <td className="px-4 py-3 text-right text-gray-300">{fmt(a.moving_time)}</td>
-                      <td className="px-4 py-3 text-right text-gray-300 hidden md:table-cell">
+                      <td className="px-4 py-3 text-right text-gray-300">
                         {a.average_watts ? `${Math.round(a.average_watts)}W` : '—'}
                       </td>
-                      <td className="px-4 py-3 text-right text-gray-300 hidden md:table-cell">
+                      <td className="px-4 py-3 text-right text-gray-300">
                         {a.average_heartrate ? Math.round(a.average_heartrate) : '—'}
                       </td>
                     </tr>
