@@ -55,8 +55,11 @@ function fmt(seconds: number): string {
 }
 
 function SegmentCard({ seg }: { seg: TrainingSegment }) {
+  const isMain = seg.type === 'main' || seg.type === 'interval';
+
   return (
     <div className={`rounded-xl border p-4 space-y-3 ${SEG_COLORS[seg.type] ?? SEG_COLORS.main}`}>
+      {/* Header */}
       <div className="flex items-center justify-between">
         <span className="text-xs font-semibold text-gray-300 uppercase tracking-wider">
           {SEG_LABELS[seg.type] ?? seg.type}
@@ -64,28 +67,40 @@ function SegmentCard({ seg }: { seg: TrainingSegment }) {
         <span className="text-xs text-gray-400">{seg.duration_min} min</span>
       </div>
 
-      <p className="text-sm text-white">{seg.description}</p>
+      {/* Main set: description is the star — show it large */}
+      {isMain && seg.description ? (
+        <p className="text-sm font-medium text-white leading-relaxed">{seg.description}</p>
+      ) : seg.description ? (
+        <p className="text-sm text-gray-400">{seg.description}</p>
+      ) : null}
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        {seg.target_np_watts && (
-          <div className="bg-black/20 rounded-lg p-2">
-            <p className="text-[10px] text-gray-500 uppercase mb-0.5">Target NP</p>
-            <p className="text-sm font-bold text-white">{seg.target_np_watts}W</p>
-          </div>
-        )}
-        {seg.target_avg_hr && (
-          <div className="bg-black/20 rounded-lg p-2">
-            <p className="text-[10px] text-gray-500 uppercase mb-0.5">Target HR</p>
-            <p className="text-sm font-bold text-white">{seg.target_avg_hr} bpm</p>
-          </div>
-        )}
-        {seg.zone && (
-          <div className="bg-black/20 rounded-lg p-2">
-            <p className="text-[10px] text-gray-500 uppercase mb-0.5">Zone</p>
-            <p className="text-sm font-bold text-white">{seg.zone}</p>
-          </div>
-        )}
-      </div>
+      {/* Power / HR targets */}
+      {(seg.target_np_watts || seg.target_avg_hr || seg.zone) && (
+        <div className="flex gap-2 flex-wrap">
+          {seg.target_np_watts && (
+            <div className="bg-black/20 rounded-lg px-3 py-2 flex items-center gap-2">
+              <div>
+                <p className="text-[10px] text-gray-500 uppercase leading-none mb-0.5">
+                  {isMain ? 'Avg Target' : 'Target'}
+                </p>
+                <p className="text-sm font-bold text-white">{seg.target_np_watts}W</p>
+              </div>
+            </div>
+          )}
+          {seg.target_avg_hr && (
+            <div className="bg-black/20 rounded-lg px-3 py-2">
+              <p className="text-[10px] text-gray-500 uppercase leading-none mb-0.5">HR</p>
+              <p className="text-sm font-bold text-white">{seg.target_avg_hr} bpm</p>
+            </div>
+          )}
+          {seg.zone && (
+            <div className="bg-black/20 rounded-lg px-3 py-2">
+              <p className="text-[10px] text-gray-500 uppercase leading-none mb-0.5">Zone</p>
+              <p className="text-sm font-bold text-white">{seg.zone}</p>
+            </div>
+          )}
+        </div>
+      )}
 
       {seg.notes && (
         <p className="text-xs text-gray-400 italic border-t border-gray-700/50 pt-2">{seg.notes}</p>

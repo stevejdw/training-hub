@@ -44,13 +44,21 @@ Overall plan: ${totalWeeks} weeks total. Build load through weeks; every 4th wee
 Training days: ${dayNames}. ALL other days MUST be type "rest".
 
 Output a JSON array of exactly 7 day objects (Mon–Sun). Each object:
-{"date":"YYYY-MM-DD","title":"Short title","type":"rest|endurance|tempo|threshold|vo2max|race|recovery","duration_min":0,"tss_target":0,"segments":[{"type":"warmup|main|cooldown","duration_min":0,"target_np_watts":0}]}
+{"date":"YYYY-MM-DD","title":"Short title","type":"rest|endurance|tempo|threshold|vo2max|race|recovery","duration_min":0,"tss_target":0,"segments":[{"type":"warmup|main|cooldown","duration_min":0,"target_np_watts":0,"description":"..."}]}
 
 Rules:
 - Rest days: type "rest", duration_min 0, tss_target 0, segments [].
-- Non-rest days: exactly 3 segments (warmup, main, cooldown). NO description fields. NO null values — omit optional fields entirely.
+- Non-rest days: exactly 3 segments (warmup, main, cooldown). NO null values — omit optional fields entirely.
 - FTP=${ftp}W zones: Z2=${Math.round(ftp*0.56)}-${Math.round(ftp*0.75)}W, Tempo=${Math.round(ftp*0.76)}-${Math.round(ftp*0.87)}W, Threshold=${Math.round(ftp*0.88)}-${Math.round(ftp*0.95)}W, VO2=${Math.round(ftp*1.06)}-${Math.round(ftp*1.20)}W.
-- Title max 4 words. Be concise.`;
+- Warmup/cooldown description: 5 words max (e.g. "Easy spin, build gradually").
+- Main set description: give the FULL interval structure. Examples:
+  Threshold: "4x8min @ ${Math.round(ftp*0.92)}W / 3min @ ${Math.round(ftp*0.6)}W recovery"
+  Over-unders: "3x(2min @ ${Math.round(ftp*1.05)}W + 1min @ ${Math.round(ftp*0.88)}W) x4, 5min recovery between sets"
+  VO2max: "6x4min @ ${Math.round(ftp*1.12)}W / 4min easy"
+  Endurance: "Steady ride at ${Math.round(ftp*0.65)}W, include 3x5min @ ${Math.round(ftp*0.80)}W mid-ride"
+  Tempo: "2x20min @ ${Math.round(ftp*0.83)}W / 5min easy"
+  Include reps, duration, watts, recovery. Be specific and prescriptive.
+- Title max 4 words.`;
 }
 
 function extractJson(text: string): string {
