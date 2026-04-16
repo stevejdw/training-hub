@@ -32,7 +32,7 @@ export function sportLabel(type: string): string {
 export function sportColor(type: string): string {
   const map: Record<string, string> = {
     Ride:                  '#38bdf8', // sky blue
-    VirtualRide:           '#38bdf8', // sky blue
+    VirtualRide:           '#818cf8', // indigo
     GravelRide:            '#1e40af', // navy blue
     MountainBikeRide:      '#f97316', // orange
     EBikeRide:             '#22c55e', // green
