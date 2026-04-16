@@ -38,6 +38,7 @@ function addDays(dateStr: string, days: number): string {
 export default function EditPlanModal({ plan, onClose, onUpdated }: Props) {
   const weeks = Math.round(plan.days.length / 7);
   const [goal, setGoal] = useState(plan.goal);
+  const [notes, setNotes] = useState('');
   const [trainingDays, setTrainingDays] = useState<number[]>(() => detectTrainingDays(plan.days));
   const [status, setStatus] = useState<'idle' | 'generating' | 'saving' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState('');
@@ -63,7 +64,7 @@ export default function EditPlanModal({ plan, onClose, onUpdated }: Props) {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              goal, trainingDays,
+              goal, notes, trainingDays,
               weekIndex: i, planStartDate, totalWeeks: weeks,
               planName, planGoal: goal,
             }),
@@ -137,6 +138,19 @@ export default function EditPlanModal({ plan, onClose, onUpdated }: Props) {
             onChange={e => setGoal(e.target.value)}
             disabled={busy}
             className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-orange-500"
+          />
+        </div>
+
+        {/* Additional notes */}
+        <div>
+          <label className="text-xs text-gray-400 uppercase tracking-wider block mb-1.5">Additional notes (optional)</label>
+          <textarea
+            value={notes}
+            onChange={e => setNotes(e.target.value)}
+            disabled={busy}
+            rows={3}
+            placeholder="e.g. Focus on threshold work, available Tue/Thu/Sat/Sun, avoid back-to-back hard days"
+            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-orange-500 resize-none"
           />
         </div>
 
