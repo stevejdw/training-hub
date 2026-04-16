@@ -1,4 +1,5 @@
 import pool from '@/lib/db';
+import { CYCLING_TYPES } from '@/lib/sport-types';
 import { NextRequest } from 'next/server';
 
 export const runtime = 'nodejs';
@@ -11,7 +12,7 @@ export async function GET(req: NextRequest) {
 
   const client = await pool.connect();
   try {
-    const params: unknown[] = [seconds];
+    const params: unknown[] = [seconds, CYCLING_TYPES];
     let dateClause = '';
     if (days > 0) {
       params.push(days);
@@ -40,6 +41,7 @@ export async function GET(req: NextRequest) {
         ) sub
       ) bp ON bp.best_watts IS NOT NULL
       WHERE a.average_watts IS NOT NULL
+        AND a.sport_type = ANY($2::text[])
         ${dateClause}
       ORDER BY bp.best_watts DESC
       LIMIT 10
