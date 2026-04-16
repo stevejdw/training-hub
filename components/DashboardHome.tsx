@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { SPORT_FILTER_LABELS, SportFilter } from '@/lib/sport-types';
 
 interface PeriodStats {
@@ -20,45 +21,97 @@ interface DashboardData {
 const TARGET_EVENT = new Date('2026-05-02');
 const PEAKS_2027 = new Date('2027-03-01');
 
+const TYPE_FILTERS = SPORT_FILTER_LABELS.filter(f => f !== 'All') as SportFilter[];
+
 function daysUntil(date: Date): number {
   return Math.ceil((date.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
 }
 
-function StatCard({ label, value }: { label: string; value: string | number }) {
-  return (
-    <div className="bg-gray-800 rounded-xl p-4">
-      <div className="text-xs text-gray-400 uppercase tracking-wider mb-1">{label}</div>
-      <div className="text-2xl font-bold text-white">{value}</div>
-    </div>
-  );
+// Returns ISO date string for start of current week (Monday), month, year in Sydney time
+function periodStart(period: 'wtd' | 'mtd' | 'ytd'): string {
+  const now = new Date(new Date().toLocaleString('en-AU', { timeZone: 'Australia/Sydney' }));
+  if (period === 'wtd') {
+    const day = now.getDay(); // 0=Sun
+    const diff = (day === 0 ? -6 : 1 - day);
+    now.setDate(now.getDate() + diff);
+  } else if (period === 'mtd') {
+    now.setDate(1);
+  } else {
+    now.setMonth(0, 1);
+  }
+  return now.toISOString().slice(0, 10);
 }
 
-function PeriodBlock({ title, stats }: { title: string; stats: PeriodStats }) {
+function StatCard({
+  label,
+  value,
+  href,
+}: {
+  label: string;
+  value: string | number;
+  href?: string;
+}) {
+  const inner = (
+    <div className={`bg-gray-800 rounded-xl p-4 h-full ${href ? 'hover:bg-gray-700 transition-colors cursor-pointer' : ''}`}>
+      <div className="text-xs text-gray-400 uppercase tracking-wider mb-1">{label}</div>
+      <div className="text-2xl font-bold text-white">{value}</div>
+      {href && <div className="text-xs text-orange-500 mt-1">View →</div>}
+    </div>
+  );
+  return href ? <Link href={href}>{inner}</Link> : <div>{inner}</div>;
+}
+
+function PeriodBlock({
+  title,
+  stats,
+  filtersParam,
+  period,
+}: {
+  title: string;
+  stats: PeriodStats;
+  filtersParam: string;
+  period: 'wtd' | 'mtd' | 'ytd';
+}) {
+  const from = periodStart(period);
+  const base = filtersParam !== 'All'
+    ? `/activities?filters=${filtersParam}&from=${from}`
+    : `/activities?from=${from}`;
+
   return (
     <div>
       <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">{title}</h3>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <StatCard label="Activities" value={stats.activities} />
-        <StatCard label="Distance" value={`${stats.km} km`} />
-        <StatCard label="Time" value={`${stats.hours} h`} />
-        <StatCard label="TSS" value={stats.tss} />
+        <StatCard label="Activities" value={stats.activities} href={base} />
+        <StatCard label="Distance" value={`${stats.km} km`} href={base} />
+        <StatCard label="Time" value={`${stats.hours} h`} href={base} />
+        <StatCard label="TSS" value={stats.tss} href={base} />
       </div>
     </div>
   );
 }
 
 export default function DashboardHome() {
-  const [filter, setFilter] = useState<SportFilter>('All');
+  const [selected, setSelected] = useState<Set<SportFilter>>(new Set());
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
 
+  function toggleFilter(f: SportFilter) {
+    setSelected(prev => {
+      const next = new Set(prev);
+      next.has(f) ? next.delete(f) : next.add(f);
+      return next;
+    });
+  }
+
+  const filtersParam = selected.size > 0 ? [...selected].join(',') : 'All';
+
   useEffect(() => {
     setLoading(true);
-    fetch(`/api/dashboard?filter=${filter}`)
+    fetch(`/api/dashboard?filters=${filtersParam}`)
       .then((r) => r.json())
       .then((d) => { setData(d); setLoading(false); })
       .catch(() => setLoading(false));
-  }, [filter]);
+  }, [filtersParam]);
 
   const daysToEvent = daysUntil(TARGET_EVENT);
   const daysToPeaks = daysUntil(PEAKS_2027);
@@ -81,14 +134,14 @@ export default function DashboardHome() {
           </div>
         </div>
 
-        {/* Activity type filter */}
-        <div className="flex gap-2 flex-wrap">
-          {SPORT_FILTER_LABELS.map((f) => (
+        {/* Multi-select filter */}
+        <div className="flex gap-2 flex-wrap items-center">
+          {TYPE_FILTERS.map((f) => (
             <button
               key={f}
-              onClick={() => setFilter(f)}
+              onClick={() => toggleFilter(f)}
               className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                filter === f
+                selected.has(f)
                   ? 'bg-orange-500 text-white'
                   : 'bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700'
               }`}
@@ -96,6 +149,14 @@ export default function DashboardHome() {
               {f}
             </button>
           ))}
+          {selected.size > 0 && (
+            <button
+              onClick={() => setSelected(new Set())}
+              className="px-3 py-1.5 rounded-lg text-sm font-medium text-gray-500 hover:text-white transition-colors"
+            >
+              Clear
+            </button>
+          )}
         </div>
 
         {loading ? (
@@ -110,17 +171,26 @@ export default function DashboardHome() {
           </div>
         ) : data ? (
           <>
-            <PeriodBlock title="Week to Date" stats={data.wtd} />
-            <PeriodBlock title="Month to Date" stats={data.mtd} />
+            <PeriodBlock title="Week to Date" stats={data.wtd} filtersParam={filtersParam} period="wtd" />
+            <PeriodBlock title="Month to Date" stats={data.mtd} filtersParam={filtersParam} period="mtd" />
 
+            {/* YTD */}
             <div>
               <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Year to Date</h3>
               <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-                <StatCard label="Activities" value={data.ytd.activities} />
-                <StatCard label="Distance" value={`${data.ytd.km} km`} />
-                <StatCard label="Time" value={`${data.ytd.hours} h`} />
-                <StatCard label="TSS" value={data.ytd.tss} />
-                <StatCard label="Elevation" value={`${data.ytd.elevation ?? 0} m`} />
+                {(() => {
+                  const from = periodStart('ytd');
+                  const base = filtersParam !== 'All'
+                    ? `/activities?filters=${filtersParam}&from=${from}`
+                    : `/activities?from=${from}`;
+                  return <>
+                    <StatCard label="Activities" value={data.ytd.activities} href={base} />
+                    <StatCard label="Distance" value={`${data.ytd.km} km`} href={base} />
+                    <StatCard label="Time" value={`${data.ytd.hours} h`} href={base} />
+                    <StatCard label="TSS" value={data.ytd.tss} href={base} />
+                    <StatCard label="Elevation" value={`${data.ytd.elevation ?? 0} m`} href={base} />
+                  </>;
+                })()}
               </div>
             </div>
           </>

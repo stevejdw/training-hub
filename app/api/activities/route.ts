@@ -3,13 +3,12 @@ import { SPORT_FILTERS, SportFilter } from '@/lib/sport-types';
 import { NextRequest } from 'next/server';
 
 export async function GET(req: NextRequest) {
-  // Support multiple filters: ?filters=Ride,Walk or legacy ?filter=Ride
   const filtersParam = req.nextUrl.searchParams.get('filters') ?? req.nextUrl.searchParams.get('filter') ?? 'All';
+  const from = req.nextUrl.searchParams.get('from'); // ISO date e.g. 2026-04-14
   const page = parseInt(req.nextUrl.searchParams.get('page') ?? '1', 10);
   const limit = 30;
   const offset = (page - 1) * limit;
 
-  // Build combined sport_types from all selected filter labels
   const selectedLabels = filtersParam.split(',').map(s => s.trim()) as SportFilter[];
   const types: string[] = [];
   for (const label of selectedLabels) {
@@ -20,34 +19,32 @@ export async function GET(req: NextRequest) {
   const client = await pool.connect();
   try {
     let activities, count;
+    const hasTypes = types.length > 0;
+    const hasFrom = !!from;
 
-    if (types.length > 0) {
-      activities = await client.query(
-        `SELECT id, name, sport_type, start_date, distance, moving_time,
-                average_watts, normalized_power, average_heartrate, tss,
-                total_elevation_gain, trainer
-         FROM activities
-         WHERE sport_type = ANY($1::text[])
-         ORDER BY start_date DESC
-         LIMIT $2 OFFSET $3`,
-        [types, limit, offset]
-      );
-      count = await client.query(
-        `SELECT COUNT(*) AS total FROM activities WHERE sport_type = ANY($1::text[])`,
-        [types]
-      );
-    } else {
-      activities = await client.query(
-        `SELECT id, name, sport_type, start_date, distance, moving_time,
-                average_watts, normalized_power, average_heartrate, tss,
-                total_elevation_gain, trainer
-         FROM activities
-         ORDER BY start_date DESC
-         LIMIT $1 OFFSET $2`,
-        [limit, offset]
-      );
-      count = await client.query(`SELECT COUNT(*) AS total FROM activities`);
-    }
+    // Build WHERE conditions
+    const conditions: string[] = [];
+    const queryParams: (string | number | string[])[] = [];
+    let p = 1;
+
+    if (hasTypes) { conditions.push(`sport_type = ANY($${p++}::text[])`); queryParams.push(types); }
+    if (hasFrom)  { conditions.push(`start_date >= $${p++}`); queryParams.push(from); }
+
+    const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    activities = await client.query(
+      `SELECT id, name, sport_type, start_date, distance, moving_time,
+              average_watts, normalized_power, average_heartrate, tss,
+              total_elevation_gain, trainer
+       FROM activities ${where}
+       ORDER BY start_date DESC
+       LIMIT $${p++} OFFSET $${p++}`,
+      [...queryParams, limit, offset]
+    );
+    count = await client.query(
+      `SELECT COUNT(*) AS total FROM activities ${where}`,
+      queryParams
+    );
 
     return Response.json({
       activities: activities.rows,

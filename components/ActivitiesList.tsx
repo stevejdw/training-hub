@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { SPORT_FILTER_LABELS, SportFilter, sportLabel, sportColor } from '@/lib/sport-types';
 
@@ -29,7 +30,15 @@ function fmt(seconds: number): string {
 const TYPE_FILTERS = SPORT_FILTER_LABELS.filter(f => f !== 'All') as SportFilter[];
 
 export default function ActivitiesList() {
-  const [selected, setSelected] = useState<Set<SportFilter>>(new Set());
+  const searchParams = useSearchParams();
+
+  // Initialise from URL params (set when navigating from dashboard tiles)
+  const [selected, setSelected] = useState<Set<SportFilter>>(() => {
+    const f = searchParams.get('filters');
+    if (!f || f === 'All') return new Set();
+    return new Set(f.split(',').filter(Boolean) as SportFilter[]);
+  });
+  const [from] = useState<string | null>(() => searchParams.get('from'));
   const [activities, setActivities] = useState<Activity[]>([]);
   const [page, setPage] = useState(1);
   const [pages, setPages] = useState(1);
@@ -57,7 +66,8 @@ export default function ActivitiesList() {
   useEffect(() => {
     setLoading(true);
     const filtersParam = selected.size > 0 ? [...selected].join(',') : 'All';
-    fetch(`/api/activities?filters=${filtersParam}&page=${page}`)
+    const fromParam = from ? `&from=${from}` : '';
+    fetch(`/api/activities?filters=${filtersParam}&page=${page}${fromParam}`)
       .then((r) => r.json())
       .then((d) => {
         setActivities(d.activities);
