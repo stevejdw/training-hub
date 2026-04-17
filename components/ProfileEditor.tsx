@@ -16,6 +16,11 @@ interface AthleteProfile {
   weight_kg: number | null;
   training_goals: string;
   events: EventGoal[];
+  max_hr: number | null;
+  hr_zones_auto: boolean;
+  hr_zone_boundaries: number[] | null;
+  power_zones_auto: boolean;
+  power_zone_boundaries: number[] | null;
 }
 
 interface EftpOption {
@@ -196,6 +201,102 @@ export default function ProfileEditor() {
             </div>
           </Field>
         )}
+      </div>
+
+      {/* Zone Settings */}
+      <div className="bg-gray-900 rounded-xl p-5 space-y-5 border border-gray-800">
+        <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Zone Settings</h2>
+
+        {/* HR Zones */}
+        <div className="space-y-3">
+          <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wider">Heart Rate Zones</h3>
+          <Field label="Max HR (bpm)" hint="Required to calculate HR zones">
+            <input
+              type="number"
+              value={profile.max_hr ?? ''}
+              onChange={e => update('max_hr', e.target.value ? Number(e.target.value) : null)}
+              className={inputCls}
+              placeholder="e.g. 185"
+              min={100}
+              max={230}
+            />
+          </Field>
+          <Field label="HR zone calculation">
+            <div className="flex items-center gap-3 mt-1">
+              <button
+                onClick={() => update('hr_zones_auto', !profile.hr_zones_auto)}
+                className={`relative w-10 h-5 rounded-full transition-colors ${profile.hr_zones_auto ? 'bg-orange-500' : 'bg-gray-700'}`}
+              >
+                <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${profile.hr_zones_auto ? 'translate-x-5' : 'translate-x-0.5'}`} />
+              </button>
+              <span className="text-sm text-gray-400">{profile.hr_zones_auto ? 'Auto (% of Max HR)' : 'Manual boundaries'}</span>
+            </div>
+          </Field>
+          {!profile.hr_zones_auto && (
+            <Field label="HR zone upper boundaries (bpm)" hint="Enter the upper boundary for Z1, Z2, Z3, Z4. Z5 is anything above Z4.">
+              <div className="grid grid-cols-4 gap-2">
+                {['Z1 max', 'Z2 max', 'Z3 max', 'Z4 max'].map((label, i) => (
+                  <div key={i}>
+                    <div className="text-xs text-gray-600 mb-1">{label}</div>
+                    <input
+                      type="number"
+                      value={profile.hr_zone_boundaries?.[i] ?? ''}
+                      onChange={e => {
+                        const boundaries = [...(profile.hr_zone_boundaries ?? [0, 0, 0, 0])];
+                        boundaries[i] = Number(e.target.value);
+                        update('hr_zone_boundaries', boundaries);
+                      }}
+                      className={inputCls}
+                      placeholder="bpm"
+                      min={80}
+                      max={230}
+                    />
+                  </div>
+                ))}
+              </div>
+            </Field>
+          )}
+        </div>
+
+        {/* Power Zones */}
+        <div className="space-y-3 pt-2 border-t border-gray-800">
+          <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wider">Power Zones</h3>
+          <Field label="Power zone calculation">
+            <div className="flex items-center gap-3 mt-1">
+              <button
+                onClick={() => update('power_zones_auto', !profile.power_zones_auto)}
+                className={`relative w-10 h-5 rounded-full transition-colors ${profile.power_zones_auto ? 'bg-orange-500' : 'bg-gray-700'}`}
+              >
+                <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${profile.power_zones_auto ? 'translate-x-5' : 'translate-x-0.5'}`} />
+              </button>
+              <span className="text-sm text-gray-400">{profile.power_zones_auto ? 'Auto (% of FTP)' : 'Manual boundaries'}</span>
+            </div>
+          </Field>
+          {!profile.power_zones_auto && (
+            <Field label="Power zone upper boundaries (W)" hint="Enter the upper boundary for Z1, Z2, Z3, Z4. Z5 is anything above Z4.">
+              <div className="grid grid-cols-4 gap-2">
+                {['Z1 max', 'Z2 max', 'Z3 max', 'Z4 max'].map((label, i) => (
+                  <div key={i}>
+                    <div className="text-xs text-gray-600 mb-1">{label}</div>
+                    <input
+                      type="number"
+                      value={profile.power_zone_boundaries?.[i] ?? ''}
+                      onChange={e => {
+                        const boundaries = [...(profile.power_zone_boundaries ?? [0, 0, 0, 0])];
+                        boundaries[i] = Number(e.target.value);
+                        update('power_zone_boundaries', boundaries);
+                      }}
+                      className={inputCls}
+                      placeholder="W"
+                      min={50}
+                      max={1000}
+                    />
+                  </div>
+                ))}
+              </div>
+            </Field>
+          )}
+        </div>
       </div>
 
       {/* Training goals */}

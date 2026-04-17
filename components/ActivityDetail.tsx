@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { sportLabel, sportColor } from '@/lib/sport-types';
+import ZoneDistribution from './ZoneDistribution';
 
 const INTERVALS: { label: string; seconds: number }[] = [
   { label: '1 sec',   seconds: 1 },
@@ -281,6 +282,12 @@ export default function ActivityDetail({ id }: { id: string }) {
           )}
 
         </div>{/* end laps+power row */}
+
+        {/* Zone Distribution */}
+        <div className="bg-gray-900 rounded-xl p-4 border border-gray-800">
+          <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">Zone Distribution</h3>
+          <ZoneDistribution activityId={id} />
+        </div>
 
         {/* No route notice (only shown when polyline is missing) */}
         {!activity.summary_polyline && (
