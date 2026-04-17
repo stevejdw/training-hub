@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: 'Training Hub',
     short_name: 'Training',
     description: 'Cycling training analytics and coaching',
-    start_url: '/dashboard',
+    start_url: '/feed',
     display: 'standalone',
     background_color: '#030712',
     theme_color: '#030712',
