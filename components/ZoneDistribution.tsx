@@ -98,8 +98,10 @@ function SetMaxHrPrompt({ onSaved }: { onSaved: (maxHr: number) => void }) {
 }
 
 export default function ZoneDistribution({ activityId }: { activityId: string }) {
-  const [data,    setData]    = useState<ZonesResponse | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [data,      setData]      = useState<ZonesResponse | null>(null);
+  const [loading,   setLoading]   = useState(true);
+  const [fetching,  setFetching]  = useState(false);
+  const [fetchMsg,  setFetchMsg]  = useState<string | null>(null);
 
   function load() {
     setLoading(true);
@@ -107,6 +109,19 @@ export default function ZoneDistribution({ activityId }: { activityId: string })
       .then(r => r.json())
       .then(d => { setData(d); setLoading(false); })
       .catch(() => setLoading(false));
+  }
+
+  async function fetchStreams() {
+    setFetching(true);
+    setFetchMsg(null);
+    const res = await fetch(`/api/activities/${activityId}/fetch-streams`, { method: 'POST' });
+    const json = await res.json() as { ok: boolean; has_hr?: boolean; message?: string };
+    if (json.ok && json.has_hr) {
+      load(); // reload zone data
+    } else {
+      setFetchMsg(json.message ?? 'No HR data available from Strava for this activity');
+    }
+    setFetching(false);
   }
 
   useEffect(() => { load(); }, [activityId]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -118,8 +133,18 @@ export default function ZoneDistribution({ activityId }: { activityId: string })
   // No stream data at all (activity predates backfill)
   if (!data || (!data.power && !data.hr && !data.has_hr_stream)) {
     return (
-      <div className="bg-gray-800/50 border border-gray-700 border-dashed rounded-xl p-4 text-center">
-        <p className="text-gray-500 text-xs">No stream data for this activity</p>
+      <div className="bg-gray-800/50 border border-gray-700 border-dashed rounded-xl p-4 flex items-center justify-between gap-4">
+        <p className="text-gray-500 text-xs">No stream data stored for this activity.</p>
+        <div className="flex flex-col items-end gap-1 flex-shrink-0">
+          <button
+            onClick={fetchStreams}
+            disabled={fetching}
+            className="px-3 py-1.5 rounded-lg bg-orange-500 hover:bg-orange-400 disabled:opacity-40 text-white text-xs font-medium transition-colors whitespace-nowrap"
+          >
+            {fetching ? 'Fetching…' : 'Fetch from Strava'}
+          </button>
+          {fetchMsg && <p className="text-xs text-gray-500 text-right">{fetchMsg}</p>}
+        </div>
       </div>
     );
   }
@@ -152,10 +177,21 @@ export default function ZoneDistribution({ activityId }: { activityId: string })
       ) : data.has_hr_stream && !data.max_hr ? (
         <SetMaxHrPrompt onSaved={() => load()} />
       ) : data.has_hr_stream ? (
-        // max_hr is set but zones still null — shouldn't normally happen
         <p className="text-xs text-gray-500">Unable to calculate HR zones</p>
       ) : (
-        <p className="text-xs text-gray-600">No HR stream recorded for this activity</p>
+        <div className="rounded-xl border border-gray-700 bg-gray-800/50 p-4 flex items-center justify-between gap-4">
+          <p className="text-xs text-gray-400">HR stream not stored for this activity.</p>
+          <div className="flex flex-col items-end gap-1 flex-shrink-0">
+            <button
+              onClick={fetchStreams}
+              disabled={fetching}
+              className="px-3 py-1.5 rounded-lg bg-orange-500 hover:bg-orange-400 disabled:opacity-40 text-white text-xs font-medium transition-colors whitespace-nowrap"
+            >
+              {fetching ? 'Fetching…' : 'Fetch from Strava'}
+            </button>
+            {fetchMsg && <p className="text-xs text-gray-500 text-right">{fetchMsg}</p>}
+          </div>
+        </div>
       )}
     </div>
   );
