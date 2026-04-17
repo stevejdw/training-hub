@@ -102,7 +102,7 @@ export default function ActivityDetail({ id }: { id: string }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [bpSeconds, setBpSeconds] = useState(300); // default 5 min
-  const [bpWatts, setBpWatts] = useState<number | null | undefined>(undefined); // undefined=not fetched, null=no data
+  const [bpResults, setBpResults] = useState<{ rank: number; watts: number; start: number }[] | undefined>(undefined);
   const [bpLoading, setBpLoading] = useState(false);
 
   useEffect(() => {
@@ -119,11 +119,11 @@ export default function ActivityDetail({ id }: { id: string }) {
   useEffect(() => {
     if (!activity) return;
     setBpLoading(true);
-    setBpWatts(undefined);
+    setBpResults(undefined);
     fetch(`/api/activities/${id}/best-power?seconds=${bpSeconds}`)
       .then(r => r.json())
-      .then(d => { setBpWatts(d.watts ?? null); setBpLoading(false); })
-      .catch(() => { setBpWatts(null); setBpLoading(false); });
+      .then(d => { setBpResults(d.results ?? []); setBpLoading(false); })
+      .catch(() => { setBpResults([]); setBpLoading(false); });
   }, [id, activity, bpSeconds]);
 
   if (loading) {
@@ -253,7 +253,7 @@ export default function ActivityDetail({ id }: { id: string }) {
 
           {/* Best Power — right column */}
           {activity.average_watts && (
-            <div className="w-36 flex-shrink-0">
+            <div className="w-44 flex-shrink-0">
               <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Best Power</h3>
               <div className="bg-gray-800 rounded-xl p-3 flex flex-col gap-3">
                 <select
@@ -265,18 +265,22 @@ export default function ActivityDetail({ id }: { id: string }) {
                     <option key={iv.seconds} value={iv.seconds}>{iv.label}</option>
                   ))}
                 </select>
-                <div className="text-center">
-                  {bpLoading ? (
-                    <div className="h-8 bg-gray-700 rounded animate-pulse" />
-                  ) : bpWatts !== null && bpWatts !== undefined ? (
-                    <div>
-                      <span className="text-2xl font-bold text-white">{bpWatts}</span>
-                      <span className="text-xs text-gray-400 ml-1">W</span>
-                    </div>
-                  ) : (
-                    <span className="text-xs text-gray-500">No data</span>
-                  )}
-                </div>
+                {bpLoading ? (
+                  <div className="space-y-1.5">
+                    {[1,2,3,4,5].map(i => <div key={i} className="h-6 bg-gray-700 rounded animate-pulse" />)}
+                  </div>
+                ) : bpResults && bpResults.length > 0 ? (
+                  <div className="space-y-1">
+                    {bpResults.map(r => (
+                      <div key={r.rank} className="flex items-center justify-between text-xs">
+                        <span className="text-gray-500 w-5">#{r.rank}</span>
+                        <span className="font-semibold text-white tabular-nums">{r.watts}<span className="text-gray-500 font-normal ml-0.5">W</span></span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <span className="text-xs text-gray-500 text-center">No data</span>
+                )}
               </div>
             </div>
           )}
