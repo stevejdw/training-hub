@@ -21,11 +21,24 @@ export async function POST(
   }
 
   const streamData = await streamRes.json() as Record<string, unknown>;
+  const availableKeys = Object.keys(streamData);
   const watts = (streamData?.watts     as { data: number[] } | null)?.data ?? null;
   const hr    = (streamData?.heartrate as { data: number[] } | null)?.data ?? null;
 
   if (!watts && !hr) {
-    return Response.json({ ok: false, message: 'No stream data returned by Strava' });
+    return Response.json({
+      ok: false,
+      message: `No stream data returned by Strava. Available keys: ${availableKeys.join(', ') || 'none'}`,
+    });
+  }
+
+  if (!hr) {
+    return Response.json({
+      ok: false,
+      has_watts: !!watts,
+      has_hr: false,
+      message: `Strava returned no heartrate stream. Available keys: ${availableKeys.join(', ')}`,
+    });
   }
 
   const client = await pool.connect();
