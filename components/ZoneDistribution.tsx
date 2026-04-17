@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
 import { ZoneResult } from '@/lib/zones';
 
 interface ZonesResponse {
@@ -24,9 +23,7 @@ function ZoneTable({ zones, maxSecs, unit }: { zones: ZoneResult[]; maxSecs: num
   return (
     <div className="space-y-1">
       {[...zones].reverse().map(z => {
-        const rangeLow  = z.min === 0 ? (unit === 'W' ? '0' : '<' + (z.max! + 1)) : String(z.min);
-        const rangeHigh = z.max === null ? `${z.min}+` : `${z.min} – ${z.max}`;
-        const rangeStr  = z.min === 0 && unit === 'bpm'
+        const rangeStr = z.min === 0 && unit === 'bpm'
           ? `< ${z.max! + 1}`
           : z.max === null
             ? `> ${z.min - 1}`
@@ -35,17 +32,11 @@ function ZoneTable({ zones, maxSecs, unit }: { zones: ZoneResult[]; maxSecs: num
 
         return (
           <div key={z.z} className="grid items-center gap-2 text-xs" style={{ gridTemplateColumns: '28px 80px 90px 52px 36px 1fr' }}>
-            {/* Zone # */}
             <span className="text-gray-500 font-medium text-center">Z{z.z}</span>
-            {/* Name */}
             <span className="text-gray-300 truncate">{z.name}</span>
-            {/* Range */}
             <span className="text-gray-500 tabular-nums">{rangeStr} {unit}</span>
-            {/* Time */}
             <span className="text-white font-semibold tabular-nums text-right">{fmtTime(z.seconds)}</span>
-            {/* % */}
             <span className="text-gray-400 tabular-nums text-right">{z.pct}%</span>
-            {/* Bar */}
             <div className="h-4 rounded-sm overflow-hidden bg-gray-800/60">
               <div
                 className="h-full rounded-sm transition-all duration-500"
@@ -54,8 +45,54 @@ function ZoneTable({ zones, maxSecs, unit }: { zones: ZoneResult[]; maxSecs: num
             </div>
           </div>
         );
-        void rangeLow;
       })}
+    </div>
+  );
+}
+
+function SetMaxHrPrompt({ onSaved }: { onSaved: (maxHr: number) => void }) {
+  const [value, setValue] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  async function save() {
+    const n = parseInt(value, 10);
+    if (!n || n < 100 || n > 230) return;
+    setSaving(true);
+    // Fetch current profile, merge max_hr, save back
+    const profile = await fetch('/api/profile').then(r => r.json());
+    await fetch('/api/profile', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...profile, max_hr: n }),
+    });
+    setSaving(false);
+    onSaved(n);
+  }
+
+  return (
+    <div className="rounded-xl border border-orange-500/30 bg-orange-500/5 p-4">
+      <p className="text-sm font-medium text-orange-300 mb-1">HR stream available</p>
+      <p className="text-xs text-gray-400 mb-3">Set your Max HR to calculate heart rate zones.</p>
+      <div className="flex items-center gap-2">
+        <input
+          type="number"
+          value={value}
+          onChange={e => setValue(e.target.value)}
+          placeholder="e.g. 185"
+          min={100}
+          max={230}
+          className="w-28 bg-gray-900 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-orange-500"
+          onKeyDown={e => e.key === 'Enter' && save()}
+        />
+        <span className="text-xs text-gray-500">bpm</span>
+        <button
+          onClick={save}
+          disabled={saving || !value}
+          className="px-3 py-1.5 rounded-lg bg-orange-500 hover:bg-orange-400 disabled:opacity-40 text-white text-xs font-medium transition-colors"
+        >
+          {saving ? 'Saving…' : 'Save'}
+        </button>
+      </div>
     </div>
   );
 }
@@ -64,24 +101,25 @@ export default function ZoneDistribution({ activityId }: { activityId: string })
   const [data,    setData]    = useState<ZonesResponse | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  function load() {
+    setLoading(true);
     fetch(`/api/activities/${activityId}/zones`)
       .then(r => r.json())
       .then(d => { setData(d); setLoading(false); })
       .catch(() => setLoading(false));
-  }, [activityId]);
+  }
+
+  useEffect(() => { load(); }, [activityId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loading) {
     return <div className="h-40 bg-gray-800 rounded-xl animate-pulse" />;
   }
 
-  if (!data || (!data.power && !data.hr)) {
+  // No stream data at all (activity predates backfill)
+  if (!data || (!data.power && !data.hr && !data.has_hr_stream)) {
     return (
       <div className="bg-gray-800/50 border border-gray-700 border-dashed rounded-xl p-4 text-center">
-        <p className="text-gray-500 text-xs">
-          No stream data — run the{' '}
-          <Link href="/profile" className="text-orange-400 hover:underline">backfill workflow</Link>
-        </p>
+        <p className="text-gray-500 text-xs">No stream data for this activity</p>
       </div>
     );
   }
@@ -107,19 +145,18 @@ export default function ZoneDistribution({ activityId }: { activityId: string })
         <div>
           <div className="flex items-center justify-between mb-2">
             <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Heart Rate Zones</h4>
-            <span className="text-xs text-gray-600">Max HR {data.max_hr}</span>
+            <span className="text-xs text-gray-600">Max HR {data.max_hr} bpm</span>
           </div>
           <ZoneTable zones={data.hr} maxSecs={hrMax} unit="bpm" />
         </div>
       ) : data.has_hr_stream && !data.max_hr ? (
-        <p className="text-xs text-gray-500">
-          HR stream available — set your{' '}
-          <Link href="/profile" className="text-orange-400 hover:underline">Max HR in settings</Link>
-          {' '}to see HR zones
-        </p>
-      ) : !data.has_hr_stream ? (
-        <p className="text-xs text-gray-600">No HR stream data for this activity</p>
-      ) : null}
+        <SetMaxHrPrompt onSaved={() => load()} />
+      ) : data.has_hr_stream ? (
+        // max_hr is set but zones still null — shouldn't normally happen
+        <p className="text-xs text-gray-500">Unable to calculate HR zones</p>
+      ) : (
+        <p className="text-xs text-gray-600">No HR stream recorded for this activity</p>
+      )}
     </div>
   );
 }
