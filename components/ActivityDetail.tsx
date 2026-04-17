@@ -90,7 +90,7 @@ export default function ActivityDetail({ id }: { id: string }) {
   const [error,    setError]    = useState(false);
   const [tab,      setTab]      = useState<Tab>('stats');
   const [bpSeconds,  setBpSeconds]  = useState(300);
-  const [bpResults,  setBpResults]  = useState<{ rank: number; watts: number }[] | undefined>(undefined);
+  const [bpResults,  setBpResults]  = useState<{ rank: number; watts: number; max_watts: number; avg_hr: number | null; max_hr: number | null }[] | undefined>(undefined);
   const [bpLoading,  setBpLoading]  = useState(false);
 
   useEffect(() => {
@@ -315,37 +315,60 @@ export default function ActivityDetail({ id }: { id: string }) {
         {/* Tab: Power */}
         {tab === 'power' && (
           activity.average_watts ? (
-            <div className="max-w-sm">
-              <p className="text-xs text-gray-500 mb-4">Top 5 best average power for the selected interval — non-overlapping segments.</p>
-              <div className="bg-gray-900 rounded-xl p-4 border border-gray-800 space-y-4">
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
                 <select
                   value={bpSeconds}
                   onChange={e => setBpSeconds(Number(e.target.value))}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-orange-500"
+                  className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-orange-500"
                 >
                   {INTERVALS.map(iv => (
                     <option key={iv.seconds} value={iv.seconds}>{iv.label}</option>
                   ))}
                 </select>
-                {bpLoading ? (
-                  <div className="space-y-2">
-                    {[1,2,3,4,5].map(i => <div key={i} className="h-8 bg-gray-800 rounded animate-pulse" />)}
-                  </div>
-                ) : bpResults && bpResults.length > 0 ? (
-                  <div className="space-y-1.5">
-                    {bpResults.map((r, i) => (
-                      <div key={r.rank} className={`flex items-center justify-between px-3 py-2 rounded-lg ${i === 0 ? 'bg-orange-500/10 border border-orange-500/30' : 'bg-gray-800'}`}>
-                        <span className={`text-sm font-medium ${i === 0 ? 'text-orange-400' : 'text-gray-500'}`}>#{r.rank}</span>
-                        <span className={`text-lg font-bold tabular-nums ${i === 0 ? 'text-white' : 'text-gray-200'}`}>
-                          {r.watts}<span className="text-xs font-normal text-gray-400 ml-1">W</span>
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-gray-500 text-center py-4">No power data</p>
-                )}
+                <span className="text-xs text-gray-500">Top 5 non-overlapping best efforts</span>
               </div>
+
+              {bpLoading ? (
+                <div className="space-y-2">
+                  {[1,2,3,4,5].map(i => <div key={i} className="h-10 bg-gray-800 rounded-xl animate-pulse" />)}
+                </div>
+              ) : bpResults && bpResults.length > 0 ? (
+                <div className="bg-gray-900 rounded-xl border border-gray-800 overflow-x-auto scroll-touch">
+                  <table className="text-sm w-full whitespace-nowrap">
+                    <thead>
+                      <tr className="border-b border-gray-800">
+                        <th className="text-left px-4 py-3 text-gray-500 font-medium">#</th>
+                        <th className="text-right px-4 py-3 text-gray-500 font-medium">Avg Power</th>
+                        <th className="text-right px-4 py-3 text-gray-500 font-medium">Max Power</th>
+                        <th className="text-right px-4 py-3 text-gray-500 font-medium">Avg HR</th>
+                        <th className="text-right px-4 py-3 text-gray-500 font-medium">Max HR</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {bpResults.map((r, i) => (
+                        <tr key={r.rank} className={`border-b border-gray-800/60 last:border-0 ${i === 0 ? 'bg-orange-500/5' : i % 2 !== 0 ? 'bg-gray-800/30' : ''}`}>
+                          <td className={`px-4 py-3 font-medium ${i === 0 ? 'text-orange-400' : 'text-gray-500'}`}>#{r.rank}</td>
+                          <td className={`px-4 py-3 text-right font-bold tabular-nums ${i === 0 ? 'text-white' : 'text-gray-200'}`}>
+                            {r.watts} <span className="text-xs font-normal text-gray-500">W</span>
+                          </td>
+                          <td className="px-4 py-3 text-right tabular-nums text-gray-300">
+                            {r.max_watts} <span className="text-xs text-gray-500">W</span>
+                          </td>
+                          <td className="px-4 py-3 text-right tabular-nums text-gray-300">
+                            {r.avg_hr ? <>{r.avg_hr} <span className="text-xs text-gray-500">bpm</span></> : '—'}
+                          </td>
+                          <td className="px-4 py-3 text-right tabular-nums text-gray-300">
+                            {r.max_hr ? <>{r.max_hr} <span className="text-xs text-gray-500">bpm</span></> : '—'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500 py-4">No power data</p>
+              )}
             </div>
           ) : (
             <div className="bg-gray-800/50 border border-gray-700 border-dashed rounded-xl p-8 text-center">

@@ -17,7 +17,7 @@ export async function GET(
   const client = await pool.connect();
   try {
     const res = await client.query(
-      `SELECT watts FROM activity_streams WHERE activity_id = $1`,
+      `SELECT watts, hr FROM activity_streams WHERE activity_id = $1`,
       [id]
     );
 
@@ -26,12 +26,13 @@ export async function GET(
     }
 
     const watts: number[] = res.rows[0].watts;
+    const hr: number[] | null = res.rows[0].hr ?? null;
 
     if (watts.length < seconds) {
       return Response.json({ results: [], seconds });
     }
 
-    // Compute rolling averages for every valid window
+    // Compute rolling average watts for every valid window
     const n = watts.length;
     const avgs: { start: number; avg: number }[] = new Array(n - seconds + 1);
 
@@ -48,22 +49,44 @@ export async function GET(
     avgs.sort((a, b) => b.avg - a.avg);
 
     // Greedily pick top 5 non-overlapping windows
-    const results: { rank: number; watts: number; start: number }[] = [];
+    const selected: { start: number; avg: number }[] = [];
     const used = new Set<number>();
 
     for (const { start, avg } of avgs) {
-      if (results.length >= 5) break;
-
-      // Check overlap with any already-selected window
+      if (selected.length >= 5) break;
       let overlaps = false;
       for (const s of used) {
         if (Math.abs(start - s) < seconds) { overlaps = true; break; }
       }
       if (overlaps) continue;
-
       used.add(start);
-      results.push({ rank: results.length + 1, watts: Math.round(avg), start });
+      selected.push({ start, avg });
     }
+
+    // For each selected window compute max watts, avg HR, max HR
+    const results = selected.map(({ start, avg }, i) => {
+      const slice = watts.slice(start, start + seconds);
+      const maxW = Math.max(...slice);
+
+      let avgHr: number | null = null;
+      let maxHr: number | null = null;
+      if (hr && hr.length >= start + seconds) {
+        const hrSlice = hr.slice(start, start + seconds).filter(v => v > 0);
+        if (hrSlice.length > 0) {
+          avgHr = Math.round(hrSlice.reduce((s, v) => s + v, 0) / hrSlice.length);
+          maxHr = Math.max(...hrSlice);
+        }
+      }
+
+      return {
+        rank:     i + 1,
+        watts:    Math.round(avg),
+        max_watts: maxW,
+        avg_hr:   avgHr,
+        max_hr:   maxHr,
+        start,
+      };
+    });
 
     return Response.json({ results, seconds });
   } finally {
