@@ -7,6 +7,7 @@ import { ZoneResult } from '@/lib/zones';
 interface ZonesResponse {
   power: ZoneResult[] | null;
   hr:    ZoneResult[] | null;
+  has_hr_stream: boolean;
   ftp:   number;
   max_hr: number | null;
 }
@@ -110,13 +111,15 @@ export default function ZoneDistribution({ activityId }: { activityId: string })
           </div>
           <ZoneTable zones={data.hr} maxSecs={hrMax} unit="bpm" />
         </div>
-      ) : data.power && (
-        <p className="text-xs text-gray-600">
-          Set your{' '}
+      ) : data.has_hr_stream && !data.max_hr ? (
+        <p className="text-xs text-gray-500">
+          HR stream available — set your{' '}
           <Link href="/profile" className="text-orange-400 hover:underline">Max HR in settings</Link>
           {' '}to see HR zones
         </p>
-      )}
+      ) : !data.has_hr_stream ? (
+        <p className="text-xs text-gray-600">No HR stream data for this activity</p>
+      ) : null}
     </div>
   );
 }

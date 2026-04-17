@@ -18,7 +18,7 @@ export async function GET(
     );
 
     if (res.rows.length === 0) {
-      return Response.json({ power: null, hr: null });
+      return Response.json({ power: null, hr: null, has_hr_stream: false, ftp: effectiveFtp(profile), max_hr: profile.max_hr });
     }
 
     const { watts, hr } = res.rows[0] as { watts: number[] | null; hr: number[] | null };
@@ -32,6 +32,7 @@ export async function GET(
     return Response.json({
       power: watts ? calcZoneTime(watts, powerZones) : null,
       hr:    (hr && hrZones) ? calcZoneTime(hr, hrZones) : null,
+      has_hr_stream: hr !== null && hr.length > 0,
       ftp,
       max_hr: profile.max_hr,
     });

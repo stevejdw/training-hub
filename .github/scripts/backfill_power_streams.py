@@ -1,10 +1,10 @@
 """
-Backfill power streams for activities that have power data but no stored stream.
+Backfill power and HR streams for activities that don't yet have a stored stream.
 Creates the activity_streams table if it doesn't exist.
 Safe to re-run — uses ON CONFLICT DO UPDATE.
 
 Set BACKFILL_LIMIT env var to control how many activities to process (default 50).
-Set BACKFILL_ALL=1 to process every activity with power data.
+Set BACKFILL_ALL=1 to process every eligible activity.
 """
 import os
 import time
@@ -56,13 +56,13 @@ def backfill():
     conn.commit()
     print("activity_streams table ready")
 
-    # Fetch activities with power data that don't yet have a stored stream
+    # Fetch activities with power or HR data that don't yet have a stored stream
     if BACKFILL_ALL:
         cur.execute("""
             SELECT a.id, a.name
             FROM activities a
             LEFT JOIN activity_streams s ON s.activity_id = a.id
-            WHERE a.average_watts IS NOT NULL
+            WHERE (a.average_watts IS NOT NULL OR a.average_heartrate IS NOT NULL)
               AND s.activity_id IS NULL
             ORDER BY a.start_date DESC
         """)
@@ -71,7 +71,7 @@ def backfill():
             SELECT a.id, a.name
             FROM activities a
             LEFT JOIN activity_streams s ON s.activity_id = a.id
-            WHERE a.average_watts IS NOT NULL
+            WHERE (a.average_watts IS NOT NULL OR a.average_heartrate IS NOT NULL)
               AND s.activity_id IS NULL
             ORDER BY a.start_date DESC
             LIMIT %s
