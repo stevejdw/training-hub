@@ -170,45 +170,22 @@ function ActivityComparison({ activity, day }: { activity: ActivityDetail; day: 
     onTarget = true;
   }
 
-  const comparisons: { label: string; actual: string; target: string; diff: string; ok: boolean }[] = [];
-  if (mainSeg?.target_np_watts && np) {
-    const diff = Math.round(np) - mainSeg.target_np_watts;
-    const pct = Math.round((np / mainSeg.target_np_watts - 1) * 100);
-    comparisons.push({
-      label: 'NP vs Target',
-      actual: `${Math.round(np)}W`,
-      target: `${mainSeg.target_np_watts}W`,
-      diff: diff > 0 ? `+${diff}W (${pct}%)` : `${diff}W (${pct}%)`,
-      ok: Math.abs(pct) <= 10,
-    });
-  }
-  if (mainSeg?.target_avg_hr && activity.average_heartrate) {
-    const diff = Math.round(activity.average_heartrate) - mainSeg.target_avg_hr;
-    comparisons.push({
-      label: 'Avg HR vs Target',
-      actual: `${Math.round(activity.average_heartrate)} bpm`,
-      target: `${mainSeg.target_avg_hr} bpm`,
-      diff: diff > 0 ? `+${diff}` : `${diff}`,
-      ok: Math.abs(diff) <= 10,
-    });
-  }
+  // Segments that have at least one target to compare against
+  const segsWithTargets = day.segments.filter(s => s.target_np_watts || s.target_avg_hr);
 
   return (
     <div className={`rounded-xl border p-4 space-y-3 ${onTarget ? 'border-green-700/40 bg-green-900/10' : 'border-yellow-700/40 bg-yellow-900/10'}`}>
-      {/* Header with tick + link */}
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 min-w-0">
-          <svg className={`w-4 h-4 flex-shrink-0 ${onTarget ? 'text-green-400' : 'text-yellow-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-          </svg>
-          <h4 className={`text-sm font-semibold truncate ${onTarget ? 'text-green-300' : 'text-yellow-300'}`}>{activity.name}</h4>
-        </div>
+      {/* Header: tick + clickable title */}
+      <div className="flex items-center gap-2 min-w-0">
+        <svg className={`w-4 h-4 flex-shrink-0 ${onTarget ? 'text-green-400' : 'text-yellow-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+        </svg>
         <Link
           href={`/activities/${activity.id}`}
-          className="flex-shrink-0 text-xs text-orange-400 hover:text-orange-300 transition-colors whitespace-nowrap"
+          className={`text-sm font-semibold truncate hover:underline ${onTarget ? 'text-green-300 hover:text-green-200' : 'text-yellow-300 hover:text-yellow-200'}`}
           onClick={e => e.stopPropagation()}
         >
-          View →
+          {activity.name}
         </Link>
       </div>
 
@@ -259,18 +236,59 @@ function ActivityComparison({ activity, day }: { activity: ActivityDetail; day: 
         {commentary}
       </div>
 
-      {/* Numeric comparisons */}
-      {comparisons.length > 0 && (
-        <div className="space-y-1.5 pt-1 border-t border-gray-700/30">
-          {comparisons.map((c, i) => (
-            <div key={i} className="flex items-center justify-between text-xs">
-              <span className="text-gray-400">{c.label}</span>
-              <div className="flex items-center gap-2">
-                <span className="text-gray-300">{c.actual} <span className="text-gray-600">/ {c.target}</span></span>
-                <span className={c.ok ? 'text-green-400' : 'text-yellow-400'}>{c.diff}</span>
-              </div>
-            </div>
-          ))}
+      {/* Segment prescribed vs actual table */}
+      {segsWithTargets.length > 0 && (
+        <div className="pt-1 border-t border-gray-700/30 space-y-2">
+          <p className="text-[10px] text-gray-500 uppercase tracking-wider">Prescribed vs Actual</p>
+          <div className="overflow-x-auto scroll-touch">
+            <table className="text-xs w-full whitespace-nowrap">
+              <thead>
+                <tr className="border-b border-gray-700/40">
+                  <th className="text-left py-1.5 pr-3 text-gray-500 font-medium">Segment</th>
+                  <th className="text-right py-1.5 px-2 text-gray-500 font-medium">Duration</th>
+                  <th className="text-right py-1.5 px-2 text-gray-500 font-medium">Target W</th>
+                  <th className="text-right py-1.5 px-2 text-gray-500 font-medium">Actual W</th>
+                  <th className="text-right py-1.5 px-2 text-gray-500 font-medium">Δ W</th>
+                  <th className="text-right py-1.5 px-2 text-gray-500 font-medium">Target HR</th>
+                  <th className="text-right py-1.5 pl-2 text-gray-500 font-medium">Actual HR</th>
+                  <th className="text-right py-1.5 pl-2 text-gray-500 font-medium">Δ HR</th>
+                </tr>
+              </thead>
+              <tbody>
+                {segsWithTargets.map((seg, i) => {
+                  const isMainSeg = seg.type === 'main' || seg.type === 'interval';
+                  const actW  = isMainSeg ? (np ? Math.round(np) : null) : null;
+                  const actHr = activity.average_heartrate ? Math.round(activity.average_heartrate) : null;
+
+                  const wDiff  = seg.target_np_watts && actW  ? actW  - seg.target_np_watts  : null;
+                  const hrDiff = seg.target_avg_hr   && actHr ? actHr - seg.target_avg_hr    : null;
+
+                  const wOk  = wDiff  !== null && Math.abs(wDiff)  <= seg.target_np_watts!  * 0.10;
+                  const hrOk = hrDiff !== null && Math.abs(hrDiff) <= 10;
+
+                  return (
+                    <tr key={i} className="border-b border-gray-700/20 last:border-0">
+                      <td className="py-2 pr-3 text-gray-300 capitalize">{SEG_LABELS[seg.type] ?? seg.type}</td>
+                      <td className="py-2 px-2 text-right text-gray-400">{seg.duration_min}m</td>
+                      {/* Power */}
+                      <td className="py-2 px-2 text-right text-gray-300">{seg.target_np_watts ? `${seg.target_np_watts}W` : '—'}</td>
+                      <td className="py-2 px-2 text-right text-white font-medium">{actW ? `${actW}W` : '—'}</td>
+                      <td className={`py-2 px-2 text-right font-medium ${wDiff === null ? 'text-gray-600' : wOk ? 'text-green-400' : 'text-yellow-400'}`}>
+                        {wDiff !== null ? (wDiff > 0 ? `+${wDiff}` : `${wDiff}`) : '—'}
+                      </td>
+                      {/* HR */}
+                      <td className="py-2 px-2 text-right text-gray-300">{seg.target_avg_hr ? `${seg.target_avg_hr}` : '—'}</td>
+                      <td className="py-2 pl-2 text-right text-white font-medium">{actHr ?? '—'}</td>
+                      <td className={`py-2 pl-2 text-right font-medium ${hrDiff === null ? 'text-gray-600' : hrOk ? 'text-green-400' : 'text-yellow-400'}`}>
+                        {hrDiff !== null ? (hrDiff > 0 ? `+${hrDiff}` : `${hrDiff}`) : '—'}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          {np && <p className="text-[10px] text-gray-600">Actual W = activity NP (overall). Actual HR = activity avg HR (overall).</p>}
         </div>
       )}
     </div>
