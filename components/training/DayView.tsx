@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { TrainingDay, TrainingSegment } from '@/lib/training-plans';
 
 interface ActivityDetail {
@@ -109,11 +110,67 @@ function SegmentCard({ seg }: { seg: TrainingSegment }) {
   );
 }
 
+function buildCommentary(activity: ActivityDetail, day: TrainingDay): string {
+  const np = activity.normalized_power ?? activity.weighted_average_watts;
+  const mainSeg = day.segments.find(s => s.type === 'main');
+  const parts: string[] = [];
+
+  // Duration
+  if (day.duration_min > 0) {
+    const prescribedSecs = day.duration_min * 60;
+    const diffMins = Math.round((activity.moving_time - prescribedSecs) / 60);
+    const pct = Math.abs(diffMins) / day.duration_min;
+    if (pct <= 0.10) parts.push(`Duration was spot on (${fmt(activity.moving_time)}).`);
+    else if (diffMins > 0) parts.push(`You rode ${diffMins} min longer than prescribed (${fmt(activity.moving_time)} vs ${fmt(prescribedSecs)}).`);
+    else parts.push(`Duration was ${Math.abs(diffMins)} min shorter than prescribed (${fmt(activity.moving_time)} vs ${fmt(prescribedSecs)}).`);
+  }
+
+  // TSS
+  if (day.tss_target && activity.tss > 0) {
+    const diff = activity.tss - day.tss_target;
+    const pct = Math.abs(diff) / day.tss_target;
+    if (pct <= 0.10) parts.push(`Load was on target (${activity.tss} TSS vs ${day.tss_target} target).`);
+    else if (diff > 0) parts.push(`Load was higher than planned (${activity.tss} TSS vs ${day.tss_target} target).`);
+    else parts.push(`Load came in below the plan (${activity.tss} TSS vs ${day.tss_target} target).`);
+  }
+
+  // Power
+  if (mainSeg?.target_np_watts && np) {
+    const diff = Math.round(np) - mainSeg.target_np_watts;
+    const pct = Math.abs(diff) / mainSeg.target_np_watts;
+    if (pct <= 0.05) parts.push(`Power was right on target (${Math.round(np)}W NP).`);
+    else if (diff > 0) parts.push(`You rode ${diff}W above the power target (${Math.round(np)}W vs ${mainSeg.target_np_watts}W NP).`);
+    else parts.push(`Power came in ${Math.abs(diff)}W below target (${Math.round(np)}W vs ${mainSeg.target_np_watts}W NP).`);
+  }
+
+  // HR
+  if (mainSeg?.target_avg_hr && activity.average_heartrate) {
+    const diff = Math.round(activity.average_heartrate) - mainSeg.target_avg_hr;
+    if (Math.abs(diff) <= 5) parts.push(`Heart rate was on target.`);
+    else if (diff > 0) parts.push(`HR ran ${diff} bpm above target — check if the effort was too hard.`);
+    else parts.push(`HR was ${Math.abs(diff)} bpm below target.`);
+  }
+
+  if (parts.length === 0) return 'Activity logged.';
+  return parts.join(' ');
+}
+
 function ActivityComparison({ activity, day }: { activity: ActivityDetail; day: TrainingDay }) {
   const np = activity.normalized_power ?? activity.weighted_average_watts;
   const mainSeg = day.segments.find(s => s.type === 'main');
+  const commentary = buildCommentary(activity, day);
 
-  const comparisons = [];
+  // Determine if on-target
+  let onTarget = false;
+  if (day.tss_target && activity.tss > 0) {
+    onTarget = Math.abs(activity.tss - day.tss_target) / day.tss_target <= 0.15;
+  } else if (day.duration_min > 0 && activity.moving_time > 0) {
+    onTarget = Math.abs(activity.moving_time - day.duration_min * 60) / (day.duration_min * 60) <= 0.20;
+  } else {
+    onTarget = true;
+  }
+
+  const comparisons: { label: string; actual: string; target: string; diff: string; ok: boolean }[] = [];
   if (mainSeg?.target_np_watts && np) {
     const diff = Math.round(np) - mainSeg.target_np_watts;
     const pct = Math.round((np / mainSeg.target_np_watts - 1) * 100);
@@ -137,63 +194,74 @@ function ActivityComparison({ activity, day }: { activity: ActivityDetail; day: 
   }
 
   return (
-    <div className="bg-gray-800/60 rounded-xl p-4 space-y-3">
-      <div className="flex items-center gap-2">
-        <div className="w-2 h-2 rounded-full bg-green-500" />
-        <h4 className="text-sm font-semibold text-green-400">{activity.name}</h4>
+    <div className={`rounded-xl border p-4 space-y-3 ${onTarget ? 'border-green-700/40 bg-green-900/10' : 'border-yellow-700/40 bg-yellow-900/10'}`}>
+      {/* Header with tick + link */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <svg className={`w-4 h-4 flex-shrink-0 ${onTarget ? 'text-green-400' : 'text-yellow-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+          </svg>
+          <h4 className={`text-sm font-semibold truncate ${onTarget ? 'text-green-300' : 'text-yellow-300'}`}>{activity.name}</h4>
+        </div>
+        <Link
+          href={`/activities/${activity.id}`}
+          className="flex-shrink-0 text-xs text-orange-400 hover:text-orange-300 transition-colors whitespace-nowrap"
+          onClick={e => e.stopPropagation()}
+        >
+          View →
+        </Link>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+      {/* Stats grid */}
+      <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+        <div className="bg-black/20 rounded-lg p-2">
+          <p className="text-[10px] text-gray-500 uppercase mb-0.5">Duration</p>
+          <p className="text-sm font-bold text-white">{fmt(activity.moving_time)}</p>
+          {day.duration_min > 0 && <p className="text-[10px] text-gray-500">of {fmt(day.duration_min * 60)}</p>}
+        </div>
         {activity.tss > 0 && (
-          <div className="bg-gray-900/50 rounded-lg p-2">
+          <div className="bg-black/20 rounded-lg p-2">
             <p className="text-[10px] text-gray-500 uppercase mb-0.5">TSS</p>
             <p className="text-sm font-bold text-white">{activity.tss}</p>
-            {day.tss_target && (
-              <p className={`text-[10px] mt-0.5 ${Math.abs(activity.tss - day.tss_target) <= day.tss_target * 0.15 ? 'text-green-400' : 'text-yellow-400'}`}>
-                target {day.tss_target}
-              </p>
-            )}
+            {day.tss_target && <p className="text-[10px] text-gray-500">of {day.tss_target}</p>}
           </div>
         )}
         {np && (
-          <div className="bg-gray-900/50 rounded-lg p-2">
+          <div className="bg-black/20 rounded-lg p-2">
             <p className="text-[10px] text-gray-500 uppercase mb-0.5">NP</p>
             <p className="text-sm font-bold text-white">{Math.round(np)}W</p>
+            {mainSeg?.target_np_watts && <p className="text-[10px] text-gray-500">of {mainSeg.target_np_watts}W</p>}
           </div>
         )}
         {activity.average_watts && (
-          <div className="bg-gray-900/50 rounded-lg p-2">
-            <p className="text-[10px] text-gray-500 uppercase mb-0.5">Avg Power</p>
+          <div className="bg-black/20 rounded-lg p-2">
+            <p className="text-[10px] text-gray-500 uppercase mb-0.5">Avg W</p>
             <p className="text-sm font-bold text-white">{Math.round(activity.average_watts)}W</p>
           </div>
         )}
         {activity.average_heartrate && (
-          <div className="bg-gray-900/50 rounded-lg p-2">
+          <div className="bg-black/20 rounded-lg p-2">
             <p className="text-[10px] text-gray-500 uppercase mb-0.5">Avg HR</p>
-            <p className="text-sm font-bold text-white">{Math.round(activity.average_heartrate)} bpm</p>
-          </div>
-        )}
-        {activity.max_heartrate && (
-          <div className="bg-gray-900/50 rounded-lg p-2">
-            <p className="text-[10px] text-gray-500 uppercase mb-0.5">Max HR</p>
-            <p className="text-sm font-bold text-white">{Math.round(activity.max_heartrate)} bpm</p>
+            <p className="text-sm font-bold text-white">{Math.round(activity.average_heartrate)}</p>
+            {mainSeg?.target_avg_hr && <p className="text-[10px] text-gray-500">of {mainSeg.target_avg_hr}</p>}
           </div>
         )}
         {activity.intensity_factor && (
-          <div className="bg-gray-900/50 rounded-lg p-2">
+          <div className="bg-black/20 rounded-lg p-2">
             <p className="text-[10px] text-gray-500 uppercase mb-0.5">IF</p>
             <p className="text-sm font-bold text-white">{activity.intensity_factor.toFixed(2)}</p>
           </div>
         )}
-        <div className="bg-gray-900/50 rounded-lg p-2">
-          <p className="text-[10px] text-gray-500 uppercase mb-0.5">Duration</p>
-          <p className="text-sm font-bold text-white">{fmt(activity.moving_time)}</p>
-        </div>
       </div>
 
+      {/* Commentary */}
+      <div className={`rounded-lg px-3 py-2.5 text-xs leading-relaxed ${onTarget ? 'bg-green-900/20 text-green-200' : 'bg-yellow-900/20 text-yellow-200'}`}>
+        {commentary}
+      </div>
+
+      {/* Numeric comparisons */}
       {comparisons.length > 0 && (
-        <div className="space-y-1.5 pt-2 border-t border-gray-700/50">
-          <p className="text-[10px] text-gray-500 uppercase tracking-wider">vs Plan</p>
+        <div className="space-y-1.5 pt-1 border-t border-gray-700/30">
           {comparisons.map((c, i) => (
             <div key={i} className="flex items-center justify-between text-xs">
               <span className="text-gray-400">{c.label}</span>
