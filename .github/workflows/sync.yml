@@ -2,7 +2,7 @@ name: Sync Strava to Neon
 
 on:
   schedule:
-    - cron: '0 15 * * *'
+    - cron: '*/30 * * * *'
   workflow_dispatch:
 
 jobs:
