@@ -40,6 +40,42 @@ function calculateTss(movingTime: number, np: number, ftp: number): number | nul
   return Math.round((movingTime * np * IF) / (ftp * 3600) * 100 * 10) / 10;
 }
 
+/** Fetch activities newer than the latest one in the DB and sync each one fully. */
+export async function syncRecentActivities(): Promise<{ synced: number; names: string[] }> {
+  const token = await getStravaToken();
+
+  // Find epoch of most recent activity stored
+  const dbClient = await pool.connect();
+  let afterEpoch = 0;
+  try {
+    const res = await dbClient.query(
+      `SELECT EXTRACT(EPOCH FROM MAX(start_date))::bigint AS epoch FROM activities`
+    );
+    afterEpoch = Number(res.rows[0]?.epoch ?? 0);
+  } finally {
+    dbClient.release();
+  }
+
+  // List activities from Strava since that epoch (max 30)
+  const qs = new URLSearchParams({ per_page: '30', page: '1' });
+  if (afterEpoch > 0) qs.set('after', String(afterEpoch));
+
+  const listRes = await fetch(`https://www.strava.com/api/v3/athlete/activities?${qs}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!listRes.ok) throw new Error(`Strava list failed: ${listRes.status}`);
+
+  const list = await listRes.json() as Record<string, unknown>[];
+  const names: string[] = [];
+
+  for (const a of list) {
+    await syncActivity(Number(a.id));
+    names.push(String(a.name));
+  }
+
+  return { synced: names.length, names };
+}
+
 export async function syncActivity(activityId: number): Promise<void> {
   const token   = await getStravaToken();
   const profile = await getProfile();

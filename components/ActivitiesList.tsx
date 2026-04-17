@@ -74,6 +74,35 @@ export default function ActivitiesList() {
   // Filter panel visibility
   const [showFilters, setShowFilters] = useState(false);
 
+  // Manual sync state
+  const [syncing,    setSyncing]    = useState(false);
+  const [syncResult, setSyncResult] = useState<string | null>(null);
+
+  async function handleSync() {
+    if (syncing) return;
+    setSyncing(true);
+    setSyncResult(null);
+    try {
+      const r = await fetch('/api/sync', { method: 'POST' });
+      const d = await r.json() as { synced?: number; names?: string[]; error?: string };
+      if (d.error) {
+        setSyncResult(`Error: ${d.error}`);
+      } else if (d.synced === 0) {
+        setSyncResult('Already up to date');
+      } else {
+        setSyncResult(`✓ Synced ${d.synced} new activit${d.synced === 1 ? 'y' : 'ies'}`);
+        // Refresh the list
+        setPage(1);
+        setSelected(prev => [...prev]); // trigger re-fetch
+      }
+    } catch {
+      setSyncResult('Sync failed');
+    } finally {
+      setSyncing(false);
+      setTimeout(() => setSyncResult(null), 4000);
+    }
+  }
+
   function toggleType(f: SportFilter) {
     setSelected(prev => prev.includes(f) ? prev.filter(x => x !== f) : [...prev, f]);
     setPage(1);
@@ -170,6 +199,32 @@ export default function ActivitiesList() {
           {/* Total count */}
           {!loading && (
             <span className="text-sm text-gray-500 flex-shrink-0">{total.toLocaleString()}</span>
+          )}
+
+          {/* Sync button */}
+          <button
+            onClick={handleSync}
+            disabled={syncing}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex-shrink-0 ${
+              syncing
+                ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
+                : 'bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700'
+            }`}
+            title="Sync new activities from Strava"
+          >
+            <svg
+              className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`}
+              fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round"
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            {syncing ? 'Syncing…' : 'Sync'}
+          </button>
+          {syncResult && (
+            <span className={`text-xs flex-shrink-0 ${syncResult.startsWith('Error') ? 'text-red-400' : 'text-green-400'}`}>
+              {syncResult}
+            </span>
           )}
         </div>
 
