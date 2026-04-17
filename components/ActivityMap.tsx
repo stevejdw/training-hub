@@ -5,9 +5,10 @@ import { useEffect, useRef } from 'react';
 interface Props {
   polyline: string;
   className?: string;
+  thumbnail?: boolean;
 }
 
-export default function ActivityMap({ polyline, className }: Props) {
+export default function ActivityMap({ polyline, className, thumbnail }: Props) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<unknown>(null);
 
@@ -22,7 +23,15 @@ export default function ActivityMap({ polyline, className }: Props) {
       const coords = polylineDecode.decode(polyline) as [number, number][];
       if (coords.length === 0) return;
 
-      const map = L.map(mapRef.current!, { zoomControl: true, attributionControl: false });
+      const map = L.map(mapRef.current!, {
+        zoomControl: !thumbnail,
+        attributionControl: false,
+        dragging: !thumbnail,
+        scrollWheelZoom: !thumbnail,
+        doubleClickZoom: !thumbnail,
+        touchZoom: !thumbnail,
+        keyboard: !thumbnail,
+      });
       mapInstanceRef.current = map;
 
       L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {

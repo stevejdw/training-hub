@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 const links = [
   {
     href: '/dashboard',
-    label: 'Dashboard',
+    label: 'Analytics',
     icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.5V19a1 1 0 001 1h4v-5h4v5h4a1 1 0 001-1v-5.5M3 13.5L12 4l9 9.5" />
