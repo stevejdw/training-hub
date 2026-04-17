@@ -76,6 +76,43 @@ export async function syncRecentActivities(): Promise<{ synced: number; names: s
   return { synced: names.length, names };
 }
 
+export async function ensureSegmentTables(): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS starred_segments (
+        id          BIGINT PRIMARY KEY,
+        name        TEXT,
+        distance    FLOAT,
+        avg_grade   FLOAT,
+        city        TEXT,
+        country     TEXT,
+        synced_at   TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS segment_efforts (
+        id                BIGINT PRIMARY KEY,
+        activity_id       BIGINT,
+        segment_id        BIGINT,
+        name              TEXT,
+        elapsed_time      INTEGER,
+        moving_time       INTEGER,
+        start_date        TIMESTAMPTZ,
+        distance          FLOAT,
+        average_watts     FLOAT,
+        average_heartrate FLOAT,
+        pr_rank           INTEGER,
+        kom_rank          INTEGER
+      )
+    `);
+    await client.query(`CREATE INDEX IF NOT EXISTS segment_efforts_activity ON segment_efforts(activity_id)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS segment_efforts_segment  ON segment_efforts(segment_id)`);
+  } finally {
+    client.release();
+  }
+}
+
 export async function syncActivity(activityId: number): Promise<void> {
   const token   = await getStravaToken();
   const profile = await getProfile();
@@ -184,6 +221,35 @@ export async function syncActivity(activityId: number): Promise<void> {
           lap.average_heartrate, lap.max_heartrate,
           lap.average_speed, lap.total_elevation_gain,
           startIdx, endIdx,
+        ]);
+      }
+    }
+
+    // Store segment efforts (from the activity detail response)
+    const segEfforts = (a.segment_efforts as Record<string, unknown>[] | null) ?? [];
+    if (segEfforts.length > 0) {
+      await ensureSegmentTables();
+      for (const se of segEfforts) {
+        const seg = se.segment as Record<string, unknown> | null;
+        await client.query(`
+          INSERT INTO segment_efforts
+            (id, activity_id, segment_id, name, elapsed_time, moving_time,
+             start_date, distance, average_watts, average_heartrate, pr_rank, kom_rank)
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+          ON CONFLICT (id) DO UPDATE SET
+            pr_rank  = EXCLUDED.pr_rank,
+            kom_rank = EXCLUDED.kom_rank
+        `, [
+          se.id, activityId,
+          seg?.id ?? null,
+          se.name ?? seg?.name,
+          se.elapsed_time, se.moving_time,
+          se.start_date,
+          se.distance,
+          (se.average_watts as number | null) ?? null,
+          (se.average_heartrate as number | null) ?? null,
+          (se.pr_rank as number | null) ?? null,
+          (se.kom_rank as number | null) ?? null,
         ]);
       }
     }

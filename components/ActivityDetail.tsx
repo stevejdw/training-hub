@@ -26,7 +26,22 @@ const INTERVALS: { label: string; seconds: number }[] = [
 
 const ActivityMap = dynamic(() => import('./ActivityMap'), { ssr: false });
 
-type Tab = 'stats' | 'laps' | 'power' | 'zones';
+type Tab = 'stats' | 'laps' | 'power' | 'zones' | 'segments';
+
+interface SegmentEffort {
+  id: number;
+  segment_id: number;
+  name: string;
+  elapsed_time: number;
+  moving_time: number;
+  distance: number;
+  average_watts: number | null;
+  average_heartrate: number | null;
+  pr_rank: number | null;
+  kom_rank: number | null;
+  avg_grade: number | null;
+  city: string | null;
+}
 
 interface Activity {
   id: number;
@@ -92,6 +107,9 @@ export default function ActivityDetail({ id }: { id: string }) {
   const [bpSeconds,  setBpSeconds]  = useState(300);
   const [bpResults,  setBpResults]  = useState<{ rank: number; watts: number; max_watts: number; avg_hr: number | null; max_hr: number | null }[] | undefined>(undefined);
   const [bpLoading,  setBpLoading]  = useState(false);
+  const [segments,   setSegments]   = useState<SegmentEffort[]>([]);
+  const [segLoading, setSegLoading] = useState(false);
+  const [segFetched, setSegFetched] = useState(false);
 
   useEffect(() => {
     fetch(`/api/activities/${id}`)
@@ -109,6 +127,16 @@ export default function ActivityDetail({ id }: { id: string }) {
       .then(d => { setBpResults(d.results ?? []); setBpLoading(false); })
       .catch(() => { setBpResults([]); setBpLoading(false); });
   }, [id, activity, bpSeconds]);
+
+  // Lazy-load segments only when Segments tab is opened
+  useEffect(() => {
+    if (tab !== 'segments' || segFetched) return;
+    setSegLoading(true);
+    fetch(`/api/activities/${id}/segments`)
+      .then(r => r.json())
+      .then(d => { setSegments(d.efforts ?? []); setSegFetched(true); setSegLoading(false); })
+      .catch(() => { setSegFetched(true); setSegLoading(false); });
+  }, [tab, id, segFetched]);
 
   if (loading) {
     return (
@@ -133,10 +161,11 @@ export default function ActivityDetail({ id }: { id: string }) {
   const speedKph = activity.average_speed ? (activity.average_speed * 3.6).toFixed(1) : null;
 
   const TABS: { key: Tab; label: string }[] = [
-    { key: 'stats', label: 'Stats' },
-    { key: 'laps',  label: `Laps${laps.length ? ` (${laps.length})` : ''}` },
-    { key: 'power', label: 'Power' },
-    { key: 'zones', label: 'Time in Zones' },
+    { key: 'stats',    label: 'Stats' },
+    { key: 'laps',     label: `Laps${laps.length ? ` (${laps.length})` : ''}` },
+    { key: 'power',    label: 'Power' },
+    { key: 'zones',    label: 'Time in Zones' },
+    { key: 'segments', label: `Segments${segments.length ? ` (${segments.length})` : ''}` },
   ];
 
   return (
@@ -380,6 +409,94 @@ export default function ActivityDetail({ id }: { id: string }) {
         {/* Tab: Time in Zones */}
         {tab === 'zones' && (
           <ZoneDistribution activityId={id} />
+        )}
+
+        {/* Tab: Segments */}
+        {tab === 'segments' && (
+          <div>
+            {segLoading ? (
+              <div className="space-y-2">
+                {[1,2,3].map(i => <div key={i} className="h-16 bg-gray-800 rounded-xl animate-pulse" />)}
+              </div>
+            ) : segments.length === 0 ? (
+              <div className="bg-gray-800/40 rounded-xl p-6 text-center space-y-2">
+                <p className="text-gray-400 text-sm">No starred segments matched this activity.</p>
+                <p className="text-gray-500 text-xs">
+                  Star segments on Strava, then{' '}
+                  <button
+                    onClick={async () => {
+                      await fetch('/api/segments/starred', { method: 'POST' });
+                      setSegFetched(false);
+                    }}
+                    className="text-orange-400 hover:underline"
+                  >
+                    re-sync
+                  </button>
+                  {' '}to update your list.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {segments.map(seg => {
+                  const mins  = Math.floor(seg.elapsed_time / 60);
+                  const secs  = seg.elapsed_time % 60;
+                  const timeStr = mins > 0
+                    ? `${mins}:${secs.toString().padStart(2,'0')}`
+                    : `0:${secs.toString().padStart(2,'0')}`;
+                  const isPR  = seg.pr_rank === 1;
+                  const isTop3 = seg.kom_rank !== null && seg.kom_rank <= 3;
+
+                  return (
+                    <a
+                      key={seg.id}
+                      href={`https://www.strava.com/segments/${seg.segment_id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`block rounded-xl p-4 border transition-colors hover:border-gray-600/60 ${
+                        isPR
+                          ? 'bg-yellow-500/10 border-yellow-500/40'
+                          : 'bg-gray-800/60 border-gray-700/40'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap mb-1">
+                            <span className="text-sm font-semibold text-white truncate">{seg.name}</span>
+                            {isPR && (
+                              <span className="text-[10px] bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 px-1.5 py-0.5 rounded font-bold flex-shrink-0">🏆 PR</span>
+                            )}
+                            {isTop3 && !isPR && (
+                              <span className="text-[10px] bg-orange-500/20 text-orange-400 border border-orange-500/30 px-1.5 py-0.5 rounded font-bold flex-shrink-0">Top {seg.kom_rank}</span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-3 flex-wrap text-xs text-gray-400">
+                            {seg.distance > 0 && (
+                              <span>{(seg.distance / 1000).toFixed(1)} km</span>
+                            )}
+                            {seg.avg_grade !== null && (
+                              <span>{seg.avg_grade.toFixed(1)}% avg</span>
+                            )}
+                            {seg.city && <span>{seg.city}</span>}
+                          </div>
+                        </div>
+                        <div className="text-right flex-shrink-0 space-y-1">
+                          <p className={`text-lg font-bold tabular-nums ${isPR ? 'text-yellow-300' : 'text-white'}`}>{timeStr}</p>
+                          <div className="flex items-center gap-2 justify-end text-xs text-gray-400">
+                            {seg.average_watts && (
+                              <span>{Math.round(seg.average_watts)}W</span>
+                            )}
+                            {seg.average_heartrate && (
+                              <span className="text-red-400">♥ {Math.round(seg.average_heartrate)}</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </a>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         )}
 
       </div>
