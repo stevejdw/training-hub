@@ -447,11 +447,9 @@ export default function ActivityDetail({ id }: { id: string }) {
                   const isTop3 = seg.kom_rank !== null && seg.kom_rank <= 3;
 
                   return (
-                    <a
+                    <Link
                       key={seg.id}
-                      href={`https://www.strava.com/segments/${seg.segment_id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                      href={`/segments/${seg.segment_id}`}
                       className={`block rounded-xl p-4 border transition-colors hover:border-gray-600/60 ${
                         isPR
                           ? 'bg-yellow-500/10 border-yellow-500/40'
@@ -489,9 +487,10 @@ export default function ActivityDetail({ id }: { id: string }) {
                               <span className="text-red-400">♥ {Math.round(seg.average_heartrate)}</span>
                             )}
                           </div>
+                          <span className="text-[10px] text-orange-400 mt-1 block">History →</span>
                         </div>
                       </div>
-                    </a>
+                    </Link>
                   );
                 })}
               </div>

@@ -108,6 +108,21 @@ export async function ensureSegmentTables(): Promise<void> {
     `);
     await client.query(`CREATE INDEX IF NOT EXISTS segment_efforts_activity ON segment_efforts(activity_id)`);
     await client.query(`CREATE INDEX IF NOT EXISTS segment_efforts_segment  ON segment_efforts(segment_id)`);
+    // Add columns idempotently (no-op if already present)
+    await client.query(`ALTER TABLE starred_segments ADD COLUMN IF NOT EXISTS start_lat            FLOAT`);
+    await client.query(`ALTER TABLE starred_segments ADD COLUMN IF NOT EXISTS start_lng            FLOAT`);
+    await client.query(`ALTER TABLE starred_segments ADD COLUMN IF NOT EXISTS elevation_high       FLOAT`);
+    await client.query(`ALTER TABLE starred_segments ADD COLUMN IF NOT EXISTS elevation_low        FLOAT`);
+    await client.query(`ALTER TABLE starred_segments ADD COLUMN IF NOT EXISTS total_elevation_gain FLOAT`);
+    await client.query(`ALTER TABLE starred_segments ADD COLUMN IF NOT EXISTS climb_category       INTEGER`);
+    await client.query(`ALTER TABLE starred_segments ADD COLUMN IF NOT EXISTS polyline             TEXT`);
+    await client.query(`ALTER TABLE starred_segments ADD COLUMN IF NOT EXISTS effort_count         INTEGER`);
+    await client.query(`ALTER TABLE starred_segments ADD COLUMN IF NOT EXISTS athlete_count        INTEGER`);
+    await client.query(`ALTER TABLE starred_segments ADD COLUMN IF NOT EXISTS altitude_stream      FLOAT[]`);
+    await client.query(`ALTER TABLE starred_segments ADD COLUMN IF NOT EXISTS distance_stream      FLOAT[]`);
+    await client.query(`ALTER TABLE segment_efforts  ADD COLUMN IF NOT EXISTS max_heartrate        FLOAT`);
+    await client.query(`ALTER TABLE segment_efforts  ADD COLUMN IF NOT EXISTS wind_speed           FLOAT`);
+    await client.query(`ALTER TABLE segment_efforts  ADD COLUMN IF NOT EXISTS wind_direction       INTEGER`);
   } finally {
     client.release();
   }
@@ -234,11 +249,12 @@ export async function syncActivity(activityId: number): Promise<void> {
         await client.query(`
           INSERT INTO segment_efforts
             (id, activity_id, segment_id, name, elapsed_time, moving_time,
-             start_date, distance, average_watts, average_heartrate, pr_rank, kom_rank)
-          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+             start_date, distance, average_watts, average_heartrate, max_heartrate, pr_rank, kom_rank)
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
           ON CONFLICT (id) DO UPDATE SET
-            pr_rank  = EXCLUDED.pr_rank,
-            kom_rank = EXCLUDED.kom_rank
+            pr_rank       = EXCLUDED.pr_rank,
+            kom_rank      = EXCLUDED.kom_rank,
+            max_heartrate = EXCLUDED.max_heartrate
         `, [
           se.id, activityId,
           seg?.id ?? null,
@@ -248,6 +264,7 @@ export async function syncActivity(activityId: number): Promise<void> {
           se.distance,
           (se.average_watts as number | null) ?? null,
           (se.average_heartrate as number | null) ?? null,
+          (se.max_heartrate as number | null) ?? null,
           (se.pr_rank as number | null) ?? null,
           (se.kom_rank as number | null) ?? null,
         ]);

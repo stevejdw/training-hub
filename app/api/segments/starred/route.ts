@@ -23,12 +23,14 @@ export async function GET() {
     const segs = await res.json() as Record<string, unknown>[];
 
     for (const s of segs) {
+      const latlng = s.start_latlng as [number, number] | null;
       await client.query(`
-        INSERT INTO starred_segments (id, name, distance, avg_grade, city, country, synced_at)
-        VALUES ($1,$2,$3,$4,$5,$6,NOW())
+        INSERT INTO starred_segments (id, name, distance, avg_grade, city, country, start_lat, start_lng, synced_at)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW())
         ON CONFLICT (id) DO UPDATE SET
-          name=EXCLUDED.name, synced_at=NOW()
-      `, [s.id, s.name, s.distance, s.average_grade, s.city, s.country]);
+          name=EXCLUDED.name, start_lat=EXCLUDED.start_lat, start_lng=EXCLUDED.start_lng, synced_at=NOW()
+      `, [s.id, s.name, s.distance, s.average_grade, s.city, s.country,
+          latlng?.[0] ?? null, latlng?.[1] ?? null]);
     }
 
     return Response.json(segs.map(s => ({
@@ -55,10 +57,12 @@ export async function POST() {
 
     await client.query(`DELETE FROM starred_segments`);
     for (const s of segs) {
+      const latlng = s.start_latlng as [number, number] | null;
       await client.query(`
-        INSERT INTO starred_segments (id, name, distance, avg_grade, city, country, synced_at)
-        VALUES ($1,$2,$3,$4,$5,$6,NOW())
-      `, [s.id, s.name, s.distance, s.average_grade, s.city, s.country]);
+        INSERT INTO starred_segments (id, name, distance, avg_grade, city, country, start_lat, start_lng, synced_at)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW())
+      `, [s.id, s.name, s.distance, s.average_grade, s.city, s.country,
+          latlng?.[0] ?? null, latlng?.[1] ?? null]);
     }
 
     return Response.json({ synced: segs.length });

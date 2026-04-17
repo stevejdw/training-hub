@@ -33,8 +33,8 @@ export async function GET(
         await client.query(`
           INSERT INTO segment_efforts
             (id, activity_id, segment_id, name, elapsed_time, moving_time,
-             start_date, distance, average_watts, average_heartrate, pr_rank, kom_rank)
-          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+             start_date, distance, average_watts, average_heartrate, max_heartrate, pr_rank, kom_rank)
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
           ON CONFLICT (id) DO NOTHING
         `, [
           se.id, id,
@@ -44,6 +44,7 @@ export async function GET(
           se.start_date, se.distance,
           (se.average_watts as number | null) ?? null,
           (se.average_heartrate as number | null) ?? null,
+          (se.max_heartrate as number | null) ?? null,
           (se.pr_rank as number | null) ?? null,
           (se.kom_rank as number | null) ?? null,
         ]);
