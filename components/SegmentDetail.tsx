@@ -77,6 +77,7 @@ export default function SegmentDetail({ id }: { id: string }) {
   const [error,    setError]    = useState(false);
   const [sortKey,  setSortKey]  = useState<SortKey>('start_date');
   const [sortDir,  setSortDir]  = useState<SortDir>('desc');
+  const [syncError, setSyncError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch(`/api/segments/${id}`)
@@ -86,7 +87,11 @@ export default function SegmentDetail({ id }: { id: string }) {
 
     fetch(`/api/segments/${id}/efforts`)
       .then(r => r.json())
-      .then(d => { setEfforts(d.efforts ?? []); setEffLoad(false); })
+      .then(d => {
+        setEfforts(d.efforts ?? []);
+        setSyncError(d.syncError ?? null);
+        setEffLoad(false);
+      })
       .catch(() => setEffLoad(false));
   }, [id]);
 
@@ -294,8 +299,23 @@ export default function SegmentDetail({ id }: { id: string }) {
               {[1,2,3,4,5].map(i => <div key={i} className="h-12 bg-gray-800 rounded-xl animate-pulse" />)}
             </div>
           ) : efforts.length === 0 ? (
-            <div className="bg-gray-800/40 rounded-xl p-6 text-center">
-              <p className="text-gray-400 text-sm">No recorded efforts found for this segment.</p>
+            <div className="bg-gray-800/40 rounded-xl p-6 text-center space-y-3">
+              <p className="text-gray-400 text-sm">No efforts found.</p>
+              {syncError && (
+                <p className="text-red-400 text-xs font-mono bg-gray-900 rounded p-2 text-left break-all">{syncError}</p>
+              )}
+              <button
+                onClick={() => {
+                  setEffLoad(true);
+                  fetch(`/api/segments/${id}/efforts?force=true`)
+                    .then(r => r.json())
+                    .then(d => { setEfforts(d.efforts ?? []); setSyncError(d.syncError ?? null); setEffLoad(false); })
+                    .catch(() => setEffLoad(false));
+                }}
+                className="text-xs text-orange-400 hover:text-orange-300 border border-orange-500/30 rounded px-3 py-1.5 transition-colors"
+              >
+                Retry sync from Strava
+              </button>
             </div>
           ) : (
             <div className="bg-gray-900 rounded-xl border border-gray-800 overflow-x-auto scroll-touch">

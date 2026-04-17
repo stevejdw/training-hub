@@ -1,5 +1,6 @@
 import pool from '@/lib/db';
 import { getStravaToken, ensureSegmentTables } from '@/lib/strava-sync';
+import type { PoolClient } from 'pg';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -14,15 +15,11 @@ async function fetchWindForEfforts(
   lng: number,
   efforts: Array<{ id: number; start_date: string; wind_speed: number | null }>
 ): Promise<Map<number, { speed: number; direction: number }>> {
-  const missing = efforts.filter(e => e.wind_speed === null && e.start_date);
+  const cutoff  = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const missing = efforts.filter(e => e.wind_speed === null && e.start_date?.slice(0, 10) <= cutoff);
   if (missing.length === 0) return new Map();
 
-  // Open-Meteo archive has ~5 day lag — exclude very recent efforts
-  const cutoff = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-  const fetchable = missing.filter(e => e.start_date.slice(0, 10) <= cutoff);
-  if (fetchable.length === 0) return new Map();
-
-  const dates   = fetchable.map(e => e.start_date.slice(0, 10));
+  const dates   = missing.map(e => e.start_date.slice(0, 10));
   const minDate = dates.reduce((a, b) => (a < b ? a : b));
   const maxDate = dates.reduce((a, b) => (a > b ? a : b));
 
@@ -44,10 +41,9 @@ async function fetchWindForEfforts(
     };
 
     const result = new Map<number, { speed: number; direction: number }>();
-    for (const effort of fetchable) {
+    for (const effort of missing) {
       const effortMs = new Date(effort.start_date).getTime();
-      let bestIdx  = 0;
-      let bestDiff = Infinity;
+      let bestIdx = 0, bestDiff = Infinity;
       data.hourly.time.forEach((t, i) => {
         const ts   = t.length === 16 ? t + ':00Z' : t;
         const diff = Math.abs(new Date(ts).getTime() - effortMs);
@@ -65,16 +61,27 @@ async function fetchWindForEfforts(
   }
 }
 
-async function syncAllEffortsFromStrava(segmentId: string, client: import('pg').PoolClient): Promise<void> {
+async function syncAllEffortsFromStrava(
+  segmentId: string,
+  client: PoolClient
+): Promise<{ count: number; error?: string }> {
   const token = await getStravaToken();
   const all: Record<string, unknown>[] = [];
+  let gotOk = false;
 
   for (let page = 1; page <= 10; page++) {
     const res = await fetch(
       `https://www.strava.com/api/v3/segments/${segmentId}/all_efforts?per_page=200&page=${page}`,
       { headers: { Authorization: `Bearer ${token}` } }
     );
-    if (!res.ok) break;
+
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      console.error(`[segments/efforts] Strava all_efforts failed: ${res.status} ${body}`);
+      return { count: 0, error: `Strava ${res.status}: ${body.slice(0, 200)}` };
+    }
+
+    gotOk = true;
     const batch = await res.json() as Record<string, unknown>[];
     all.push(...batch);
     if (batch.length < 200) break;
@@ -96,41 +103,58 @@ async function syncAllEffortsFromStrava(segmentId: string, client: import('pg').
       se.name,
       se.elapsed_time, se.moving_time,
       se.start_date, se.distance,
-      (se.average_watts      as number | null) ?? null,
-      (se.average_heartrate  as number | null) ?? null,
-      (se.max_heartrate      as number | null) ?? null,
-      (se.pr_rank            as number | null) ?? null,
-      (se.kom_rank           as number | null) ?? null,
+      (se.average_watts     as number | null) ?? null,
+      (se.average_heartrate as number | null) ?? null,
+      (se.max_heartrate     as number | null) ?? null,
+      (se.pr_rank           as number | null) ?? null,
+      (se.kom_rank          as number | null) ?? null,
     ]);
   }
 
-  await client.query(
-    `UPDATE starred_segments SET all_efforts_synced_at = NOW() WHERE id = $1`,
-    [segmentId]
-  );
+  // Only mark synced if Strava responded OK (even if 0 results means legitimately no efforts)
+  if (gotOk) {
+    await client.query(
+      `UPDATE starred_segments SET all_efforts_synced_at = NOW() WHERE id = $1`,
+      [segmentId]
+    );
+  }
+
+  return { count: all.length };
 }
 
 export async function GET(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+  const force   = new URL(req.url).searchParams.has('force');
+
   await ensureSegmentTables();
   const client = await pool.connect();
 
   try {
-    // Check if we need to (re)sync from Strava — sync once per day
     const syncRes = await client.query(
       `SELECT all_efforts_synced_at FROM starred_segments WHERE id = $1`, [id]
     );
     const lastSync = syncRes.rows[0]?.all_efforts_synced_at as Date | null;
-    const stale = !lastSync || (Date.now() - new Date(lastSync).getTime() > 24 * 60 * 60 * 1000);
+    const stale    = force || !lastSync || (Date.now() - new Date(lastSync).getTime() > 24 * 60 * 60 * 1000);
 
+    let syncError: string | undefined;
     if (stale) {
-      await syncAllEffortsFromStrava(id, client);
+      const result = await syncAllEffortsFromStrava(id, client).catch(err => {
+        console.error('[segments/efforts] sync threw:', err);
+        return { count: 0, error: String(err) };
+      });
+      syncError = result.error;
+      // If sync errored, clear the timestamp so next load retries automatically
+      if (result.error) {
+        await client.query(
+          `UPDATE starred_segments SET all_efforts_synced_at = NULL WHERE id = $1`, [id]
+        ).catch(() => {});
+      }
     }
 
-    // Load all efforts from DB
+    // Always return whatever is in DB
     const effortsRes = await client.query(`
       SELECT
         se.id, se.activity_id, se.elapsed_time,
@@ -151,7 +175,7 @@ export async function GET(
     );
     const seg = segRes.rows[0];
 
-    if (seg?.start_lat && seg?.start_lng) {
+    if (seg?.start_lat && seg?.start_lng && efforts.some((e: { wind_speed: number | null }) => e.wind_speed === null)) {
       const windMap = await fetchWindForEfforts(seg.start_lat, seg.start_lng, efforts);
       for (const effort of efforts) {
         const wind = windMap.get(effort.id);
@@ -167,12 +191,10 @@ export async function GET(
     }
 
     for (const e of efforts) {
-      if (e.wind_direction != null) {
-        e.wind_compass = windDegToCompass(e.wind_direction);
-      }
+      if (e.wind_direction != null) e.wind_compass = windDegToCompass(e.wind_direction);
     }
 
-    return Response.json({ efforts });
+    return Response.json({ efforts, syncError });
   } finally {
     client.release();
   }

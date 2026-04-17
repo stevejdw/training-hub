@@ -124,6 +124,15 @@ export async function ensureSegmentTables(): Promise<void> {
     await client.query(`ALTER TABLE segment_efforts  ADD COLUMN IF NOT EXISTS wind_speed                 FLOAT`);
     await client.query(`ALTER TABLE segment_efforts  ADD COLUMN IF NOT EXISTS wind_direction             INTEGER`);
     await client.query(`ALTER TABLE starred_segments ADD COLUMN IF NOT EXISTS all_efforts_synced_at      TIMESTAMPTZ`);
+    // Reset sync timestamps for segments with no stored efforts (clears stuck state from prior bug)
+    await client.query(`
+      UPDATE starred_segments ss
+      SET all_efforts_synced_at = NULL
+      WHERE ss.all_efforts_synced_at IS NOT NULL
+        AND NOT EXISTS (
+          SELECT 1 FROM segment_efforts se WHERE se.segment_id = ss.id
+        )
+    `);
   } finally {
     client.release();
   }
