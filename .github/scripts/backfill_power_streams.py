@@ -15,7 +15,7 @@ STRAVA_CLIENT_ID     = os.environ["STRAVA_CLIENT_ID"]
 STRAVA_CLIENT_SECRET = os.environ["STRAVA_CLIENT_SECRET"]
 STRAVA_REFRESH_TOKEN = os.environ["STRAVA_REFRESH_TOKEN"]
 DATABASE_URL         = os.environ["DATABASE_URL"]
-LIMIT                = int(os.environ.get("BACKFILL_LIMIT", "50"))
+LIMIT                = int(os.environ.get("BACKFILL_LIMIT", "100"))
 BACKFILL_ALL         = os.environ.get("BACKFILL_ALL", "0") == "1"
 
 def get_access_token():
@@ -63,7 +63,7 @@ def backfill():
             FROM activities a
             LEFT JOIN activity_streams s ON s.activity_id = a.id
             WHERE (a.average_watts IS NOT NULL OR a.average_heartrate IS NOT NULL)
-              AND s.activity_id IS NULL
+              AND (s.activity_id IS NULL OR s.hr IS NULL)
             ORDER BY a.start_date DESC
         """)
     else:
@@ -72,7 +72,7 @@ def backfill():
             FROM activities a
             LEFT JOIN activity_streams s ON s.activity_id = a.id
             WHERE (a.average_watts IS NOT NULL OR a.average_heartrate IS NOT NULL)
-              AND s.activity_id IS NULL
+              AND (s.activity_id IS NULL OR s.hr IS NULL)
             ORDER BY a.start_date DESC
             LIMIT %s
         """, (LIMIT,))
