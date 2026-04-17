@@ -91,9 +91,14 @@ export async function syncActivity(activityId: number): Promise<void> {
       tss, ifVal, np, polyline,
     ]);
 
-    // Fetch power stream + laps
+    // Ensure hr column exists (idempotent)
+    await client.query(`
+      ALTER TABLE activity_streams ADD COLUMN IF NOT EXISTS hr INT[]
+    `).catch(() => {});
+
+    // Fetch power+HR streams + laps in parallel
     const [streamRes, lapsRes] = await Promise.all([
-      fetch(`https://www.strava.com/api/v3/activities/${activityId}/streams?keys=watts&key_by_type=true`, {
+      fetch(`https://www.strava.com/api/v3/activities/${activityId}/streams?keys=watts,heartrate&key_by_type=true`, {
         headers: { Authorization: `Bearer ${token}` },
       }),
       fetch(`https://www.strava.com/api/v3/activities/${activityId}/laps`, {
@@ -101,16 +106,19 @@ export async function syncActivity(activityId: number): Promise<void> {
       }),
     ]);
 
-    const streamData = streamRes.ok ? await streamRes.json() as Record<string, unknown> : null;
-    const powerStream = (streamData?.watts as { data: number[] } | null)?.data ?? null;
+    const streamData  = streamRes.ok ? await streamRes.json() as Record<string, unknown> : null;
+    const powerStream = (streamData?.watts     as { data: number[] } | null)?.data ?? null;
+    const hrStream    = (streamData?.heartrate as { data: number[] } | null)?.data ?? null;
 
-    // Store power stream
-    if (powerStream) {
+    // Store streams
+    if (powerStream || hrStream) {
       await client.query(`
-        INSERT INTO activity_streams (activity_id, watts)
-        VALUES ($1, $2)
-        ON CONFLICT (activity_id) DO UPDATE SET watts = EXCLUDED.watts
-      `, [activityId, powerStream]);
+        INSERT INTO activity_streams (activity_id, watts, hr)
+        VALUES ($1, $2, $3)
+        ON CONFLICT (activity_id) DO UPDATE
+          SET watts = COALESCE(EXCLUDED.watts, activity_streams.watts),
+              hr    = COALESCE(EXCLUDED.hr,    activity_streams.hr)
+      `, [activityId, powerStream, hrStream]);
     }
 
     // Store laps

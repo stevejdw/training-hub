@@ -48,16 +48,17 @@ def fetch_activities(token, page=1):
     )
     return r.json()
 
-def fetch_power_stream(token, activity_id):
+def fetch_streams(token, activity_id):
+    """Returns (watts_list, hr_list) — either may be None."""
     r = requests.get(
         f"https://www.strava.com/api/v3/activities/{activity_id}/streams",
         headers={"Authorization": f"Bearer {token}"},
-        params={"keys": "watts", "key_by_type": "true"}
+        params={"keys": "watts,heartrate", "key_by_type": "true"}
     )
     if r.status_code != 200:
-        return None
+        return None, None
     data = r.json()
-    return data.get("watts", {}).get("data")
+    return data.get("watts", {}).get("data"), data.get("heartrate", {}).get("data")
 
 def fetch_laps(token, activity_id):
     r = requests.get(
@@ -139,20 +140,28 @@ def sync():
             synced += len(rows)
             print(f"Synced {len(rows)} activities (page {page})")
 
-        # Fetch laps + power stream for each new activity
+        # Ensure hr column exists
+        cur.execute("ALTER TABLE activity_streams ADD COLUMN IF NOT EXISTS hr INT[]")
+        conn.commit()
+
+        # Fetch laps + streams for each new activity
         for activity_id in new_activity_ids:
             laps = fetch_laps(token, activity_id)
-            power_stream = fetch_power_stream(token, activity_id)
+            power_stream, hr_stream = fetch_streams(token, activity_id)
 
-            # Store power stream for best-power calculations
-            if power_stream:
+            # Store streams
+            if power_stream or hr_stream:
                 cur.execute("""
-                    INSERT INTO activity_streams (activity_id, watts)
-                    VALUES (%s, %s)
-                    ON CONFLICT (activity_id) DO UPDATE SET watts = EXCLUDED.watts
-                """, (activity_id, power_stream))
+                    INSERT INTO activity_streams (activity_id, watts, hr)
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT (activity_id) DO UPDATE
+                        SET watts = COALESCE(EXCLUDED.watts, activity_streams.watts),
+                            hr    = COALESCE(EXCLUDED.hr,    activity_streams.hr)
+                """, (activity_id, power_stream, hr_stream))
                 conn.commit()
-                print(f"  Stored power stream ({len(power_stream)}pts) for activity {activity_id}")
+                pts = len(power_stream or [])
+                hr_pts = len(hr_stream or [])
+                print(f"  Stored streams ({pts}W pts, {hr_pts}HR pts) for activity {activity_id}")
 
             if not laps:
                 continue

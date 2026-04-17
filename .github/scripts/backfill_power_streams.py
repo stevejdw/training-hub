@@ -27,29 +27,32 @@ def get_access_token():
     })
     return r.json()["access_token"]
 
-def fetch_power_stream(token, activity_id):
+def fetch_streams(token, activity_id):
     r = requests.get(
         f"https://www.strava.com/api/v3/activities/{activity_id}/streams",
         headers={"Authorization": f"Bearer {token}"},
-        params={"keys": "watts", "key_by_type": "true"},
+        params={"keys": "watts,heartrate", "key_by_type": "true"},
     )
     if r.status_code != 200:
-        return None
-    return r.json().get("watts", {}).get("data")
+        return None, None
+    data = r.json()
+    return data.get("watts", {}).get("data"), data.get("heartrate", {}).get("data")
 
 def backfill():
     token = get_access_token()
     conn  = psycopg2.connect(DATABASE_URL)
     cur   = conn.cursor()
 
-    # Create table if missing
+    # Create table + ensure hr column exists
     cur.execute("""
         CREATE TABLE IF NOT EXISTS activity_streams (
             activity_id BIGINT PRIMARY KEY REFERENCES activities(id) ON DELETE CASCADE,
             watts       INT[],
+            hr          INT[],
             created_at  TIMESTAMPTZ DEFAULT now()
         )
     """)
+    cur.execute("ALTER TABLE activity_streams ADD COLUMN IF NOT EXISTS hr INT[]")
     conn.commit()
     print("activity_streams table ready")
 
@@ -79,22 +82,24 @@ def backfill():
 
     ok = skip = fail = 0
     for activity_id, name in activities:
-        stream = fetch_power_stream(token, activity_id)
-        if not stream:
-            print(f"  SKIP  {name} — no power stream")
+        watts, hr = fetch_streams(token, activity_id)
+        if not watts and not hr:
+            print(f"  SKIP  {name} — no streams")
             skip += 1
             time.sleep(0.3)
             continue
 
         cur.execute("""
-            INSERT INTO activity_streams (activity_id, watts)
-            VALUES (%s, %s)
-            ON CONFLICT (activity_id) DO UPDATE SET watts = EXCLUDED.watts
-        """, (activity_id, stream))
+            INSERT INTO activity_streams (activity_id, watts, hr)
+            VALUES (%s, %s, %s)
+            ON CONFLICT (activity_id) DO UPDATE
+                SET watts = COALESCE(EXCLUDED.watts, activity_streams.watts),
+                    hr    = COALESCE(EXCLUDED.hr,    activity_streams.hr)
+        """, (activity_id, watts, hr))
         conn.commit()
-        print(f"  OK    {name} ({len(stream)} pts)")
+        print(f"  OK    {name} (W:{len(watts or [])} HR:{len(hr or [])} pts)")
         ok += 1
-        time.sleep(0.5)  # stay within Strava rate limit
+        time.sleep(0.5)
 
     cur.close()
     conn.close()

@@ -15,6 +15,13 @@ export interface AthleteProfile {
   weight_kg: number | null;
   training_goals: string;
   events: EventGoal[];
+  // HR zones
+  max_hr: number | null;
+  hr_zones_auto: boolean;
+  hr_zone_boundaries: number[] | null; // [z1_max, z2_max, z3_max, z4_max]
+  // Power zones
+  power_zones_auto: boolean;
+  power_zone_boundaries: number[] | null; // [z1_max, z2_max, z3_max, z4_max] in watts
 }
 
 const DEFAULTS: AthleteProfile = {
@@ -25,6 +32,11 @@ const DEFAULTS: AthleteProfile = {
   weight_kg: null,
   training_goals: '',
   events: [],
+  max_hr: null,
+  hr_zones_auto: true,
+  hr_zone_boundaries: null,
+  power_zones_auto: true,
+  power_zone_boundaries: null,
 };
 
 async function ensureTable(client: PoolClient) {
