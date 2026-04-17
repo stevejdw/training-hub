@@ -140,6 +140,38 @@ export async function deletePlan(id: number): Promise<void> {
   }
 }
 
+export async function updateTrainingDay(
+  dayId: number,
+  fields: Partial<Pick<TrainingDay, 'title' | 'type' | 'duration_min' | 'tss_target' | 'description' | 'segments'>>,
+): Promise<void> {
+  const client = await pool.connect();
+  try {
+    const updates: string[] = [];
+    const values: unknown[] = [];
+    let i = 1;
+    if (fields.title !== undefined)        { updates.push(`title = $${i++}`);        values.push(fields.title); }
+    if (fields.type !== undefined)         { updates.push(`type = $${i++}`);         values.push(fields.type); }
+    if (fields.duration_min !== undefined) { updates.push(`duration_min = $${i++}`); values.push(fields.duration_min); }
+    if (fields.tss_target !== undefined)   { updates.push(`tss_target = $${i++}`);   values.push(fields.tss_target); }
+    if (fields.description !== undefined)  { updates.push(`description = $${i++}`);  values.push(fields.description); }
+    if (fields.segments !== undefined)     { updates.push(`segments = $${i++}`);     values.push(JSON.stringify(fields.segments)); }
+    if (!updates.length) return;
+    values.push(dayId);
+    await client.query(`UPDATE training_days SET ${updates.join(', ')} WHERE id = $${i}`, values);
+  } finally {
+    client.release();
+  }
+}
+
+export async function updatePlanMeta(planId: number, name: string, goal: string): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query('UPDATE training_plans SET name = $1, goal = $2 WHERE id = $3', [name, goal, planId]);
+  } finally {
+    client.release();
+  }
+}
+
 export async function replacePlanDays(
   id: number,
   goal: string,

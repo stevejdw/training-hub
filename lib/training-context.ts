@@ -1,6 +1,7 @@
 import pool from './db';
 import { calculateFitness } from './fitness';
 import { getProfile, effectiveFtp } from './profile';
+import { listPlans, getPlan } from './training-plans';
 
 export interface Activity {
   id: number;
@@ -36,7 +37,7 @@ function formatDistance(meters: number): string {
 }
 
 export async function buildTrainingContext(): Promise<string> {
-  const [client, profile] = await Promise.all([pool.connect(), getProfile()]);
+  const [client, profile, plansMeta] = await Promise.all([pool.connect(), getProfile(), listPlans()]);
   const FTP = effectiveFtp(profile);
   try {
     // 1. Recent 90 days — full detail
@@ -82,16 +83,19 @@ export async function buildTrainingContext(): Promise<string> {
 
     // 4. Laps for the most recent 10 activities that have lap data
     const recentIds = recent.slice(0, 20).map(a => a.id);
-    const lapsResult: { rows: Record<string, unknown>[] } = recentIds.length > 0 ? await client.query(`
-      SELECT l.activity_id, l.lap_index, l.name,
-             l.moving_time, l.distance,
-             l.average_watts, l.normalized_power,
-             l.average_heartrate, l.max_heartrate,
-             l.total_elevation_gain
-      FROM laps l
-      WHERE l.activity_id = ANY($1::bigint[])
-      ORDER BY l.activity_id DESC, l.lap_index ASC
-    `, [recentIds]) : { rows: [] };
+    const [lapsResult, activePlan] = await Promise.all([
+      recentIds.length > 0 ? client.query(`
+        SELECT l.activity_id, l.lap_index, l.name,
+               l.moving_time, l.distance,
+               l.average_watts, l.normalized_power,
+               l.average_heartrate, l.max_heartrate,
+               l.total_elevation_gain
+        FROM laps l
+        WHERE l.activity_id = ANY($1::bigint[])
+        ORDER BY l.activity_id DESC, l.lap_index ASC
+      `, [recentIds]) as Promise<{ rows: Record<string, unknown>[] }> : Promise.resolve({ rows: [] }),
+      plansMeta.length > 0 ? getPlan(plansMeta[0].id) : Promise.resolve(null),
+    ]);
 
     // Group laps by activity_id — use string keys to avoid bigint/number mismatch
     const lapsByActivity = new Map<string, Record<string, unknown>[]>();
@@ -184,6 +188,29 @@ ${profile.events.length > 0 ? profile.events.map(e => {
             maxHr ? `maxHR ${Math.round(maxHr)}` : null,
           ].filter(Boolean);
           ctx += `    - ${lapParts.join(' | ')}\n`;
+        }
+      }
+    }
+
+    // 6. Active training plan
+    if (activePlan) {
+      ctx += `\n## Active Training Plan\n`;
+      ctx += `Plan ID: ${activePlan.id} | Name: ${activePlan.name} | Goal: ${activePlan.goal}\n\n`;
+      ctx += `### Training Days (use Day ID when calling update_training_day)\n`;
+      for (const day of activePlan.days) {
+        ctx += `- Day ID ${day.id} | ${day.date} | ${day.type.toUpperCase()} | "${day.title}" | ${day.duration_min}min`;
+        if (day.tss_target) ctx += ` | TSS ${day.tss_target}`;
+        ctx += '\n';
+        if (day.description) ctx += `  Desc: ${day.description}\n`;
+        if (day.segments?.length > 0) {
+          for (const seg of day.segments) {
+            const segParts = [`  [${seg.type}] ${seg.duration_min}min`];
+            if (seg.target_np_watts) segParts.push(`@${seg.target_np_watts}W`);
+            if (seg.target_avg_hr) segParts.push(`HR${seg.target_avg_hr}`);
+            if (seg.zone) segParts.push(`Zone:${seg.zone}`);
+            if (seg.description) segParts.push(`— ${seg.description}`);
+            ctx += segParts.join(' ') + '\n';
+          }
         }
       }
     }
