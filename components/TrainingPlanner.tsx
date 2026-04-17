@@ -45,44 +45,49 @@ export default function TrainingPlanner() {
   const fetchPlans = useCallback(() =>
     fetch('/api/training/plans')
       .then(r => r.json())
-      .then((data: PlanMeta[]) => {
-        setPlans(data);
-        return data;
-      })
+      .then((data: PlanMeta[]) => { setPlans(data); return data; })
       .catch(console.error), []);
 
+  // Initial load: single request returns plans + active plan + activities
   useEffect(() => {
-    fetchPlans().then(data => {
-      if (data && data.length > 0 && !activePlanId) setActivePlanId(data[0].id);
-    });
+    setLoadingPlan(true);
+    fetch('/api/training/plans/active')
+      .then(r => r.json())
+      .then((data: { plans: PlanMeta[]; plan: TrainingPlan | null; activities: ActivitySummary[] }) => {
+        setPlans(data.plans);
+        if (data.plan) { setPlan(data.plan); setActivePlanId(data.plan.id); }
+        if (data.activities) setActivities(data.activities);
+      })
+      .catch(console.error)
+      .finally(() => setLoadingPlan(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadPlan = useCallback((id: number) => {
     setLoadingPlan(true);
-    fetch(`/api/training/plans/${id}`)
-      .then(r => r.json())
-      .then((data: TrainingPlan) => { setPlan(data); setView({ type: 'block' }); })
-      .catch(console.error)
-      .finally(() => setLoadingPlan(false));
+    Promise.all([
+      fetch(`/api/training/plans/${id}`).then(r => r.json()) as Promise<TrainingPlan>,
+    ]).then(([data]) => {
+      setPlan(data);
+      setView({ type: 'block' });
+      // Load activities for new plan
+      if (data.days?.length) {
+        fetch(`/api/training/activities?from=${data.days[0].date}&to=${data.days[data.days.length - 1].date}`)
+          .then(r => r.json()).then(setActivities).catch(console.error);
+      }
+    })
+    .catch(console.error)
+    .finally(() => setLoadingPlan(false));
   }, []);
 
+  // Only fire loadPlan when user explicitly switches plans (not on mount)
+  const isFirstLoad = useState(true);
   useEffect(() => {
+    if (isFirstLoad[0]) { isFirstLoad[1](false); return; }
     if (!activePlanId) { setPlan(null); return; }
     loadPlan(activePlanId);
-  }, [activePlanId, loadPlan]);
-
-  const loadActivities = useCallback((days: TrainingDay[]) => {
-    if (!days.length) return;
-    fetch(`/api/training/activities?from=${days[0].date}&to=${days[days.length - 1].date}`)
-      .then(r => r.json())
-      .then(setActivities)
-      .catch(console.error);
-  }, []);
-
-  useEffect(() => {
-    if (plan?.days) loadActivities(plan.days);
-  }, [plan, loadActivities]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activePlanId]);
 
   function handleDeletePlan(id: number) {
     fetch(`/api/training/plans/${id}`, { method: 'DELETE' })
