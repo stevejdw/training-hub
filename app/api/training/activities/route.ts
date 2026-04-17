@@ -34,8 +34,9 @@ export async function GET(req: NextRequest) {
         FROM activities
         WHERE (start_date AT TIME ZONE 'Australia/Sydney')::date >= $1
           AND (start_date AT TIME ZONE 'Australia/Sydney')::date <= $2
+          AND sport_type = ANY($3::text[])
         ORDER BY start_date
-      `, [from, to]);
+      `, [from, to, ['Ride','VirtualRide','GravelRide','MountainBikeRide','EBikeRide','EMountainBikeRide']]);
 
       return Response.json(res.rows);
     } finally {
