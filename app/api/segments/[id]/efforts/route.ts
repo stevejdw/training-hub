@@ -1,7 +1,8 @@
 import pool from '@/lib/db';
-import { ensureSegmentTables } from '@/lib/strava-sync';
+import { getStravaToken, ensureSegmentTables } from '@/lib/strava-sync';
 
 export const runtime = 'nodejs';
+export const maxDuration = 60;
 
 function windDegToCompass(deg: number): string {
   const dirs = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
@@ -16,7 +17,12 @@ async function fetchWindForEfforts(
   const missing = efforts.filter(e => e.wind_speed === null && e.start_date);
   if (missing.length === 0) return new Map();
 
-  const dates   = missing.map(e => e.start_date.slice(0, 10));
+  // Open-Meteo archive has ~5 day lag — exclude very recent efforts
+  const cutoff = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const fetchable = missing.filter(e => e.start_date.slice(0, 10) <= cutoff);
+  if (fetchable.length === 0) return new Map();
+
+  const dates   = fetchable.map(e => e.start_date.slice(0, 10));
   const minDate = dates.reduce((a, b) => (a < b ? a : b));
   const maxDate = dates.reduce((a, b) => (a > b ? a : b));
 
@@ -30,7 +36,7 @@ async function fetchWindForEfforts(
     url.searchParams.set('wind_speed_unit', 'kmh');
     url.searchParams.set('timezone',        'UTC');
 
-    const res = await fetch(url.toString(), { signal: AbortSignal.timeout(8000) });
+    const res = await fetch(url.toString(), { signal: AbortSignal.timeout(10000) });
     if (!res.ok) return new Map();
 
     const data = await res.json() as {
@@ -38,12 +44,13 @@ async function fetchWindForEfforts(
     };
 
     const result = new Map<number, { speed: number; direction: number }>();
-    for (const effort of missing) {
+    for (const effort of fetchable) {
       const effortMs = new Date(effort.start_date).getTime();
       let bestIdx  = 0;
       let bestDiff = Infinity;
       data.hourly.time.forEach((t, i) => {
-        const diff = Math.abs(new Date(t.includes('T') ? t + ':00Z' : t + 'T00:00Z').getTime() - effortMs);
+        const ts   = t.length === 16 ? t + ':00Z' : t;
+        const diff = Math.abs(new Date(ts).getTime() - effortMs);
         if (diff < bestDiff) { bestDiff = diff; bestIdx = i; }
       });
       const speed     = data.hourly.wind_speed_10m[bestIdx];
@@ -58,6 +65,51 @@ async function fetchWindForEfforts(
   }
 }
 
+async function syncAllEffortsFromStrava(segmentId: string, client: import('pg').PoolClient): Promise<void> {
+  const token = await getStravaToken();
+  const all: Record<string, unknown>[] = [];
+
+  for (let page = 1; page <= 10; page++) {
+    const res = await fetch(
+      `https://www.strava.com/api/v3/segments/${segmentId}/all_efforts?per_page=200&page=${page}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    if (!res.ok) break;
+    const batch = await res.json() as Record<string, unknown>[];
+    all.push(...batch);
+    if (batch.length < 200) break;
+  }
+
+  for (const se of all) {
+    const activityId = (se.activity as Record<string, unknown> | null)?.id ?? se.activity_id;
+    await client.query(`
+      INSERT INTO segment_efforts
+        (id, activity_id, segment_id, name, elapsed_time, moving_time,
+         start_date, distance, average_watts, average_heartrate, max_heartrate, pr_rank, kom_rank)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+      ON CONFLICT (id) DO UPDATE SET
+        pr_rank       = EXCLUDED.pr_rank,
+        kom_rank      = EXCLUDED.kom_rank,
+        max_heartrate = EXCLUDED.max_heartrate
+    `, [
+      se.id, activityId, segmentId,
+      se.name,
+      se.elapsed_time, se.moving_time,
+      se.start_date, se.distance,
+      (se.average_watts      as number | null) ?? null,
+      (se.average_heartrate  as number | null) ?? null,
+      (se.max_heartrate      as number | null) ?? null,
+      (se.pr_rank            as number | null) ?? null,
+      (se.kom_rank           as number | null) ?? null,
+    ]);
+  }
+
+  await client.query(
+    `UPDATE starred_segments SET all_efforts_synced_at = NOW() WHERE id = $1`,
+    [segmentId]
+  );
+}
+
 export async function GET(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -67,10 +119,22 @@ export async function GET(
   const client = await pool.connect();
 
   try {
+    // Check if we need to (re)sync from Strava — sync once per day
+    const syncRes = await client.query(
+      `SELECT all_efforts_synced_at FROM starred_segments WHERE id = $1`, [id]
+    );
+    const lastSync = syncRes.rows[0]?.all_efforts_synced_at as Date | null;
+    const stale = !lastSync || (Date.now() - new Date(lastSync).getTime() > 24 * 60 * 60 * 1000);
+
+    if (stale) {
+      await syncAllEffortsFromStrava(id, client);
+    }
+
+    // Load all efforts from DB
     const effortsRes = await client.query(`
       SELECT
-        se.id, se.activity_id, se.elapsed_time, se.moving_time,
-        se.start_date, se.distance, se.average_watts, se.average_heartrate, se.max_heartrate,
+        se.id, se.activity_id, se.elapsed_time,
+        se.start_date, se.average_watts, se.average_heartrate, se.max_heartrate,
         se.pr_rank, se.kom_rank, se.wind_speed, se.wind_direction,
         a.name AS activity_name
       FROM segment_efforts se
@@ -81,7 +145,7 @@ export async function GET(
 
     const efforts = effortsRes.rows;
 
-    // Fetch wind for efforts that are missing it
+    // Fetch wind for efforts missing it
     const segRes = await client.query(
       `SELECT start_lat, start_lng FROM starred_segments WHERE id = $1`, [id]
     );
@@ -102,7 +166,6 @@ export async function GET(
       }
     }
 
-    // Add compass label
     for (const e of efforts) {
       if (e.wind_direction != null) {
         e.wind_compass = windDegToCompass(e.wind_direction);

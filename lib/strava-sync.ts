@@ -120,9 +120,10 @@ export async function ensureSegmentTables(): Promise<void> {
     await client.query(`ALTER TABLE starred_segments ADD COLUMN IF NOT EXISTS athlete_count        INTEGER`);
     await client.query(`ALTER TABLE starred_segments ADD COLUMN IF NOT EXISTS altitude_stream      FLOAT[]`);
     await client.query(`ALTER TABLE starred_segments ADD COLUMN IF NOT EXISTS distance_stream      FLOAT[]`);
-    await client.query(`ALTER TABLE segment_efforts  ADD COLUMN IF NOT EXISTS max_heartrate        FLOAT`);
-    await client.query(`ALTER TABLE segment_efforts  ADD COLUMN IF NOT EXISTS wind_speed           FLOAT`);
-    await client.query(`ALTER TABLE segment_efforts  ADD COLUMN IF NOT EXISTS wind_direction       INTEGER`);
+    await client.query(`ALTER TABLE segment_efforts  ADD COLUMN IF NOT EXISTS max_heartrate              FLOAT`);
+    await client.query(`ALTER TABLE segment_efforts  ADD COLUMN IF NOT EXISTS wind_speed                 FLOAT`);
+    await client.query(`ALTER TABLE segment_efforts  ADD COLUMN IF NOT EXISTS wind_direction             INTEGER`);
+    await client.query(`ALTER TABLE starred_segments ADD COLUMN IF NOT EXISTS all_efforts_synced_at      TIMESTAMPTZ`);
   } finally {
     client.release();
   }
