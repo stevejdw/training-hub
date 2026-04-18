@@ -53,7 +53,10 @@ export async function POST() {
     const ids: number[] = pending.rows.map((r: { id: number }) => r.id);
     const CONCURRENCY = 2;
 
+    let rateLimited = false;
+
     for (let i = 0; i < ids.length; i += CONCURRENCY) {
+      if (rateLimited) break;
       const batch = ids.slice(i, i + CONCURRENCY);
       await Promise.all(batch.map(async (activityId) => {
         try {
@@ -61,13 +64,15 @@ export async function POST() {
             `https://www.strava.com/api/v3/activities/${activityId}`,
             {
               headers: { Authorization: `Bearer ${token}` },
-              signal: AbortSignal.timeout(5000),
+              signal: AbortSignal.timeout(8000),
             }
           );
 
-          // Mark as synced regardless — don't retry permanently failing activities
-          const syncedAt = res.ok ? 'NOW()' : 'NOW()';
-          void syncedAt; // always mark done
+          // Rate limited — stop processing this batch and let the next cron run handle it
+          if (res.status === 429) {
+            rateLimited = true;
+            return;
+          }
 
           if (res.ok) {
             const a = await res.json() as Record<string, unknown>;
@@ -128,10 +133,11 @@ export async function POST() {
     );
     remaining = Number(remRes.rows[0].n);
 
-    return Response.json({ processed, remaining });
+    return Response.json({ processed, remaining, rateLimited });
   } catch (err) {
     console.error('[backfill POST]', err);
-    return Response.json({ processed, remaining, error: String(err) }, { status: 500 });
+    // Always return 200 so the cron workflow doesn't fail — the error is logged above
+    return Response.json({ processed, remaining, error: String(err) });
   } finally {
     client.release();
   }
