@@ -92,12 +92,11 @@ export default function SegmentDetail({ id }: { id: string }) {
       .then(r => r.json())
       .then(d => {
         setEfforts(d.efforts ?? []);
-        setSyncInfo(d.syncInfo ?? null);
         setRemaining(d.remaining ?? 0);
-        setDebug(d.debug ?? null);
+        setDebug(d.error ? { error: d.error } : (d.debug ?? null));
         setEffLoad(false);
       })
-      .catch(() => setEffLoad(false));
+      .catch(err => { setDebug({ fetch_error: String(err) }); setEffLoad(false); });
   }, [id]);
 
   const sorted = useMemo(() => {
