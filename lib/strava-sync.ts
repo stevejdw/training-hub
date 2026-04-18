@@ -244,34 +244,37 @@ export async function syncActivity(activityId: number): Promise<void> {
 
     // Store segment efforts (from the activity detail response)
     const segEfforts = (a.segment_efforts as Record<string, unknown>[] | null) ?? [];
-    if (segEfforts.length > 0) {
-      await ensureSegmentTables();
-      for (const se of segEfforts) {
-        const seg = se.segment as Record<string, unknown> | null;
-        await client.query(`
-          INSERT INTO segment_efforts
-            (id, activity_id, segment_id, name, elapsed_time, moving_time,
-             start_date, distance, average_watts, average_heartrate, max_heartrate, pr_rank, kom_rank)
-          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
-          ON CONFLICT (id) DO UPDATE SET
-            pr_rank       = EXCLUDED.pr_rank,
-            kom_rank      = EXCLUDED.kom_rank,
-            max_heartrate = EXCLUDED.max_heartrate
-        `, [
-          se.id, activityId,
-          seg?.id ?? null,
-          se.name ?? seg?.name,
-          se.elapsed_time, se.moving_time,
-          se.start_date,
-          se.distance,
-          (se.average_watts as number | null) ?? null,
-          (se.average_heartrate as number | null) ?? null,
-          (se.max_heartrate as number | null) ?? null,
-          (se.pr_rank as number | null) ?? null,
-          (se.kom_rank as number | null) ?? null,
-        ]);
-      }
+    for (const se of segEfforts) {
+      const seg = se.segment as Record<string, unknown> | null;
+      if (!seg?.id) continue;
+      await client.query(`
+        INSERT INTO segment_efforts
+          (id, activity_id, segment_id, name, elapsed_time, moving_time,
+           start_date, distance, average_watts, average_heartrate, max_heartrate, pr_rank, kom_rank)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+        ON CONFLICT (id) DO UPDATE SET
+          segment_id    = EXCLUDED.segment_id,
+          pr_rank       = EXCLUDED.pr_rank,
+          kom_rank      = EXCLUDED.kom_rank,
+          max_heartrate = EXCLUDED.max_heartrate
+      `, [
+        se.id, activityId,
+        seg.id,
+        se.name ?? seg.name,
+        se.elapsed_time, se.moving_time,
+        se.start_date,
+        se.distance,
+        (se.average_watts as number | null) ?? null,
+        (se.average_heartrate as number | null) ?? null,
+        (se.max_heartrate as number | null) ?? null,
+        (se.pr_rank as number | null) ?? null,
+        (se.kom_rank as number | null) ?? null,
+      ]);
     }
+    // Mark activity as having segment efforts stored (even if 0 — avoids re-fetching)
+    await client.query(
+      `UPDATE activities SET segments_synced_at = NOW() WHERE id = $1`, [activityId]
+    ).catch(() => {});
   } finally {
     client.release();
   }
