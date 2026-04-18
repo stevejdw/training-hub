@@ -27,7 +27,7 @@ const geistFonts = `${geistSans.variable} ${geistMono.variable}`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${geistFonts} h-full antialiased`}>
+    <html lang="en" className={`${geistFonts} antialiased`}>
       <body className="flex flex-col bg-gray-950 text-white">
         {/* Top nav — desktop only */}
         <Nav />
