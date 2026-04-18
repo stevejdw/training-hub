@@ -5,6 +5,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recha
 import { SPORT_FILTER_LABELS, CYCLING_TYPES, SportFilter, sportColor, sportLabel } from '@/lib/sport-types';
 import DashboardBestPower from './DashboardBestPower';
 
+type Tab    = 'training' | 'power';
 type Period = 'week' | 'month' | 'year';
 type Metric = 'tss' | 'km' | 'hours' | 'activities';
 
@@ -47,6 +48,11 @@ const METRIC_OPTS: { key: Metric; label: string; unit: string }[] = [
   { key: 'tss',        label: 'TSS',       unit: ''   },
 ];
 
+const NAV: { key: Tab; label: string }[] = [
+  { key: 'training', label: 'Training' },
+  { key: 'power',    label: 'Power'    },
+];
+
 function SummaryCard({ label, value }: { label: string; value: string }) {
   return (
     <div className="bg-gray-800 rounded-xl p-3 flex flex-col gap-0.5 min-w-[80px]">
@@ -87,7 +93,7 @@ function CustomTooltip({ active, payload, label, metric, unit }: any) {
   );
 }
 
-export default function DashboardHome() {
+function TrainingTab() {
   const [period, setPeriod]   = useState<Period>('week');
   const [offset, setOffset]   = useState(0);
   const [metric, setMetric]   = useState<Metric>('km');
@@ -137,185 +143,216 @@ export default function DashboardHome() {
   }
 
   return (
-    <div className="h-full overflow-y-auto scroll-touch">
-      <div className="max-w-2xl mx-auto px-4 py-4 space-y-4">
-
-        {/* Period selector */}
-        <div className="flex items-center gap-2">
-          <div className="flex bg-gray-800 rounded-xl p-1 gap-1 flex-1">
-            {(['week', 'month', 'year'] as Period[]).map(p => (
-              <button
-                key={p}
-                onClick={() => changePeriod(p)}
-                className={`flex-1 py-1.5 rounded-lg text-sm font-medium transition-colors capitalize ${
-                  period === p ? 'bg-orange-500 text-white' : 'text-gray-400 hover:text-white'
-                }`}
-              >
-                {p === 'week' ? 'Week' : p === 'month' ? 'Month' : 'Year'}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Period navigation */}
-        <div className="flex items-center justify-between">
+    <div className="space-y-4">
+      {/* Period selector */}
+      <div className="flex bg-gray-800 rounded-xl p-1 gap-1">
+        {(['week', 'month', 'year'] as Period[]).map(p => (
           <button
-            onClick={() => setOffset(o => o - 1)}
-            className="w-9 h-9 flex items-center justify-center rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white transition-colors"
+            key={p}
+            onClick={() => changePeriod(p)}
+            className={`flex-1 py-1.5 rounded-lg text-sm font-medium transition-colors capitalize ${
+              period === p ? 'bg-orange-500 text-white' : 'text-gray-400 hover:text-white'
+            }`}
           >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-            </svg>
+            {p === 'week' ? 'Week' : p === 'month' ? 'Month' : 'Year'}
           </button>
-          <span className="text-sm font-medium text-white">
-            {loading && !data ? '…' : data?.label ?? ''}
-          </span>
-          <button
-            onClick={() => setOffset(o => o + 1)}
-            disabled={!data?.canGoForward}
-            className="w-9 h-9 flex items-center justify-center rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-            </svg>
-          </button>
-        </div>
-
-        {/* Sport filters */}
-        <div className="flex gap-2 flex-wrap">
-          {TYPE_FILTERS.map(f => (
-            <button
-              key={f}
-              onClick={() => toggleFilter(f)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                selected.includes(f)
-                  ? 'bg-orange-500 text-white'
-                  : 'bg-gray-800 text-gray-400 hover:text-white'
-              }`}
-            >
-              {f}
-            </button>
-          ))}
-          {selected.length > 0 && (
-            <button onClick={() => setSelected([])} className="px-3 py-1.5 rounded-lg text-xs text-gray-500 hover:text-white transition-colors">
-              Clear
-            </button>
-          )}
-        </div>
-
-        {/* Summary cards */}
-        {loading && !data ? (
-          <div className="grid grid-cols-5 gap-2">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="bg-gray-800 rounded-xl p-3 h-16 animate-pulse" />
-            ))}
-          </div>
-        ) : data ? (
-          <div className="grid grid-cols-5 gap-2">
-            <SummaryCard label="Rides"  value={String(data.summary.activities ?? 0)} />
-            <SummaryCard label="km"     value={String(data.summary.km ?? 0)} />
-            <SummaryCard label="Hours"  value={String(data.summary.hours ?? 0)} />
-            <SummaryCard label="TSS"    value={String(data.summary.tss ?? 0)} />
-            <SummaryCard label="Elev m" value={String(data.summary.elevation ?? 0)} />
-          </div>
-        ) : null}
-
-        {/* Metric toggle */}
-        <div className="flex gap-1.5 flex-wrap">
-          {METRIC_OPTS.map(m => (
-            <button
-              key={m.key}
-              onClick={() => setMetric(m.key)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                metric === m.key
-                  ? 'bg-orange-500/20 text-orange-400 border border-orange-500/50'
-                  : 'bg-gray-800 text-gray-500 hover:text-gray-300'
-              }`}
-            >
-              {m.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Bar chart */}
-        <div className="bg-gray-800/60 rounded-xl p-3">
-          {error ? (
-            <div className="h-48 flex items-center justify-center">
-              <p className="text-red-400 text-xs text-center px-4">{error}</p>
-            </div>
-          ) : loading && !data ? (
-            <div className="h-48 animate-pulse bg-gray-800 rounded-lg" />
-          ) : (
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={flatBars} margin={{ top: 20, right: 4, left: 4, bottom: 0 }} barCategoryGap="25%">
-                <XAxis
-                  dataKey="label"
-                  tick={{ fill: '#9ca3af', fontSize: 11 }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <YAxis hide />
-                <Tooltip
-                  content={<CustomTooltip metric={metric} unit={metricCfg.unit} />}
-                  cursor={{ fill: 'rgba(255,255,255,0.04)' }}
-                />
-                {CYCLING_TYPES.map((type, i) => (
-                  <Bar
-                    key={type}
-                    dataKey={`${metric}_${type}`}
-                    stackId="a"
-                    fill={sportColor(type)}
-                    radius={i === CYCLING_TYPES.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
-                  />
-                ))}
-                <Bar
-                  dataKey={() => 0}
-                  stackId="a"
-                  fill="transparent"
-                  stroke="none"
-                  isAnimationActive={false}
-                  legendType="none"
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  shape={(props: any) => {
-                    const { x, y, width } = props;
-                    const total = Number(props[metric]) || 0;
-                    if (!total) return <g />;
-                    return (
-                      <text
-                        x={x + width / 2}
-                        y={y - 5}
-                        textAnchor="middle"
-                        fill="#d1d5db"
-                        fontSize={10}
-                        fontWeight={500}
-                      >
-                        {barLabel(total)}
-                      </text>
-                    );
-                  }}
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </div>
-
-        {/* Legend */}
-        <div className="flex gap-3 flex-wrap">
-          {CYCLING_TYPES.map(type => (
-            <div key={type} className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ background: sportColor(type) }} />
-              <span className="text-xs text-gray-400">{sportLabel(type)}</span>
-            </div>
-          ))}
-        </div>
-
-        {/* Best Power */}
-        <div>
-          <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Best Power</h3>
-          <DashboardBestPower />
-        </div>
-
+        ))}
       </div>
+
+      {/* Period navigation */}
+      <div className="flex items-center justify-between">
+        <button
+          onClick={() => setOffset(o => o - 1)}
+          className="w-9 h-9 flex items-center justify-center rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white transition-colors"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
+        <span className="text-sm font-medium text-white">
+          {loading && !data ? '…' : data?.label ?? ''}
+        </span>
+        <button
+          onClick={() => setOffset(o => o + 1)}
+          disabled={!data?.canGoForward}
+          className="w-9 h-9 flex items-center justify-center rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+      </div>
+
+      {/* Sport filters */}
+      <div className="flex gap-2 flex-wrap">
+        {TYPE_FILTERS.map(f => (
+          <button
+            key={f}
+            onClick={() => toggleFilter(f)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              selected.includes(f)
+                ? 'bg-orange-500 text-white'
+                : 'bg-gray-800 text-gray-400 hover:text-white'
+            }`}
+          >
+            {f}
+          </button>
+        ))}
+        {selected.length > 0 && (
+          <button onClick={() => setSelected([])} className="px-3 py-1.5 rounded-lg text-xs text-gray-500 hover:text-white transition-colors">
+            Clear
+          </button>
+        )}
+      </div>
+
+      {/* Summary cards */}
+      {loading && !data ? (
+        <div className="grid grid-cols-5 gap-2">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="bg-gray-800 rounded-xl p-3 h-16 animate-pulse" />
+          ))}
+        </div>
+      ) : data ? (
+        <div className="grid grid-cols-5 gap-2">
+          <SummaryCard label="Rides"  value={String(data.summary.activities ?? 0)} />
+          <SummaryCard label="km"     value={String(data.summary.km ?? 0)} />
+          <SummaryCard label="Hours"  value={String(data.summary.hours ?? 0)} />
+          <SummaryCard label="TSS"    value={String(data.summary.tss ?? 0)} />
+          <SummaryCard label="Elev m" value={String(data.summary.elevation ?? 0)} />
+        </div>
+      ) : null}
+
+      {/* Metric toggle */}
+      <div className="flex gap-1.5 flex-wrap">
+        {METRIC_OPTS.map(m => (
+          <button
+            key={m.key}
+            onClick={() => setMetric(m.key)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              metric === m.key
+                ? 'bg-orange-500/20 text-orange-400 border border-orange-500/50'
+                : 'bg-gray-800 text-gray-500 hover:text-gray-300'
+            }`}
+          >
+            {m.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Bar chart */}
+      <div className="bg-gray-800/60 rounded-xl p-3">
+        {error ? (
+          <div className="h-48 flex items-center justify-center">
+            <p className="text-red-400 text-xs text-center px-4">{error}</p>
+          </div>
+        ) : loading && !data ? (
+          <div className="h-48 animate-pulse bg-gray-800 rounded-lg" />
+        ) : (
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={flatBars} margin={{ top: 20, right: 4, left: 4, bottom: 0 }} barCategoryGap="25%">
+              <XAxis
+                dataKey="label"
+                tick={{ fill: '#9ca3af', fontSize: 11 }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <YAxis hide />
+              <Tooltip
+                content={<CustomTooltip metric={metric} unit={metricCfg.unit} />}
+                cursor={{ fill: 'rgba(255,255,255,0.04)' }}
+              />
+              {CYCLING_TYPES.map((type, i) => (
+                <Bar
+                  key={type}
+                  dataKey={`${metric}_${type}`}
+                  stackId="a"
+                  fill={sportColor(type)}
+                  radius={i === CYCLING_TYPES.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
+                />
+              ))}
+              <Bar
+                dataKey={() => 0}
+                stackId="a"
+                fill="transparent"
+                stroke="none"
+                isAnimationActive={false}
+                legendType="none"
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                shape={(props: any) => {
+                  const { x, y, width } = props;
+                  const total = Number(props[metric]) || 0;
+                  if (!total) return <g />;
+                  return (
+                    <text
+                      x={x + width / 2}
+                      y={y - 5}
+                      textAnchor="middle"
+                      fill="#d1d5db"
+                      fontSize={10}
+                      fontWeight={500}
+                    >
+                      {barLabel(total)}
+                    </text>
+                  );
+                }}
+              />
+            </BarChart>
+          </ResponsiveContainer>
+        )}
+      </div>
+
+      {/* Legend */}
+      <div className="flex gap-3 flex-wrap">
+        {CYCLING_TYPES.map(type => (
+          <div key={type} className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ background: sportColor(type) }} />
+            <span className="text-xs text-gray-400">{sportLabel(type)}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function PowerTab() {
+  return (
+    <div className="space-y-4">
+      <DashboardBestPower />
+    </div>
+  );
+}
+
+export default function DashboardHome() {
+  const [tab, setTab] = useState<Tab>('training');
+
+  return (
+    <div className="h-full flex">
+
+      {/* Left sidebar nav */}
+      <div className="w-36 flex-shrink-0 border-r border-gray-800 py-6 px-2 space-y-1">
+        {NAV.map(({ key, label }) => (
+          <button
+            key={key}
+            onClick={() => setTab(key)}
+            className={`w-full text-left px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+              tab === key
+                ? 'bg-orange-500/15 text-orange-400 border border-orange-500/30'
+                : 'text-gray-400 hover:text-white hover:bg-gray-800'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* Main content */}
+      <div className="flex-1 overflow-y-auto scroll-touch">
+        <div className="max-w-2xl mx-auto px-4 py-4">
+          {tab === 'training' && <TrainingTab />}
+          {tab === 'power'    && <PowerTab />}
+        </div>
+      </div>
+
     </div>
   );
 }
