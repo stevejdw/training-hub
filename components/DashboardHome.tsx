@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import React from 'react';
+import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -83,13 +84,37 @@ const NAV: { key: Tab; label: string; icon: React.ReactNode }[] = [
   },
 ];
 
-function SummaryCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="bg-gray-800 rounded-xl p-3 flex flex-col gap-0.5 min-w-[80px]">
+/** Returns the ISO date string (YYYY-MM-DD) for the start of the current
+ *  period, accounting for the given offset, using UTC+10 (Sydney) math. */
+function periodStart(period: Period, offset: number): string {
+  // Use UTC+10 to approximate Sydney "today" without locale string parsing
+  const nowMs = Date.now() + 10 * 3_600_000;
+  const d = new Date(nowMs);
+  // Work in UTC (which is now effectively UTC+10)
+  if (period === 'week') {
+    const dow = d.getUTCDay(); // 0=Sun … 6=Sat
+    const toMonday = (dow === 0) ? 6 : dow - 1;
+    d.setUTCDate(d.getUTCDate() - toMonday + offset * 7);
+  } else if (period === 'month') {
+    d.setUTCDate(1);
+    d.setUTCMonth(d.getUTCMonth() + offset);
+  } else {
+    d.setUTCMonth(0, 1);
+    d.setUTCFullYear(d.getUTCFullYear() + offset);
+  }
+  return d.toISOString().slice(0, 10);
+}
+
+function StatCard({ label, value, href }: { label: string; value: string; href?: string }) {
+  const inner = (
+    <div className={`bg-gray-800 rounded-xl p-3 flex flex-col gap-0.5 min-w-[80px] transition-colors ${href ? 'group-hover:bg-gray-700 cursor-pointer' : ''}`}>
       <span className="text-[10px] text-gray-500 uppercase tracking-wider">{label}</span>
       <span className="text-lg font-bold text-white leading-tight">{value}</span>
+      {href && <span className="text-[10px] text-orange-400 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity">View →</span>}
     </div>
   );
+  if (href) return <Link href={href} className="group">{inner}</Link>;
+  return inner;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -242,15 +267,20 @@ function TrainingTab() {
             <div key={i} className="bg-gray-800 rounded-xl p-3 h-16 animate-pulse" />
           ))}
         </div>
-      ) : data ? (
-        <div className="grid grid-cols-5 gap-2">
-          <SummaryCard label="Rides"  value={String(data.summary.activities ?? 0)} />
-          <SummaryCard label="km"     value={String(data.summary.km ?? 0)} />
-          <SummaryCard label="Hours"  value={String(data.summary.hours ?? 0)} />
-          <SummaryCard label="TSS"    value={String(data.summary.tss ?? 0)} />
-          <SummaryCard label="Elev m" value={String(data.summary.elevation ?? 0)} />
-        </div>
-      ) : null}
+      ) : data ? (() => {
+        const from = periodStart(period, offset);
+        const filtersQ = selected.length > 0 ? selected.join(',') : 'All';
+        const href = `/activities?filters=${encodeURIComponent(filtersQ)}&from=${from}`;
+        return (
+          <div className="grid grid-cols-5 gap-2">
+            <StatCard label="Rides"  value={String(data.summary.activities ?? 0)} href={href} />
+            <StatCard label="km"     value={String(data.summary.km ?? 0)}         href={href} />
+            <StatCard label="Hours"  value={String(data.summary.hours ?? 0)}      href={href} />
+            <StatCard label="TSS"    value={String(data.summary.tss ?? 0)}        href={href} />
+            <StatCard label="Elev m" value={String(data.summary.elevation ?? 0)}  href={href} />
+          </div>
+        );
+      })() : null}
 
       {/* Metric toggle */}
       <div className="flex gap-1.5 flex-wrap">
