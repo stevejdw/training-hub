@@ -37,21 +37,21 @@ export async function POST() {
   try {
     const token = await getStravaToken();
 
-    // Grab 20 unscanned activities
+    // Grab 8 unscanned activities
     const pending = await client.query(`
       SELECT id FROM activities
       WHERE segments_synced_at IS NULL
       ORDER BY start_date DESC
-      LIMIT 20
+      LIMIT 8
     `);
 
     if (pending.rows.length === 0) {
       return Response.json({ processed: 0, remaining: 0 });
     }
 
-    // Process in parallel batches of 4 to stay within Strava rate limits
+    // Process in parallel batches of 2 to stay well within Vercel's 60s timeout
     const ids: number[] = pending.rows.map((r: { id: number }) => r.id);
-    const CONCURRENCY = 4;
+    const CONCURRENCY = 2;
 
     for (let i = 0; i < ids.length; i += CONCURRENCY) {
       const batch = ids.slice(i, i + CONCURRENCY);
@@ -61,7 +61,7 @@ export async function POST() {
             `https://www.strava.com/api/v3/activities/${activityId}`,
             {
               headers: { Authorization: `Bearer ${token}` },
-              signal: AbortSignal.timeout(8000),
+              signal: AbortSignal.timeout(5000),
             }
           );
 
