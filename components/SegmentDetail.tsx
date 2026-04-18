@@ -80,6 +80,7 @@ export default function SegmentDetail({ id }: { id: string }) {
   const [syncInfo,  setSyncInfo]  = useState<string | null>(null);
   const [remaining, setRemaining] = useState(0);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [debug, setDebug] = useState<Record<string, unknown> | null>(null);
 
   useEffect(() => {
     fetch(`/api/segments/${id}`)
@@ -93,6 +94,7 @@ export default function SegmentDetail({ id }: { id: string }) {
         setEfforts(d.efforts ?? []);
         setSyncInfo(d.syncInfo ?? null);
         setRemaining(d.remaining ?? 0);
+        setDebug(d.debug ?? null);
         setEffLoad(false);
       })
       .catch(() => setEffLoad(false));
@@ -312,13 +314,18 @@ export default function SegmentDetail({ id }: { id: string }) {
                   setEffLoad(true);
                   fetch(`/api/segments/${id}/efforts?backfill`)
                     .then(r => r.json())
-                    .then(d => { setEfforts(d.efforts ?? []); setSyncInfo(d.syncInfo ?? null); setRemaining(d.remaining ?? 0); setEffLoad(false); })
+                    .then(d => { setEfforts(d.efforts ?? []); setSyncInfo(d.syncInfo ?? null); setRemaining(d.remaining ?? 0); setDebug(d.debug ?? null); setEffLoad(false); })
                     .catch(() => setEffLoad(false));
                 }}
                 className="text-xs text-orange-400 hover:text-orange-300 border border-orange-500/30 rounded px-3 py-1.5 transition-colors"
               >
                 Scan activity history
               </button>
+              {debug && (
+                <pre className="text-left text-xs text-gray-400 bg-gray-900 rounded p-3 overflow-auto max-h-48 mt-2">
+                  {JSON.stringify(debug, null, 2)}
+                </pre>
+              )}
             </div>
           ) : (
             <div className="bg-gray-900 rounded-xl border border-gray-800 overflow-x-auto scroll-touch">

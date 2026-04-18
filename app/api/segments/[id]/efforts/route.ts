@@ -242,10 +242,27 @@ export async function GET(
       `SELECT COUNT(*) AS n FROM activities WHERE segments_synced_at IS NULL`
     );
 
+    // Debug info when no efforts found
+    let debug: Record<string, unknown> | undefined;
+    if (efforts.length === 0) {
+      const [nullCount, sample, totalEfforts] = await Promise.all([
+        client.query(`SELECT COUNT(*) AS n FROM segment_efforts WHERE segment_id IS NULL`),
+        client.query(`SELECT id, activity_id, segment_id, name FROM segment_efforts ORDER BY start_date DESC LIMIT 5`),
+        client.query(`SELECT COUNT(*) AS n FROM segment_efforts`),
+      ]);
+      debug = {
+        queried_segment_id: id,
+        total_efforts_in_db: Number(totalEfforts.rows[0].n),
+        null_segment_id_count: Number(nullCount.rows[0].n),
+        recent_sample: sample.rows,
+      };
+    }
+
     return Response.json({
       efforts,
       syncInfo,
       remaining: Number(afterPending.rows[0].n),
+      debug,
     });
   } finally {
     client.release();
