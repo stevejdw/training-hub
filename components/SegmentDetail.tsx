@@ -75,9 +75,11 @@ export default function SegmentDetail({ id }: { id: string }) {
   const [segLoad,  setSegLoad]  = useState(true);
   const [effLoad,  setEffLoad]  = useState(true);
   const [error,    setError]    = useState(false);
-  const [sortKey,  setSortKey]  = useState<SortKey>('start_date');
-  const [sortDir,  setSortDir]  = useState<SortDir>('desc');
-  const [syncError, setSyncError] = useState<string | null>(null);
+  const [sortKey,   setSortKey]   = useState<SortKey>('start_date');
+  const [sortDir,   setSortDir]   = useState<SortDir>('desc');
+  const [syncInfo,  setSyncInfo]  = useState<string | null>(null);
+  const [remaining, setRemaining] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   useEffect(() => {
     fetch(`/api/segments/${id}`)
@@ -89,7 +91,8 @@ export default function SegmentDetail({ id }: { id: string }) {
       .then(r => r.json())
       .then(d => {
         setEfforts(d.efforts ?? []);
-        setSyncError(d.syncError ?? null);
+        setSyncInfo(d.syncInfo ?? null);
+        setRemaining(d.remaining ?? 0);
         setEffLoad(false);
       })
       .catch(() => setEffLoad(false));
@@ -300,21 +303,21 @@ export default function SegmentDetail({ id }: { id: string }) {
             </div>
           ) : efforts.length === 0 ? (
             <div className="bg-gray-800/40 rounded-xl p-6 text-center space-y-3">
-              <p className="text-gray-400 text-sm">No efforts found.</p>
-              {syncError && (
-                <p className="text-red-400 text-xs font-mono bg-gray-900 rounded p-2 text-left break-all">{syncError}</p>
+              <p className="text-gray-400 text-sm">No efforts found yet.</p>
+              {remaining > 0 && (
+                <p className="text-gray-500 text-xs">{remaining} activities still need to be scanned.</p>
               )}
               <button
                 onClick={() => {
                   setEffLoad(true);
-                  fetch(`/api/segments/${id}/efforts?force=true`)
+                  fetch(`/api/segments/${id}/efforts?backfill`)
                     .then(r => r.json())
-                    .then(d => { setEfforts(d.efforts ?? []); setSyncError(d.syncError ?? null); setEffLoad(false); })
+                    .then(d => { setEfforts(d.efforts ?? []); setSyncInfo(d.syncInfo ?? null); setRemaining(d.remaining ?? 0); setEffLoad(false); })
                     .catch(() => setEffLoad(false));
                 }}
                 className="text-xs text-orange-400 hover:text-orange-300 border border-orange-500/30 rounded px-3 py-1.5 transition-colors"
               >
-                Retry sync from Strava
+                Scan activity history
               </button>
             </div>
           ) : (
@@ -415,6 +418,33 @@ export default function SegmentDetail({ id }: { id: string }) {
                   })}
                 </tbody>
               </table>
+            </div>
+          )}
+
+          {/* Load more / progress */}
+          {!effLoad && (syncInfo || remaining > 0) && (
+            <div className="mt-3 flex items-center gap-3">
+              {syncInfo && <p className="text-xs text-gray-500">{syncInfo}</p>}
+              {remaining > 0 && (
+                <button
+                  disabled={loadingMore}
+                  onClick={() => {
+                    setLoadingMore(true);
+                    fetch(`/api/segments/${id}/efforts?backfill`)
+                      .then(r => r.json())
+                      .then(d => {
+                        setEfforts(d.efforts ?? []);
+                        setSyncInfo(d.syncInfo ?? null);
+                        setRemaining(d.remaining ?? 0);
+                        setLoadingMore(false);
+                      })
+                      .catch(() => setLoadingMore(false));
+                  }}
+                  className="text-xs text-orange-400 hover:text-orange-300 border border-orange-500/30 rounded px-3 py-1.5 transition-colors disabled:opacity-50"
+                >
+                  {loadingMore ? 'Scanning…' : `Load more history (${remaining} activities remaining)`}
+                </button>
+              )}
             </div>
           )}
         </div>
