@@ -102,35 +102,37 @@ export default function Nav() {
       </header>
 
       {/* ── Mobile: fixed bottom tab bar ── */}
-      <nav
-        className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-gray-950 border-t border-gray-800 flex"
-        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
-      >
-        {links.map(({ href, label, icon }) => {
-          const active = pathname.startsWith(href);
-          return (
-            <Link
-              key={href}
-              href={href}
-              className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2 min-h-[56px] transition-colors ${
-                active ? 'text-orange-500' : 'text-gray-500'
-              }`}
-            >
-              {icon}
-              <span className="text-[10px] font-medium tracking-wide">{label}</span>
-            </Link>
-          );
-        })}
-        {/* Gear icon on mobile */}
-        <Link
-          href="/profile"
-          className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2 min-h-[56px] transition-colors ${
-            pathname.startsWith('/profile') ? 'text-orange-500' : 'text-gray-500'
-          }`}
-        >
-          <GearIcon />
-          <span className="text-[10px] font-medium tracking-wide">Settings</span>
-        </Link>
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-gray-950 border-t border-gray-800">
+        {/* Tab items row — fixed 56px tall */}
+        <div className="flex h-14">
+          {links.map(({ href, label, icon }) => {
+            const active = pathname.startsWith(href);
+            return (
+              <Link
+                key={href}
+                href={href}
+                className={`flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors ${
+                  active ? 'text-orange-500' : 'text-gray-500'
+                }`}
+              >
+                {icon}
+                <span className="text-[10px] font-medium tracking-wide">{label}</span>
+              </Link>
+            );
+          })}
+          {/* Gear icon on mobile */}
+          <Link
+            href="/profile"
+            className={`flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors ${
+              pathname.startsWith('/profile') ? 'text-orange-500' : 'text-gray-500'
+            }`}
+          >
+            <GearIcon />
+            <span className="text-[10px] font-medium tracking-wide">Settings</span>
+          </Link>
+        </div>
+        {/* Safe-area spacer — fills the home-indicator region with nav background */}
+        <div style={{ height: 'env(safe-area-inset-bottom, 0px)' }} />
       </nav>
     </>
   );

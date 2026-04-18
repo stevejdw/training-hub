@@ -32,7 +32,8 @@ html {
 body {
   background: var(--background);
   color: var(--foreground);
-  height: 100%;
+  /* 100dvh: dynamic viewport height that excludes browser chrome on iOS Safari */
+  height: 100dvh;
   overscroll-behavior: none;
   /* Prevent text size adjustment on rotation */
   -webkit-text-size-adjust: 100%;
@@ -47,13 +48,15 @@ body {
 @media (max-width: 767px) {
   .content-area {
     /* Pin content area precisely between status bar and bottom nav.
-       Fixed positioning avoids dvh measurement issues on iOS PWA. */
+       Fixed positioning avoids dvh measurement issues on iOS Safari/PWA. */
     position: fixed;
     top: env(safe-area-inset-top, 0px);
     left: 0;
     right: 0;
+    /* 56px (h-14) icon row + safe-area spacer div inside the nav */
     bottom: calc(56px + env(safe-area-inset-bottom, 0px));
     height: auto;
+    overflow: hidden;
   }
 }
 
