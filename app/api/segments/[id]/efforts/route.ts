@@ -133,7 +133,7 @@ export async function GET(
   }
 }
 
-// POST — backfill: fetch 10 unprocessed activities from Strava + update wind data
+// POST — backfill: fix null segment_ids, scan 5 new activities from Strava
 export async function POST(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -142,25 +142,46 @@ export async function POST(
   await ensureSegmentTables();
 
   let processed = 0;
+  let repaired = 0;
 
-  // Phase 1: scan activities
+  const client = await pool.connect();
   try {
-    const token = await getStravaToken();
-    const client = await pool.connect();
-    try {
+    // Phase 1 (instant): fix efforts stored with null segment_id by matching on name.
+    // This repairs the bulk of missing history left by the old sync code.
+    const repairRes = await client.query(`
+      UPDATE segment_efforts se
+      SET segment_id = ss.id
+      FROM starred_segments ss
+      WHERE se.segment_id IS NULL
+        AND se.name = ss.name
+    `);
+    repaired = repairRes.rowCount ?? 0;
+
+    // Phase 2: scan up to 5 activities that have never been processed
+    let token: string | null = null;
+    try { token = await getStravaToken(); } catch { /* skip Strava scan */ }
+
+    if (token) {
       const pending = await client.query(`
         SELECT id FROM activities
         WHERE segments_synced_at IS NULL
         ORDER BY start_date DESC
-        LIMIT 10
+        LIMIT 5
       `);
 
       for (const row of pending.rows) {
         try {
           const res = await fetch(`https://www.strava.com/api/v3/activities/${row.id}`, {
             headers: { Authorization: `Bearer ${token}` },
+            signal: AbortSignal.timeout(8000),
           });
-          if (!res.ok) continue;
+          if (!res.ok) {
+            // Still mark as synced to avoid re-trying a permanently failing activity
+            await client.query(
+              `UPDATE activities SET segments_synced_at = NOW() WHERE id = $1`, [row.id]
+            ).catch(() => {});
+            continue;
+          }
           const a = await res.json() as Record<string, unknown>;
           const segEfforts = (a.segment_efforts as Record<string, unknown>[] | null) ?? [];
 
@@ -196,20 +217,19 @@ export async function POST(
           processed++;
         } catch { /* skip this activity */ }
       }
-    } finally {
-      client.release();
     }
   } catch (err) {
     console.error('[efforts POST scan]', err);
+  } finally {
+    client.release();
   }
 
-  // Phase 2: backfill wind data
-  await backfillWind(id);
+  // (Wind backfill handled by GET on next page load — skip here to stay fast)
 
   // Phase 3: return updated efforts + remaining count
-  const client = await pool.connect();
+  const client2 = await pool.connect();
   try {
-    const effortsRes = await client.query(`
+    const effortsRes = await client2.query(`
       SELECT se.id, se.activity_id, se.elapsed_time,
              se.start_date, se.average_watts, se.average_heartrate, se.max_heartrate,
              se.pr_rank, se.kom_rank, se.wind_speed, se.wind_direction,
@@ -225,15 +245,15 @@ export async function POST(
       if (e.wind_direction != null) e.wind_compass = windDegToCompass(e.wind_direction);
     }
 
-    const remaining = await client.query(
+    const remaining = await client2.query(
       `SELECT COUNT(*) AS n FROM activities WHERE segments_synced_at IS NULL`
     ).catch(() => ({ rows: [{ n: 0 }] }));
 
-    return Response.json({ efforts, processed, remaining: Number(remaining.rows[0].n) });
+    return Response.json({ efforts, processed, repaired, remaining: Number(remaining.rows[0].n) });
   } catch (err) {
     console.error('[efforts POST]', err);
-    return Response.json({ efforts: [], processed: 0, remaining: 0, error: String(err) });
+    return Response.json({ efforts: [], processed: 0, repaired: 0, remaining: 0, error: String(err) });
   } finally {
-    client.release();
+    client2.release();
   }
 }

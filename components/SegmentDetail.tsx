@@ -429,21 +429,29 @@ export default function SegmentDetail({ id }: { id: string }) {
 
           {/* Load more / progress */}
           {!effLoad && (syncInfo || remaining > 0) && (
-            <div className="mt-3 flex items-center gap-3">
+            <div className="mt-3 flex items-center gap-3 flex-wrap">
               {syncInfo && <p className="text-xs text-gray-500">{syncInfo}</p>}
               {remaining > 0 && (
                 <button
                   disabled={loadingMore}
                   onClick={() => {
                     setLoadingMore(true);
+                    setSyncInfo(null);
                     fetch(`/api/segments/${id}/efforts`, { method: 'POST' })
                       .then(r => r.json())
                       .then(d => {
                         setEfforts(d.efforts ?? []);
                         setRemaining(d.remaining ?? 0);
                         setLoadingMore(false);
+                        const parts: string[] = [];
+                        if (d.repaired > 0) parts.push(`${d.repaired} efforts recovered`);
+                        if (d.processed > 0) parts.push(`${d.processed} activities scanned`);
+                        if (parts.length > 0) setSyncInfo(parts.join(' · '));
                       })
-                      .catch(() => setLoadingMore(false));
+                      .catch(() => {
+                        setLoadingMore(false);
+                        setSyncInfo('Scan failed — try again');
+                      });
                   }}
                   className="text-xs text-orange-400 hover:text-orange-300 border border-orange-500/30 rounded px-3 py-1.5 transition-colors disabled:opacity-50"
                 >
