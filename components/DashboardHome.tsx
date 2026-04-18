@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import React from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { SPORT_FILTER_LABELS, CYCLING_TYPES, SportFilter, sportColor, sportLabel } from '@/lib/sport-types';
 import DashboardBestPower from './DashboardBestPower';
@@ -48,10 +49,34 @@ const METRIC_OPTS: { key: Metric; label: string; unit: string }[] = [
   { key: 'tss',        label: 'TSS',       unit: ''   },
 ];
 
-const NAV: { key: Tab; label: string }[] = [
-  { key: 'training', label: 'Training' },
-  { key: 'power',    label: 'Best Efforts' },
-  { key: 'fitness',  label: 'Fitness'  },
+const NAV: { key: Tab; label: string; icon: React.ReactNode }[] = [
+  {
+    key: 'training',
+    label: 'Training',
+    icon: (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
+      </svg>
+    ),
+  },
+  {
+    key: 'power',
+    label: 'Best Efforts',
+    icon: (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+      </svg>
+    ),
+  },
+  {
+    key: 'fitness',
+    label: 'Fitness',
+    icon: (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+      </svg>
+    ),
+  },
 ];
 
 function SummaryCard({ label, value }: { label: string; value: string }) {
@@ -332,29 +357,57 @@ function FitnessTab() {
 }
 
 export default function DashboardHome() {
-  const [tab, setTab] = useState<Tab>('training');
+  const [tab,      setTab]      = useState<Tab>('training');
+  const [expanded, setExpanded] = useState(false);
 
   return (
     <div className="h-full flex">
 
-      {/* Left sidebar nav — narrow strip */}
-      <div className="w-28 flex-shrink-0 border-r border-gray-800 py-4 px-2 space-y-1">
-        {NAV.map(({ key, label }) => (
-          <button
-            key={key}
-            onClick={() => setTab(key)}
-            className={`w-full text-center px-2 py-2.5 rounded-lg text-xs font-medium transition-colors ${
-              tab === key
-                ? 'bg-orange-500/15 text-orange-400 border border-orange-500/30'
-                : 'text-gray-500 hover:text-white hover:bg-gray-800'
-            }`}
+      {/* Left sidebar */}
+      <div
+        className={`flex-shrink-0 border-r border-gray-800 flex flex-col transition-all duration-200 ${
+          expanded ? 'w-36' : 'w-14'
+        }`}
+      >
+        {/* Toggle button */}
+        <button
+          onClick={() => setExpanded(e => !e)}
+          className="flex items-center justify-center h-11 text-gray-500 hover:text-white transition-colors border-b border-gray-800"
+          title={expanded ? 'Collapse' : 'Expand'}
+        >
+          <svg
+            className={`w-4 h-4 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
+            fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
           >
-            {label}
-          </button>
-        ))}
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+
+        {/* Nav items */}
+        <nav className="flex flex-col py-3 px-1.5 gap-1">
+          {NAV.map(({ key, label, icon }) => (
+            <button
+              key={key}
+              onClick={() => setTab(key)}
+              title={!expanded ? label : undefined}
+              className={`flex items-center gap-2.5 px-2 py-2.5 rounded-lg transition-colors ${
+                expanded ? '' : 'justify-center'
+              } ${
+                tab === key
+                  ? 'bg-orange-500/15 text-orange-400 border border-orange-500/30'
+                  : 'text-gray-500 hover:text-white hover:bg-gray-800'
+              }`}
+            >
+              <span className="flex-shrink-0">{icon}</span>
+              {expanded && (
+                <span className="text-xs font-medium truncate">{label}</span>
+              )}
+            </button>
+          ))}
+        </nav>
       </div>
 
-      {/* Main content — fills all remaining width */}
+      {/* Main content */}
       <div className="flex-1 overflow-y-auto scroll-touch min-w-0">
         <div className="px-4 py-4">
           {tab === 'training' && <TrainingTab />}
