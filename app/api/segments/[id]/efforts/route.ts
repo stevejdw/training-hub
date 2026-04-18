@@ -110,13 +110,12 @@ async function queryEfforts(segmentId: string, client: PoolClient) {
   return res.rows;
 }
 
-// GET — just read from DB, no Strava calls
+// GET — just read from DB, no Strava calls, no schema migrations
 export async function GET(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  await ensureSegmentTables();
   const client = await pool.connect();
 
   try {
