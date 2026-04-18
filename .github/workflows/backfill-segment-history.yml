@@ -9,16 +9,20 @@ jobs:
     steps:
       - name: Repair null segment_ids + mark all activities synced
         run: |
-          response=$(curl -s -X POST "${{ secrets.APP_URL }}/api/activities/backfill" \
+          response=$(curl -s -o /tmp/backfill.json -w "%{http_code}" \
+            -X POST "${{ secrets.APP_URL }}/api/activities/backfill" \
             -H "Content-Type: application/json")
-          echo "$response"
-          echo "$response" | python3 -c "
-          import sys, json
-          d = json.load(sys.stdin)
-          if not d.get('ok'):
-              print('ERROR:', d.get('error'))
-              sys.exit(1)
-          print(f\"Repaired {d['repaired']} segment_id rows\")
-          print(f\"Marked   {d['marked']} activities as synced\")
-          print(f\"Stats:   {d['stats']}\")
-          "
+          echo "HTTP status: $response"
+          cat /tmp/backfill.json
+          if [ "$response" != "200" ]; then
+            echo "ERROR: unexpected HTTP $response"
+            exit 1
+          fi
+          ok=$(jq -r '.ok' /tmp/backfill.json)
+          if [ "$ok" != "true" ]; then
+            echo "ERROR: $(jq -r '.error' /tmp/backfill.json)"
+            exit 1
+          fi
+          echo "Repaired:  $(jq '.repaired' /tmp/backfill.json) segment_id rows"
+          echo "Marked:    $(jq '.marked'   /tmp/backfill.json) activities as synced"
+          echo "Still null: $(jq '.stats.still_null' /tmp/backfill.json)"
