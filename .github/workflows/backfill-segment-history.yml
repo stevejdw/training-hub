@@ -1,16 +1,16 @@
 name: Backfill Segment History
 
 on:
+  schedule:
+    - cron: '*/15 * * * *'   # every 15 minutes until remaining hits 0
   workflow_dispatch:
 
 jobs:
   backfill:
     runs-on: ubuntu-latest
-    env:
-      APP_URL: ${{ secrets.APP_URL }}
     steps:
-      - name: Repair null segment_ids + mark all activities synced
+      - name: Scan 20 activities for segment efforts
         run: |
-          BASE_URL="${APP_URL%/}"
-          echo "Calling ${BASE_URL}/api/activities/backfill"
-          curl -f -s -X POST "${BASE_URL}/api/activities/backfill" -H "Content-Type: application/json"
+          curl -X POST "${{ secrets.APP_URL }}/api/activities/backfill" \
+            --fail --retry 3 --retry-delay 5 \
+            -H "Content-Type: application/json"
