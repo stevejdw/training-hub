@@ -6,8 +6,11 @@ on:
 jobs:
   backfill:
     runs-on: ubuntu-latest
+    env:
+      APP_URL: ${{ secrets.APP_URL }}
     steps:
       - name: Repair null segment_ids + mark all activities synced
         run: |
-          curl -f -s -X POST "${{ secrets.APP_URL }}/api/activities/backfill" \
-            -H "Content-Type: application/json"
+          BASE_URL="${APP_URL%/}"
+          echo "Calling ${BASE_URL}/api/activities/backfill"
+          curl -f -s -X POST "${BASE_URL}/api/activities/backfill" -H "Content-Type: application/json"
