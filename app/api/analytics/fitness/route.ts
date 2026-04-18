@@ -20,7 +20,7 @@ export async function GET(req: Request) {
 
     const res = await client.query<{ date: string; tss: number }>(`
       SELECT
-        date_trunc('day', start_date AT TIME ZONE 'Australia/Sydney')::date AS date,
+        (date_trunc('day', start_date AT TIME ZONE 'Australia/Sydney')::date)::text AS date,
         ROUND(SUM(COALESCE(tss, 0)))::int AS tss
       FROM activities
       WHERE start_date >= NOW() - INTERVAL '${totalDays} days'
