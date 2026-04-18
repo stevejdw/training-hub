@@ -312,9 +312,9 @@ export default function SegmentDetail({ id }: { id: string }) {
               <button
                 onClick={() => {
                   setEffLoad(true);
-                  fetch(`/api/segments/${id}/efforts?backfill`)
+                  fetch(`/api/segments/${id}/efforts`, { method: 'POST' })
                     .then(r => r.json())
-                    .then(d => { setEfforts(d.efforts ?? []); setSyncInfo(d.syncInfo ?? null); setRemaining(d.remaining ?? 0); setDebug(d.debug ?? null); setEffLoad(false); })
+                    .then(d => { setEfforts(d.efforts ?? []); setRemaining(d.remaining ?? 0); setDebug(d.debug ?? null); setEffLoad(false); })
                     .catch(() => setEffLoad(false));
                 }}
                 className="text-xs text-orange-400 hover:text-orange-300 border border-orange-500/30 rounded px-3 py-1.5 transition-colors"
@@ -437,11 +437,10 @@ export default function SegmentDetail({ id }: { id: string }) {
                   disabled={loadingMore}
                   onClick={() => {
                     setLoadingMore(true);
-                    fetch(`/api/segments/${id}/efforts?backfill`)
+                    fetch(`/api/segments/${id}/efforts`, { method: 'POST' })
                       .then(r => r.json())
                       .then(d => {
                         setEfforts(d.efforts ?? []);
-                        setSyncInfo(d.syncInfo ?? null);
                         setRemaining(d.remaining ?? 0);
                         setLoadingMore(false);
                       })

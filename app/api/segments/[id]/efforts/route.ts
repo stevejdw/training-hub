@@ -61,7 +61,6 @@ async function fetchWindForEfforts(
   }
 }
 
-/** Store all segment efforts from a single Strava activity detail response */
 async function storeEffortsFromActivity(
   activityId: number,
   segEfforts: Record<string, unknown>[],
@@ -76,6 +75,7 @@ async function storeEffortsFromActivity(
          start_date, distance, average_watts, average_heartrate, max_heartrate, pr_rank, kom_rank)
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
       ON CONFLICT (id) DO UPDATE SET
+        segment_id    = EXCLUDED.segment_id,
         pr_rank       = EXCLUDED.pr_rank,
         kom_rank      = EXCLUDED.kom_rank,
         max_heartrate = EXCLUDED.max_heartrate
@@ -91,127 +91,58 @@ async function storeEffortsFromActivity(
       (se.kom_rank          as number | null) ?? null,
     ]);
   }
-  // Mark this activity as having its segment efforts fetched
   await client.query(
-    `UPDATE activities SET segments_synced_at = NOW() WHERE id = $1`,
-    [activityId]
-  ).catch(() => {}); // column may not exist yet; ensureSegmentTables handles it
+    `UPDATE activities SET segments_synced_at = NOW() WHERE id = $1`, [activityId]
+  ).catch(() => {});
 }
 
-/**
- * Backfill segment efforts by fetching full activity detail from Strava
- * for activities that haven't had their segment efforts stored yet.
- * Processes up to `limit` activities per call.
- */
-async function backfillFromActivities(
-  client: PoolClient,
-  limit = 30
-): Promise<{ processed: number }> {
-  const token = await getStravaToken();
-
-  // Find activities that haven't had segment efforts fetched
-  const pending = await client.query(`
-    SELECT id FROM activities
-    WHERE segments_synced_at IS NULL
-    ORDER BY start_date DESC
-    LIMIT $1
-  `, [limit]);
-
-  let processed = 0;
-  for (const row of pending.rows) {
-    try {
-      const res = await fetch(`https://www.strava.com/api/v3/activities/${row.id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) continue;
-      const a = await res.json() as Record<string, unknown>;
-      const segEfforts = (a.segment_efforts as Record<string, unknown>[] | null) ?? [];
-      await storeEffortsFromActivity(row.id, segEfforts, client);
-      processed++;
-    } catch {
-      // skip this activity and continue
-    }
-  }
-
-  return { processed };
+async function queryEfforts(segmentId: string, client: PoolClient) {
+  const res = await client.query(`
+    SELECT se.id, se.activity_id, se.elapsed_time,
+           se.start_date, se.average_watts, se.average_heartrate, se.max_heartrate,
+           se.pr_rank, se.kom_rank, se.wind_speed, se.wind_direction,
+           a.name AS activity_name
+    FROM segment_efforts se
+    LEFT JOIN activities a ON a.id = se.activity_id
+    WHERE se.segment_id = $1
+    ORDER BY se.start_date DESC
+  `, [segmentId]);
+  return res.rows;
 }
 
+// GET — just read from DB, no Strava calls
 export async function GET(
-  req: Request,
+  _req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const url     = new URL(req.url);
-  const force   = url.searchParams.has('force');
-  const backfill = url.searchParams.has('backfill');
-
   await ensureSegmentTables();
   const client = await pool.connect();
 
   try {
-    if (backfill) {
-      // Fetch full Strava activity detail for unprocessed activities
-      const { processed } = await backfillFromActivities(client);
+    const efforts = await queryEfforts(id, client);
 
-      // Return updated efforts from DB
-      const effortsRes = await client.query(`
-        SELECT se.id, se.activity_id, se.elapsed_time,
-               se.start_date, se.average_watts, se.average_heartrate, se.max_heartrate,
-               se.pr_rank, se.kom_rank, se.wind_speed, se.wind_direction,
-               a.name AS activity_name
-        FROM segment_efforts se
-        LEFT JOIN activities a ON a.id = se.activity_id
-        WHERE se.segment_id = $1
-        ORDER BY se.start_date DESC
-      `, [id]);
-
-      // Count remaining unprocessed activities
-      const remaining = await client.query(
-        `SELECT COUNT(*) AS n FROM activities WHERE segments_synced_at IS NULL`
-      );
-
-      return Response.json({
-        efforts: effortsRes.rows,
-        processed,
-        remaining: Number(remaining.rows[0].n),
-      });
+    // Debug info when empty
+    let debug: Record<string, unknown> | undefined;
+    if (efforts.length === 0) {
+      const [nullCount, sample, total, pending] = await Promise.all([
+        client.query(`SELECT COUNT(*) AS n FROM segment_efforts WHERE segment_id IS NULL`),
+        client.query(`SELECT id, activity_id, segment_id, name FROM segment_efforts ORDER BY start_date DESC LIMIT 5`),
+        client.query(`SELECT COUNT(*) AS n FROM segment_efforts`),
+        client.query(`SELECT COUNT(*) AS n FROM activities WHERE segments_synced_at IS NULL`),
+      ]);
+      debug = {
+        queried_segment_id: id,
+        total_efforts_in_db: Number(total.rows[0].n),
+        null_segment_id_count: Number(nullCount.rows[0].n),
+        unsynced_activities: Number(pending.rows[0].n),
+        recent_sample: sample.rows,
+      };
     }
 
-    // Normal load: check if we have efforts in DB already
-    const existingCount = await client.query(
-      `SELECT COUNT(*) AS n FROM segment_efforts WHERE segment_id = $1`, [id]
-    );
-    const hasEfforts = Number(existingCount.rows[0].n) > 0;
-
-    // If no efforts yet (or force), check how many activities still need processing
     const remaining = await client.query(
       `SELECT COUNT(*) AS n FROM activities WHERE segments_synced_at IS NULL`
     );
-    const pendingCount = Number(remaining.rows[0].n);
-
-    let syncInfo: string | undefined;
-    if (!hasEfforts || force) {
-      if (pendingCount > 0) {
-        // Run a first batch automatically
-        await backfillFromActivities(client, 30);
-        syncInfo = pendingCount > 30
-          ? `Processed 30 of ${pendingCount} activities. Click "Load more" to continue.`
-          : undefined;
-      }
-    }
-
-    const effortsRes = await client.query(`
-      SELECT se.id, se.activity_id, se.elapsed_time,
-             se.start_date, se.average_watts, se.average_heartrate, se.max_heartrate,
-             se.pr_rank, se.kom_rank, se.wind_speed, se.wind_direction,
-             a.name AS activity_name
-      FROM segment_efforts se
-      LEFT JOIN activities a ON a.id = se.activity_id
-      WHERE se.segment_id = $1
-      ORDER BY se.start_date DESC
-    `, [id]);
-
-    const efforts = effortsRes.rows;
 
     // Fetch wind for efforts missing it
     const segRes = await client.query(
@@ -232,37 +163,59 @@ export async function GET(
         }
       }
     }
-
     for (const e of efforts) {
       if (e.wind_direction != null) e.wind_compass = windDegToCompass(e.wind_direction);
     }
 
-    // Re-check pending count after the backfill
-    const afterPending = await client.query(
+    return Response.json({ efforts, remaining: Number(remaining.rows[0].n), debug });
+  } finally {
+    client.release();
+  }
+}
+
+// POST — explicit backfill: fetch N activities from Strava and store their segment efforts
+export async function POST(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  await ensureSegmentTables();
+  const client = await pool.connect();
+
+  try {
+    const token = await getStravaToken();
+
+    const pending = await client.query(`
+      SELECT id FROM activities
+      WHERE segments_synced_at IS NULL
+      ORDER BY start_date DESC
+      LIMIT 10
+    `);
+
+    let processed = 0;
+    for (const row of pending.rows) {
+      try {
+        const res = await fetch(`https://www.strava.com/api/v3/activities/${row.id}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) continue;
+        const a = await res.json() as Record<string, unknown>;
+        const segEfforts = (a.segment_efforts as Record<string, unknown>[] | null) ?? [];
+        await storeEffortsFromActivity(row.id, segEfforts, client);
+        processed++;
+      } catch { /* skip */ }
+    }
+
+    const efforts = await queryEfforts(id, client);
+
+    const remaining = await client.query(
       `SELECT COUNT(*) AS n FROM activities WHERE segments_synced_at IS NULL`
     );
 
-    // Debug info when no efforts found
-    let debug: Record<string, unknown> | undefined;
-    if (efforts.length === 0) {
-      const [nullCount, sample, totalEfforts] = await Promise.all([
-        client.query(`SELECT COUNT(*) AS n FROM segment_efforts WHERE segment_id IS NULL`),
-        client.query(`SELECT id, activity_id, segment_id, name FROM segment_efforts ORDER BY start_date DESC LIMIT 5`),
-        client.query(`SELECT COUNT(*) AS n FROM segment_efforts`),
-      ]);
-      debug = {
-        queried_segment_id: id,
-        total_efforts_in_db: Number(totalEfforts.rows[0].n),
-        null_segment_id_count: Number(nullCount.rows[0].n),
-        recent_sample: sample.rows,
-      };
-    }
-
     return Response.json({
       efforts,
-      syncInfo,
-      remaining: Number(afterPending.rows[0].n),
-      debug,
+      processed,
+      remaining: Number(remaining.rows[0].n),
     });
   } finally {
     client.release();
