@@ -1,0 +1,24 @@
+name: Backfill Segment History
+
+on:
+  workflow_dispatch:
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Repair null segment_ids + mark all activities synced
+        run: |
+          response=$(curl -s -X POST "${{ secrets.APP_URL }}/api/activities/backfill" \
+            -H "Content-Type: application/json")
+          echo "$response"
+          echo "$response" | python3 -c "
+          import sys, json
+          d = json.load(sys.stdin)
+          if not d.get('ok'):
+              print('ERROR:', d.get('error'))
+              sys.exit(1)
+          print(f\"Repaired {d['repaired']} segment_id rows\")
+          print(f\"Marked   {d['marked']} activities as synced\")
+          print(f\"Stats:   {d['stats']}\")
+          "
