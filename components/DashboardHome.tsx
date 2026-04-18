@@ -5,7 +5,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recha
 import { SPORT_FILTER_LABELS, CYCLING_TYPES, SportFilter, sportColor, sportLabel } from '@/lib/sport-types';
 import DashboardBestPower from './DashboardBestPower';
 
-type Tab    = 'training' | 'power';
+type Tab    = 'training' | 'power' | 'fitness';
 type Period = 'week' | 'month' | 'year';
 type Metric = 'tss' | 'km' | 'hours' | 'activities';
 
@@ -51,6 +51,7 @@ const METRIC_OPTS: { key: Metric; label: string; unit: string }[] = [
 const NAV: { key: Tab; label: string }[] = [
   { key: 'training', label: 'Training' },
   { key: 'power',    label: 'Power'    },
+  { key: 'fitness',  label: 'Fitness'  },
 ];
 
 function SummaryCard({ label, value }: { label: string; value: string }) {
@@ -322,22 +323,30 @@ function PowerTab() {
   );
 }
 
+function FitnessTab() {
+  return (
+    <div className="flex items-center justify-center h-48 text-gray-500 text-sm">
+      Coming soon
+    </div>
+  );
+}
+
 export default function DashboardHome() {
   const [tab, setTab] = useState<Tab>('training');
 
   return (
     <div className="h-full flex">
 
-      {/* Left sidebar nav */}
-      <div className="w-36 flex-shrink-0 border-r border-gray-800 py-6 px-2 space-y-1">
+      {/* Left sidebar nav — narrow strip */}
+      <div className="w-24 flex-shrink-0 border-r border-gray-800 py-4 px-2 space-y-1">
         {NAV.map(({ key, label }) => (
           <button
             key={key}
             onClick={() => setTab(key)}
-            className={`w-full text-left px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+            className={`w-full text-center px-2 py-2.5 rounded-lg text-xs font-medium transition-colors ${
               tab === key
                 ? 'bg-orange-500/15 text-orange-400 border border-orange-500/30'
-                : 'text-gray-400 hover:text-white hover:bg-gray-800'
+                : 'text-gray-500 hover:text-white hover:bg-gray-800'
             }`}
           >
             {label}
@@ -345,11 +354,12 @@ export default function DashboardHome() {
         ))}
       </div>
 
-      {/* Main content */}
-      <div className="flex-1 overflow-y-auto scroll-touch">
-        <div className="max-w-2xl mx-auto px-4 py-4">
+      {/* Main content — fills all remaining width */}
+      <div className="flex-1 overflow-y-auto scroll-touch min-w-0">
+        <div className="px-4 py-4">
           {tab === 'training' && <TrainingTab />}
           {tab === 'power'    && <PowerTab />}
+          {tab === 'fitness'  && <FitnessTab />}
         </div>
       </div>
 
