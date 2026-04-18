@@ -2,7 +2,11 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import React from 'react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { useSearchParams } from 'next/navigation';
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
+  LineChart, Line, CartesianGrid, ReferenceLine, Legend,
+} from 'recharts';
 import { SPORT_FILTER_LABELS, CYCLING_TYPES, SportFilter, sportColor, sportLabel } from '@/lib/sport-types';
 import DashboardBestPower from './DashboardBestPower';
 
@@ -348,16 +352,143 @@ function PowerTab() {
   );
 }
 
+interface FitnessPoint { date: string; atl: number; ctl: number; tsb: number }
+
 function FitnessTab() {
+  const [data,    setData]    = useState<FitnessPoint[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [days,    setDays]    = useState(90);
+
+  useEffect(() => {
+    setLoading(true);
+    fetch(`/api/analytics/fitness?days=${days}`)
+      .then(r => r.json())
+      .then(d => { setData(d.data ?? []); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, [days]);
+
+  const latest = data[data.length - 1];
+  const tsbColor = (v: number) => v >= 5 ? '#34d399' : v <= -20 ? '#f87171' : '#facc15';
+  const tsbLabel = (v: number) => v >= 5 ? 'Fresh' : v <= -20 ? 'Fatigued' : 'Neutral';
+
+  // Thin out data for the chart (max 180 points)
+  const chartData = data.length > 180
+    ? data.filter((_, i) => i % Math.ceil(data.length / 180) === 0).concat(data[data.length - 1])
+    : data;
+
+  // Format date for x-axis
+  const fmtDate = (s: string) => {
+    const d = new Date(s);
+    return d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
+  };
+
   return (
-    <div className="flex items-center justify-center h-48 text-gray-500 text-sm">
-      Coming soon
+    <div className="space-y-5">
+      {/* Current snapshot */}
+      {latest && (
+        <div className="grid grid-cols-3 gap-3">
+          <div className="bg-gray-800/60 rounded-xl p-3 text-center">
+            <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Fitness (CTL)</p>
+            <p className="text-2xl font-bold text-blue-400">{latest.ctl}</p>
+          </div>
+          <div className="bg-gray-800/60 rounded-xl p-3 text-center">
+            <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Fatigue (ATL)</p>
+            <p className="text-2xl font-bold text-purple-400">{latest.atl}</p>
+          </div>
+          <div className="bg-gray-800/60 rounded-xl p-3 text-center">
+            <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Form (TSB)</p>
+            <p className="text-2xl font-bold" style={{ color: tsbColor(latest.tsb) }}>
+              {latest.tsb > 0 ? '+' : ''}{latest.tsb}
+            </p>
+            <p className="text-[10px] mt-0.5" style={{ color: tsbColor(latest.tsb) }}>
+              {tsbLabel(latest.tsb)}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Range selector */}
+      <div className="flex gap-1.5">
+        {[30, 90, 180, 365].map(d => (
+          <button
+            key={d}
+            onClick={() => setDays(d)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              days === d
+                ? 'bg-orange-500/20 text-orange-400 border border-orange-500/50'
+                : 'bg-gray-800 text-gray-500 hover:text-gray-300'
+            }`}
+          >
+            {d === 365 ? '1Y' : `${d}D`}
+          </button>
+        ))}
+      </div>
+
+      {/* Chart */}
+      <div className="bg-gray-900 rounded-xl border border-gray-800 p-4">
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4">ATL · CTL · Form (TSB)</p>
+        {loading ? (
+          <div className="h-64 animate-pulse bg-gray-800 rounded-lg" />
+        ) : chartData.length === 0 ? (
+          <div className="h-64 flex items-center justify-center text-gray-500 text-sm">No TSS data found</div>
+        ) : (
+          <ResponsiveContainer width="100%" height={280}>
+            <LineChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
+              <XAxis
+                dataKey="date"
+                tickFormatter={fmtDate}
+                tick={{ fill: '#6b7280', fontSize: 10 }}
+                axisLine={false}
+                tickLine={false}
+                interval="preserveStartEnd"
+              />
+              <YAxis
+                tick={{ fill: '#6b7280', fontSize: 10 }}
+                axisLine={false}
+                tickLine={false}
+                width={32}
+              />
+              <ReferenceLine y={0} stroke="#374151" strokeDasharray="3 3" />
+              <Tooltip
+                contentStyle={{ background: '#111827', border: '1px solid #374151', borderRadius: 8, fontSize: 12 }}
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                labelFormatter={(s: any) => fmtDate(String(s))}
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                formatter={(val: any, name: any) => {
+                  const labels: Record<string, string> = { ctl: 'Fitness (CTL)', atl: 'Fatigue (ATL)', tsb: 'Form (TSB)' };
+                  const n = Number(val);
+                  return [n > 0 ? `+${n}` : n, labels[String(name)] ?? String(name)];
+                }}
+              />
+              <Legend
+                formatter={(value) => {
+                  const labels: Record<string, string> = { ctl: 'Fitness (CTL)', atl: 'Fatigue (ATL)', tsb: 'Form (TSB)' };
+                  return <span style={{ color: '#9ca3af', fontSize: 11 }}>{labels[value] ?? value}</span>;
+                }}
+              />
+              <Line type="monotone" dataKey="ctl" stroke="#60a5fa" strokeWidth={2} dot={false} />
+              <Line type="monotone" dataKey="atl" stroke="#c084fc" strokeWidth={2} dot={false} />
+              <Line type="monotone" dataKey="tsb" stroke="#34d399" strokeWidth={1.5} dot={false} strokeDasharray="4 2" />
+            </LineChart>
+          </ResponsiveContainer>
+        )}
+      </div>
+
+      {/* Legend explainer */}
+      <div className="grid grid-cols-3 gap-2 text-xs text-gray-500">
+        <div><span className="text-blue-400 font-medium">CTL</span> — Chronic Training Load (42d avg). Your fitness base.</div>
+        <div><span className="text-purple-400 font-medium">ATL</span> — Acute Training Load (7d avg). Recent fatigue.</div>
+        <div><span className="text-green-400 font-medium">TSB</span> — Form = CTL − ATL. Positive = fresh, negative = tired.</div>
+      </div>
     </div>
   );
 }
 
 export default function DashboardHome() {
-  const [tab,      setTab]      = useState<Tab>('training');
+  const searchParams = useSearchParams();
+  const initialTab = (searchParams.get('tab') as Tab | null) ?? 'training';
+  const [tab,      setTab]      = useState<Tab>(initialTab);
   const [expanded, setExpanded] = useState(false);
 
   return (

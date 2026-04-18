@@ -190,23 +190,26 @@ export default function FeedPage() {
           </div>
         )}
 
-        {/* Fitness snapshot */}
+        {/* Fitness snapshot — links to Fitness tab in Analytics */}
         {fitness && (
-          <div className="grid grid-cols-3 gap-2">
-            <div className="bg-gray-800/60 rounded-xl p-3 text-center">
-              <p className="text-[10px] text-gray-500 uppercase tracking-wider">Fitness (CTL)</p>
-              <p className="text-xl font-bold text-blue-400">{fitness.ctl}</p>
+          <Link href="/dashboard?tab=fitness" className="block group">
+            <div className="grid grid-cols-3 gap-2">
+              <div className="bg-gray-800/60 rounded-xl p-3 text-center group-hover:bg-gray-700/60 transition-colors">
+                <p className="text-[10px] text-gray-500 uppercase tracking-wider">Fitness (CTL)</p>
+                <p className="text-xl font-bold text-blue-400">{fitness.ctl}</p>
+              </div>
+              <div className="bg-gray-800/60 rounded-xl p-3 text-center group-hover:bg-gray-700/60 transition-colors">
+                <p className="text-[10px] text-gray-500 uppercase tracking-wider">Fatigue (ATL)</p>
+                <p className="text-xl font-bold text-purple-400">{fitness.atl}</p>
+              </div>
+              <div className="bg-gray-800/60 rounded-xl p-3 text-center group-hover:bg-gray-700/60 transition-colors">
+                <p className="text-[10px] text-gray-500 uppercase tracking-wider">Form (TSB)</p>
+                <p className={`text-xl font-bold ${tsbColor}`}>{fitness.tsb > 0 ? '+' : ''}{fitness.tsb}</p>
+                <p className={`text-[10px] ${tsbColor}`}>{tsbLabel}</p>
+              </div>
             </div>
-            <div className="bg-gray-800/60 rounded-xl p-3 text-center">
-              <p className="text-[10px] text-gray-500 uppercase tracking-wider">Fatigue (ATL)</p>
-              <p className="text-xl font-bold text-purple-400">{fitness.atl}</p>
-            </div>
-            <div className="bg-gray-800/60 rounded-xl p-3 text-center">
-              <p className="text-[10px] text-gray-500 uppercase tracking-wider">Form (TSB)</p>
-              <p className={`text-xl font-bold ${tsbColor}`}>{fitness.tsb > 0 ? '+' : ''}{fitness.tsb}</p>
-              <p className={`text-[10px] ${tsbColor}`}>{tsbLabel}</p>
-            </div>
-          </div>
+            <p className="text-[10px] text-gray-600 text-right mt-1 group-hover:text-gray-500 transition-colors">View fitness history →</p>
+          </Link>
         )}
 
         {/* Coaching Insight */}
