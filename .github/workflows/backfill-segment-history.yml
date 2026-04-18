@@ -13,6 +13,4 @@ jobs:
         run: |
           curl -X POST "${{ secrets.APP_URL }}/api/activities/backfill" \
             -H "Content-Type: application/json" \
-            --max-time 90 \
-            --silent --show-error \
-            -w "\nHTTP %{http_code} — processed=%{size_download}b in %{time_total}s\n"
+            --max-time 90
