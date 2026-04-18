@@ -50,7 +50,7 @@ const METRIC_OPTS: { key: Metric; label: string; unit: string }[] = [
 
 const NAV: { key: Tab; label: string }[] = [
   { key: 'training', label: 'Training' },
-  { key: 'power',    label: 'Power'    },
+  { key: 'power',    label: 'Best Efforts' },
   { key: 'fitness',  label: 'Fitness'  },
 ];
 
@@ -338,7 +338,7 @@ export default function DashboardHome() {
     <div className="h-full flex">
 
       {/* Left sidebar nav — narrow strip */}
-      <div className="w-24 flex-shrink-0 border-r border-gray-800 py-4 px-2 space-y-1">
+      <div className="w-28 flex-shrink-0 border-r border-gray-800 py-4 px-2 space-y-1">
         {NAV.map(({ key, label }) => (
           <button
             key={key}
