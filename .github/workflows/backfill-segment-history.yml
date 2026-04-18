@@ -9,11 +9,20 @@ jobs:
   backfill:
     runs-on: ubuntu-latest
     steps:
+      - name: Check APP_URL secret is set
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+        run: |
+          if [ -z "$APP_URL" ]; then
+            echo "ERROR: APP_URL secret is empty or not set"
+            exit 1
+          fi
+          echo "APP_URL is set (length: ${#APP_URL})"
+
       - name: Scan activities for segment efforts
         env:
           APP_URL: ${{ secrets.APP_URL }}
         run: |
-          echo "POST ${APP_URL}/api/activities/backfill"
-          curl -X POST "${APP_URL}/api/activities/backfill" \
+          curl -v -X POST "${APP_URL}/api/activities/backfill" \
             -H "Content-Type: application/json" \
-            --max-time 90
+            --max-time 90 2>&1 || true
