@@ -239,6 +239,21 @@ function TrainingTab() {
         ))}
       </div>
 
+      {/* Period selector — Week / Month / Year */}
+      <div className="flex bg-gray-800 rounded-xl p-1 gap-1">
+        {(['week', 'month', 'year'] as Period[]).map(p => (
+          <button
+            key={p}
+            onClick={() => changePeriod(p)}
+            className={`flex-1 py-1.5 rounded-lg text-sm font-medium transition-colors capitalize ${
+              period === p ? 'bg-orange-500 text-white' : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            {p === 'week' ? 'Week' : p === 'month' ? 'Month' : 'Year'}
+          </button>
+        ))}
+      </div>
+
       {/* Period navigation — above chart */}
       <div className="flex items-center justify-between">
         <button
@@ -335,21 +350,6 @@ function TrainingTab() {
         ))}
       </div>
 
-      {/* Period selector — very bottom */}
-      <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Date</p>
-      <div className="flex bg-gray-800 rounded-xl p-1 gap-1 pb-2">
-        {(['week', 'month', 'year'] as Period[]).map(p => (
-          <button
-            key={p}
-            onClick={() => changePeriod(p)}
-            className={`flex-1 py-1.5 rounded-lg text-sm font-medium transition-colors capitalize ${
-              period === p ? 'bg-orange-500 text-white' : 'text-gray-400 hover:text-white'
-            }`}
-          >
-            {p === 'week' ? 'Week' : p === 'month' ? 'Month' : 'Year'}
-          </button>
-        ))}
-      </div>
     </div>
   );
 }

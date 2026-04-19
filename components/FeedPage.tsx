@@ -32,12 +32,15 @@ interface PowerHighlight {
   isNew: boolean;
 }
 
+interface WTD { rides: number; km: number; hours: number; tss: number; elevation: number }
+
 interface FeedData {
   recentRides: RecentRide[];
   nextEvent: { name: string; date: string; goal: string; daysAway: number } | null;
   fitness: { ctl: number; atl: number; tsb: number };
   powerHighlights: PowerHighlight[];
   lastCyclingRideId: number | null;
+  wtd: WTD | null;
 }
 
 function fmt(s: number) {
@@ -150,7 +153,7 @@ export default function FeedPage() {
     );
   }
 
-  const { recentRides = [], nextEvent, fitness, powerHighlights = [] } = data ?? {};
+  const { recentRides = [], nextEvent, fitness, powerHighlights = [], wtd } = data ?? {};
   const newPRs   = powerHighlights.filter(p => p.isNew);
   const tsbLabel = (fitness?.tsb ?? 0) >= 5 ? 'Fresh' : (fitness?.tsb ?? 0) <= -20 ? 'Fatigued' : 'Neutral';
   const tsbColor = (fitness?.tsb ?? 0) >= 5 ? 'text-green-400' : (fitness?.tsb ?? 0) <= -20 ? 'text-red-400' : 'text-yellow-400';
@@ -196,6 +199,27 @@ export default function FeedPage() {
             </div>
             <p className="text-[10px] text-gray-600 text-right mt-1 group-hover:text-gray-500 transition-colors">View fitness history →</p>
           </Link>
+        )}
+
+        {/* Week to Date */}
+        {wtd && (
+          <div className="bg-gray-800/60 rounded-2xl p-4">
+            <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-3">Week to Date</p>
+            <div className="grid grid-cols-5 gap-2">
+              {[
+                { label: 'Rides',  value: String(wtd.rides)  },
+                { label: 'km',     value: String(wtd.km)     },
+                { label: 'Hours',  value: String(wtd.hours)  },
+                { label: 'TSS',    value: String(wtd.tss)    },
+                { label: 'Elev m', value: String(wtd.elevation) },
+              ].map(({ label, value }) => (
+                <div key={label} className="text-center">
+                  <p className="text-base font-bold text-white leading-tight">{value}</p>
+                  <p className="text-[10px] text-gray-500 mt-0.5">{label}</p>
+                </div>
+              ))}
+            </div>
+          </div>
         )}
 
         {/* Coaching Insight */}

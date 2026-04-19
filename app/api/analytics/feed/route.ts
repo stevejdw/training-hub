@@ -39,7 +39,7 @@ export async function GET() {
   try {
     await ensurePRTable(client);
 
-    // Parallel: recent rides, daily TSS (for fitness), profile
+    // Parallel: recent rides, daily TSS (for fitness), profile, WTD stats
     const [ridesRes, dailyTssRes, profile] = await Promise.all([
       client.query(`
         SELECT id, name, sport_type, start_date, distance, moving_time,
@@ -59,6 +59,19 @@ export async function GET() {
       `),
       getProfile(),
     ]);
+
+    const tz = profile.timezone || 'Australia/Sydney';
+    const wtdRes = await client.query(`
+      SELECT
+        COUNT(*)                                   AS rides,
+        ROUND(COALESCE(SUM(distance)/1000, 0)::numeric, 1) AS km,
+        ROUND(COALESCE(SUM(moving_time)/3600.0, 0)::numeric, 1) AS hours,
+        COALESCE(SUM(tss), 0)::int                AS tss,
+        ROUND(COALESCE(SUM(total_elevation_gain), 0)::numeric) AS elevation
+      FROM activities
+      WHERE sport_type NOT ILIKE '%walk%'
+        AND start_date >= date_trunc('week', NOW() AT TIME ZONE '${tz}') AT TIME ZONE '${tz}'
+    `);
 
     const dailyTss = dailyTssRes.rows.map(r => ({ date: String(r.date), tss: Number(r.tss) }));
     const fitness = calculateFitness(dailyTss);
@@ -130,12 +143,20 @@ export async function GET() {
       }
     }
 
+    const wtd = wtdRes.rows[0];
     return Response.json({
       recentRides: ridesRes.rows,
       nextEvent: nextEvent ? { ...nextEvent, daysAway } : null,
       fitness,
       powerHighlights,
       lastCyclingRideId: lastCyclingRide?.id ?? null,
+      wtd: {
+        rides:     Number(wtd.rides),
+        km:        Number(wtd.km),
+        hours:     Number(wtd.hours),
+        tss:       Number(wtd.tss),
+        elevation: Number(wtd.elevation),
+      },
     });
   } catch (err) {
     console.error('Analytics feed error:', err);
