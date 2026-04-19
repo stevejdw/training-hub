@@ -61,6 +61,20 @@ export async function GET() {
     ]);
 
     const tz = profile.timezone || 'Australia/Sydney';
+
+    // Next non-rest training day from the active plan
+    const nextSessionRes = await client.query(`
+      SELECT d.id, d.date, d.title, d.type, d.duration_min, d.tss_target, d.description
+      FROM training_days d
+      JOIN training_plans p ON p.id = d.plan_id
+      WHERE p.id = (SELECT id FROM training_plans ORDER BY created_at DESC LIMIT 1)
+        AND d.date >= (NOW() AT TIME ZONE '${tz}')::date
+        AND d.type != 'rest'
+      ORDER BY d.date
+      LIMIT 1
+    `);
+    const nextSession = nextSessionRes.rows[0] ?? null;
+
     const wtdRes = await client.query(`
       SELECT
         COUNT(*)                                   AS rides,
@@ -147,6 +161,7 @@ export async function GET() {
     return Response.json({
       recentRides: ridesRes.rows,
       nextEvent: nextEvent ? { ...nextEvent, daysAway } : null,
+      nextSession,
       fitness,
       powerHighlights,
       lastCyclingRideId: lastCyclingRide?.id ?? null,

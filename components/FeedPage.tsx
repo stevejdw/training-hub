@@ -34,9 +34,20 @@ interface PowerHighlight {
 
 interface WTD { rides: number; km: number; hours: number; tss: number; elevation: number }
 
+interface NextSession {
+  id: number;
+  date: string;
+  title: string;
+  type: string;
+  duration_min: number | null;
+  tss_target: number | null;
+  description: string | null;
+}
+
 interface FeedData {
   recentRides: RecentRide[];
   nextEvent: { name: string; date: string; goal: string; daysAway: number } | null;
+  nextSession: NextSession | null;
   fitness: { ctl: number; atl: number; tsb: number };
   powerHighlights: PowerHighlight[];
   lastCyclingRideId: number | null;
@@ -84,6 +95,17 @@ function LazyMap({ polyline }: { polyline: string }) {
     </div>
   );
 }
+
+const FEED_CACHE_KEY = 'feed-data-v1';
+
+const SESSION_TYPE_COLOR: Record<string, string> = {
+  recovery:   '#34d399',
+  endurance:  '#60a5fa',
+  tempo:      '#facc15',
+  threshold:  '#f97316',
+  vo2max:     '#ef4444',
+  race:       '#a78bfa',
+};
 
 const CACHE_KEY = 'coaching-insight-v1';
 
@@ -133,93 +155,155 @@ function CoachingTip() {
 }
 
 export default function FeedPage() {
-  const [data,    setData]    = useState<FeedData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<FeedData | null>(() => {
+    // Hydrate from cache instantly — no loading flicker
+    if (typeof window === 'undefined') return null;
+    try {
+      const cached = localStorage.getItem(FEED_CACHE_KEY);
+      return cached ? JSON.parse(cached) : null;
+    } catch { return null; }
+  });
+  const [loading, setLoading] = useState(!data);
 
   useEffect(() => {
     fetch('/api/analytics/feed')
       .then(r => r.json())
-      .then(d => { setData(d); setLoading(false); })
+      .then(d => {
+        setData(d);
+        setLoading(false);
+        try { localStorage.setItem(FEED_CACHE_KEY, JSON.stringify(d)); } catch { /* ignore */ }
+      })
       .catch(() => setLoading(false));
   }, []);
 
-  if (loading) {
+  if (loading && !data) {
     return (
       <div className="h-full overflow-y-auto scroll-touch">
         <div className="max-w-2xl mx-auto px-4 py-4 space-y-4">
-          {[1,2,3,4].map(i => <div key={i} className="bg-gray-800 rounded-2xl h-28 animate-pulse" />)}
+          <div className="h-28 bg-gray-800 rounded-2xl animate-pulse" />
+          <div className="h-16 bg-gray-800 rounded-2xl animate-pulse" />
+          <div className="h-20 bg-gray-800 rounded-2xl animate-pulse" />
+          <div className="h-24 bg-gray-800 rounded-2xl animate-pulse" />
         </div>
       </div>
     );
   }
 
-  const { recentRides = [], nextEvent, fitness, powerHighlights = [], wtd } = data ?? {};
+  const { recentRides = [], nextEvent, nextSession, fitness, powerHighlights = [], wtd } = data ?? {};
   const newPRs   = powerHighlights.filter(p => p.isNew);
   const tsbLabel = (fitness?.tsb ?? 0) >= 5 ? 'Fresh' : (fitness?.tsb ?? 0) <= -20 ? 'Fatigued' : 'Neutral';
   const tsbColor = (fitness?.tsb ?? 0) >= 5 ? 'text-green-400' : (fitness?.tsb ?? 0) <= -20 ? 'text-red-400' : 'text-yellow-400';
 
+  const sessionColor = nextSession ? (SESSION_TYPE_COLOR[nextSession.type] ?? '#9ca3af') : '#9ca3af';
+
+  // Format session date relative to today
+  function sessionDateLabel(dateStr: string) {
+    const today = new Date(); today.setHours(0,0,0,0);
+    const d = new Date(dateStr + 'T00:00:00'); d.setHours(0,0,0,0);
+    const diff = Math.round((d.getTime() - today.getTime()) / 86400000);
+    if (diff === 0) return 'Today';
+    if (diff === 1) return 'Tomorrow';
+    return d.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' });
+  }
+
   return (
     <div className="h-full overflow-y-auto scroll-touch">
-      <div className="max-w-2xl mx-auto px-4 py-4 space-y-4 pb-8">
+      <div className="max-w-2xl mx-auto px-4 py-4 space-y-3 pb-8">
 
-        {/* Next Event countdown */}
-        {nextEvent && (
-          <div className="bg-gradient-to-r from-orange-500/10 to-orange-500/5 rounded-2xl p-4 border border-orange-500/25">
-            <div className="flex items-center justify-between">
-              <div className="min-w-0">
-                <p className="text-[10px] font-semibold text-orange-400 uppercase tracking-wider mb-0.5">Next Event</p>
-                <p className="text-base font-bold text-white truncate">{nextEvent.name}</p>
-                {nextEvent.goal && <p className="text-xs text-gray-400 mt-0.5">Goal: {nextEvent.goal}</p>}
-              </div>
-              <div className="text-right flex-shrink-0 ml-4">
-                <span className="text-3xl font-black text-orange-400">{nextEvent.daysAway}</span>
-                <p className="text-xs text-gray-400">days away</p>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Row 1: Next Training Session (left) + Next Event badge (top-right) */}
+        <div className="flex gap-3 items-stretch">
 
-        {/* Fitness snapshot — links to Fitness tab in Analytics */}
-        {fitness && (
-          <Link href="/fitness" className="block group">
-            <div className="grid grid-cols-3 gap-2">
-              <div className="bg-gray-800/60 rounded-xl p-3 text-center group-hover:bg-gray-700/60 transition-colors">
-                <p className="text-[10px] text-gray-500 uppercase tracking-wider">Fitness (CTL)</p>
-                <p className="text-xl font-bold text-blue-400">{fitness.ctl}</p>
-              </div>
-              <div className="bg-gray-800/60 rounded-xl p-3 text-center group-hover:bg-gray-700/60 transition-colors">
-                <p className="text-[10px] text-gray-500 uppercase tracking-wider">Fatigue (ATL)</p>
-                <p className="text-xl font-bold text-purple-400">{fitness.atl}</p>
-              </div>
-              <div className="bg-gray-800/60 rounded-xl p-3 text-center group-hover:bg-gray-700/60 transition-colors">
-                <p className="text-[10px] text-gray-500 uppercase tracking-wider">Form (TSB)</p>
-                <p className={`text-xl font-bold ${tsbColor}`}>{fitness.tsb > 0 ? '+' : ''}{fitness.tsb}</p>
-                <p className={`text-[10px] ${tsbColor}`}>{tsbLabel}</p>
-              </div>
-            </div>
-            <p className="text-[10px] text-gray-600 text-right mt-1 group-hover:text-gray-500 transition-colors">View fitness history →</p>
+          {/* Next Training Session */}
+          <Link
+            href="/training?tab=plan"
+            className={`flex-1 min-w-0 rounded-2xl p-4 border transition-colors group ${
+              nextSession ? 'bg-gray-800/70 border-gray-700/60 hover:border-gray-600' : 'bg-gray-800/40 border-gray-800'
+            }`}
+          >
+            <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-2">Next Session</p>
+            {nextSession ? (
+              <>
+                <div className="flex items-center gap-2 mb-1.5">
+                  <span
+                    className="px-2 py-0.5 rounded text-[10px] font-semibold flex-shrink-0 capitalize"
+                    style={{ background: sessionColor + '22', color: sessionColor }}
+                  >
+                    {nextSession.type}
+                  </span>
+                  <span className="text-[11px] text-gray-500">{sessionDateLabel(nextSession.date)}</span>
+                </div>
+                <p className="text-sm font-bold text-white group-hover:text-orange-300 transition-colors leading-snug">
+                  {nextSession.title}
+                </p>
+                <div className="flex items-center gap-3 mt-1.5 text-[11px] text-gray-500">
+                  {nextSession.duration_min && <span>{nextSession.duration_min} min</span>}
+                  {nextSession.tss_target && <span>{nextSession.tss_target} TSS</span>}
+                </div>
+                {nextSession.description && (
+                  <p className="text-xs text-gray-500 mt-1.5 line-clamp-2 leading-relaxed">
+                    {nextSession.description}
+                  </p>
+                )}
+              </>
+            ) : (
+              <p className="text-sm text-gray-600">No plan active</p>
+            )}
           </Link>
-        )}
+
+          {/* Next Event — compact badge */}
+          {nextEvent && (
+            <div className="flex-shrink-0 w-24 rounded-2xl p-3 bg-orange-500/10 border border-orange-500/25 flex flex-col items-center justify-center text-center gap-0.5">
+              <p className="text-[9px] font-semibold text-orange-400 uppercase tracking-wider">Event</p>
+              <p className="text-2xl font-black text-orange-400 leading-none">{nextEvent.daysAway}</p>
+              <p className="text-[9px] text-orange-400/70">days</p>
+              <p className="text-[10px] text-gray-400 font-medium mt-1 leading-tight line-clamp-2">{nextEvent.name}</p>
+            </div>
+          )}
+        </div>
 
         {/* Week to Date */}
         {wtd && (
-          <div className="bg-gray-800/60 rounded-2xl p-4">
-            <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-3">Week to Date</p>
-            <div className="grid grid-cols-5 gap-2">
+          <div className="bg-gray-800/60 rounded-2xl px-4 py-3">
+            <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-2">Week to Date</p>
+            <div className="grid grid-cols-5 gap-1">
               {[
-                { label: 'Rides',  value: String(wtd.rides)  },
-                { label: 'km',     value: String(wtd.km)     },
-                { label: 'Hours',  value: String(wtd.hours)  },
-                { label: 'TSS',    value: String(wtd.tss)    },
-                { label: 'Elev m', value: String(wtd.elevation) },
+                { label: 'Rides',  value: String(wtd.rides)      },
+                { label: 'km',     value: String(wtd.km)         },
+                { label: 'Hours',  value: String(wtd.hours)      },
+                { label: 'TSS',    value: String(wtd.tss)        },
+                { label: 'Elev m', value: String(wtd.elevation)  },
               ].map(({ label, value }) => (
                 <div key={label} className="text-center">
-                  <p className="text-base font-bold text-white leading-tight">{value}</p>
+                  <p className="text-sm font-bold text-white leading-tight">{value}</p>
                   <p className="text-[10px] text-gray-500 mt-0.5">{label}</p>
                 </div>
               ))}
             </div>
           </div>
+        )}
+
+        {/* Fitness snapshot */}
+        {fitness && (
+          <Link href="/fitness" className="block group">
+            <div className="bg-gray-800/60 rounded-2xl px-4 py-3">
+              <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-2">Fitness</p>
+              <div className="grid grid-cols-3 gap-2">
+                <div className="text-center">
+                  <p className="text-xl font-bold text-blue-400">{fitness.ctl}</p>
+                  <p className="text-[10px] text-gray-500 mt-0.5">Fitness (CTL)</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-xl font-bold text-purple-400">{fitness.atl}</p>
+                  <p className="text-[10px] text-gray-500 mt-0.5">Fatigue (ATL)</p>
+                </div>
+                <div className="text-center">
+                  <p className={`text-xl font-bold ${tsbColor}`}>{fitness.tsb > 0 ? '+' : ''}{fitness.tsb}</p>
+                  <p className={`text-[10px] mt-0.5 ${tsbColor}`}>{tsbLabel}</p>
+                </div>
+              </div>
+              <p className="text-[10px] text-gray-700 text-right mt-1.5 group-hover:text-gray-500 transition-colors">View fitness history →</p>
+            </div>
+          </Link>
         )}
 
         {/* Coaching Insight */}
