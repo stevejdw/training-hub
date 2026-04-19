@@ -200,28 +200,6 @@ function TrainingTab() {
         </button>
       </div>
 
-      {/* Sport filters */}
-      <div className="flex gap-2 flex-wrap">
-        {TYPE_FILTERS.map(f => (
-          <button
-            key={f}
-            onClick={() => toggleFilter(f)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-              selected.includes(f)
-                ? 'bg-orange-500 text-white'
-                : 'bg-gray-800 text-gray-400 hover:text-white'
-            }`}
-          >
-            {f}
-          </button>
-        ))}
-        {selected.length > 0 && (
-          <button onClick={() => setSelected([])} className="px-3 py-1.5 rounded-lg text-xs text-gray-500 hover:text-white transition-colors">
-            Clear
-          </button>
-        )}
-      </div>
-
       {/* Summary cards */}
       {loading && !data ? (
         <div className="grid grid-cols-5 gap-2">
@@ -323,7 +301,39 @@ function TrainingTab() {
         )}
       </div>
 
-      {/* Period selector — below chart */}
+      {/* Sport filters */}
+      <div className="flex gap-2 flex-wrap">
+        {TYPE_FILTERS.map(f => (
+          <button
+            key={f}
+            onClick={() => toggleFilter(f)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              selected.includes(f)
+                ? 'bg-orange-500 text-white'
+                : 'bg-gray-800 text-gray-400 hover:text-white'
+            }`}
+          >
+            {f}
+          </button>
+        ))}
+        {selected.length > 0 && (
+          <button onClick={() => setSelected([])} className="px-3 py-1.5 rounded-lg text-xs text-gray-500 hover:text-white transition-colors">
+            Clear
+          </button>
+        )}
+      </div>
+
+      {/* Legend */}
+      <div className="flex gap-3 flex-wrap">
+        {CYCLING_TYPES.map(type => (
+          <div key={type} className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ background: sportColor(type) }} />
+            <span className="text-xs text-gray-400">{sportLabel(type)}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Period selector — at the bottom */}
       <div className="flex bg-gray-800 rounded-xl p-1 gap-1">
         {(['week', 'month', 'year'] as Period[]).map(p => (
           <button
@@ -335,16 +345,6 @@ function TrainingTab() {
           >
             {p === 'week' ? 'Week' : p === 'month' ? 'Month' : 'Year'}
           </button>
-        ))}
-      </div>
-
-      {/* Legend */}
-      <div className="flex gap-3 flex-wrap">
-        {CYCLING_TYPES.map(type => (
-          <div key={type} className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ background: sportColor(type) }} />
-            <span className="text-xs text-gray-400">{sportLabel(type)}</span>
-          </div>
         ))}
       </div>
     </div>
