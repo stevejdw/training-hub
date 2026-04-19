@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import TrainingPlansSettings from './training/TrainingPlansSettings';
 import EventPacingModal from './EventPacingModal';
-import { AthleteProfile, EventGoal } from '@/lib/profile';
+import { AthleteProfile, EventGoal, PowerTarget } from '@/lib/profile';
 import { type ThemePreference, getThemePreference, setThemePreference } from './ThemeProvider';
 import { fmtTime } from '@/lib/pacing';
 
@@ -95,6 +95,31 @@ export default function ProfileEditor() {
   }
   function removeGoal(i: number) {
     setProfile(prev => prev ? { ...prev, goals: (prev.goals ?? []).filter((_, idx) => idx !== i) } : prev);
+  }
+
+  // Power targets
+  function addPowerTarget() {
+    const newTarget: PowerTarget = {
+      id: String(Date.now()),
+      label: '5 min',
+      seconds: 300,
+      repeats: undefined,
+      target_watts: 300,
+      notes: '',
+    };
+    setProfile(prev => prev ? { ...prev, power_targets: [...(prev.power_targets ?? []), newTarget] } : prev);
+  }
+  function updatePowerTarget(i: number, field: keyof PowerTarget, value: unknown) {
+    setProfile(prev => {
+      if (!prev) return prev;
+      const power_targets = (prev.power_targets ?? []).map((t, idx) =>
+        idx === i ? { ...t, [field]: value } : t
+      );
+      return { ...prev, power_targets };
+    });
+  }
+  function removePowerTarget(i: number) {
+    setProfile(prev => prev ? { ...prev, power_targets: (prev.power_targets ?? []).filter((_, idx) => idx !== i) } : prev);
   }
 
   // Events
@@ -462,6 +487,101 @@ export default function ProfileEditor() {
           {/* ── EVENTS & GOALS TAB ── */}
           {tab === 'events' && (
             <>
+              {/* Power Efforts */}
+              <div className="bg-gray-900 rounded-xl p-5 space-y-3 border border-gray-800">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Power Efforts</h2>
+                    <p className="text-xs text-gray-600 mt-0.5">Drives the Performance chart. Up to 5 shown; defaults fill any gaps.</p>
+                  </div>
+                  {(profile.power_targets ?? []).length < 5 && (
+                    <button onClick={addPowerTarget} className="text-sm text-orange-400 hover:text-orange-300 transition-colors">
+                      + Add
+                    </button>
+                  )}
+                </div>
+
+                {(profile.power_targets ?? []).length === 0 && (
+                  <p className="text-sm text-gray-600 py-1">Using defaults: 3, 5, 10, 20, 30 min.</p>
+                )}
+
+                <div className="space-y-2">
+                  {(profile.power_targets ?? []).map((t, i) => (
+                    <div key={t.id} className="grid grid-cols-[1fr_80px_80px_80px_auto] gap-2 items-end">
+                      {/* Duration select */}
+                      <div>
+                        {i === 0 && <div className="text-[10px] text-gray-600 mb-1 uppercase tracking-wider">Duration</div>}
+                        <select
+                          value={t.seconds}
+                          onChange={e => {
+                            const s = Number(e.target.value);
+                            const labels: Record<number,string> = {
+                              60:'1 min',120:'2 min',180:'3 min',300:'5 min',480:'8 min',
+                              600:'10 min',900:'15 min',1200:'20 min',1800:'30 min',
+                              2700:'45 min',3600:'60 min',
+                            };
+                            updatePowerTarget(i, 'seconds', s);
+                            updatePowerTarget(i, 'label', labels[s] ?? `${Math.round(s/60)} min`);
+                          }}
+                          className={inputCls}
+                        >
+                          {[
+                            [60,'1 min'],[120,'2 min'],[180,'3 min'],[300,'5 min'],
+                            [480,'8 min'],[600,'10 min'],[900,'15 min'],[1200,'20 min'],
+                            [1800,'30 min'],[2700,'45 min'],[3600,'60 min'],
+                          ].map(([s, l]) => (
+                            <option key={s} value={s}>{l}</option>
+                          ))}
+                        </select>
+                      </div>
+                      {/* Repeats */}
+                      <div>
+                        {i === 0 && <div className="text-[10px] text-gray-600 mb-1 uppercase tracking-wider">Reps</div>}
+                        <input
+                          type="number"
+                          value={t.repeats ?? ''}
+                          onChange={e => updatePowerTarget(i, 'repeats', e.target.value ? Number(e.target.value) : undefined)}
+                          className={inputCls}
+                          placeholder="e.g. 3"
+                          min={1}
+                          max={20}
+                        />
+                      </div>
+                      {/* Target watts */}
+                      <div>
+                        {i === 0 && <div className="text-[10px] text-gray-600 mb-1 uppercase tracking-wider">Target W</div>}
+                        <input
+                          type="number"
+                          value={t.target_watts}
+                          onChange={e => updatePowerTarget(i, 'target_watts', Number(e.target.value))}
+                          className={inputCls}
+                          placeholder="W"
+                          min={50}
+                          max={2000}
+                        />
+                      </div>
+                      {/* Notes */}
+                      <div>
+                        {i === 0 && <div className="text-[10px] text-gray-600 mb-1 uppercase tracking-wider">Notes</div>}
+                        <input
+                          type="text"
+                          value={t.notes}
+                          onChange={e => updatePowerTarget(i, 'notes', e.target.value)}
+                          className={inputCls}
+                          placeholder="optional"
+                        />
+                      </div>
+                      <button
+                        onClick={() => removePowerTarget(i)}
+                        className={`text-gray-600 hover:text-red-400 transition-colors text-xs px-1 py-2 ${i === 0 ? 'mt-5' : ''}`}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               {/* Goals */}
               <div className="bg-gray-900 rounded-xl p-5 space-y-3 border border-gray-800">
                 <div className="flex items-center justify-between">

@@ -39,8 +39,9 @@ export interface EventGoal {
 
 export interface PowerTarget {
   id: string;
-  label: string;       // e.g. "5 min", "20 min", "1 hour"
+  label: string;       // e.g. "5 min", "20 min"
   seconds: number;
+  repeats?: number;    // e.g. 3 for "3×5 min"
   target_watts: number;
   notes: string;
 }

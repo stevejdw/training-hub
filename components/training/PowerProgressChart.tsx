@@ -6,37 +6,22 @@ import {
   Tooltip, ResponsiveContainer, ReferenceLine,
 } from 'recharts';
 
-interface WeekPoint {
-  week_start: string;
-  d5min:  number | null;
-  d10min: number | null;
-  d20min: number | null;
-  d60min: number | null;
-}
-
 interface Target {
   key:          string;
   label:        string;
   seconds:      number;
+  repeats:      number | null;
   target_watts: number;
+  color:        string;
   source:       'profile' | 'ftp';
 }
 
 interface PowerData {
-  weekly:  WeekPoint[];
-  current: { d5min: number | null; d10min: number | null; d20min: number | null; d60min: number | null };
+  weekly:  Record<string, number | string | null>[];
+  current: Record<string, number | null>;
   targets: Target[];
   ftp:     number;
 }
-
-const DURATIONS = [
-  { key: 'd5min',  label: '5 min',  color: '#ef4444' },
-  { key: 'd10min', label: '10 min', color: '#f97316' },
-  { key: 'd20min', label: '20 min', color: '#eab308' },
-  { key: 'd60min', label: '60 min', color: '#60a5fa' },
-] as const;
-
-type DKey = typeof DURATIONS[number]['key'];
 
 function fmtWeek(iso: string) {
   const [y, m, d] = iso.split('-').map(Number);
@@ -64,17 +49,24 @@ export default function PowerProgressChart() {
   const [data,    setData]    = useState<PowerData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState<string | null>(null);
-  const [shown,   setShown]   = useState<Set<DKey>>(new Set(['d10min', 'd20min']));
+  const [shown,   setShown]   = useState<Set<string> | null>(null);
 
   useEffect(() => {
     fetch('/api/training/power-progress')
       .then(r => r.json())
-      .then(d => { if (d.error) setError(d.error); else setData(d); })
+      .then(d => {
+        if (d.error) { setError(d.error); return; }
+        setData(d);
+        // Default: show middle 2 durations
+        const keys = (d.targets as Target[]).map(t => t.key);
+        const mid = Math.floor(keys.length / 2);
+        setShown(new Set(keys.slice(Math.max(0, mid - 1), mid + 1)));
+      })
       .catch(e => setError(String(e)))
       .finally(() => setLoading(false));
   }, []);
 
-  function toggleDuration(key: DKey) {
+  function toggleDuration(key: string) {
     setShown(prev => {
       const next = new Set(prev);
       if (next.has(key)) { if (next.size > 1) next.delete(key); }
@@ -86,19 +78,16 @@ export default function PowerProgressChart() {
   if (loading) {
     return (
       <div className="space-y-3">
-        <div className="grid grid-cols-4 gap-2">
-          {[1,2,3,4].map(i => <div key={i} className="h-20 bg-gray-800 rounded-xl animate-pulse" />)}
+        <div className="grid grid-cols-5 gap-2">
+          {[1,2,3,4,5].map(i => <div key={i} className="h-20 bg-gray-800 rounded-xl animate-pulse" />)}
         </div>
         <div className="h-52 bg-gray-800 rounded-xl animate-pulse" />
       </div>
     );
   }
 
-  if (error) {
-    return <p className="text-red-400 text-xs px-1">{error}</p>;
-  }
-
-  if (!data || (!data.weekly.length && !data.current.d5min)) {
+  if (error) return <p className="text-red-400 text-xs px-1">{error}</p>;
+  if (!data || !data.targets.length) {
     return (
       <div className="bg-gray-800/40 border border-gray-700 border-dashed rounded-xl p-6 text-center">
         <p className="text-sm text-gray-500">No power stream data yet</p>
@@ -107,65 +96,62 @@ export default function PowerProgressChart() {
     );
   }
 
-  const targetMap = new Map(data.targets.map(t => [t.key, t]));
+  const visibleKeys = shown ?? new Set(data.targets.map(t => t.key));
 
-  // Y axis domain — cover all visible lines + targets with some headroom
+  // Y axis domain
   const allVals: number[] = [];
   for (const w of data.weekly) {
-    for (const d of DURATIONS) {
-      if (shown.has(d.key)) {
-        const v = w[d.key as keyof WeekPoint];
+    for (const t of data.targets) {
+      if (visibleKeys.has(t.key)) {
+        const v = w[t.key];
         if (typeof v === 'number') allVals.push(v);
       }
     }
   }
-  for (const d of DURATIONS) {
-    if (shown.has(d.key)) {
-      const t = targetMap.get(d.key);
-      if (t) allVals.push(t.target_watts);
-      const cur = data.current[d.key as keyof typeof data.current];
+  for (const t of data.targets) {
+    if (visibleKeys.has(t.key)) {
+      allVals.push(t.target_watts);
+      const cur = data.current[t.key];
       if (typeof cur === 'number') allVals.push(cur);
     }
   }
   const yMin = allVals.length ? Math.floor((Math.min(...allVals) - 20) / 10) * 10 : 200;
   const yMax = allVals.length ? Math.ceil( (Math.max(...allVals) + 20) / 10) * 10 : 500;
 
-  // Chart data — ensure week labels are human-readable
-  const chartData = data.weekly.map(w => ({
-    ...w,
-    week: fmtWeek(w.week_start),
-  }));
+  const chartData = data.weekly.map(w => ({ ...w, week: fmtWeek(String(w.week_start)) }));
+
+  const cols = Math.min(data.targets.length, 5);
+  const gridCols = cols === 5 ? 'grid-cols-5' : cols === 4 ? 'grid-cols-4' : cols === 3 ? 'grid-cols-3' : 'grid-cols-2';
 
   return (
     <div className="space-y-3">
 
       {/* Progress cards */}
-      <div className="grid grid-cols-4 gap-2">
-        {DURATIONS.map(d => {
-          const target  = targetMap.get(d.key);
-          const current = data.current[d.key as keyof typeof data.current];
-          const pct     = (current && target) ? Math.min((current / target.target_watts) * 100, 120) : null;
+      <div className={`grid ${gridCols} gap-2`}>
+        {data.targets.map(t => {
+          const current = data.current[t.key];
+          const pct     = (typeof current === 'number') ? Math.min((current / t.target_watts) * 100, 120) : null;
           const achieved = pct != null && pct >= 100;
-          const isShown  = shown.has(d.key);
+          const isShown  = visibleKeys.has(t.key);
 
           return (
             <button
-              key={d.key}
-              onClick={() => toggleDuration(d.key)}
+              key={t.key}
+              onClick={() => toggleDuration(t.key)}
               className={`rounded-xl p-3 text-left transition-colors border ${
-                isShown
-                  ? 'bg-gray-800 border-gray-600'
-                  : 'bg-gray-900/60 border-gray-800 opacity-60'
+                isShown ? 'bg-gray-800 border-gray-600' : 'bg-gray-900/60 border-gray-800 opacity-60'
               }`}
             >
-              {/* Duration label */}
+              {/* Duration + repeats label */}
               <div className="flex items-center gap-1.5 mb-2">
-                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: d.color }} />
-                <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">{d.label}</span>
+                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: t.color }} />
+                <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider leading-tight">
+                  {t.repeats ? `${t.repeats}×` : ''}{t.label}
+                </span>
               </div>
 
               {/* Current watts */}
-              {current != null ? (
+              {typeof current === 'number' ? (
                 <p className="text-xl font-bold leading-none" style={{ color: achieved ? '#4ade80' : 'white' }}>
                   {current}<span className="text-xs font-normal text-gray-500 ml-0.5">W</span>
                 </p>
@@ -173,33 +159,23 @@ export default function PowerProgressChart() {
                 <p className="text-sm text-gray-600">No data</p>
               )}
 
-              {/* Target + gap */}
-              {target && (
-                <>
-                  <p className="text-[10px] text-gray-500 mt-1">
-                    Target: {target.target_watts}W
-                    {target.source === 'ftp' && <span className="ml-1 text-gray-700">FTP</span>}
+              {/* Target + progress */}
+              <p className="text-[10px] text-gray-500 mt-1">
+                Target: {t.target_watts}W
+                {t.source === 'ftp' && <span className="ml-1 text-gray-700">est.</span>}
+              </p>
+              {typeof current === 'number' && (
+                <div className="mt-1.5">
+                  <div className="h-1 rounded-full bg-gray-700 overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all"
+                      style={{ width: `${Math.min(pct ?? 0, 100)}%`, background: achieved ? '#4ade80' : t.color }}
+                    />
+                  </div>
+                  <p className={`text-[10px] mt-0.5 font-medium ${achieved ? 'text-green-400' : 'text-gray-500'}`}>
+                    {achieved ? `+${current - t.target_watts}W ✓` : `${t.target_watts - current}W to go`}
                   </p>
-                  {current != null && (
-                    <div className="mt-1.5">
-                      {/* Progress bar */}
-                      <div className="h-1 rounded-full bg-gray-700 overflow-hidden">
-                        <div
-                          className="h-full rounded-full transition-all"
-                          style={{
-                            width: `${Math.min(pct ?? 0, 100)}%`,
-                            background: achieved ? '#4ade80' : d.color,
-                          }}
-                        />
-                      </div>
-                      <p className={`text-[10px] mt-0.5 font-medium ${achieved ? 'text-green-400' : 'text-gray-500'}`}>
-                        {achieved
-                          ? `+${current - target.target_watts}W ✓`
-                          : `${target.target_watts - current}W to go`}
-                      </p>
-                    </div>
-                  )}
-                </>
+                </div>
               )}
             </button>
           );
@@ -229,32 +205,26 @@ export default function PowerProgressChart() {
               />
               <Tooltip content={<ChartTooltip />} cursor={{ stroke: '#374151', strokeWidth: 1 }} />
 
-              {/* Target reference lines */}
-              {DURATIONS.filter(d => shown.has(d.key)).map(d => {
-                const t = targetMap.get(d.key);
-                if (!t) return null;
-                return (
-                  <ReferenceLine
-                    key={`target-${d.key}`}
-                    y={t.target_watts}
-                    stroke={d.color}
-                    strokeDasharray="6 3"
-                    strokeOpacity={0.5}
-                    strokeWidth={1.5}
-                  />
-                );
-              })}
+              {data.targets.filter(t => visibleKeys.has(t.key)).map(t => (
+                <ReferenceLine
+                  key={`target-${t.key}`}
+                  y={t.target_watts}
+                  stroke={t.color}
+                  strokeDasharray="6 3"
+                  strokeOpacity={0.5}
+                  strokeWidth={1.5}
+                />
+              ))}
 
-              {/* Power lines */}
-              {DURATIONS.filter(d => shown.has(d.key)).map(d => (
+              {data.targets.filter(t => visibleKeys.has(t.key)).map(t => (
                 <Line
-                  key={d.key}
+                  key={t.key}
                   type="monotone"
-                  dataKey={d.key}
-                  name={d.label}
-                  stroke={d.color}
+                  dataKey={t.key}
+                  name={t.label}
+                  stroke={t.color}
                   strokeWidth={2}
-                  dot={{ fill: d.color, r: 3, strokeWidth: 0 }}
+                  dot={{ fill: t.color, r: 3, strokeWidth: 0 }}
                   activeDot={{ r: 5 }}
                   connectNulls={false}
                 />
@@ -262,18 +232,14 @@ export default function PowerProgressChart() {
             </LineChart>
           </ResponsiveContainer>
 
-          {/* Legend */}
           <div className="flex items-center gap-4 flex-wrap mt-2">
-            {DURATIONS.filter(d => shown.has(d.key)).map(d => {
-              const t = targetMap.get(d.key);
-              return (
-                <div key={d.key} className="flex items-center gap-1.5">
-                  <span className="w-3 h-0.5 inline-block rounded" style={{ background: d.color }} />
-                  <span className="text-[10px] text-gray-400">{d.label}</span>
-                  {t && <span className="text-[10px] text-gray-600">— — {t.target_watts}W target</span>}
-                </div>
-              );
-            })}
+            {data.targets.filter(t => visibleKeys.has(t.key)).map(t => (
+              <div key={t.key} className="flex items-center gap-1.5">
+                <span className="w-3 h-0.5 inline-block rounded" style={{ background: t.color }} />
+                <span className="text-[10px] text-gray-400">{t.repeats ? `${t.repeats}×` : ''}{t.label}</span>
+                <span className="text-[10px] text-gray-600">— — {t.target_watts}W</span>
+              </div>
+            ))}
           </div>
         </div>
       )}
