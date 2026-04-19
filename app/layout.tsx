@@ -11,7 +11,7 @@ export const metadata: Metadata = {
   description: 'Cycling training analytics and coaching',
   appleWebApp: {
     capable: true,
-    statusBarStyle: 'black-translucent',
+    statusBarStyle: 'black',
     title: 'Training Hub',
   },
 };
@@ -19,7 +19,6 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  viewportFit: 'cover',   // lets content extend under notch/dynamic island
   themeColor: '#030712',
 };
 

@@ -100,7 +100,7 @@ export default function Nav() {
         the physical edge, while padding-bottom pushes the icons back up
         into the visible zone.
       */}
-      <nav className="md:hidden mobile-nav fixed left-0 right-0 z-50 bg-gray-950 border-t border-gray-800">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-gray-950 border-t border-gray-800">
         <div className="flex h-14">
           {links.map(({ href, label, icon }) => {
             const active = pathname.startsWith(href);

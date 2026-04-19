@@ -3,10 +3,6 @@
 :root {
   --background: #030712;
   --foreground: #f9fafb;
-  /* Safe area insets for iPhone notch / home indicator */
-  --sat: env(safe-area-inset-top, 0px);
-  --sab: env(safe-area-inset-bottom, 0px);
-  /* Nav heights */
   --top-nav-h: 64px;
   --bottom-nav-h: 56px;
 }
@@ -44,40 +40,16 @@ body {
 
 @media (max-width: 767px) {
   .content-area {
-    /* Pin content area precisely between status bar and bottom nav.
-       Fixed positioning avoids dvh measurement issues on iOS Safari/PWA. */
     position: fixed;
-    top: env(safe-area-inset-top, 0px);
+    top: 0;
     left: 0;
     right: 0;
-    /* Must match .mobile-nav top: 56px icons + safe-area */
-    bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+    bottom: 56px;
     height: auto;
     overflow: hidden;
   }
 }
 
-/* Mobile bottom nav */
-@media (max-width: 767px) {
-  .mobile-nav {
-    bottom: 0;
-    padding-bottom: env(safe-area-inset-bottom, 0px);
-    /* ::after bleeds the nav background colour below bottom:0, covering
-       whatever gap iOS leaves between the viewport edge and the screen edge */
-    overflow: visible;
-  }
-  .mobile-nav::after {
-    content: '';
-    position: absolute;
-    left: 0;
-    right: 0;
-    /* Sits just below the nav's own bottom edge */
-    top: 100%;
-    /* 100px is far more than any iPhone safe-area-inset-bottom */
-    height: 100px;
-    background: #030712;
-  }
-}
 
 /* Smooth momentum scrolling on iOS for any scroll container */
 .scroll-touch {
