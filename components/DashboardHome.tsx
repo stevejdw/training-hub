@@ -125,14 +125,28 @@ function CustomTooltip({ active, payload, label, metric, unit }: any) {
   );
 }
 
+const CHART_CACHE_KEY = (period: Period, offset: number, filters: string) =>
+  `cache-chart-${period}-${offset}-${filters}`;
+const INITIAL_CHART_KEY = CHART_CACHE_KEY('week', 0, 'All');
+
 function TrainingTab() {
   const [period, setPeriod]   = useState<Period>('week');
   const [offset, setOffset]   = useState(0);
   const [metric, setMetric]   = useState<Metric>('km');
   const [selected, setSelected] = useState<SportFilter[]>([]);
-  const [data, setData]       = useState<ChartResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError]     = useState<string | null>(null);
+  const [data, setData] = useState<ChartResponse | null>(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const s = localStorage.getItem(INITIAL_CHART_KEY);
+      return s ? JSON.parse(s) : null;
+    } catch { return null; }
+  });
+  const [loading, setLoading] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    try { return !localStorage.getItem(INITIAL_CHART_KEY); }
+    catch { return true; }
+  });
+  const [error, setError] = useState<string | null>(null);
 
   function changePeriod(p: Period) { setPeriod(p); setOffset(0); }
 
@@ -143,13 +157,24 @@ function TrainingTab() {
   const filtersParam = selected.length > 0 ? selected.join(',') : 'All';
 
   const load = useCallback(() => {
-    setLoading(true);
+    const cacheKey = CHART_CACHE_KEY(period, offset, filtersParam);
+    let cachedData: ChartResponse | null = null;
+    try {
+      const s = localStorage.getItem(cacheKey);
+      if (s) cachedData = JSON.parse(s);
+    } catch {}
+    if (cachedData) { setData(cachedData); setLoading(false); }
+    else setLoading(true);
     setError(null);
+
     fetch(`/api/dashboard/chart?period=${period}&offset=${offset}&filters=${encodeURIComponent(filtersParam)}`)
       .then(r => r.json())
       .then(d => {
         if (d.error) { setError(d.error); setData(null); }
-        else setData(d);
+        else {
+          setData(d);
+          try { localStorage.setItem(cacheKey, JSON.stringify(d)); } catch {}
+        }
         setLoading(false);
       })
       .catch(e => { setError(String(e)); setLoading(false); });

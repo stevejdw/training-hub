@@ -45,11 +45,36 @@ function ChartTooltip({ active, payload, label }: any) {
   );
 }
 
+const POWER_CACHE_KEY = 'cache-power-progress';
+
+function defaultShown(d: PowerData): Set<string> {
+  const keys = d.targets.map(t => t.key);
+  const mid = Math.floor(keys.length / 2);
+  return new Set(keys.slice(Math.max(0, mid - 1), mid + 1));
+}
+
 export default function PowerProgressChart() {
-  const [data,    setData]    = useState<PowerData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error,   setError]   = useState<string | null>(null);
-  const [shown,   setShown]   = useState<Set<string> | null>(null);
+  const [data, setData] = useState<PowerData | null>(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const s = localStorage.getItem(POWER_CACHE_KEY);
+      return s ? JSON.parse(s) : null;
+    } catch { return null; }
+  });
+  const [loading, setLoading] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    try { return !localStorage.getItem(POWER_CACHE_KEY); }
+    catch { return true; }
+  });
+  const [error, setError] = useState<string | null>(null);
+  const [shown, setShown] = useState<Set<string> | null>(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const s = localStorage.getItem(POWER_CACHE_KEY);
+      if (s) return defaultShown(JSON.parse(s) as PowerData);
+    } catch {}
+    return null;
+  });
 
   useEffect(() => {
     fetch('/api/training/power-progress')
@@ -57,10 +82,8 @@ export default function PowerProgressChart() {
       .then(d => {
         if (d.error) { setError(d.error); return; }
         setData(d);
-        // Default: show middle 2 durations
-        const keys = (d.targets as Target[]).map(t => t.key);
-        const mid = Math.floor(keys.length / 2);
-        setShown(new Set(keys.slice(Math.max(0, mid - 1), mid + 1)));
+        setShown(prev => prev ?? defaultShown(d));
+        try { localStorage.setItem(POWER_CACHE_KEY, JSON.stringify(d)); } catch {}
       })
       .catch(e => setError(String(e)))
       .finally(() => setLoading(false));

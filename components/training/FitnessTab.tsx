@@ -8,16 +8,40 @@ import {
 
 interface FitnessPoint { date: string; atl: number; ctl: number; tsb: number }
 
+const FITNESS_CACHE_KEY = (d: number) => `cache-fitness-${d}`;
+const INITIAL_FITNESS_DAYS = 90;
+
 export default function FitnessTab() {
-  const [data,    setData]    = useState<FitnessPoint[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [days,    setDays]    = useState(90);
+  const [data, setData] = useState<FitnessPoint[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const s = localStorage.getItem(FITNESS_CACHE_KEY(INITIAL_FITNESS_DAYS));
+      return s ? JSON.parse(s) : [];
+    } catch { return []; }
+  });
+  const [loading, setLoading] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    try { return !localStorage.getItem(FITNESS_CACHE_KEY(INITIAL_FITNESS_DAYS)); }
+    catch { return true; }
+  });
+  const [days, setDays] = useState(INITIAL_FITNESS_DAYS);
 
   useEffect(() => {
-    setLoading(true);
+    const cacheKey = FITNESS_CACHE_KEY(days);
+    try {
+      const s = localStorage.getItem(cacheKey);
+      if (s) { setData(JSON.parse(s)); setLoading(false); }
+      else setLoading(true);
+    } catch { setLoading(true); }
+
     fetch(`/api/analytics/fitness?days=${days}`)
       .then(r => r.json())
-      .then(d => { setData(d.data ?? []); setLoading(false); })
+      .then(d => {
+        const arr = d.data ?? [];
+        setData(arr);
+        setLoading(false);
+        try { localStorage.setItem(cacheKey, JSON.stringify(arr)); } catch {}
+      })
       .catch(() => setLoading(false));
   }, [days]);
 

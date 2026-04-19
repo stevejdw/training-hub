@@ -171,16 +171,32 @@ function WeekCard({ week, isFirst }: { week: WeekRow; isFirst: boolean }) {
   );
 }
 
+const SUMMARY_CACHE_KEY = 'cache-weekly-summary';
+
 export default function SummaryTab() {
-  const [weeks, setWeeks] = useState<WeekRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [weeks, setWeeks] = useState<WeekRow[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const s = localStorage.getItem(SUMMARY_CACHE_KEY);
+      return s ? JSON.parse(s) : [];
+    } catch { return []; }
+  });
+  const [loading, setLoading] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    try { return !localStorage.getItem(SUMMARY_CACHE_KEY); }
+    catch { return true; }
+  });
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch('/api/training/weekly-summary')
       .then(r => r.json())
       .then(data => {
-        if (data.error) { setError(data.error); } else { setWeeks(data); }
+        if (data.error) { setError(data.error); }
+        else {
+          setWeeks(data);
+          try { localStorage.setItem(SUMMARY_CACHE_KEY, JSON.stringify(data)); } catch {}
+        }
         setLoading(false);
       })
       .catch(e => { setError(String(e)); setLoading(false); });

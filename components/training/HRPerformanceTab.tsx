@@ -70,17 +70,45 @@ function EffTooltip({ active, payload, label }: any) {
   );
 }
 
+const HR_CACHE_KEY = (w: number) => `cache-hr-performance-${w}`;
+const INITIAL_HR_WEEKS = 16;
+
 export default function HRPerformanceTab() {
-  const [data,    setData]    = useState<HRData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error,   setError]   = useState<string | null>(null);
-  const [weeks,   setWeeks]   = useState(16);
+  const [data, setData] = useState<HRData | null>(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const s = localStorage.getItem(HR_CACHE_KEY(INITIAL_HR_WEEKS));
+      return s ? JSON.parse(s) : null;
+    } catch { return null; }
+  });
+  const [loading, setLoading] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    try { return !localStorage.getItem(HR_CACHE_KEY(INITIAL_HR_WEEKS)); }
+    catch { return true; }
+  });
+  const [error, setError] = useState<string | null>(null);
+  const [weeks, setWeeks] = useState(INITIAL_HR_WEEKS);
 
   useEffect(() => {
-    setLoading(true);
+    const cacheKey = HR_CACHE_KEY(weeks);
+    let cachedData: HRData | null = null;
+    try {
+      const s = localStorage.getItem(cacheKey);
+      if (s) cachedData = JSON.parse(s);
+    } catch {}
+    setData(cachedData);
+    setLoading(!cachedData);
+    setError(null);
+
     fetch(`/api/analytics/hr-performance?weeks=${weeks}`)
       .then(r => r.json())
-      .then(d => { if (d.error) setError(d.error); else setData(d); })
+      .then(d => {
+        if (d.error) setError(d.error);
+        else {
+          setData(d);
+          try { localStorage.setItem(cacheKey, JSON.stringify(d)); } catch {}
+        }
+      })
       .catch(e => setError(String(e)))
       .finally(() => setLoading(false));
   }, [weeks]);

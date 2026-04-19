@@ -63,12 +63,31 @@ function PowerTargetCard({ target }: { target: PowerTarget }) {
   );
 }
 
+const PROFILE_CACHE_KEY = 'cache-profile';
+
 export default function ObjectivesTab() {
-  const [profile, setProfile] = useState<AthleteProfile | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [profile, setProfile] = useState<AthleteProfile | null>(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const s = localStorage.getItem(PROFILE_CACHE_KEY);
+      return s ? JSON.parse(s) : null;
+    } catch { return null; }
+  });
+  const [loading, setLoading] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    try { return !localStorage.getItem(PROFILE_CACHE_KEY); }
+    catch { return true; }
+  });
   const [error, setError] = useState<string | null>(null);
   const [editingNotes, setEditingNotes] = useState(false);
-  const [notesValue, setNotesValue] = useState('');
+  const [notesValue, setNotesValue] = useState(() => {
+    if (typeof window === 'undefined') return '';
+    try {
+      const s = localStorage.getItem(PROFILE_CACHE_KEY);
+      if (s) return (JSON.parse(s) as AthleteProfile).training_notes ?? '';
+    } catch {}
+    return '';
+  });
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -79,6 +98,7 @@ export default function ObjectivesTab() {
         else {
           setProfile(data);
           setNotesValue(data.training_notes ?? '');
+          try { localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(data)); } catch {}
         }
         setLoading(false);
       })
@@ -96,6 +116,7 @@ export default function ObjectivesTab() {
         body: JSON.stringify(updated),
       });
       setProfile(updated);
+      try { localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(updated)); } catch {}
       setEditingNotes(false);
     } finally {
       setSaving(false);

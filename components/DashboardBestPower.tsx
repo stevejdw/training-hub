@@ -52,21 +52,47 @@ interface Result {
   best_watts: number;
 }
 
+const BP_CACHE_KEY = (s: number, d: number) => `cache-best-power-${s}-${d}`;
+const INITIAL_BP_SECONDS = 600;
+const INITIAL_BP_DAYS = 30;
+
 export default function DashboardBestPower() {
-  const [seconds, setSeconds] = useState(600);
-  const [days,    setDays]    = useState(30);
-  const [results, setResults] = useState<Result[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error,   setError]   = useState<string | null>(null);
+  const [seconds, setSeconds] = useState(INITIAL_BP_SECONDS);
+  const [days,    setDays]    = useState(INITIAL_BP_DAYS);
+  const [results, setResults] = useState<Result[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const s = localStorage.getItem(BP_CACHE_KEY(INITIAL_BP_SECONDS, INITIAL_BP_DAYS));
+      return s ? JSON.parse(s) : [];
+    } catch { return []; }
+  });
+  const [loading, setLoading] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    try { return !localStorage.getItem(BP_CACHE_KEY(INITIAL_BP_SECONDS, INITIAL_BP_DAYS)); }
+    catch { return true; }
+  });
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    setLoading(true);
+    const cacheKey = BP_CACHE_KEY(seconds, days);
+    let cachedResults: Result[] | null = null;
+    try {
+      const s = localStorage.getItem(cacheKey);
+      if (s) cachedResults = JSON.parse(s);
+    } catch {}
+    setResults(cachedResults ?? []);
+    setLoading(!cachedResults);
     setError(null);
+
     fetch(`/api/dashboard/best-power?seconds=${seconds}&days=${days}`)
       .then(r => r.json())
       .then(d => {
         if (d.error) { setError(d.error); setResults([]); }
-        else setResults(d.results ?? []);
+        else {
+          const r = d.results ?? [];
+          setResults(r);
+          try { localStorage.setItem(cacheKey, JSON.stringify(r)); } catch {}
+        }
         setLoading(false);
       })
       .catch(e => { setError(String(e)); setLoading(false); });
