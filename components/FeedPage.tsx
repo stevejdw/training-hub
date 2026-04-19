@@ -82,9 +82,12 @@ function LazyMap({ polyline }: { polyline: string }) {
   );
 }
 
+const CACHE_KEY = 'coaching-insight-v1';
+
 function CoachingTip() {
-  const [tip,     setTip]     = useState('');
-  const [loading, setLoading] = useState(true);
+  const cached  = typeof window !== 'undefined' ? localStorage.getItem(CACHE_KEY) ?? '' : '';
+  const [tip,     setTip]     = useState(cached);
+  const [loading, setLoading] = useState(!cached);
   const fetched = useRef(false);
 
   useEffect(() => {
@@ -93,8 +96,13 @@ function CoachingTip() {
 
     fetch('/api/coaching-insight')
       .then(r => r.json())
-      .then(d => { setTip(d.content ?? ''); setLoading(false); })
-      .catch(() => { setTip('Unable to load coaching tip.'); setLoading(false); });
+      .then(d => {
+        const content = d.content ?? '';
+        setTip(content);
+        setLoading(false);
+        if (content) localStorage.setItem(CACHE_KEY, content);
+      })
+      .catch(() => { if (!tip) { setTip('Unable to load coaching tip.'); setLoading(false); } });
   }, []);
 
   return (
