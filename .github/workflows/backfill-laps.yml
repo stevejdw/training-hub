@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       limit:
-        description: 'Number of recent activities to backfill laps for'
+        description: 'Max activities without laps to process (newest first)'
         required: false
-        default: '10'
+        default: '50'
 
 jobs:
   backfill:

@@ -13,7 +13,7 @@ STRAVA_CLIENT_ID = os.environ["STRAVA_CLIENT_ID"]
 STRAVA_CLIENT_SECRET = os.environ["STRAVA_CLIENT_SECRET"]
 STRAVA_REFRESH_TOKEN = os.environ["STRAVA_REFRESH_TOKEN"]
 DATABASE_URL = os.environ["DATABASE_URL"]
-LIMIT = int(os.environ.get("BACKFILL_LIMIT", "10"))
+LIMIT = int(os.environ.get("BACKFILL_LIMIT", "50"))
 
 def get_access_token():
     r = requests.post("https://www.strava.com/oauth/token", data={
@@ -57,13 +57,15 @@ def backfill():
     conn = psycopg2.connect(DATABASE_URL)
     cur = conn.cursor()
 
+    # Only target activities that have no laps stored yet
     cur.execute("""
-        SELECT id, name FROM activities
-        ORDER BY start_date DESC
+        SELECT a.id, a.name FROM activities a
+        WHERE NOT EXISTS (SELECT 1 FROM laps l WHERE l.activity_id = a.id)
+        ORDER BY a.start_date DESC
         LIMIT %s
     """, (LIMIT,))
     activities = cur.fetchall()
-    print(f"Backfilling laps + NP for {len(activities)} activities...")
+    print(f"Found {len(activities)} activities with no laps — backfilling...")
 
     for activity_id, name in activities:
         laps = fetch_laps(token, activity_id)
