@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 import Nav from '@/components/Nav';
+import ThemeProvider from '@/components/ThemeProvider';
 
 const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] });
 const geistMono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin'] });
@@ -26,8 +27,13 @@ const geistFonts = `${geistSans.variable} ${geistMono.variable}`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${geistFonts} antialiased`}>
+    <html lang="en" data-theme="dark" className={`${geistFonts} antialiased`}>
+      {/* Anti-flash: apply stored theme before first paint */}
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: `(function(){try{var p=localStorage.getItem('theme')||'dark';var t=p==='auto'?(new Date().getHours()>=7&&new Date().getHours()<19?'light':'dark'):p;document.documentElement.setAttribute('data-theme',t);}catch(e){}})();` }} />
+      </head>
       <body className="flex flex-col bg-gray-950 text-white">
+        <ThemeProvider />
         {/* Top nav — desktop only */}
         <Nav />
         {/* Main content fills remaining space */}

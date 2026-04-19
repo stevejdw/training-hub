@@ -1,10 +1,31 @@
 @import "tailwindcss";
 
-:root {
+/* ── Dark theme (default) ── */
+:root,
+[data-theme="dark"] {
   --background: #030712;
   --foreground: #f9fafb;
   --top-nav-h: 64px;
   --bottom-nav-h: 56px;
+}
+
+/* ── Light theme ── */
+[data-theme="light"] {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+
+  /* Remap Tailwind gray scale so all existing classes work inverted */
+  --color-white:    #0f172a;   /* text-white → near-black primary text     */
+  --color-gray-950: #f8fafc;   /* page background → off-white              */
+  --color-gray-900: #ffffff;   /* card background → white                  */
+  --color-gray-800: #f1f5f9;   /* secondary card → slate-100               */
+  --color-gray-700: #e2e8f0;   /* tertiary surface → slate-200             */
+  --color-gray-600: #cbd5e1;   /* muted borders → slate-300                */
+  --color-gray-500: #94a3b8;   /* muted text → slate-400                   */
+  --color-gray-400: #64748b;   /* tertiary text → slate-500                */
+  --color-gray-300: #334155;   /* secondary text → slate-700               */
+  --color-gray-200: #1e293b;   /* strong secondary → slate-800             */
+  --color-gray-100: #0f172a;   /* near-black text → slate-900              */
 }
 
 @theme inline {
@@ -30,6 +51,7 @@ body {
   height: 100%;
   overscroll-behavior: none;
   -webkit-text-size-adjust: 100%;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 /* Content area: fills screen minus top nav on desktop, minus bottom nav on mobile */

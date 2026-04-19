@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import TrainingPlansSettings from './training/TrainingPlansSettings';
 import { AthleteProfile, EventGoal } from '@/lib/profile';
+import { type ThemePreference, getThemePreference, setThemePreference } from './ThemeProvider';
 
 const TIMEZONES = [
   { label: 'Sydney / Melbourne (AEST/AEDT)',  value: 'Australia/Sydney'    },
@@ -61,11 +62,18 @@ export default function ProfileEditor() {
   const [eftpData, setEftpData] = useState<EftpData | null>(null);
   const [saving,   setSaving]   = useState(false);
   const [saved,    setSaved]    = useState(false);
+  const [theme,    setTheme]    = useState<ThemePreference>('dark');
 
   useEffect(() => {
     fetch('/api/profile').then(r => r.json()).then(setProfile);
     fetch('/api/profile/eftp-options').then(r => r.json()).then(setEftpData);
+    setTheme(getThemePreference());
   }, []);
+
+  function changeTheme(t: ThemePreference) {
+    setTheme(t);
+    setThemePreference(t);
+  }
 
   function update<K extends keyof AthleteProfile>(key: K, value: AthleteProfile[K]) {
     setProfile(prev => prev ? { ...prev, [key]: value } : prev);
@@ -149,6 +157,53 @@ export default function ProfileEditor() {
           {/* ── PROFILE TAB ── */}
           {tab === 'profile' && (
             <>
+              {/* Appearance */}
+              <div className="bg-gray-900 rounded-xl p-5 space-y-3 border border-gray-800">
+                <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Appearance</h2>
+                <div className="grid grid-cols-3 gap-2">
+                  {/* Dark */}
+                  <button
+                    onClick={() => changeTheme('dark')}
+                    className={`rounded-xl p-3 border-2 transition-colors text-left ${theme === 'dark' ? 'border-orange-500' : 'border-gray-700 hover:border-gray-600'}`}
+                  >
+                    <div className="flex gap-1 mb-2">
+                      <div className="w-4 h-4 rounded bg-gray-950 border border-gray-700" />
+                      <div className="w-4 h-4 rounded bg-gray-800 border border-gray-700" />
+                      <div className="w-4 h-4 rounded bg-gray-700 border border-gray-700" />
+                    </div>
+                    <p className="text-xs font-semibold text-gray-200">Dark</p>
+                    <p className="text-[10px] text-gray-500 mt-0.5">Always dark</p>
+                  </button>
+
+                  {/* Auto */}
+                  <button
+                    onClick={() => changeTheme('auto')}
+                    className={`rounded-xl p-3 border-2 transition-colors text-left ${theme === 'auto' ? 'border-orange-500' : 'border-gray-700 hover:border-gray-600'}`}
+                  >
+                    <div className="flex gap-1 mb-2">
+                      <div className="w-4 h-4 rounded" style={{ background: 'linear-gradient(135deg, #030712 50%, #f8fafc 50%)' }} />
+                      <div className="w-4 h-4 rounded bg-orange-500/30 border border-orange-500/50" />
+                    </div>
+                    <p className="text-xs font-semibold text-gray-200">Auto</p>
+                    <p className="text-[10px] text-gray-500 mt-0.5">7am–7pm light</p>
+                  </button>
+
+                  {/* Light */}
+                  <button
+                    onClick={() => changeTheme('light')}
+                    className={`rounded-xl p-3 border-2 transition-colors text-left ${theme === 'light' ? 'border-orange-500' : 'border-gray-700 hover:border-gray-600'}`}
+                  >
+                    <div className="flex gap-1 mb-2">
+                      <div className="w-4 h-4 rounded bg-white border border-gray-300" />
+                      <div className="w-4 h-4 rounded bg-slate-100 border border-gray-300" />
+                      <div className="w-4 h-4 rounded bg-slate-200 border border-gray-300" />
+                    </div>
+                    <p className="text-xs font-semibold text-gray-200">Light</p>
+                    <p className="text-[10px] text-gray-500 mt-0.5">Always light</p>
+                  </button>
+                </div>
+              </div>
+
               {/* Basic info */}
               <div className="bg-gray-900 rounded-xl p-5 space-y-4 border border-gray-800">
                 <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Basic Info</h2>
