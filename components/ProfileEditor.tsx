@@ -41,12 +41,17 @@ const TIMEZONES = [
   { label: 'UTC',                              value: 'UTC'                 },
 ];
 
-interface EftpOption {
-  name: string;
-  date: string;
-  duration_min: number;
-  np: number;
-  eftp_estimate: number;
+interface EftpEstimate {
+  duration_label: string;
+  best_watts:     number;
+  multiplier:     number;
+  eftp:           number;
+}
+
+interface EftpData {
+  estimates:      EftpEstimate[];
+  best_eftp:      number | null;
+  best_duration:  string | null;
 }
 
 function Field({ label, children, hint }: { label: string; children: React.ReactNode; hint?: string }) {
@@ -65,13 +70,13 @@ const inputCls = 'w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2
 
 export default function ProfileEditor() {
   const [profile, setProfile] = useState<AthleteProfile | null>(null);
-  const [eftpOptions, setEftpOptions] = useState<EftpOption[]>([]);
+  const [eftpData, setEftpData] = useState<EftpData | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     fetch('/api/profile').then(r => r.json()).then(setProfile);
-    fetch('/api/profile/eftp-options').then(r => r.json()).then(setEftpOptions);
+    fetch('/api/profile/eftp-options').then(r => r.json()).then(setEftpData);
   }, []);
 
   function update<K extends keyof AthleteProfile>(key: K, value: AthleteProfile[K]) {
@@ -192,31 +197,46 @@ export default function ProfileEditor() {
         </Field>
 
         {profile.use_eftp && (
-          <Field label="Select eFTP from recent rides" hint="NP × 0.95 for 18–25 min efforts; raw NP for longer rides">
-            <div className="space-y-2 mt-1">
-              {eftpOptions.length === 0 && (
-                <p className="text-sm text-gray-600">No eligible rides in the last 90 days</p>
+          <Field label="eFTP — estimated from best power (last 14 days)">
+            <div className="space-y-3 mt-1">
+
+              {/* Auto-calculated recommendation */}
+              {eftpData && eftpData.best_eftp ? (
+                <div className="rounded-xl border border-orange-500/30 bg-orange-500/5 p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-lg font-bold text-white">{eftpData.best_eftp}<span className="text-sm font-normal text-gray-400 ml-1">W</span></p>
+                      <p className="text-xs text-gray-500">Best estimate · from {eftpData.best_duration} best power</p>
+                    </div>
+                    <button
+                      onClick={() => update('eftp', eftpData.best_eftp)}
+                      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                        profile.eftp === eftpData.best_eftp
+                          ? 'bg-orange-500 text-white'
+                          : 'bg-orange-500/20 text-orange-400 hover:bg-orange-500/30'
+                      }`}
+                    >
+                      {profile.eftp === eftpData.best_eftp ? 'Applied' : 'Use this'}
+                    </button>
+                  </div>
+
+                  {/* Breakdown table */}
+                  <div className="border-t border-orange-500/20 pt-2 space-y-1">
+                    {eftpData.estimates.map(e => (
+                      <div key={e.duration_label} className="flex items-center justify-between text-xs">
+                        <span className="text-gray-500">{e.duration_label} best</span>
+                        <span className="text-gray-400 tabular-nums">{e.best_watts}W × {(e.multiplier * 100).toFixed(0)}% = <span className={e.eftp === eftpData.best_eftp ? 'text-orange-400 font-semibold' : 'text-gray-300'}>{e.eftp}W</span></span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-gray-600 py-1">No power stream data in the last 14 days — run the backfill workflow to load activity streams</p>
               )}
-              {eftpOptions.map((opt, i) => (
-                <button
-                  key={i}
-                  onClick={() => update('eftp', Number(opt.eftp_estimate))}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-lg border text-sm transition-colors ${
-                    profile.eftp === Number(opt.eftp_estimate)
-                      ? 'border-orange-500 bg-orange-500/10 text-white'
-                      : 'border-gray-700 hover:border-gray-600 text-gray-300'
-                  }`}
-                >
-                  <span className="truncate text-left">{opt.name} <span className="text-gray-500">({opt.date})</span></span>
-                  <span className="flex gap-3 flex-shrink-0 ml-3">
-                    <span className="text-gray-500">{opt.duration_min} min</span>
-                    <span className="text-gray-400">NP {opt.np}W</span>
-                    <span className="text-orange-400 font-medium">→ {opt.eftp_estimate}W</span>
-                  </span>
-                </button>
-              ))}
-              <div className="flex items-center gap-2 pt-1">
-                <span className="text-xs text-gray-500">Or enter manually:</span>
+
+              {/* Manual override */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-500 flex-shrink-0">Override manually:</span>
                 <input
                   type="number"
                   value={profile.eftp ?? ''}
@@ -226,6 +246,9 @@ export default function ProfileEditor() {
                   min={100}
                   max={600}
                 />
+                {profile.eftp && eftpData?.best_eftp && profile.eftp !== eftpData.best_eftp && (
+                  <span className="text-xs text-gray-600">Current: {profile.eftp}W</span>
+                )}
               </div>
             </div>
           </Field>
