@@ -202,7 +202,7 @@ export default function SummaryTab() {
   }
 
   return (
-    <div className="space-y-4 pt-2">
+    <div className="space-y-4 pt-4">
       {/* Power progress chart */}
       <div>
         <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Power Goals</h3>

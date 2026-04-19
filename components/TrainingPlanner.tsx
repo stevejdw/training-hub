@@ -113,7 +113,7 @@ export default function TrainingPlanner() {
 
         {/* Training Plan tab */}
         {mainTab === 'plan' && (
-          <>
+          <div className="pt-4 space-y-4">
             {/* Plan name/goal header */}
             {plan && view.type === 'block' && (
               <div>
@@ -166,7 +166,7 @@ export default function TrainingPlanner() {
                 )}
               </>
             )}
-          </>
+          </div>
         )}
 
       </div>
