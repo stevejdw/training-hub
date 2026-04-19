@@ -33,7 +33,6 @@ function fmtKm(meters: number) {
 }
 
 function sportEmoji(sport: string) {
-  if (sport.includes('Run') || sport.includes('Walk')) return '🏃';
   if (sport.includes('Virtual')) return '💻';
   if (sport.includes('Gravel')) return '🪨';
   if (sport.includes('Mountain') || sport.includes('MTB')) return '⛰️';
@@ -41,13 +40,13 @@ function sportEmoji(sport: string) {
   return '🚴';
 }
 
-// Get the 7 dates for a week starting on week_start (Monday)
+// Get the 7 dates for a week starting on week_start (Monday).
+// Use Date.UTC to avoid local-timezone shifts when converting back to ISO string.
 function weekDates(weekStart: string): string[] {
-  const d = new Date(weekStart + 'T00:00:00');
+  const [y, m, d] = weekStart.split('-').map(Number);
   return Array.from({ length: 7 }, (_, i) => {
-    const day = new Date(d);
-    day.setDate(d.getDate() + i);
-    return day.toISOString().slice(0, 10);
+    const dt = new Date(Date.UTC(y, m - 1, d + i));
+    return dt.toISOString().slice(0, 10);
   });
 }
 
@@ -74,14 +73,15 @@ function WeekCard({ week, isFirst }: { week: WeekRow; isFirst: boolean }) {
   const rideCount = week.activities.length;
 
   // Format week label: "14–20 Apr" or "14–20 Apr 2025"
-  const d1 = new Date(dates[0] + 'T00:00:00');
-  const d7 = new Date(dates[6] + 'T00:00:00');
+  // Use UTC dates to avoid timezone shifting
+  const d1 = new Date(dates[0] + 'T00:00:00Z');
+  const d7 = new Date(dates[6] + 'T00:00:00Z');
   const today = new Date();
   const currentYear = today.getFullYear();
-  const monthFmt = new Intl.DateTimeFormat('en-AU', { month: 'short' });
-  const weekLabel = d1.getMonth() === d7.getMonth()
-    ? `${d1.getDate()}–${d7.getDate()} ${monthFmt.format(d1)}${d1.getFullYear() !== currentYear ? ` ${d1.getFullYear()}` : ''}`
-    : `${d1.getDate()} ${monthFmt.format(d1)} – ${d7.getDate()} ${monthFmt.format(d7)}${d7.getFullYear() !== currentYear ? ` ${d7.getFullYear()}` : ''}`;
+  const monthFmt = new Intl.DateTimeFormat('en-AU', { month: 'short', timeZone: 'UTC' });
+  const weekLabel = d1.getUTCMonth() === d7.getUTCMonth()
+    ? `${d1.getUTCDate()}–${d7.getUTCDate()} ${monthFmt.format(d1)}${d1.getUTCFullYear() !== currentYear ? ` ${d1.getUTCFullYear()}` : ''}`
+    : `${d1.getUTCDate()} ${monthFmt.format(d1)} – ${d7.getUTCDate()} ${monthFmt.format(d7)}${d7.getUTCFullYear() !== currentYear ? ` ${d7.getUTCFullYear()}` : ''}`;
 
   const current = isCurrentWeek(week.week_start);
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
@@ -129,7 +129,7 @@ function WeekCard({ week, isFirst }: { week: WeekRow; isFirst: boolean }) {
                   {DAY_LABELS[i]}
                 </span>
                 <div className={`text-[10px] ${isToday ? 'text-orange-400/70' : 'text-gray-600'}`}>
-                  {new Date(date + 'T00:00:00').getDate()}
+                  {Number(date.slice(8, 10))}
                 </div>
               </div>
 

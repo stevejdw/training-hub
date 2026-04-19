@@ -25,6 +25,7 @@ export interface AthleteProfile {
   events: EventGoal[];
   power_targets: PowerTarget[];
   training_notes: string;
+  timezone: string; // IANA timezone, e.g. 'Australia/Sydney'
   // HR zones
   max_hr: number | null;
   hr_zones_auto: boolean;
@@ -44,6 +45,7 @@ const DEFAULTS: AthleteProfile = {
   events: [],
   power_targets: [],
   training_notes: '',
+  timezone: 'Australia/Sydney',
   max_hr: null,
   hr_zones_auto: true,
   hr_zone_boundaries: null,

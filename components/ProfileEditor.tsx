@@ -16,12 +16,29 @@ interface AthleteProfile {
   weight_kg: number | null;
   training_goals: string;
   events: EventGoal[];
+  timezone: string;
   max_hr: number | null;
   hr_zones_auto: boolean;
   hr_zone_boundaries: number[] | null;
   power_zones_auto: boolean;
   power_zone_boundaries: number[] | null;
 }
+
+const TIMEZONES = [
+  { label: 'Sydney / Melbourne (AEST/AEDT)',  value: 'Australia/Sydney'    },
+  { label: 'Brisbane (AEST)',                  value: 'Australia/Brisbane'  },
+  { label: 'Adelaide (ACST/ACDT)',             value: 'Australia/Adelaide'  },
+  { label: 'Perth (AWST)',                     value: 'Australia/Perth'     },
+  { label: 'Darwin (ACST)',                    value: 'Australia/Darwin'    },
+  { label: 'Auckland (NZST/NZDT)',             value: 'Pacific/Auckland'    },
+  { label: 'London (GMT/BST)',                 value: 'Europe/London'       },
+  { label: 'Paris / Berlin (CET/CEST)',        value: 'Europe/Paris'        },
+  { label: 'New York (EST/EDT)',               value: 'America/New_York'    },
+  { label: 'Los Angeles (PST/PDT)',            value: 'America/Los_Angeles' },
+  { label: 'Denver (MST/MDT)',                 value: 'America/Denver'      },
+  { label: 'Chicago (CST/CDT)',                value: 'America/Chicago'     },
+  { label: 'UTC',                              value: 'UTC'                 },
+];
 
 interface EftpOption {
   name: string;
@@ -130,6 +147,17 @@ export default function ProfileEditor() {
             />
           </Field>
         </div>
+        <Field label="Timezone" hint="Used for weekly summaries and date calculations">
+          <select
+            value={profile.timezone ?? 'Australia/Sydney'}
+            onChange={e => update('timezone', e.target.value)}
+            className={inputCls}
+          >
+            {TIMEZONES.map(tz => (
+              <option key={tz.value} value={tz.value}>{tz.label}</option>
+            ))}
+          </select>
+        </Field>
       </div>
 
       {/* FTP */}

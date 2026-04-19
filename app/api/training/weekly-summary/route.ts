@@ -1,21 +1,26 @@
 import pool from '@/lib/db';
+import { getProfile } from '@/lib/profile';
 
 export const runtime = 'nodejs';
 
-// Returns last 4 calendar weeks (Mon–Sun, Australia/Sydney) of cycling activities
+const CYCLING_TYPES = ['Ride','VirtualRide','GravelRide','MountainBikeRide','EBikeRide','EMountainBikeRide'];
+
+// Returns last 4 calendar weeks (Mon–Sun) of cycling activities
 export async function GET() {
   try {
+    const profile = await getProfile();
+    const tz = profile.timezone || 'Australia/Sydney';
+
     const client = await pool.connect();
     try {
-      // Anchor on current Sydney date, walk back to last 4 Mon–Sun weeks
       const res = await client.query(`
-        WITH sydney_now AS (
-          SELECT (NOW() AT TIME ZONE 'Australia/Sydney')::date AS today
+        WITH tz_now AS (
+          SELECT (NOW() AT TIME ZONE $1)::date AS today
         ),
         week_starts AS (
           SELECT
-            (today - (EXTRACT(DOW FROM today)::int + 6) % 7 * INTERVAL '1 day' - (n * 7) * INTERVAL '1 day')::date AS week_start
-          FROM sydney_now, generate_series(0, 3) AS n
+            (today - ((EXTRACT(DOW FROM today)::int + 6) % 7) * INTERVAL '1 day' - (n * 7) * INTERVAL '1 day')::date AS week_start
+          FROM tz_now, generate_series(0, 3) AS n
         ),
         weeks AS (
           SELECT
@@ -28,14 +33,14 @@ export async function GET() {
             id,
             name,
             sport_type,
-            (start_date AT TIME ZONE 'Australia/Sydney')::date AS act_date,
+            (start_date AT TIME ZONE $1)::date AS act_date,
             moving_time,
             distance,
             COALESCE(tss, 0)::int AS tss
           FROM activities
-          WHERE sport_type = ANY(ARRAY['Ride','VirtualRide','GravelRide','MountainBikeRide','EBikeRide','EMountainBikeRide','Run','Walk'])
-            AND (start_date AT TIME ZONE 'Australia/Sydney')::date >= (SELECT MIN(week_start) FROM weeks)
-            AND (start_date AT TIME ZONE 'Australia/Sydney')::date <= (SELECT MAX(week_end) FROM weeks)
+          WHERE sport_type = ANY($2::text[])
+            AND (start_date AT TIME ZONE $1)::date >= (SELECT MIN(week_start) FROM weeks)
+            AND (start_date AT TIME ZONE $1)::date <= (SELECT MAX(week_end) FROM weeks)
         )
         SELECT
           w.week_start::text,
@@ -58,7 +63,7 @@ export async function GET() {
         LEFT JOIN acts a ON a.act_date BETWEEN w.week_start AND w.week_end
         GROUP BY w.week_start, w.week_end
         ORDER BY w.week_start DESC
-      `);
+      `, [tz, CYCLING_TYPES]);
 
       return Response.json(res.rows);
     } finally {
