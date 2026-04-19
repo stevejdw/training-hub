@@ -83,36 +83,18 @@ function LazyMap({ polyline }: { polyline: string }) {
 }
 
 function CoachingTip() {
-  const [tip, setTip]   = useState('');
-  const [done, setDone] = useState(false);
+  const [tip,     setTip]     = useState('');
+  const [loading, setLoading] = useState(true);
   const fetched = useRef(false);
 
   useEffect(() => {
     if (fetched.current) return;
     fetched.current = true;
 
-    fetch('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        messages: [{
-          role: 'user',
-          content: 'In 3–4 sentences, give me the single most important coaching insight or recommendation based on my current CTL/ATL/TSB, recent training, and upcoming events. Be direct, specific, and reference actual numbers.',
-        }],
-      }),
-    }).then(async res => {
-      const reader = res.body?.getReader();
-      if (!reader) return;
-      const dec = new TextDecoder();
-      let text = '';
-      while (true) {
-        const { done: d, value } = await reader.read();
-        if (d) break;
-        text += dec.decode(value, { stream: true });
-        setTip(text);
-      }
-      setDone(true);
-    }).catch(() => { setTip('Unable to load coaching tip.'); setDone(true); });
+    fetch('/api/coaching-insight')
+      .then(r => r.json())
+      .then(d => { setTip(d.content ?? ''); setLoading(false); })
+      .catch(() => { setTip('Unable to load coaching tip.'); setLoading(false); });
   }, []);
 
   return (
@@ -121,17 +103,13 @@ function CoachingTip() {
         <div className="w-6 h-6 rounded-full bg-orange-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">C</div>
         <span className="text-xs font-semibold text-orange-400 uppercase tracking-wider">Coaching Insight</span>
       </div>
-      {!tip && !done ? (
+      {loading ? (
         <div className="space-y-2">
           <div className="h-3 bg-gray-700 rounded animate-pulse w-full" />
           <div className="h-3 bg-gray-700 rounded animate-pulse w-4/5" />
-          <div className="h-3 bg-gray-700 rounded animate-pulse w-3/5" />
         </div>
       ) : (
-        <p className="text-sm text-gray-300 leading-relaxed">
-          {tip}
-          {!done && <span className="inline-block w-1 h-3.5 bg-orange-400 ml-0.5 animate-pulse align-middle" />}
-        </p>
+        <p className="text-sm text-gray-300 leading-relaxed">{tip}</p>
       )}
       <Link href="/chat" className="mt-3 inline-flex items-center gap-1.5 text-xs text-orange-400 hover:text-orange-300 transition-colors">
         Ask a follow-up
