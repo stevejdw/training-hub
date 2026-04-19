@@ -120,7 +120,7 @@ export default function ObjectivesTab() {
   const pastEvents   = upcomingEvents.filter(e => daysUntil(e.date) < 0);
 
   return (
-    <div className="space-y-4 pt-4">
+    <div className="space-y-4">
 
       {/* Upcoming Events */}
       <div>
