@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import TrainingPlansSettings from './training/TrainingPlansSettings';
 
 interface EventGoal {
   name: string;
@@ -397,7 +398,7 @@ export default function ProfileEditor() {
         ))}
       </div>
 
-      <div className="flex justify-end pb-8">
+      <div className="flex justify-end">
         <button
           onClick={save}
           disabled={saving}
@@ -406,6 +407,11 @@ export default function ProfileEditor() {
           {saving ? 'Saving…' : saved ? 'Saved ✓' : 'Save profile'}
         </button>
       </div>
+
+      {/* Training Plans — managed here, shown on Training tab */}
+      <TrainingPlansSettings />
+
+      <div className="pb-8" />
     </div>
   );
 }

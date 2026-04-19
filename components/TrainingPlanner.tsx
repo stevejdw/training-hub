@@ -1,12 +1,10 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+// useCallback kept for loadPlan
 import { TrainingPlan, TrainingDay } from '@/lib/training-plans';
-import PlanSelector from './training/PlanSelector';
 import BlockView from './training/BlockView';
 import DayView from './training/DayView';
-import CreatePlanModal from './training/CreatePlanModal';
-import EditPlanModal from './training/EditPlanModal';
 import SummaryTab from './training/SummaryTab';
 import ObjectivesTab from './training/ObjectivesTab';
 
@@ -43,20 +41,11 @@ const TABS: { key: MainTab; label: string }[] = [
 
 export default function TrainingPlanner() {
   const [mainTab, setMainTab]           = useState<MainTab>('summary');
-  const [plans, setPlans]               = useState<PlanMeta[]>([]);
   const [activePlanId, setActivePlanId] = useState<number | null>(null);
   const [plan, setPlan]                 = useState<TrainingPlan | null>(null);
   const [activities, setActivities]     = useState<ActivitySummary[]>([]);
   const [view, setView]                 = useState<View>({ type: 'block' });
-  const [showCreate, setShowCreate]     = useState(false);
-  const [showEdit, setShowEdit]         = useState(false);
   const [loadingPlan, setLoadingPlan]   = useState(false);
-
-  const fetchPlans = useCallback(() =>
-    fetch('/api/training/plans')
-      .then(r => r.json())
-      .then((data: PlanMeta[]) => { setPlans(data); return data; })
-      .catch(console.error), []);
 
   // Initial load: plans + active plan + activities (only needed for plan tab)
   useEffect(() => {
@@ -64,7 +53,6 @@ export default function TrainingPlanner() {
     fetch('/api/training/plans/active')
       .then(r => r.json())
       .then((data: { plans: PlanMeta[]; plan: TrainingPlan | null; activities: ActivitySummary[] }) => {
-        setPlans(data.plans);
         if (data.plan) { setPlan(data.plan); setActivePlanId(data.plan.id); }
         if (data.activities) setActivities(data.activities);
       })
@@ -88,35 +76,6 @@ export default function TrainingPlanner() {
       .catch(console.error)
       .finally(() => setLoadingPlan(false));
   }, []);
-
-  const isFirstLoad = useState(true);
-  useEffect(() => {
-    if (isFirstLoad[0]) { isFirstLoad[1](false); return; }
-    if (!activePlanId) { setPlan(null); return; }
-    loadPlan(activePlanId);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activePlanId]);
-
-  function handleDeletePlan(id: number) {
-    fetch(`/api/training/plans/${id}`, { method: 'DELETE' })
-      .then(() => fetchPlans())
-      .then(data => {
-        const remaining = (data as PlanMeta[] | undefined) ?? [];
-        setActivePlanId(remaining.length > 0 ? remaining[0].id : null);
-        if (!remaining.length) setPlan(null);
-      })
-      .catch(console.error);
-  }
-
-  function handlePlanCreated(planId: number) {
-    setShowCreate(false);
-    fetchPlans().then(() => setActivePlanId(planId));
-  }
-
-  function handlePlanUpdated() {
-    setShowEdit(false);
-    if (activePlanId) loadPlan(activePlanId);
-  }
 
   const actsByDate = new Map<string, ActivitySummary[]>();
   for (const a of activities) {
@@ -155,36 +114,14 @@ export default function TrainingPlanner() {
         {/* Training Plan tab */}
         {mainTab === 'plan' && (
           <>
-            {/* Plan selector + edit */}
-            <div className="flex items-center gap-2">
-              <div className="flex-1 min-w-0">
-                <PlanSelector
-                  plans={plans}
-                  activePlanId={activePlanId}
-                  onSelect={id => { setActivePlanId(id); setView({ type: 'block' }); }}
-                  onNew={() => setShowCreate(true)}
-                  onDelete={handleDeletePlan}
-                />
-              </div>
-              {plan && (
-                <button
-                  onClick={() => setShowEdit(true)}
-                  className="flex-shrink-0 w-9 h-9 flex items-center justify-center rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white transition-colors"
-                  title="Edit plan"
-                >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                  </svg>
-                </button>
-              )}
-            </div>
-
-            {/* Plan goal */}
+            {/* Plan name/goal header */}
             {plan && view.type === 'block' && (
-              <p className="text-sm text-gray-400">
-                <span className="font-medium text-white">{plan.name}</span>
-                {plan.goal && <> · {plan.goal}</>}
-              </p>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-base font-semibold text-white">{plan.name}</p>
+                  {plan.goal && <p className="text-xs text-gray-500 mt-0.5">{plan.goal}</p>}
+                </div>
+              </div>
             )}
 
             {/* Loading skeleton */}
@@ -197,17 +134,17 @@ export default function TrainingPlanner() {
             )}
 
             {/* Empty state */}
-            {!loadingPlan && !plan && plans.length === 0 && (
+            {!loadingPlan && !plan && (
               <div className="bg-gray-800/40 border border-gray-700 border-dashed rounded-2xl p-10 text-center space-y-3">
                 <div className="text-4xl">📅</div>
-                <h3 className="text-lg font-semibold text-white">No training plans yet</h3>
-                <p className="text-sm text-gray-400">Generate a personalised plan with AI based on your profile and goals</p>
-                <button
-                  onClick={() => setShowCreate(true)}
-                  className="mt-2 px-5 py-2.5 bg-orange-500 hover:bg-orange-400 text-white rounded-xl text-sm font-medium transition-colors"
+                <h3 className="text-lg font-semibold text-white">No training plan</h3>
+                <p className="text-sm text-gray-400">Generate a plan from the Settings page</p>
+                <a
+                  href="/profile"
+                  className="inline-block mt-2 px-5 py-2.5 bg-orange-500 hover:bg-orange-400 text-white rounded-xl text-sm font-medium transition-colors"
                 >
-                  Generate a plan
-                </button>
+                  Go to Settings
+                </a>
               </div>
             )}
 
@@ -236,20 +173,6 @@ export default function TrainingPlanner() {
 
       </div>
 
-      {showCreate && (
-        <CreatePlanModal
-          onClose={() => setShowCreate(false)}
-          onCreated={handlePlanCreated}
-        />
-      )}
-
-      {showEdit && plan && (
-        <EditPlanModal
-          plan={plan}
-          onClose={() => setShowEdit(false)}
-          onUpdated={handlePlanUpdated}
-        />
-      )}
     </div>
   );
 }

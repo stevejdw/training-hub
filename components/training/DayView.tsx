@@ -380,23 +380,6 @@ export default function DayView({ day, activities, onBack, onDayUpdated }: Props
         <h2 className="text-lg font-bold text-white truncate">{day.title}</h2>
         <p className="text-xs text-gray-400">{dateLabel}</p>
       </div>
-      {/* Edit buttons — only in view mode */}
-      {mode === 'view' && day.type !== 'rest' && (
-        <div className="flex gap-1.5 flex-shrink-0">
-          <button
-            onClick={enterEdit}
-            className="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white transition-colors"
-          >
-            Edit
-          </button>
-          <button
-            onClick={() => { setAiResponse(''); setAiUpdated(false); setAiMessage(''); setMode('ai'); }}
-            className="px-3 py-1.5 text-xs font-medium rounded-lg bg-orange-500/20 hover:bg-orange-500/30 text-orange-400 hover:text-orange-300 border border-orange-500/30 transition-colors"
-          >
-            Coach AI
-          </button>
-        </div>
-      )}
     </div>
   );
 
@@ -406,6 +389,31 @@ export default function DayView({ day, activities, onBack, onDayUpdated }: Props
     return (
       <div className="space-y-4">
         {header}
+
+        {/* Edit actions — prominent, only for non-rest days */}
+        {day.type !== 'rest' && (
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={enterEdit}
+              className="flex items-center justify-center gap-2 py-3 rounded-xl bg-gray-800 hover:bg-gray-700 border border-gray-700 hover:border-gray-600 text-white text-sm font-medium transition-colors"
+            >
+              <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+              Edit session
+            </button>
+            <button
+              onClick={() => { setAiResponse(''); setAiUpdated(false); setAiMessage(''); setMode('ai'); }}
+              className="flex items-center justify-center gap-2 py-3 rounded-xl bg-orange-500 hover:bg-orange-400 text-white text-sm font-medium transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              </svg>
+              Coach AI
+            </button>
+          </div>
+        )}
+
         {day.description && (
           <div className="bg-gray-800/60 rounded-xl p-4">
             <p className="text-sm text-gray-300">{day.description}</p>
