@@ -111,6 +111,8 @@ export default function ActivityDetail({ id }: { id: string }) {
   const [segLoading, setSegLoading] = useState(false);
   const [segFetched, setSegFetched] = useState(false);
   const [segSyncing, setSegSyncing] = useState(false);
+  type LapSortKey = 'index' | 'distance' | 'moving_time' | 'average_watts' | 'normalized_power' | 'average_heartrate' | 'max_heartrate';
+  const [lapSort, setLapSort] = useState<{ key: LapSortKey; dir: 'asc' | 'desc' }>({ key: 'index', dir: 'asc' });
 
   useEffect(() => {
     fetch(`/api/activities/${id}`)
@@ -319,25 +321,61 @@ export default function ActivityDetail({ id }: { id: string }) {
         )}
 
         {/* Tab: Laps */}
-        {tab === 'laps' && (
-          laps.length > 0 ? (
+        {tab === 'laps' && (() => {
+          if (laps.length === 0) return (
+            <div className="bg-gray-800/50 border border-gray-700 border-dashed rounded-xl p-8 text-center">
+              <p className="text-gray-500 text-sm">No lap data for this activity</p>
+            </div>
+          );
+
+          const sortedLaps = [...laps].sort((a, b) => {
+            let av: number, bv: number;
+            if (lapSort.key === 'index') {
+              av = a.lap_index; bv = b.lap_index;
+            } else {
+              av = (a[lapSort.key] as number | null) ?? -Infinity;
+              bv = (b[lapSort.key] as number | null) ?? -Infinity;
+            }
+            return lapSort.dir === 'asc' ? av - bv : bv - av;
+          });
+
+          function SortTh({ col, label, align = 'right' }: { col: LapSortKey; label: string; align?: 'left' | 'right' }) {
+            const active = lapSort.key === col;
+            const arrow  = active ? (lapSort.dir === 'asc' ? ' ↑' : ' ↓') : '';
+            return (
+              <th
+                className={`px-4 py-3 font-medium cursor-pointer select-none whitespace-nowrap
+                  ${align === 'left' ? 'text-left' : 'text-right'}
+                  ${active ? 'text-orange-400' : 'text-gray-500 hover:text-gray-300'}`}
+                onClick={() => setLapSort(s =>
+                  s.key === col
+                    ? { key: col, dir: s.dir === 'asc' ? 'desc' : 'asc' }
+                    : { key: col, dir: col === 'index' ? 'asc' : 'desc' }
+                )}
+              >
+                {label}{arrow}
+              </th>
+            );
+          }
+
+          return (
             <div className="bg-gray-900 rounded-xl overflow-x-auto scroll-touch border border-gray-800">
               <table className="text-sm whitespace-nowrap w-full">
                 <thead>
                   <tr className="border-b border-gray-800">
-                    <th className="text-left px-4 py-3 text-gray-500 font-medium">#</th>
-                    <th className="text-right px-4 py-3 text-gray-500 font-medium">Distance</th>
-                    <th className="text-right px-4 py-3 text-gray-500 font-medium">Time</th>
-                    <th className="text-right px-4 py-3 text-gray-500 font-medium">Avg W</th>
-                    <th className="text-right px-4 py-3 text-gray-500 font-medium">NP</th>
-                    <th className="text-right px-4 py-3 text-gray-500 font-medium">Avg HR</th>
-                    <th className="text-right px-4 py-3 text-gray-500 font-medium">Max HR</th>
+                    <SortTh col="index"             label="#"        align="left" />
+                    <SortTh col="distance"          label="Distance" />
+                    <SortTh col="moving_time"       label="Time" />
+                    <SortTh col="average_watts"     label="Avg W" />
+                    <SortTh col="normalized_power"  label="NP" />
+                    <SortTh col="average_heartrate" label="Avg HR" />
+                    <SortTh col="max_heartrate"     label="Max HR" />
                   </tr>
                 </thead>
                 <tbody>
-                  {laps.map((lap, i) => (
+                  {sortedLaps.map((lap, i) => (
                     <tr key={lap.id} className={`border-b border-gray-800/60 ${i % 2 === 0 ? '' : 'bg-gray-800/30'}`}>
-                      <td className="px-4 py-2.5 text-gray-400">{lap.lap_index + 1}</td>
+                      <td className="px-4 py-2.5 text-gray-400">{lap.lap_index}</td>
                       <td className="px-4 py-2.5 text-right text-gray-300">
                         {lap.distance > 0 ? `${(lap.distance / 1000).toFixed(2)} km` : '—'}
                       </td>
@@ -359,12 +397,8 @@ export default function ActivityDetail({ id }: { id: string }) {
                 </tbody>
               </table>
             </div>
-          ) : (
-            <div className="bg-gray-800/50 border border-gray-700 border-dashed rounded-xl p-8 text-center">
-              <p className="text-gray-500 text-sm">No lap data for this activity</p>
-            </div>
-          )
-        )}
+          );
+        })()}
 
         {/* Tab: Power */}
         {tab === 'power' && (
