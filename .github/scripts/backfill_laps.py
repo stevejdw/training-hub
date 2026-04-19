@@ -1,7 +1,10 @@
 """
-Backfill laps (with calculated NP) for the last N activities.
-Fetches power stream per activity and calculates NP per lap slice.
-Safe to re-run — uses ON CONFLICT DO UPDATE to refresh NP values.
+Backfill laps (with calculated NP) for activities that have no laps stored.
+Self-paces against Strava's rate limits using response headers:
+  - 100 requests / 15 min window
+  - 1000 requests / day
+
+Safe to re-run — only processes activities still missing laps.
 """
 import os
 import time
@@ -13,7 +16,10 @@ STRAVA_CLIENT_ID = os.environ["STRAVA_CLIENT_ID"]
 STRAVA_CLIENT_SECRET = os.environ["STRAVA_CLIENT_SECRET"]
 STRAVA_REFRESH_TOKEN = os.environ["STRAVA_REFRESH_TOKEN"]
 DATABASE_URL = os.environ["DATABASE_URL"]
-LIMIT = int(os.environ.get("BACKFILL_LIMIT", "200"))
+LIMIT = int(os.environ.get("BACKFILL_LIMIT", "500"))
+
+# Stop with headroom before hitting daily limit so other app calls still work
+DAILY_LIMIT_STOP_AT = 950
 
 def get_access_token():
     r = requests.post("https://www.strava.com/oauth/token", data={
@@ -35,36 +41,51 @@ def calculate_np(power_values):
     ]
     return round((sum(x**4 for x in rolling) / len(rolling)) ** 0.25, 1)
 
-class RateLimitError(Exception):
-    pass
+# Track rate limit state across calls
+rate_state = {"window_used": 0, "daily_used": 0}
 
-def fetch_power_stream(token, activity_id):
-    r = requests.get(
-        f"https://www.strava.com/api/v3/activities/{activity_id}/streams",
-        headers={"Authorization": f"Bearer {token}"},
-        params={"keys": "watts", "key_by_type": "true"}
-    )
-    if r.status_code == 429:
-        raise RateLimitError("rate limited")
-    if r.status_code != 200:
-        return None
-    return r.json().get("watts", {}).get("data")
+def update_rate_state(response):
+    """Parse X-RateLimit-Usage header and update state."""
+    usage = response.headers.get("X-RateLimit-Usage", "")
+    if usage:
+        parts = usage.split(",")
+        if len(parts) == 2:
+            rate_state["window_used"] = int(parts[0].strip())
+            rate_state["daily_used"]  = int(parts[1].strip())
 
-def fetch_laps(token, activity_id):
-    r = requests.get(
-        f"https://www.strava.com/api/v3/activities/{activity_id}/laps",
-        headers={"Authorization": f"Bearer {token}"}
-    )
+def check_rate_limits():
+    """
+    Sleep if approaching the 15-min window limit (≥90 of 100).
+    Returns False if the daily limit is reached and we should stop.
+    """
+    if rate_state["daily_used"] >= DAILY_LIMIT_STOP_AT:
+        print(f"  Daily limit reached ({rate_state['daily_used']} calls used) — stopping for today.")
+        return False
+    if rate_state["window_used"] >= 90:
+        wait = 905  # 15 min + 5s buffer
+        print(f"  15-min window at {rate_state['window_used']}/100 — sleeping {wait}s...")
+        time.sleep(wait)
+    return True
+
+def strava_get(token, url, params=None):
+    """GET with rate limit tracking. Returns (response|None, hit_daily_limit)."""
+    r = requests.get(url, headers={"Authorization": f"Bearer {token}"}, params=params)
+    update_rate_state(r)
     if r.status_code == 429:
-        raise RateLimitError("rate limited")
-    return r.json() if r.status_code == 200 else []
+        # Shouldn't happen if we pace correctly, but handle gracefully
+        print("  Got 429 — sleeping 15 min then retrying once...")
+        time.sleep(905)
+        r = requests.get(url, headers={"Authorization": f"Bearer {token}"}, params=params)
+        update_rate_state(r)
+    if not check_rate_limits():
+        return None, True
+    return r, False
 
 def backfill():
     token = get_access_token()
     conn = psycopg2.connect(DATABASE_URL)
     cur = conn.cursor()
 
-    # Only target activities that have no laps stored yet
     cur.execute("""
         SELECT a.id, a.name FROM activities a
         WHERE NOT EXISTS (SELECT 1 FROM laps l WHERE l.activity_id = a.id)
@@ -73,36 +94,47 @@ def backfill():
     """, (LIMIT,))
     activities = cur.fetchall()
     print(f"Found {len(activities)} activities with no laps — backfilling...")
+    print(f"Strava allows ~500 activities/day. Will self-pace and stop at {DAILY_LIMIT_STOP_AT} daily calls.")
 
+    processed = 0
     for activity_id, name in activities:
-        try:
-            laps = fetch_laps(token, activity_id)
-        except RateLimitError:
-            print(f"  Rate limited on {name} — stopping. Re-run to continue.")
+        # ── fetch laps ──────────────────────────────────────────
+        laps_r, daily_done = strava_get(
+            token,
+            f"https://www.strava.com/api/v3/activities/{activity_id}/laps"
+        )
+        if daily_done:
             break
+        laps = laps_r.json() if laps_r and laps_r.status_code == 200 else []
         if not laps:
-            print(f"  {name}: no laps")
-            time.sleep(0.3)
+            print(f"  {name}: no laps (window={rate_state['window_used']}, day={rate_state['daily_used']})")
+            time.sleep(0.2)
             continue
 
-        try:
-            power_stream = fetch_power_stream(token, activity_id)
-        except RateLimitError:
-            print(f"  Rate limited fetching stream for {name} — stopping. Re-run to continue.")
-            break
-        np_count = 0
+        # ── fetch power stream ───────────────────────────────────
+        stream_r, daily_done = strava_get(
+            token,
+            f"https://www.strava.com/api/v3/activities/{activity_id}/streams",
+            params={"keys": "watts", "key_by_type": "true"}
+        )
+        if daily_done:
+            # Commit laps without NP rather than lose them
+            power_stream = None
+        else:
+            stream_data  = stream_r.json() if stream_r and stream_r.status_code == 200 else {}
+            power_stream = stream_data.get("watts", {}).get("data")
 
+        # ── build lap rows ───────────────────────────────────────
+        np_count = 0
         lap_rows = []
         for lap in laps:
             start_idx = lap.get("start_index")
-            end_idx = lap.get("end_index")
-            np_val = None
+            end_idx   = lap.get("end_index")
+            np_val    = None
             if power_stream and start_idx is not None and end_idx is not None:
-                slice_ = power_stream[start_idx:end_idx + 1]
-                np_val = calculate_np(slice_)
+                np_val = calculate_np(power_stream[start_idx:end_idx + 1])
                 if np_val:
                     np_count += 1
-
             lap_rows.append((
                 lap["id"], activity_id,
                 lap.get("name"), lap.get("lap_index"),
@@ -123,20 +155,23 @@ def backfill():
                 start_index, end_index
             ) VALUES %s
             ON CONFLICT (id) DO UPDATE SET
-                normalized_power = EXCLUDED.normalized_power,
-                average_watts = EXCLUDED.average_watts,
+                normalized_power  = EXCLUDED.normalized_power,
+                average_watts     = EXCLUDED.average_watts,
                 average_heartrate = EXCLUDED.average_heartrate,
-                max_heartrate = EXCLUDED.max_heartrate,
-                start_index = EXCLUDED.start_index,
-                end_index = EXCLUDED.end_index
+                max_heartrate     = EXCLUDED.max_heartrate,
+                start_index       = EXCLUDED.start_index,
+                end_index         = EXCLUDED.end_index
         """, lap_rows)
         conn.commit()
-        print(f"  {name}: {len(lap_rows)} laps, {np_count} with NP")
-        time.sleep(0.5)
+        processed += 1
+        print(f"  [{processed}] {name}: {len(lap_rows)} laps, {np_count} NP  (window={rate_state['window_used']}, day={rate_state['daily_used']})")
+
+        if daily_done:
+            break
 
     cur.close()
     conn.close()
-    print("Done.")
+    print(f"\nDone. Processed {processed} activities. {len(activities) - processed} still pending (re-run tomorrow).")
 
 if __name__ == "__main__":
     backfill()
