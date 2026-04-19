@@ -25,8 +25,6 @@
 
 html {
   height: 100%;
-  /* Hard clip — prevents document-level scroll revealing blank below fixed nav */
-  overflow: hidden;
   overscroll-behavior: none;
 }
 
@@ -34,10 +32,7 @@ body {
   background: var(--background);
   color: var(--foreground);
   height: 100%;
-  /* Hard clip — same reason */
-  overflow: hidden;
   overscroll-behavior: none;
-  /* Prevent text size adjustment on rotation */
   -webkit-text-size-adjust: 100%;
 }
 
@@ -55,21 +50,19 @@ body {
     top: env(safe-area-inset-top, 0px);
     left: 0;
     right: 0;
-    /* 56px (h-14) icon row + safe-area height */
-    bottom: calc(56px + env(safe-area-inset-bottom, 34px));
+    /* Must match .mobile-nav top: 56px icons + safe-area */
+    bottom: calc(56px + env(safe-area-inset-bottom, 0px));
     height: auto;
     overflow: hidden;
   }
 }
 
-/* Mobile bottom nav — pulls the bar below the safe-area boundary so its
-   background fills the home-indicator zone on iPhone. */
+/* Mobile bottom nav — overshoots the screen edge by 100px so the background
+   is guaranteed to fill the home-indicator zone on any iPhone variant. */
 @media (max-width: 767px) {
   .mobile-nav {
-    /* Overshoot past the safe-area bottom so no gap ever shows */
-    bottom: calc(-1 * env(safe-area-inset-bottom, 34px));
-    /* Push icons back up so they sit above the home indicator */
-    padding-bottom: env(safe-area-inset-bottom, 34px);
+    bottom: -100px;
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 100px);
   }
 }
 
