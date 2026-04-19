@@ -11,6 +11,22 @@ interface Props {
 
 const DOW_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
+const TIME_OPTIONS = [
+  { label: '1h',   minutes: 60  },
+  { label: '1.5h', minutes: 90  },
+  { label: '2h',   minutes: 120 },
+  { label: '2.5h', minutes: 150 },
+  { label: '3h',   minutes: 180 },
+  { label: '3.5h', minutes: 210 },
+  { label: '4h',   minutes: 240 },
+];
+
+interface DaySetting {
+  maxMinutes: number;
+  isGroupRide: boolean;
+}
+type DaySettingsMap = Record<number, DaySetting>;
+
 function detectTrainingDays(days: TrainingDay[]): number[] {
   // Look at first week to detect which DOW (0=Mon) have non-rest sessions
   const first7 = days.slice(0, 7);
@@ -40,6 +56,19 @@ export default function EditPlanModal({ plan, onClose, onUpdated }: Props) {
   const [goal, setGoal] = useState(plan.goal);
   const [notes, setNotes] = useState('');
   const [trainingDays, setTrainingDays] = useState<number[]>(() => detectTrainingDays(plan.days));
+  const [daySettings, setDaySettings] = useState<DaySettingsMap>(() => {
+    // Initialise with 2h per day, detect group rides from existing plan descriptions
+    const map: DaySettingsMap = {};
+    const first7 = plan.days.slice(0, 7);
+    DOW_LABELS.forEach((_, i) => {
+      const existing = first7[i];
+      const isGroup = existing
+        ? /group|bunch|club|social/i.test(existing.title + ' ' + (existing.description ?? ''))
+        : false;
+      map[i] = { maxMinutes: existing?.duration_min ?? 120, isGroupRide: isGroup };
+    });
+    return map;
+  });
   const [status, setStatus] = useState<'idle' | 'generating' | 'saving' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -47,6 +76,10 @@ export default function EditPlanModal({ plan, onClose, onUpdated }: Props) {
     setTrainingDays(prev =>
       prev.includes(d) ? (prev.length > 1 ? prev.filter(x => x !== d) : prev) : [...prev, d].sort()
     );
+  }
+
+  function updateDaySetting<K extends keyof DaySetting>(dow: number, key: K, value: DaySetting[K]) {
+    setDaySettings(prev => ({ ...prev, [dow]: { ...prev[dow], [key]: value } }));
   }
 
   async function handleRegenerate() {
@@ -64,7 +97,7 @@ export default function EditPlanModal({ plan, onClose, onUpdated }: Props) {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              goal, notes, trainingDays,
+              goal, notes, trainingDays, daySettings,
               weekIndex: i, planStartDate, totalWeeks: weeks,
               planName, planGoal: goal,
             }),
@@ -120,7 +153,8 @@ export default function EditPlanModal({ plan, onClose, onUpdated }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
-      <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-md p-6 space-y-5">
+      <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-md max-h-[90vh] flex flex-col">
+      <div className="p-6 overflow-y-auto flex-1 space-y-5">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-white">Edit Plan</h2>
           <button onClick={onClose} disabled={busy} className="text-gray-500 hover:text-white transition-colors">
@@ -174,8 +208,56 @@ export default function EditPlanModal({ plan, onClose, onUpdated }: Props) {
             ))}
           </div>
           <p className="text-[10px] text-gray-500 mt-1.5">
-            {trainingDays.length} days/week selected. Regenerate to apply changes.
+            {trainingDays.length} days/week selected.
           </p>
+        </div>
+
+        {/* Per-day settings */}
+        <div>
+          <label className="text-xs text-gray-400 uppercase tracking-wider block mb-2">Day settings</label>
+          <div className="space-y-1.5">
+            {/* Header row */}
+            <div className="grid grid-cols-[56px_1fr_auto] gap-2 px-1">
+              <span className="text-[10px] text-gray-600 uppercase tracking-wider">Day</span>
+              <span className="text-[10px] text-gray-600 uppercase tracking-wider">Available time</span>
+              <span className="text-[10px] text-gray-600 uppercase tracking-wider">Group ride</span>
+            </div>
+            {trainingDays.map(i => (
+              <div key={i} className="grid grid-cols-[56px_1fr_auto] gap-2 items-center bg-gray-800/50 rounded-lg px-2 py-1.5">
+                <span className="text-xs font-medium text-gray-300">{DOW_LABELS[i]}</span>
+                {/* Time pills */}
+                <div className="flex gap-1 flex-wrap">
+                  {TIME_OPTIONS.map(opt => (
+                    <button
+                      key={opt.minutes}
+                      onClick={() => updateDaySetting(i, 'maxMinutes', opt.minutes)}
+                      disabled={busy}
+                      className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${
+                        daySettings[i]?.maxMinutes === opt.minutes
+                          ? 'bg-orange-500 text-white'
+                          : 'bg-gray-700 text-gray-400 hover:text-white'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+                {/* Group ride toggle */}
+                <button
+                  onClick={() => updateDaySetting(i, 'isGroupRide', !daySettings[i]?.isGroupRide)}
+                  disabled={busy}
+                  className={`relative w-9 h-5 rounded-full transition-colors flex-shrink-0 ${
+                    daySettings[i]?.isGroupRide ? 'bg-blue-500' : 'bg-gray-700'
+                  }`}
+                >
+                  <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
+                    daySettings[i]?.isGroupRide ? 'translate-x-4' : 'translate-x-0.5'
+                  }`} />
+                </button>
+              </div>
+            ))}
+          </div>
+          <p className="text-[10px] text-gray-600 mt-1.5">Group ride days use steady-state targets, not structured intervals.</p>
         </div>
 
         {status === 'generating' && (
@@ -190,7 +272,9 @@ export default function EditPlanModal({ plan, onClose, onUpdated }: Props) {
         {status === 'saving' && <p className="text-sm text-gray-400">Saving…</p>}
         {status === 'error'   && <p className="text-sm text-red-400">{errorMsg}</p>}
 
-        <div className="flex gap-2 pt-1">
+        </div>
+        {/* Sticky footer */}
+        <div className="flex gap-2 p-4 border-t border-gray-800 flex-shrink-0">
           <button
             onClick={onClose}
             disabled={busy}

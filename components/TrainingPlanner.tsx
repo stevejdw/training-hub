@@ -124,20 +124,33 @@ export default function TrainingPlanner() {
           {mainTab === 'plan' && (
             <div className="space-y-4">
               {/* Plan name/goal header */}
-              {plan && view.type === 'block' && (
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <h2 className="text-lg font-semibold text-white">{plan.name}</h2>
-                    {plan.goal && <p className="text-sm text-gray-400 mt-0.5">{plan.goal}</p>}
+              {plan && view.type === 'block' && (() => {
+                // Parse "12 Week Plan: Event name" into parts
+                const m = plan.name.match(/^(\d+)\s*[Ww]eeks?\s*[Pp]lan\s*[:\-–]\s*(.+)$/);
+                const weekBadge = m ? `${m[1]} Weeks` : null;
+                const title     = m ? m[2].trim() : plan.name;
+                return (
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      {weekBadge && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-orange-500/15 text-orange-400 text-[11px] font-semibold uppercase tracking-wider mb-1.5">
+                          {weekBadge}
+                        </span>
+                      )}
+                      <h2 className="text-xl font-bold text-white leading-tight">{title}</h2>
+                      {plan.goal && (
+                        <p className="text-sm text-gray-400 mt-1 leading-snug">{plan.goal}</p>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => setEditingPlan(true)}
+                      className="flex-shrink-0 mt-0.5 px-3 py-1.5 text-xs text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
+                    >
+                      Edit
+                    </button>
                   </div>
-                  <button
-                    onClick={() => setEditingPlan(true)}
-                    className="flex-shrink-0 px-3 py-1.5 text-xs text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
-                  >
-                    Edit
-                  </button>
-                </div>
-              )}
+                );
+              })()}
 
               {/* Loading skeleton */}
               {loadingPlan && (

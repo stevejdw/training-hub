@@ -25,6 +25,9 @@ function addDays(dateStr: string, days: number): string {
 
 const DOW_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
+interface DaySetting { maxMinutes: number; isGroupRide: boolean }
+type DaySettingsMap = Record<number, DaySetting>;
+
 function buildSystemPrompt(
   ftp: number,
   profile: { weight_kg: number | null; training_goals: string; events: { name: string; date: string }[] },
@@ -32,16 +35,28 @@ function buildSystemPrompt(
   totalWeeks: number,
   goal: string,
   trainingDays: number[], // 0=Mon…6=Sun
+  daySettings: DaySettingsMap = {},
 ) {
   const dayNames = trainingDays.length > 0
     ? trainingDays.map(d => DOW_NAMES[d]).join(', ')
     : 'any days';
+
+  // Build per-day constraint lines
+  const dayConstraints = trainingDays.map(d => {
+    const s = daySettings[d];
+    if (!s) return null;
+    const hrs = s.maxMinutes >= 60 ? `${s.maxMinutes / 60}h` : `${s.maxMinutes}min`;
+    const flag = s.isGroupRide ? ' (GROUP RIDE — use steady Z2/tempo pace, no structured intervals)' : '';
+    return `- ${DOW_NAMES[d]}: up to ${hrs}${flag}`;
+  }).filter(Boolean).join('\n');
+
   return `You are an expert cycling coach. Output ONLY a JSON array — no markdown, no explanation, no code fences.
 Athlete: FTP=${ftp}W${profile.weight_kg ? ', ' + profile.weight_kg + 'kg' : ''}. ${profile.training_goals || 'General fitness'}. ${recentSummary}.
 Events: ${profile.events.length > 0 ? profile.events.map(e => `${e.name} ${e.date}`).join(', ') : 'none'}.
 Goal: ${goal || 'base fitness'}.
 Overall plan: ${totalWeeks} weeks total. Build load through weeks; every 4th week is recovery (~60% TSS).
 Training days: ${dayNames}. ALL other days MUST be type "rest".
+${dayConstraints ? `\nDay constraints:\n${dayConstraints}\nNever exceed the listed available time per day. For group ride days, use endurance/tempo type and steady power targets.` : ''}
 
 Output a JSON array of exactly 7 day objects (Mon–Sun). Each object:
 {"date":"YYYY-MM-DD","title":"Short title","type":"rest|endurance|tempo|threshold|vo2max|race|recovery","duration_min":0,"tss_target":0,"segments":[{"type":"warmup|main|cooldown","duration_min":0,"target_np_watts":0,"description":"..."}]}
@@ -79,7 +94,7 @@ function extractJson(text: string): string {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { goal = '', weeks = 4, notes = '', weekIndex, planStartDate: bodyStartDate, totalWeeks, planName, planGoal, trainingDays = [] } = body;
+    const { goal = '', weeks = 4, notes = '', weekIndex, planStartDate: bodyStartDate, totalWeeks, planName, planGoal, trainingDays = [], daySettings = {} } = body;
 
     const profile = await getProfile();
     const ftp = effectiveFtp(profile);
@@ -109,7 +124,7 @@ export async function POST(req: NextRequest) {
       const weekEnd = addDays(weekStart, 6);
       const weekNum = weekIndex + 1;
 
-      const systemPrompt = buildSystemPrompt(ftp, profile, recentSummary, totalWeeks, goal, trainingDays);
+      const systemPrompt = buildSystemPrompt(ftp, profile, recentSummary, totalWeeks, goal, trainingDays, daySettings);
       const userPrompt = `Generate week ${weekNum} of ${totalWeeks} (${weekStart} to ${weekEnd}). Week ${weekNum} load level: ${weekNum % 4 === 0 ? 'recovery (60% of peak TSS)' : weekNum % 4 === 1 ? 'build 1' : weekNum % 4 === 2 ? 'build 2' : 'peak'}. ${notes ? 'Notes: ' + notes : ''}`;
 
       const message = await client.messages.create({
@@ -135,7 +150,7 @@ export async function POST(req: NextRequest) {
 
     // Legacy single-shot mode (kept for compatibility, 4-week only)
     const planStart = startOfWeekSydney();
-    const systemPrompt = buildSystemPrompt(ftp, profile, recentSummary, weeks, goal, trainingDays);
+    const systemPrompt = buildSystemPrompt(ftp, profile, recentSummary, weeks, goal, trainingDays, daySettings);
 
     const allDays: unknown[] = [];
     const name = `${weeks}-Week Plan${goal ? ': ' + goal.slice(0, 40) : ''}`;
