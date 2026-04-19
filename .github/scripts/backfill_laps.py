@@ -13,7 +13,7 @@ STRAVA_CLIENT_ID = os.environ["STRAVA_CLIENT_ID"]
 STRAVA_CLIENT_SECRET = os.environ["STRAVA_CLIENT_SECRET"]
 STRAVA_REFRESH_TOKEN = os.environ["STRAVA_REFRESH_TOKEN"]
 DATABASE_URL = os.environ["DATABASE_URL"]
-LIMIT = int(os.environ.get("BACKFILL_LIMIT", "50"))
+LIMIT = int(os.environ.get("BACKFILL_LIMIT", "200"))
 
 def get_access_token():
     r = requests.post("https://www.strava.com/oauth/token", data={
@@ -35,12 +35,17 @@ def calculate_np(power_values):
     ]
     return round((sum(x**4 for x in rolling) / len(rolling)) ** 0.25, 1)
 
+class RateLimitError(Exception):
+    pass
+
 def fetch_power_stream(token, activity_id):
     r = requests.get(
         f"https://www.strava.com/api/v3/activities/{activity_id}/streams",
         headers={"Authorization": f"Bearer {token}"},
         params={"keys": "watts", "key_by_type": "true"}
     )
+    if r.status_code == 429:
+        raise RateLimitError("rate limited")
     if r.status_code != 200:
         return None
     return r.json().get("watts", {}).get("data")
@@ -50,6 +55,8 @@ def fetch_laps(token, activity_id):
         f"https://www.strava.com/api/v3/activities/{activity_id}/laps",
         headers={"Authorization": f"Bearer {token}"}
     )
+    if r.status_code == 429:
+        raise RateLimitError("rate limited")
     return r.json() if r.status_code == 200 else []
 
 def backfill():
@@ -68,13 +75,21 @@ def backfill():
     print(f"Found {len(activities)} activities with no laps — backfilling...")
 
     for activity_id, name in activities:
-        laps = fetch_laps(token, activity_id)
+        try:
+            laps = fetch_laps(token, activity_id)
+        except RateLimitError:
+            print(f"  Rate limited on {name} — stopping. Re-run to continue.")
+            break
         if not laps:
             print(f"  {name}: no laps")
             time.sleep(0.3)
             continue
 
-        power_stream = fetch_power_stream(token, activity_id)
+        try:
+            power_stream = fetch_power_stream(token, activity_id)
+        except RateLimitError:
+            print(f"  Rate limited fetching stream for {name} — stopping. Re-run to continue.")
+            break
         np_count = 0
 
         lap_rows = []

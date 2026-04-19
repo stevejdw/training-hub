@@ -6,7 +6,7 @@ on:
       limit:
         description: 'Max activities without laps to process (newest first)'
         required: false
-        default: '50'
+        default: '200'
 
 jobs:
   backfill:
