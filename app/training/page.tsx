@@ -1,5 +1,10 @@
+import { Suspense } from 'react';
 import TrainingPlanner from '@/components/TrainingPlanner';
 
 export default function TrainingPage() {
-  return <TrainingPlanner />;
+  return (
+    <Suspense>
+      <TrainingPlanner />
+    </Suspense>
+  );
 }
