@@ -57,12 +57,25 @@ body {
   }
 }
 
-/* Mobile bottom nav — overshoots the screen edge by 100px so the background
-   is guaranteed to fill the home-indicator zone on any iPhone variant. */
+/* Mobile bottom nav */
 @media (max-width: 767px) {
   .mobile-nav {
-    bottom: -100px;
-    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 100px);
+    bottom: 0;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    /* ::after bleeds the nav background colour below bottom:0, covering
+       whatever gap iOS leaves between the viewport edge and the screen edge */
+    overflow: visible;
+  }
+  .mobile-nav::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    /* Sits just below the nav's own bottom edge */
+    top: 100%;
+    /* 100px is far more than any iPhone safe-area-inset-bottom */
+    height: 100px;
+    background: #030712;
   }
 }
 
