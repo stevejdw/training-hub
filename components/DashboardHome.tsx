@@ -311,24 +311,8 @@ function TrainingTab() {
         ))}
       </div>
 
-      {/* Period selector */}
-      <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Date</p>
-      <div className="flex bg-gray-800 rounded-xl p-1 gap-1">
-        {(['week', 'month', 'year'] as Period[]).map(p => (
-          <button
-            key={p}
-            onClick={() => changePeriod(p)}
-            className={`flex-1 py-1.5 rounded-lg text-sm font-medium transition-colors capitalize ${
-              period === p ? 'bg-orange-500 text-white' : 'text-gray-400 hover:text-white'
-            }`}
-          >
-            {p === 'week' ? 'Week' : p === 'month' ? 'Month' : 'Year'}
-          </button>
-        ))}
-      </div>
-
-      {/* Period navigation — very bottom */}
-      <div className="flex items-center justify-between pb-2">
+      {/* Period navigation */}
+      <div className="flex items-center justify-between">
         <button
           onClick={() => setOffset(o => o - 1)}
           className="w-9 h-9 flex items-center justify-center rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white transition-colors"
@@ -349,6 +333,22 @@ function TrainingTab() {
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
           </svg>
         </button>
+      </div>
+
+      {/* Period selector — very bottom */}
+      <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Date</p>
+      <div className="flex bg-gray-800 rounded-xl p-1 gap-1 pb-2">
+        {(['week', 'month', 'year'] as Period[]).map(p => (
+          <button
+            key={p}
+            onClick={() => changePeriod(p)}
+            className={`flex-1 py-1.5 rounded-lg text-sm font-medium transition-colors capitalize ${
+              period === p ? 'bg-orange-500 text-white' : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            {p === 'week' ? 'Week' : p === 'month' ? 'Month' : 'Year'}
+          </button>
+        ))}
       </div>
     </div>
   );
