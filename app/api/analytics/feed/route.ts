@@ -47,6 +47,7 @@ export async function GET() {
                total_elevation_gain, trainer, summary_polyline,
                average_speed, intensity_factor
         FROM activities
+        WHERE sport_type NOT ILIKE '%walk%'
         ORDER BY start_date DESC
         LIMIT 8
       `),
