@@ -161,16 +161,16 @@ export default function ActivitiesList() {
   return (
     <div className="h-full flex flex-col">
 
-      {/* Top bar: type filters + filter toggle */}
-      <div className="border-b border-gray-800 px-4 py-3 flex-shrink-0 space-y-2">
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* Type chips */}
-          <div className="flex gap-2 flex-wrap flex-1">
+      {/* Top bar */}
+      <div className="border-b border-gray-800 px-3 py-2.5 flex-shrink-0 space-y-2">
+        <div className="flex items-center gap-2">
+          {/* Sport filter chips — scrollable, no wrap */}
+          <div className="flex gap-1.5 overflow-x-auto flex-1 min-w-0 scrollbar-none">
             {TYPE_FILTERS.map(f => (
               <button
                 key={f}
                 onClick={() => toggleType(f)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap flex-shrink-0 ${
                   selected.includes(f)
                     ? 'bg-orange-500 text-white'
                     : 'bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700'
@@ -179,54 +179,64 @@ export default function ActivitiesList() {
                 {f}
               </button>
             ))}
+            {selected.length > 0 && (
+              <button
+                onClick={() => { setSelected([]); setPage(1); }}
+                className="px-2 py-1.5 rounded-lg text-xs text-gray-500 hover:text-white transition-colors whitespace-nowrap flex-shrink-0"
+              >
+                ✕
+              </button>
+            )}
           </div>
 
-          {/* Filter toggle button */}
-          <button
-            onClick={() => setShowFilters(v => !v)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex-shrink-0 ${
-              showFilters || hasActiveFilters
-                ? 'bg-orange-500/20 text-orange-400 border border-orange-500/50'
-                : 'bg-gray-800 text-gray-400 hover:text-white'
-            }`}
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3 4h18M6 8h12M9 12h6M11 16h2" />
-            </svg>
-            Filters{hasActiveFilters ? ' ●' : ''}
-          </button>
+          {/* Right controls */}
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            {!loading && (
+              <span className="text-xs text-gray-600">{total.toLocaleString()}</span>
+            )}
 
-          {/* Total count */}
-          {!loading && (
-            <span className="text-sm text-gray-500 flex-shrink-0">{total.toLocaleString()}</span>
-          )}
-
-          {/* Sync button */}
-          <button
-            onClick={handleSync}
-            disabled={syncing}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex-shrink-0 ${
-              syncing
-                ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
-                : 'bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700'
-            }`}
-            title="Sync new activities from Strava"
-          >
-            <svg
-              className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`}
-              fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+            {/* Filter toggle */}
+            <button
+              onClick={() => setShowFilters(v => !v)}
+              title="More filters"
+              className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors ${
+                showFilters || hasActiveFilters
+                  ? 'bg-orange-500/20 text-orange-400 border border-orange-500/50'
+                  : 'bg-gray-800 text-gray-400 hover:text-white'
+              }`}
             >
-              <path strokeLinecap="round" strokeLinejoin="round"
-                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-            {syncing ? 'Syncing…' : 'Sync'}
-          </button>
-          {syncResult && (
-            <span className={`text-xs flex-shrink-0 ${syncResult.startsWith('Error') ? 'text-red-400' : 'text-green-400'}`}>
-              {syncResult}
-            </span>
-          )}
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 4h18M6 8h12M9 12h6M11 16h2" />
+              </svg>
+            </button>
+
+            {/* Sync */}
+            <button
+              onClick={handleSync}
+              disabled={syncing}
+              title={syncing ? 'Syncing…' : 'Sync from Strava'}
+              className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors ${
+                syncing
+                  ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
+                  : 'bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700'
+              }`}
+            >
+              <svg
+                className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`}
+                fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+              >
+                <path strokeLinecap="round" strokeLinejoin="round"
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            </button>
+          </div>
         </div>
+
+        {syncResult && (
+          <p className={`text-xs ${syncResult.startsWith('Error') ? 'text-red-400' : 'text-green-400'}`}>
+            {syncResult}
+          </p>
+        )}
 
         {/* Expanded filter panel */}
         {showFilters && (

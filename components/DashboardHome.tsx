@@ -55,8 +55,8 @@ const METRIC_OPTS: { key: Metric; label: string; unit: string }[] = [
 ];
 
 const NAV: { key: Tab; label: string }[] = [
-  { key: 'activities', label: 'Activities'  },
   { key: 'training',   label: 'Progress'    },
+  { key: 'activities', label: 'Activities'  },
   { key: 'power',      label: 'Best Efforts' },
   { key: 'fitness',    label: 'Fitness'     },
 ];
@@ -501,7 +501,7 @@ function FitnessTab() {
 
 export default function DashboardHome() {
   const searchParams = useSearchParams();
-  const initialTab = (searchParams.get('tab') as Tab | null) ?? 'activities';
+  const initialTab = (searchParams.get('tab') as Tab | null) ?? 'training';
   const [tab, setTab] = useState<Tab>(initialTab);
 
   return (
