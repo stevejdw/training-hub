@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { TrainingDay } from '@/lib/training-plans';
 
 interface ActivitySummary {
@@ -26,54 +27,69 @@ const TYPE_DOT: Record<string, string> = {
   race:       'bg-purple-500',
 };
 
-function fmtMins(mins: number): string {
-  if (!mins) return '';
-  const h = Math.floor(mins / 60);
-  const m = mins % 60;
-  return h > 0 ? (m > 0 ? `${h}h${m}m` : `${h}h`) : `${m}m`;
-}
+const TYPE_BADGE: Record<string, string> = {
+  rest:       'bg-gray-700/60 text-gray-400',
+  recovery:   'bg-blue-900/60 text-blue-400',
+  endurance:  'bg-green-900/60 text-green-400',
+  tempo:      'bg-yellow-900/60 text-yellow-400',
+  threshold:  'bg-orange-900/60 text-orange-400',
+  vo2max:     'bg-red-900/60 text-red-400',
+  race:       'bg-purple-900/60 text-purple-400',
+};
 
-function fmtActTime(seconds: number): string {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  return h > 0 ? (m > 0 ? `${h}h${m}m` : `${h}h`) : `${m}m`;
-}
-
-const DOW = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const DOW_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 function todaySydney(): string {
   const d = new Date(Date.now() + 10 * 60 * 60 * 1000);
   return d.toISOString().slice(0, 10);
 }
 
-/** Returns 'done' (within targets), 'logged' (activity exists but off-plan), or 'none' */
+function fmtMins(mins: number): string {
+  if (!mins) return '';
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return h > 0 ? (m > 0 ? `${h}h ${m}m` : `${h}h`) : `${m}m`;
+}
+
+function fmtActTime(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  return h > 0 ? (m > 0 ? `${h}h ${m}m` : `${h}h`) : `${m}m`;
+}
+
 function completionStatus(day: TrainingDay, acts: ActivitySummary[]): 'done' | 'logged' | 'none' {
   if (acts.length === 0) return 'none';
-
-  // Pick the best-matching activity (highest TSS or longest duration)
   const best = acts.reduce((a, b) => (b.tss > a.tss || b.moving_time > a.moving_time ? b : a));
-
-  // TSS match: within 15% of target
   if (day.tss_target && day.tss_target > 0 && best.tss > 0) {
-    const pct = Math.abs(best.tss - day.tss_target) / day.tss_target;
-    return pct <= 0.15 ? 'done' : 'logged';
+    return Math.abs(best.tss - day.tss_target) / day.tss_target <= 0.15 ? 'done' : 'logged';
   }
-
-  // Duration match: within 20% of prescribed
   if (day.duration_min > 0 && best.moving_time > 0) {
-    const prescribedSecs = day.duration_min * 60;
-    const pct = Math.abs(best.moving_time - prescribedSecs) / prescribedSecs;
-    return pct <= 0.20 ? 'done' : 'logged';
+    return Math.abs(best.moving_time - day.duration_min * 60) / (day.duration_min * 60) <= 0.20 ? 'done' : 'logged';
   }
-
-  // Activity exists but no targets to compare — count as done
   return 'done';
 }
 
 export default function BlockView({ days, activities, onSelectDay }: Props) {
-  if (!days.length) return null;
-
   const today = todaySydney();
+
+  // Group into weeks of 7
+  const weeks: TrainingDay[][] = [];
+  for (let i = 0; i < days.length; i += 7) weeks.push(days.slice(i, i + 7));
+
+  // Default to the current week, else week 0
+  const defaultIdx = weeks.findIndex(w => w.some(d => d.date === today));
+  const [weekIdx, setWeekIdx] = useState(defaultIdx >= 0 ? defaultIdx : 0);
+
+  // If days prop changes (new plan loaded), reset to current week
+  useEffect(() => {
+    const idx = weeks.findIndex(w => w.some(d => d.date === today));
+    setWeekIdx(idx >= 0 ? idx : 0);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [days]);
+
+  if (!weeks.length) return null;
+
+  const week = weeks[weekIdx] ?? [];
   const actByDate = new Map<string, ActivitySummary[]>();
   for (const a of activities) {
     const arr = actByDate.get(a.date) ?? [];
@@ -81,140 +97,188 @@ export default function BlockView({ days, activities, onSelectDay }: Props) {
     actByDate.set(a.date, arr);
   }
 
-  // Group into weeks
-  const weeks: TrainingDay[][] = [];
-  for (let i = 0; i < days.length; i += 7) weeks.push(days.slice(i, i + 7));
+  const weekStart = week[0]?.date ?? '';
+  const weekEnd   = week[week.length - 1]?.date ?? '';
+  const weekTss   = week.reduce((s, d) => s + (d.tss_target ?? 0), 0);
+  const weekMins  = week.reduce((s, d) => s + (d.duration_min ?? 0), 0);
+  const isCurrentWeek = week.some(d => d.date === today);
+
+  const nonRestDays = week.filter(d => d.type !== 'rest');
+  const doneDays    = nonRestDays.filter(d => completionStatus(d, actByDate.get(d.date) ?? []) === 'done').length;
+
+  const weekLabel = weekStart
+    ? new Date(weekStart + 'T00:00:00Z').toLocaleDateString('en-AU', { day: 'numeric', month: 'short', timeZone: 'UTC' }) +
+      ' – ' +
+      new Date(weekEnd + 'T00:00:00Z').toLocaleDateString('en-AU', { day: 'numeric', month: 'short', timeZone: 'UTC' })
+    : `Week ${weekIdx + 1}`;
 
   return (
-    <div className="space-y-4">
-      {weeks.map((week, wi) => {
-        const weekStart = week[0]?.date;
-        const weekEnd   = week[week.length - 1]?.date;
-        const weekLabel = weekStart
-          ? new Date(weekStart + 'T00:00:00Z').toLocaleDateString('en-AU', { day: 'numeric', month: 'short', timeZone: 'UTC' }) +
-            ' – ' +
-            new Date(weekEnd   + 'T00:00:00Z').toLocaleDateString('en-AU', { day: 'numeric', month: 'short', timeZone: 'UTC' })
-          : `Week ${wi + 1}`;
+    <div className="space-y-3">
 
-        const weekTss     = week.reduce((s, d) => s + (d.tss_target ?? 0), 0);
-        const weekMins    = week.reduce((s, d) => s + (d.duration_min ?? 0), 0);
-        const isCurrentWeek = week.some(d => d.date === today);
+      {/* Week navigation */}
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => setWeekIdx(i => Math.max(0, i - 1))}
+          disabled={weekIdx === 0}
+          className="w-9 h-9 flex items-center justify-center rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex-shrink-0"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
 
-        // Count completions for the week header
-        const nonRestDays = week.filter(d => d.type !== 'rest');
-        const doneDays    = nonRestDays.filter(d => completionStatus(d, actByDate.get(d.date) ?? []) === 'done').length;
-        const loggedDays  = nonRestDays.filter(d => completionStatus(d, actByDate.get(d.date) ?? []) === 'logged').length;
-
-        return (
-          <div
-            key={wi}
-            className={`bg-gray-800/60 rounded-xl overflow-hidden border ${
-              isCurrentWeek ? 'border-orange-500/30' : 'border-gray-700/50'
-            }`}
-          >
-            {/* Week header */}
-            <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-700/50">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold text-white">Week {wi + 1}</span>
-                {isCurrentWeek && (
-                  <span className="text-[10px] bg-orange-500/20 text-orange-400 border border-orange-500/30 rounded px-1.5 py-0.5 font-medium">Current</span>
-                )}
-                {doneDays > 0 && (
-                  <span className="text-[10px] bg-green-500/20 text-green-400 border border-green-500/30 rounded px-1.5 py-0.5 font-medium">
-                    {doneDays}/{nonRestDays.length} done
-                  </span>
-                )}
-                {loggedDays > 0 && doneDays === 0 && (
-                  <span className="text-[10px] bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 rounded px-1.5 py-0.5 font-medium">Logged</span>
-                )}
-              </div>
-              <div className="flex items-center gap-3 text-xs text-gray-400">
-                <span className="hidden sm:block">{weekLabel}</span>
-                {weekMins > 0 && <span className="text-gray-300 font-medium">{fmtMins(weekMins)}</span>}
-                {weekTss > 0  && <span className="text-orange-400 font-medium">{weekTss} TSS</span>}
-              </div>
-            </div>
-
-            {/* Day cards grid */}
-            <div className="grid grid-cols-7 gap-px bg-gray-700/20 p-px">
-              {week.map((day, di) => {
-                const acts    = actByDate.get(day.date) ?? [];
-                const status  = completionStatus(day, acts);
-                const isToday = day.date === today;
-                const isRest  = day.type === 'rest';
-                const isPast  = day.date < today;
-
-                return (
-                  <div
-                    key={day.date}
-                    onClick={() => !isRest && onSelectDay(day)}
-                    className={`bg-gray-800/80 p-2 min-h-[88px] flex flex-col gap-1 transition-colors ${
-                      isToday ? 'ring-1 ring-orange-500/50 ring-inset' : ''
-                    } ${!isRest ? 'cursor-pointer hover:bg-gray-700/80' : ''}`}
-                  >
-                    {/* Day label + completion tick */}
-                    <div className="flex items-center justify-between">
-                      <span className={`text-[10px] font-medium ${isToday ? 'text-orange-400' : 'text-gray-500'}`}>
-                        {DOW[di]}
-                      </span>
-                      {status === 'done' ? (
-                        <svg className="w-3 h-3 text-green-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                        </svg>
-                      ) : status === 'logged' ? (
-                        <svg className="w-3 h-3 text-yellow-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                        </svg>
-                      ) : (
-                        <span className={`text-[10px] ${isToday ? 'text-orange-400' : 'text-gray-600'}`}>
-                          {new Date(day.date + 'T00:00:00Z').getUTCDate()}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Show date number below tick when completed */}
-                    {status !== 'none' && (
-                      <span className={`text-[9px] ${isToday ? 'text-orange-400' : 'text-gray-600'}`}>
-                        {new Date(day.date + 'T00:00:00Z').getUTCDate()}
-                      </span>
-                    )}
-
-                    {!isRest ? (
-                      <>
-                        <div className={`w-2 h-2 rounded-full flex-shrink-0 ${TYPE_DOT[day.type] ?? 'bg-gray-500'} ${isPast && status === 'none' ? 'opacity-40' : ''}`} />
-                        <p className={`text-[10px] leading-tight line-clamp-2 flex-1 ${isPast && status === 'none' ? 'text-gray-500' : 'text-gray-300'}`}>
-                          {day.title}
-                        </p>
-                        {day.duration_min > 0 && (
-                          <span className="text-[10px] text-gray-500">{fmtMins(day.duration_min)}</span>
-                        )}
-                      </>
-                    ) : (
-                      <span className="text-[10px] text-gray-600 italic mt-1">Rest</span>
-                    )}
-
-                    {acts.length > 0 && (
-                      <div className="mt-auto space-y-0.5">
-                        {acts.map(a => (
-                          <div key={a.id} className="flex items-center gap-1">
-                            <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${status === 'done' ? 'bg-green-500' : 'bg-yellow-500'}`} />
-                            <span className={`text-[9px] truncate ${status === 'done' ? 'text-green-400' : 'text-yellow-400'}`}>
-                              {a.tss > 0 ? `${a.tss} TSS` : fmtActTime(a.moving_time)}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+        <div className="flex-1 text-center">
+          <div className="flex items-center justify-center gap-2">
+            <span className="text-sm font-semibold text-white">Week {weekIdx + 1}</span>
+            {isCurrentWeek && (
+              <span className="text-[10px] bg-orange-500/20 text-orange-400 border border-orange-500/30 rounded px-1.5 py-0.5 font-medium">Current</span>
+            )}
           </div>
-        );
-      })}
+          <p className="text-xs text-gray-500 mt-0.5">{weekLabel}</p>
+        </div>
+
+        <button
+          onClick={() => setWeekIdx(i => Math.min(weeks.length - 1, i + 1))}
+          disabled={weekIdx === weeks.length - 1}
+          className="w-9 h-9 flex items-center justify-center rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex-shrink-0"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+      </div>
+
+      {/* Week summary strip */}
+      <div className="flex items-center gap-3 px-1 text-xs text-gray-500">
+        {doneDays > 0 && (
+          <span className="text-green-400 font-medium">{doneDays}/{nonRestDays.length} done</span>
+        )}
+        {weekMins > 0 && <span>{fmtMins(weekMins)} planned</span>}
+        {weekTss > 0  && <span className="text-orange-400">{weekTss} TSS planned</span>}
+        <span className="ml-auto text-gray-600">{weekIdx + 1} / {weeks.length}</span>
+      </div>
+
+      {/* Day cards */}
+      <div className="space-y-2">
+        {week.map((day, di) => {
+          const acts    = actByDate.get(day.date) ?? [];
+          const status  = completionStatus(day, acts);
+          const isToday = day.date === today;
+          const isPast  = day.date < today;
+          const isRest  = day.type === 'rest';
+          const dateNum = new Date(day.date + 'T00:00:00Z').getUTCDate();
+
+          return (
+            <div
+              key={day.date}
+              onClick={() => !isRest && onSelectDay(day)}
+              className={`rounded-xl border transition-colors ${
+                isToday
+                  ? 'border-orange-500/50 bg-gray-800/80'
+                  : isRest
+                  ? 'border-gray-800 bg-gray-900/40'
+                  : 'border-gray-800 bg-gray-800/60 cursor-pointer hover:bg-gray-700/60 hover:border-gray-700'
+              }`}
+            >
+              <div className="flex items-start gap-3 px-4 py-3">
+
+                {/* Day label column */}
+                <div className="flex-shrink-0 w-12 text-center pt-0.5">
+                  <p className={`text-xs font-semibold ${isToday ? 'text-orange-400' : 'text-gray-400'}`}>
+                    {DOW_SHORT[di]}
+                  </p>
+                  <p className={`text-lg font-bold leading-tight ${isToday ? 'text-orange-400' : isPast ? 'text-gray-600' : 'text-gray-300'}`}>
+                    {dateNum}
+                  </p>
+                </div>
+
+                {/* Divider */}
+                <div className={`w-px self-stretch mx-1 flex-shrink-0 ${isToday ? 'bg-orange-500/40' : 'bg-gray-700'}`} />
+
+                {/* Content */}
+                <div className="flex-1 min-w-0">
+                  {isRest ? (
+                    <div className="flex items-center gap-2 py-1">
+                      <div className={`w-2 h-2 rounded-full flex-shrink-0 ${TYPE_DOT.rest}`} />
+                      <span className="text-sm text-gray-500 italic">Rest day</span>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Title row */}
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <div className={`w-2 h-2 rounded-full flex-shrink-0 mt-1.5 ${TYPE_DOT[day.type] ?? 'bg-gray-500'} ${isPast && status === 'none' ? 'opacity-40' : ''}`} />
+                          <p className={`text-sm font-semibold leading-snug ${isPast && status === 'none' ? 'text-gray-500' : 'text-white'}`}>
+                            {day.title}
+                          </p>
+                        </div>
+                        {/* Status tick */}
+                        {status === 'done' && (
+                          <svg className="w-4 h-4 text-green-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                        {status === 'logged' && (
+                          <svg className="w-4 h-4 text-yellow-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </div>
+
+                      {/* Meta row: type badge + duration + TSS */}
+                      <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                        <span className={`text-[10px] rounded px-1.5 py-0.5 capitalize font-medium ${TYPE_BADGE[day.type] ?? TYPE_BADGE.endurance}`}>
+                          {day.type}
+                        </span>
+                        {day.duration_min > 0 && (
+                          <span className="text-[11px] text-gray-500">{fmtMins(day.duration_min)}</span>
+                        )}
+                        {day.tss_target && day.tss_target > 0 && (
+                          <span className="text-[11px] text-orange-400/70">{day.tss_target} TSS</span>
+                        )}
+                      </div>
+
+                      {/* Description snippet */}
+                      {day.description && (
+                        <p className={`text-xs mt-1.5 line-clamp-2 leading-relaxed ${isPast && status === 'none' ? 'text-gray-600' : 'text-gray-400'}`}>
+                          {day.description}
+                        </p>
+                      )}
+
+                      {/* Logged activities */}
+                      {acts.length > 0 && (
+                        <div className="mt-2 space-y-1">
+                          {acts.map(a => (
+                            <div key={a.id} className="flex items-center gap-1.5">
+                              <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${status === 'done' ? 'bg-green-500' : 'bg-yellow-500'}`} />
+                              <span className={`text-[11px] truncate ${status === 'done' ? 'text-green-400' : 'text-yellow-400'}`}>
+                                {a.name}
+                              </span>
+                              <span className="text-[10px] text-gray-600 flex-shrink-0 ml-auto">
+                                {a.tss > 0 ? `${a.tss} TSS` : fmtActTime(a.moving_time)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+
+                {/* Chevron for non-rest days */}
+                {!isRest && (
+                  <svg className="w-4 h-4 text-gray-600 flex-shrink-0 mt-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                  </svg>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
 
       {/* Legend */}
-      <div className="flex gap-4 flex-wrap px-1 items-center">
+      <div className="flex gap-3 flex-wrap px-1 pt-1 items-center">
         {Object.entries(TYPE_DOT).filter(([k]) => k !== 'rest').map(([type, cls]) => (
           <div key={type} className="flex items-center gap-1.5">
             <div className={`w-2 h-2 rounded-full ${cls}`} />
@@ -232,6 +296,7 @@ export default function BlockView({ days, activities, onSelectDay }: Props) {
           </div>
         </div>
       </div>
+
     </div>
   );
 }
