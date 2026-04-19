@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import PowerProgressChart from './PowerProgressChart';
 
 interface ActivityRow {
   id: number;
@@ -202,22 +201,10 @@ export default function SummaryTab() {
   }
 
   return (
-    <div className="space-y-4">
-      {/* Power progress chart */}
-      <div>
-        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Power Goals</h3>
-        <PowerProgressChart />
-      </div>
-
-      {/* Weekly activity log */}
-      <div>
-        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Recent Weeks</h3>
-        <div className="space-y-3">
-          {weeks.map((week, i) => (
-            <WeekCard key={week.week_start} week={week} isFirst={i === 0} />
-          ))}
-        </div>
-      </div>
+    <div className="space-y-3">
+      {weeks.map((week, i) => (
+        <WeekCard key={week.week_start} week={week} isFirst={i === 0} />
+      ))}
     </div>
   );
 }

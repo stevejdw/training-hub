@@ -7,8 +7,9 @@ import BlockView from './training/BlockView';
 import DayView from './training/DayView';
 import SummaryTab from './training/SummaryTab';
 import ObjectivesTab from './training/ObjectivesTab';
+import FitnessTab from './training/FitnessTab';
 
-type MainTab = 'summary' | 'objectives' | 'plan';
+type MainTab = 'summary' | 'objectives' | 'fitness' | 'plan';
 type View = { type: 'block' } | { type: 'day'; day: TrainingDay };
 
 interface PlanMeta {
@@ -36,6 +37,7 @@ interface ActivitySummary {
 const TABS: { key: MainTab; label: string }[] = [
   { key: 'summary',    label: 'Summary'       },
   { key: 'objectives', label: 'Objectives'    },
+  { key: 'fitness',    label: 'Fitness'       },
   { key: 'plan',       label: 'Training Plan' },
 ];
 
@@ -113,6 +115,9 @@ export default function TrainingPlanner() {
 
           {/* Objectives tab */}
           {mainTab === 'objectives' && <ObjectivesTab />}
+
+          {/* Fitness tab */}
+          {mainTab === 'fitness' && <FitnessTab />}
 
           {/* Training Plan tab */}
           {mainTab === 'plan' && (
