@@ -53,8 +53,8 @@ interface Result {
 }
 
 export default function DashboardBestPower() {
-  const [seconds, setSeconds] = useState(300);
-  const [days,    setDays]    = useState(365);
+  const [seconds, setSeconds] = useState(600);
+  const [days,    setDays]    = useState(30);
   const [results, setResults] = useState<Result[]>([]);
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState<string | null>(null);
