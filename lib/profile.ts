@@ -7,6 +7,14 @@ export interface EventGoal {
   goal: string;
 }
 
+export interface PowerTarget {
+  id: string;
+  label: string;       // e.g. "5 min", "20 min", "1 hour"
+  seconds: number;
+  target_watts: number;
+  notes: string;
+}
+
 export interface AthleteProfile {
   name: string;
   ftp: number;
@@ -15,6 +23,8 @@ export interface AthleteProfile {
   weight_kg: number | null;
   training_goals: string;
   events: EventGoal[];
+  power_targets: PowerTarget[];
+  training_notes: string;
   // HR zones
   max_hr: number | null;
   hr_zones_auto: boolean;
@@ -32,6 +42,8 @@ const DEFAULTS: AthleteProfile = {
   weight_kg: null,
   training_goals: '',
   events: [],
+  power_targets: [],
+  training_notes: '',
   max_hr: null,
   hr_zones_auto: true,
   hr_zone_boundaries: null,
