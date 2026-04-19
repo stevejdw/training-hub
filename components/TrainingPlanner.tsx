@@ -226,6 +226,7 @@ export default function TrainingPlanner() {
                     day={view.day}
                     activities={actsByDate.get(view.day.date) ?? []}
                     onBack={() => setView({ type: 'block' })}
+                    onDayUpdated={() => { if (activePlanId) loadPlan(activePlanId); }}
                   />
                 )}
               </>
