@@ -205,13 +205,30 @@ function TrainingTab() {
         );
       })() : null}
 
-      {/* Metric toggle */}
-      <div className="flex gap-1.5 flex-wrap">
+      {/* Sport filters — evenly spread above chart */}
+      <div className="grid grid-cols-4 gap-2">
+        {TYPE_FILTERS.map(f => (
+          <button
+            key={f}
+            onClick={() => toggleFilter(f)}
+            className={`py-1.5 rounded-lg text-xs font-medium transition-colors text-center ${
+              selected.includes(f)
+                ? 'bg-orange-500 text-white'
+                : 'bg-gray-800 text-gray-400 hover:text-white'
+            }`}
+          >
+            {f}
+          </button>
+        ))}
+      </div>
+
+      {/* Metric toggle — evenly spread above chart */}
+      <div className="grid grid-cols-4 gap-2">
         {METRIC_OPTS.map(m => (
           <button
             key={m.key}
             onClick={() => setMetric(m.key)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+            className={`py-1.5 rounded-lg text-xs font-medium transition-colors text-center ${
               metric === m.key
                 ? 'bg-orange-500/20 text-orange-400 border border-orange-500/50'
                 : 'bg-gray-800 text-gray-500 hover:text-gray-300'
@@ -284,28 +301,6 @@ function TrainingTab() {
         )}
       </div>
 
-      {/* Sport filters */}
-      <div className="flex gap-2 flex-wrap">
-        {TYPE_FILTERS.map(f => (
-          <button
-            key={f}
-            onClick={() => toggleFilter(f)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-              selected.includes(f)
-                ? 'bg-orange-500 text-white'
-                : 'bg-gray-800 text-gray-400 hover:text-white'
-            }`}
-          >
-            {f}
-          </button>
-        ))}
-        {selected.length > 0 && (
-          <button onClick={() => setSelected([])} className="px-3 py-1.5 rounded-lg text-xs text-gray-500 hover:text-white transition-colors">
-            Clear
-          </button>
-        )}
-      </div>
-
       {/* Legend */}
       <div className="flex gap-3 flex-wrap">
         {CYCLING_TYPES.map(type => (
@@ -317,6 +312,7 @@ function TrainingTab() {
       </div>
 
       {/* Period selector */}
+      <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Date</p>
       <div className="flex bg-gray-800 rounded-xl p-1 gap-1">
         {(['week', 'month', 'year'] as Period[]).map(p => (
           <button
