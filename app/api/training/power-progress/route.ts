@@ -26,7 +26,7 @@ export async function GET() {
       // Single lateral per activity computes all 4 windows in one pass
       const weeklyRes = await client.query(`
         SELECT
-          date_trunc('week', (a.start_date AT TIME ZONE $1))::date::text AS week_start,
+          date_trunc('week', (a.start_date AT TIME ZONE $1::text))::date::text AS week_start,
           MAX(CASE WHEN bp.max_s300  IS NOT NULL THEN ROUND(bp.max_s300  / 300.0 )::int END) AS d5min,
           MAX(CASE WHEN bp.max_s600  IS NOT NULL THEN ROUND(bp.max_s600  / 600.0 )::int END) AS d10min,
           MAX(CASE WHEN bp.max_s1200 IS NOT NULL THEN ROUND(bp.max_s1200 / 1200.0)::int END) AS d20min,
