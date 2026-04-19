@@ -176,48 +176,31 @@ function TrainingTab() {
 
   return (
     <div className="space-y-4">
-      {/* Period navigation */}
-      <div className="flex items-center justify-between">
-        <button
-          onClick={() => setOffset(o => o - 1)}
-          className="w-9 h-9 flex items-center justify-center rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-          </svg>
-        </button>
-        <span className="text-sm font-medium text-white">
-          {loading && !data ? '…' : data?.label ?? ''}
-        </span>
-        <button
-          onClick={() => setOffset(o => o + 1)}
-          disabled={!data?.canGoForward}
-          className="w-9 h-9 flex items-center justify-center rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-          </svg>
-        </button>
-      </div>
-
-      {/* Summary cards */}
+      {/* Summary cards — 3 top, 2 bottom */}
       {loading && !data ? (
-        <div className="grid grid-cols-5 gap-2">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="bg-gray-800 rounded-xl p-3 h-16 animate-pulse" />
-          ))}
+        <div className="space-y-2">
+          <div className="grid grid-cols-3 gap-2">
+            {Array.from({ length: 3 }).map((_, i) => <div key={i} className="bg-gray-800 rounded-xl p-3 h-16 animate-pulse" />)}
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            {Array.from({ length: 2 }).map((_, i) => <div key={i} className="bg-gray-800 rounded-xl p-3 h-16 animate-pulse" />)}
+          </div>
         </div>
       ) : data ? (() => {
         const from = periodStart(period, offset);
         const filtersQ = selected.length > 0 ? selected.join(',') : 'All';
         const href = `/dashboard?tab=activities&filters=${encodeURIComponent(filtersQ)}&from=${from}`;
         return (
-          <div className="grid grid-cols-5 gap-2">
-            <StatCard label="Rides"  value={String(data.summary.activities ?? 0)} href={href} />
-            <StatCard label="km"     value={String(data.summary.km ?? 0)}         href={href} />
-            <StatCard label="Hours"  value={String(data.summary.hours ?? 0)}      href={href} />
-            <StatCard label="TSS"    value={String(data.summary.tss ?? 0)}        href={href} />
-            <StatCard label="Elev m" value={String(data.summary.elevation ?? 0)}  href={href} />
+          <div className="space-y-2">
+            <div className="grid grid-cols-3 gap-2">
+              <StatCard label="Rides" value={String(data.summary.activities ?? 0)} href={href} />
+              <StatCard label="km"    value={String(data.summary.km ?? 0)}         href={href} />
+              <StatCard label="Hours" value={String(data.summary.hours ?? 0)}      href={href} />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <StatCard label="TSS"    value={String(data.summary.tss ?? 0)}       href={href} />
+              <StatCard label="Elev m" value={String(data.summary.elevation ?? 0)} href={href} />
+            </div>
           </div>
         );
       })() : null}
@@ -333,7 +316,7 @@ function TrainingTab() {
         ))}
       </div>
 
-      {/* Period selector — at the bottom */}
+      {/* Period selector */}
       <div className="flex bg-gray-800 rounded-xl p-1 gap-1">
         {(['week', 'month', 'year'] as Period[]).map(p => (
           <button
@@ -346,6 +329,30 @@ function TrainingTab() {
             {p === 'week' ? 'Week' : p === 'month' ? 'Month' : 'Year'}
           </button>
         ))}
+      </div>
+
+      {/* Period navigation — very bottom */}
+      <div className="flex items-center justify-between pb-2">
+        <button
+          onClick={() => setOffset(o => o - 1)}
+          className="w-9 h-9 flex items-center justify-center rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white transition-colors"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
+        <span className="text-sm font-medium text-white">
+          {loading && !data ? '…' : data?.label ?? ''}
+        </span>
+        <button
+          onClick={() => setOffset(o => o + 1)}
+          disabled={!data?.canGoForward}
+          className="w-9 h-9 flex items-center justify-center rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
       </div>
     </div>
   );
