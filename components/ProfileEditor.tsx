@@ -430,6 +430,23 @@ export default function ProfileEditor() {
                 </div>
               </div>
 
+              {/* Coach AI Persona */}
+              <div className="bg-gray-900 rounded-xl p-5 space-y-3 border border-gray-800">
+                <div>
+                  <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Coach AI Persona</h2>
+                  <p className="text-xs text-gray-500 mt-1">Describe how you want your coach to communicate. Leave blank for the default style.</p>
+                </div>
+                <Field label="Persona">
+                  <textarea
+                    value={profile.coach_persona ?? ''}
+                    onChange={e => update('coach_persona', e.target.value)}
+                    rows={3}
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white resize-none focus:outline-none focus:border-orange-500"
+                    placeholder="e.g. Direct and no-nonsense. Skip the encouragement, just give me the numbers and the plan."
+                  />
+                </Field>
+              </div>
+
               {/* Save */}
               <div className="flex justify-end">
                 <button onClick={save} disabled={saving} className="px-6 py-2.5 rounded-lg bg-orange-500 hover:bg-orange-400 disabled:opacity-50 text-white text-sm font-medium transition-colors">

@@ -64,6 +64,8 @@ export interface AthleteProfile {
   // Power zones
   power_zones_auto: boolean;
   power_zone_boundaries: number[] | null; // [z1_max, z2_max, z3_max, z4_max] in watts
+  // Coach AI
+  coach_persona?: string;
 }
 
 const DEFAULTS: AthleteProfile = {

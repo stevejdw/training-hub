@@ -7,10 +7,11 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
 } from 'recharts';
 import { SPORT_FILTER_LABELS, CYCLING_TYPES, SportFilter, sportColor, sportLabel } from '@/lib/sport-types';
-import DashboardBestPower from './DashboardBestPower';
 import ActivitiesList from './ActivitiesList';
+import FeedPage from './FeedPage';
+import ProfileEditor from './ProfileEditor';
 
-type Tab    = 'training' | 'power' | 'activities';
+type Tab    = 'feed' | 'activities' | 'progress' | 'settings';
 type Period = 'week' | 'month' | 'year';
 type Metric = 'tss' | 'km' | 'hours' | 'activities';
 
@@ -54,9 +55,10 @@ const METRIC_OPTS: { key: Metric; label: string; unit: string }[] = [
 ];
 
 const NAV: { key: Tab; label: string }[] = [
-  { key: 'training',   label: 'Progress'    },
+  { key: 'feed',       label: 'Feed'        },
   { key: 'activities', label: 'Activities'  },
-  { key: 'power',      label: 'Best Efforts' },
+  { key: 'progress',   label: 'Progress'    },
+  { key: 'settings',   label: 'Settings'    },
 ];
 
 /** Returns the ISO date string (YYYY-MM-DD) for the start of the current
@@ -352,17 +354,9 @@ function TrainingTab() {
   );
 }
 
-function PowerTab() {
-  return (
-    <div className="space-y-4">
-      <DashboardBestPower />
-    </div>
-  );
-}
-
 export default function DashboardHome() {
   const searchParams = useSearchParams();
-  const initialTab = (searchParams.get('tab') as Tab | null) ?? 'training';
+  const initialTab = (searchParams.get('tab') as Tab | null) ?? 'feed';
   const [tab, setTab] = useState<Tab>(initialTab);
 
   return (
@@ -387,12 +381,12 @@ export default function DashboardHome() {
 
       {/* Content */}
       <div className="flex-1 overflow-hidden min-w-0">
-        {tab === 'activities' ? (
-          <ActivitiesList />
-        ) : (
+        {tab === 'feed'       && <FeedPage />}
+        {tab === 'activities' && <ActivitiesList />}
+        {tab === 'settings'   && <ProfileEditor />}
+        {tab === 'progress'   && (
           <div className="h-full overflow-y-auto scroll-touch px-4 py-4">
-            {tab === 'training' && <TrainingTab />}
-            {tab === 'power'    && <PowerTab />}
+            <TrainingTab />
           </div>
         )}
       </div>

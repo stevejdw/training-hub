@@ -178,7 +178,7 @@ export default function FeedPage() {
 
         {/* Fitness snapshot — links to Fitness tab in Analytics */}
         {fitness && (
-          <Link href="/dashboard?tab=fitness" className="block group">
+          <Link href="/fitness" className="block group">
             <div className="grid grid-cols-3 gap-2">
               <div className="bg-gray-800/60 rounded-xl p-3 text-center group-hover:bg-gray-700/60 transition-colors">
                 <p className="text-[10px] text-gray-500 uppercase tracking-wider">Fitness (CTL)</p>

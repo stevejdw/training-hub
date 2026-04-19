@@ -1,15 +1,16 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { useSearchParams } from 'next/navigation';
 // useCallback kept for loadPlan
 import { TrainingPlan, TrainingDay } from '@/lib/training-plans';
 import BlockView from './training/BlockView';
 import DayView from './training/DayView';
 import SummaryTab from './training/SummaryTab';
-import ObjectivesTab from './training/ObjectivesTab';
-import FitnessTab from './training/FitnessTab';
+import EditPlanModal from './training/EditPlanModal';
+import DashboardBestPower from './DashboardBestPower';
 
-type MainTab = 'summary' | 'objectives' | 'fitness' | 'plan';
+type MainTab = 'summary' | 'best-efforts' | 'plan';
 type View = { type: 'block' } | { type: 'day'; day: TrainingDay };
 
 interface PlanMeta {
@@ -35,19 +36,22 @@ interface ActivitySummary {
 }
 
 const TABS: { key: MainTab; label: string }[] = [
-  { key: 'summary',    label: 'Summary'       },
-  { key: 'objectives', label: 'Objectives'    },
-  { key: 'fitness',    label: 'Fitness'       },
-  { key: 'plan',       label: 'Training Plan' },
+  { key: 'summary',      label: 'Summary'       },
+  { key: 'best-efforts', label: 'Best Efforts'  },
+  { key: 'plan',         label: 'Training Plan' },
 ];
 
 export default function TrainingPlanner() {
-  const [mainTab, setMainTab]           = useState<MainTab>('summary');
+  const searchParams = useSearchParams();
+  const rawTab = searchParams.get('tab');
+  const initialTab: MainTab = (rawTab === 'summary' || rawTab === 'best-efforts' || rawTab === 'plan') ? rawTab : 'summary';
+  const [mainTab, setMainTab]           = useState<MainTab>(initialTab);
   const [activePlanId, setActivePlanId] = useState<number | null>(null);
   const [plan, setPlan]                 = useState<TrainingPlan | null>(null);
   const [activities, setActivities]     = useState<ActivitySummary[]>([]);
   const [view, setView]                 = useState<View>({ type: 'block' });
   const [loadingPlan, setLoadingPlan]   = useState(false);
+  const [editingPlan, setEditingPlan]   = useState(false);
 
   // Initial load: plans + active plan + activities (only needed for plan tab)
   useEffect(() => {
@@ -113,20 +117,25 @@ export default function TrainingPlanner() {
           {/* Summary tab */}
           {mainTab === 'summary' && <SummaryTab />}
 
-          {/* Objectives tab */}
-          {mainTab === 'objectives' && <ObjectivesTab />}
-
-          {/* Fitness tab */}
-          {mainTab === 'fitness' && <FitnessTab />}
+          {/* Best Efforts tab */}
+          {mainTab === 'best-efforts' && <DashboardBestPower />}
 
           {/* Training Plan tab */}
           {mainTab === 'plan' && (
             <div className="space-y-4">
               {/* Plan name/goal header */}
               {plan && view.type === 'block' && (
-                <div>
-                  <h2 className="text-lg font-semibold text-white">{plan.name}</h2>
-                  {plan.goal && <p className="text-sm text-gray-400 mt-0.5">{plan.goal}</p>}
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <h2 className="text-lg font-semibold text-white">{plan.name}</h2>
+                    {plan.goal && <p className="text-sm text-gray-400 mt-0.5">{plan.goal}</p>}
+                  </div>
+                  <button
+                    onClick={() => setEditingPlan(true)}
+                    className="flex-shrink-0 px-3 py-1.5 text-xs text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
+                  >
+                    Edit
+                  </button>
                 </div>
               )}
 
@@ -179,6 +188,15 @@ export default function TrainingPlanner() {
 
         </div>
       </div>
+
+      {/* Edit plan modal */}
+      {editingPlan && plan && (
+        <EditPlanModal
+          plan={plan}
+          onClose={() => setEditingPlan(false)}
+          onUpdated={() => { setEditingPlan(false); if (activePlanId) loadPlan(activePlanId); }}
+        />
+      )}
 
     </div>
   );

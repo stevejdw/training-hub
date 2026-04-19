@@ -5,15 +5,6 @@ import { usePathname } from 'next/navigation';
 
 const links = [
   {
-    href: '/feed',
-    label: 'Feed',
-    icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
-      </svg>
-    ),
-  },
-  {
     href: '/dashboard',
     label: 'Dashboard',
     icon: (
@@ -28,6 +19,15 @@ const links = [
     icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+      </svg>
+    ),
+  },
+  {
+    href: '/fitness',
+    label: 'Fitness',
+    icon: (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
       </svg>
     ),
   },
@@ -79,17 +79,6 @@ export default function Nav() {
             );
           })}
         </nav>
-        <Link
-          href="/profile"
-          className={`flex items-center justify-center w-9 h-9 rounded-lg transition-colors ${
-            pathname.startsWith('/profile')
-              ? 'bg-orange-500 text-white'
-              : 'text-gray-400 hover:text-white hover:bg-gray-800'
-          }`}
-          title="Settings"
-        >
-          <GearIcon />
-        </Link>
       </header>
 
       {/* ── Mobile: fixed bottom tab bar ── */}
@@ -117,15 +106,6 @@ export default function Nav() {
               </Link>
             );
           })}
-          <Link
-            href="/profile"
-            className={`flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors ${
-              pathname.startsWith('/profile') ? 'text-orange-500' : 'text-gray-500'
-            }`}
-          >
-            <GearIcon />
-            <span className="text-[10px] font-medium tracking-wide">Settings</span>
-          </Link>
         </div>
       </nav>
     </>
