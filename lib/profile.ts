@@ -1,10 +1,40 @@
 import { PoolClient } from 'pg';
 import pool from './db';
 
+export interface EventClimb {
+  name: string;
+  start_km: number;
+  end_km: number;
+  distance_km: number;
+  elevation_gain: number;
+  avg_gradient: number;
+  target_watts: number;
+}
+
+export interface CachedRoute {
+  id: string;
+  name: string;
+  distance_m: number;
+  elevation_gain: number;
+  stream_distance_km: number[];  // downsampled, km from start
+  stream_altitude_m:  number[];  // downsampled, meters
+}
+
+export interface PacingStrategy {
+  flat_watts:       number;
+  descent_watts:    number;
+  bike_weight_kg:   number;
+  climbs:           EventClimb[];
+  est_time_min:     number;
+}
+
 export interface EventGoal {
   name: string;
   date: string;   // YYYY-MM-DD
   goal: string;
+  strava_route_id?:  string;
+  route?:            CachedRoute | null;
+  pacing_strategy?:  PacingStrategy | null;
 }
 
 export interface PowerTarget {

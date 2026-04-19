@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import TrainingPlansSettings from './training/TrainingPlansSettings';
+import EventPacingModal from './EventPacingModal';
 import { AthleteProfile, EventGoal } from '@/lib/profile';
 import { type ThemePreference, getThemePreference, setThemePreference } from './ThemeProvider';
+import { fmtTime } from '@/lib/pacing';
 
 const TIMEZONES = [
   { label: 'Sydney / Melbourne (AEST/AEDT)',  value: 'Australia/Sydney'    },
@@ -60,9 +62,10 @@ export default function ProfileEditor() {
   const [tab,      setTab]      = useState<SettingsTab>('profile');
   const [profile,  setProfile]  = useState<AthleteProfile | null>(null);
   const [eftpData, setEftpData] = useState<EftpData | null>(null);
-  const [saving,   setSaving]   = useState(false);
-  const [saved,    setSaved]    = useState(false);
-  const [theme,    setTheme]    = useState<ThemePreference>('dark');
+  const [saving,       setSaving]       = useState(false);
+  const [saved,        setSaved]        = useState(false);
+  const [theme,        setTheme]        = useState<ThemePreference>('dark');
+  const [pacingEvent,  setPacingEvent]  = useState<EventGoal | null>(null);
 
   useEffect(() => {
     fetch('/api/profile').then(r => r.json()).then(setProfile);
@@ -526,6 +529,32 @@ export default function ProfileEditor() {
                           placeholder="e.g. Sub 8:30, finish strong, top 10"
                         />
                       </Field>
+
+                      {/* Pacing strategy summary / button */}
+                      <div className="flex items-center justify-between pt-1">
+                        {event.pacing_strategy?.est_time_min ? (
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-gray-500">Pacing:</span>
+                            <span className="text-xs font-semibold text-orange-400">
+                              {fmtTime(event.pacing_strategy.est_time_min)}
+                            </span>
+                            {event.route && (
+                              <span className="text-xs text-gray-600">
+                                · {Math.round(event.route.distance_m / 100) / 10} km
+                                · {event.pacing_strategy.climbs.length} climb{event.pacing_strategy.climbs.length !== 1 ? 's' : ''}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-gray-600">No pacing strategy set</span>
+                        )}
+                        <button
+                          onClick={() => setPacingEvent(event)}
+                          className="px-3 py-1 text-xs font-medium rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white transition-colors border border-gray-700"
+                        >
+                          {event.pacing_strategy ? 'Edit pacing' : 'Set pacing →'}
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -542,6 +571,36 @@ export default function ProfileEditor() {
 
         </div>
       </div>
+
+      {/* Pacing modal — full screen overlay */}
+      {pacingEvent && profile && (
+        <EventPacingModal
+          event={pacingEvent}
+          riderWeightKg={profile.weight_kg ?? 75}
+          onSave={updated => {
+            // Persist updated event back into profile state
+            setProfile(prev => {
+              if (!prev) return prev;
+              const events = prev.events.map(e =>
+                e.name === pacingEvent.name && e.date === pacingEvent.date ? updated : e
+              );
+              return { ...prev, events };
+            });
+            setPacingEvent(null);
+            // Auto-save
+            if (profile) {
+              const merged = {
+                ...profile,
+                events: profile.events.map(e =>
+                  e.name === pacingEvent.name && e.date === pacingEvent.date ? updated : e
+                ),
+              };
+              fetch('/api/profile', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(merged) });
+            }
+          }}
+          onClose={() => setPacingEvent(null)}
+        />
+      )}
     </div>
   );
 }
