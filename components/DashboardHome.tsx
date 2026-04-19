@@ -239,6 +239,30 @@ function TrainingTab() {
         ))}
       </div>
 
+      {/* Period navigation — above chart */}
+      <div className="flex items-center justify-between">
+        <button
+          onClick={() => setOffset(o => o - 1)}
+          className="w-9 h-9 flex items-center justify-center rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white transition-colors"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
+        <span className="text-sm font-medium text-white">
+          {loading && !data ? '…' : data?.label ?? ''}
+        </span>
+        <button
+          onClick={() => setOffset(o => o + 1)}
+          disabled={!data?.canGoForward}
+          className="w-9 h-9 flex items-center justify-center rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+      </div>
+
       {/* Bar chart */}
       <div className="bg-gray-800/60 rounded-xl p-3">
         {error ? (
@@ -309,30 +333,6 @@ function TrainingTab() {
             <span className="text-xs text-gray-400">{sportLabel(type)}</span>
           </div>
         ))}
-      </div>
-
-      {/* Period navigation */}
-      <div className="flex items-center justify-between">
-        <button
-          onClick={() => setOffset(o => o - 1)}
-          className="w-9 h-9 flex items-center justify-center rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-          </svg>
-        </button>
-        <span className="text-sm font-medium text-white">
-          {loading && !data ? '…' : data?.label ?? ''}
-        </span>
-        <button
-          onClick={() => setOffset(o => o + 1)}
-          disabled={!data?.canGoForward}
-          className="w-9 h-9 flex items-center justify-center rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-          </svg>
-        </button>
       </div>
 
       {/* Period selector — very bottom */}
