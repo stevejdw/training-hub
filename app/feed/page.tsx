@@ -1,7 +1,5 @@
-import FeedPage from '@/components/FeedPage';
-
-export const metadata = { title: 'Feed | Training Hub' };
+import { redirect } from 'next/navigation';
 
 export default function Feed() {
-  return <FeedPage />;
+  redirect('/dashboard');
 }
