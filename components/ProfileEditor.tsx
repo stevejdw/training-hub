@@ -2,28 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import TrainingPlansSettings from './training/TrainingPlansSettings';
-
-interface EventGoal {
-  name: string;
-  date: string;
-  goal: string;
-}
-
-interface AthleteProfile {
-  name: string;
-  ftp: number;
-  use_eftp: boolean;
-  eftp: number | null;
-  weight_kg: number | null;
-  training_goals: string;
-  events: EventGoal[];
-  timezone: string;
-  max_hr: number | null;
-  hr_zones_auto: boolean;
-  hr_zone_boundaries: number[] | null;
-  power_zones_auto: boolean;
-  power_zone_boundaries: number[] | null;
-}
+import { AthleteProfile, EventGoal } from '@/lib/profile';
 
 const TIMEZONES = [
   { label: 'Sydney / Melbourne (AEST/AEDT)',  value: 'Australia/Sydney'    },
@@ -49,10 +28,18 @@ interface EftpEstimate {
 }
 
 interface EftpData {
-  estimates:      EftpEstimate[];
-  best_eftp:      number | null;
-  best_duration:  string | null;
+  estimates:     EftpEstimate[];
+  best_eftp:     number | null;
+  best_duration: string | null;
 }
+
+type SettingsTab = 'profile' | 'plans' | 'events';
+
+const TABS: { key: SettingsTab; label: string }[] = [
+  { key: 'profile', label: 'Profile'         },
+  { key: 'plans',   label: 'Training Plans'  },
+  { key: 'events',  label: 'Events & Goals'  },
+];
 
 function Field({ label, children, hint }: { label: string; children: React.ReactNode; hint?: string }) {
   return (
@@ -69,10 +56,11 @@ function Field({ label, children, hint }: { label: string; children: React.React
 const inputCls = 'w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-orange-500 transition-colors';
 
 export default function ProfileEditor() {
-  const [profile, setProfile] = useState<AthleteProfile | null>(null);
+  const [tab,      setTab]      = useState<SettingsTab>('profile');
+  const [profile,  setProfile]  = useState<AthleteProfile | null>(null);
   const [eftpData, setEftpData] = useState<EftpData | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [saving,   setSaving]   = useState(false);
+  const [saved,    setSaved]    = useState(false);
 
   useEffect(() => {
     fetch('/api/profile').then(r => r.json()).then(setProfile);
@@ -83,10 +71,25 @@ export default function ProfileEditor() {
     setProfile(prev => prev ? { ...prev, [key]: value } : prev);
   }
 
+  // Goals
+  function addGoal() {
+    setProfile(prev => prev ? { ...prev, goals: [...(prev.goals ?? []), ''] } : prev);
+  }
+  function updateGoal(i: number, value: string) {
+    setProfile(prev => {
+      if (!prev) return prev;
+      const goals = (prev.goals ?? []).map((g, idx) => idx === i ? value : g);
+      return { ...prev, goals };
+    });
+  }
+  function removeGoal(i: number) {
+    setProfile(prev => prev ? { ...prev, goals: (prev.goals ?? []).filter((_, idx) => idx !== i) } : prev);
+  }
+
+  // Events
   function addEvent() {
     setProfile(prev => prev ? { ...prev, events: [...prev.events, { name: '', date: '', goal: '' }] } : prev);
   }
-
   function updateEvent(i: number, field: keyof EventGoal, value: string) {
     setProfile(prev => {
       if (!prev) return prev;
@@ -94,7 +97,6 @@ export default function ProfileEditor() {
       return { ...prev, events };
     });
   }
-
   function removeEvent(i: number) {
     setProfile(prev => prev ? { ...prev, events: prev.events.filter((_, idx) => idx !== i) } : prev);
   }
@@ -109,332 +111,382 @@ export default function ProfileEditor() {
   }
 
   if (!profile) {
-    return <div className="flex items-center justify-center h-40 text-gray-500 text-sm">Loading profile…</div>;
+    return (
+      <div className="h-full flex flex-col">
+        <div className="flex-shrink-0 h-12 border-b border-gray-800" />
+        <div className="flex-1 flex items-center justify-center text-gray-500 text-sm">Loading…</div>
+      </div>
+    );
   }
 
   const displayFtp = profile.use_eftp && profile.eftp ? profile.eftp : profile.ftp;
+  const goals = profile.goals ?? [];
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-8 space-y-8">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold text-white">Athlete Profile</h1>
-        <button
-          onClick={save}
-          disabled={saving}
-          className="px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-400 disabled:opacity-50 text-white text-sm font-medium transition-colors"
-        >
-          {saving ? 'Saving…' : saved ? 'Saved ✓' : 'Save'}
-        </button>
-      </div>
+    <div className="h-full flex flex-col">
 
-      {/* Basic info */}
-      <div className="bg-gray-900 rounded-xl p-5 space-y-4 border border-gray-800">
-        <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Basic Info</h2>
-        <div className="grid grid-cols-2 gap-4">
-          <Field label="Name">
-            <input
-              type="text"
-              value={profile.name}
-              onChange={e => update('name', e.target.value)}
-              className={inputCls}
-              placeholder="Your name"
-            />
-          </Field>
-          <Field label="Weight (kg)" hint="Used for w/kg calculations">
-            <input
-              type="number"
-              value={profile.weight_kg ?? ''}
-              onChange={e => update('weight_kg', e.target.value ? Number(e.target.value) : null)}
-              className={inputCls}
-              placeholder="e.g. 75"
-              min={30}
-              max={200}
-              step={0.1}
-            />
-          </Field>
-        </div>
-        <Field label="Timezone" hint="Used for weekly summaries and date calculations">
-          <select
-            value={profile.timezone ?? 'Australia/Sydney'}
-            onChange={e => update('timezone', e.target.value)}
-            className={inputCls}
-          >
-            {TIMEZONES.map(tz => (
-              <option key={tz.value} value={tz.value}>{tz.label}</option>
-            ))}
-          </select>
-        </Field>
-      </div>
-
-      {/* FTP */}
-      <div className="bg-gray-900 rounded-xl p-5 space-y-4 border border-gray-800">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Power — FTP</h2>
-          <span className="text-orange-400 font-bold text-lg">{displayFtp}W active</span>
-        </div>
-
-        <Field label="Manual FTP">
-          <input
-            type="number"
-            value={profile.ftp}
-            onChange={e => update('ftp', Number(e.target.value))}
-            className={inputCls}
-            min={100}
-            max={600}
-          />
-        </Field>
-
-        <Field label="Use eFTP instead of manual FTP">
-          <div className="flex items-center gap-3 mt-1">
-            <button
-              onClick={() => update('use_eftp', !profile.use_eftp)}
-              className={`relative w-10 h-5 rounded-full transition-colors ${profile.use_eftp ? 'bg-orange-500' : 'bg-gray-700'}`}
-            >
-              <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${profile.use_eftp ? 'translate-x-5' : 'translate-x-0.5'}`} />
-            </button>
-            <span className="text-sm text-gray-400">{profile.use_eftp ? 'Using eFTP' : 'Using manual FTP'}</span>
-          </div>
-        </Field>
-
-        {profile.use_eftp && (
-          <Field label="eFTP — estimated from best power (last 14 days)">
-            <div className="space-y-3 mt-1">
-
-              {/* Auto-calculated recommendation */}
-              {eftpData && eftpData.best_eftp ? (
-                <div className="rounded-xl border border-orange-500/30 bg-orange-500/5 p-3 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-lg font-bold text-white">{eftpData.best_eftp}<span className="text-sm font-normal text-gray-400 ml-1">W</span></p>
-                      <p className="text-xs text-gray-500">Best estimate · from {eftpData.best_duration} best power</p>
-                    </div>
-                    <button
-                      onClick={() => update('eftp', eftpData.best_eftp)}
-                      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                        profile.eftp === eftpData.best_eftp
-                          ? 'bg-orange-500 text-white'
-                          : 'bg-orange-500/20 text-orange-400 hover:bg-orange-500/30'
-                      }`}
-                    >
-                      {profile.eftp === eftpData.best_eftp ? 'Applied' : 'Use this'}
-                    </button>
-                  </div>
-
-                  {/* Breakdown table */}
-                  <div className="border-t border-orange-500/20 pt-2 space-y-1">
-                    {eftpData.estimates.map(e => (
-                      <div key={e.duration_label} className="flex items-center justify-between text-xs">
-                        <span className="text-gray-500">{e.duration_label} best</span>
-                        <span className="text-gray-400 tabular-nums">{e.best_watts}W × {(e.multiplier * 100).toFixed(0)}% = <span className={e.eftp === eftpData.best_eftp ? 'text-orange-400 font-semibold' : 'text-gray-300'}>{e.eftp}W</span></span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <p className="text-sm text-gray-600 py-1">No power stream data in the last 14 days — run the backfill workflow to load activity streams</p>
-              )}
-
-              {/* Manual override */}
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-gray-500 flex-shrink-0">Override manually:</span>
-                <input
-                  type="number"
-                  value={profile.eftp ?? ''}
-                  onChange={e => update('eftp', e.target.value ? Number(e.target.value) : null)}
-                  className="w-24 bg-gray-900 border border-gray-700 rounded-lg px-2 py-1 text-sm text-white focus:outline-none focus:border-orange-500"
-                  placeholder="W"
-                  min={100}
-                  max={600}
-                />
-                {profile.eftp && eftpData?.best_eftp && profile.eftp !== eftpData.best_eftp && (
-                  <span className="text-xs text-gray-600">Current: {profile.eftp}W</span>
-                )}
-              </div>
-            </div>
-          </Field>
-        )}
-      </div>
-
-      {/* Zone Settings */}
-      <div className="bg-gray-900 rounded-xl p-5 space-y-5 border border-gray-800">
-        <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Zone Settings</h2>
-
-        {/* HR Zones */}
-        <div className="space-y-3">
-          <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wider">Heart Rate Zones</h3>
-          <Field label="Max HR (bpm)" hint="Required to calculate HR zones">
-            <input
-              type="number"
-              value={profile.max_hr ?? ''}
-              onChange={e => update('max_hr', e.target.value ? Number(e.target.value) : null)}
-              className={inputCls}
-              placeholder="e.g. 185"
-              min={100}
-              max={230}
-            />
-          </Field>
-          <Field label="HR zone calculation">
-            <div className="flex items-center gap-3 mt-1">
-              <button
-                onClick={() => update('hr_zones_auto', !profile.hr_zones_auto)}
-                className={`relative w-10 h-5 rounded-full transition-colors ${profile.hr_zones_auto ? 'bg-orange-500' : 'bg-gray-700'}`}
-              >
-                <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${profile.hr_zones_auto ? 'translate-x-5' : 'translate-x-0.5'}`} />
-              </button>
-              <span className="text-sm text-gray-400">{profile.hr_zones_auto ? 'Auto (% of Max HR)' : 'Manual boundaries'}</span>
-            </div>
-          </Field>
-          {!profile.hr_zones_auto && (
-            <Field label="HR zone upper boundaries (bpm)" hint="Enter the upper boundary for Z1, Z2, Z3, Z4. Z5 is anything above Z4.">
-              <div className="grid grid-cols-4 gap-2">
-                {['Z1 max', 'Z2 max', 'Z3 max', 'Z4 max'].map((label, i) => (
-                  <div key={i}>
-                    <div className="text-xs text-gray-600 mb-1">{label}</div>
-                    <input
-                      type="number"
-                      value={profile.hr_zone_boundaries?.[i] ?? ''}
-                      onChange={e => {
-                        const boundaries = [...(profile.hr_zone_boundaries ?? [0, 0, 0, 0])];
-                        boundaries[i] = Number(e.target.value);
-                        update('hr_zone_boundaries', boundaries);
-                      }}
-                      className={inputCls}
-                      placeholder="bpm"
-                      min={80}
-                      max={230}
-                    />
-                  </div>
-                ))}
-              </div>
-            </Field>
-          )}
-        </div>
-
-        {/* Power Zones */}
-        <div className="space-y-3 pt-2 border-t border-gray-800">
-          <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wider">Power Zones</h3>
-          <Field label="Power zone calculation">
-            <div className="flex items-center gap-3 mt-1">
-              <button
-                onClick={() => update('power_zones_auto', !profile.power_zones_auto)}
-                className={`relative w-10 h-5 rounded-full transition-colors ${profile.power_zones_auto ? 'bg-orange-500' : 'bg-gray-700'}`}
-              >
-                <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${profile.power_zones_auto ? 'translate-x-5' : 'translate-x-0.5'}`} />
-              </button>
-              <span className="text-sm text-gray-400">{profile.power_zones_auto ? 'Auto (% of FTP)' : 'Manual boundaries'}</span>
-            </div>
-          </Field>
-          {!profile.power_zones_auto && (
-            <Field label="Power zone upper boundaries (W)" hint="Enter the upper boundary for Z1, Z2, Z3, Z4. Z5 is anything above Z4.">
-              <div className="grid grid-cols-4 gap-2">
-                {['Z1 max', 'Z2 max', 'Z3 max', 'Z4 max'].map((label, i) => (
-                  <div key={i}>
-                    <div className="text-xs text-gray-600 mb-1">{label}</div>
-                    <input
-                      type="number"
-                      value={profile.power_zone_boundaries?.[i] ?? ''}
-                      onChange={e => {
-                        const boundaries = [...(profile.power_zone_boundaries ?? [0, 0, 0, 0])];
-                        boundaries[i] = Number(e.target.value);
-                        update('power_zone_boundaries', boundaries);
-                      }}
-                      className={inputCls}
-                      placeholder="W"
-                      min={50}
-                      max={1000}
-                    />
-                  </div>
-                ))}
-              </div>
-            </Field>
-          )}
-        </div>
-      </div>
-
-      {/* Training goals */}
-      <div className="bg-gray-900 rounded-xl p-5 space-y-4 border border-gray-800">
-        <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Training Goals</h2>
-        <Field label="Current training focus" hint="Describe your training priorities, limiters, and what you're working on">
-          <textarea
-            value={profile.training_goals}
-            onChange={e => update('training_goals', e.target.value)}
-            rows={4}
-            className={inputCls + ' resize-none'}
-            placeholder="e.g. Building base fitness for long events, improving climbing, reducing body weight…"
-          />
-        </Field>
-      </div>
-
-      {/* Events */}
-      <div className="bg-gray-900 rounded-xl p-5 space-y-4 border border-gray-800">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Events & Goals</h2>
+      {/* Tab bar */}
+      <div className="flex-shrink-0 flex border-b border-gray-800 overflow-x-auto">
+        {TABS.map(({ key, label }) => (
           <button
-            onClick={addEvent}
-            className="text-sm text-orange-400 hover:text-orange-300 transition-colors"
+            key={key}
+            onClick={() => setTab(key)}
+            className={`px-5 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors -mb-px ${
+              tab === key
+                ? 'border-orange-500 text-white'
+                : 'border-transparent text-gray-500 hover:text-gray-300 hover:border-gray-600'
+            }`}
           >
-            + Add event
+            {label}
           </button>
-        </div>
-
-        {profile.events.length === 0 && (
-          <p className="text-sm text-gray-600">No events added yet.</p>
-        )}
-
-        {profile.events.map((event, i) => (
-          <div key={i} className="border border-gray-800 rounded-lg p-4 space-y-3 relative">
-            <button
-              onClick={() => removeEvent(i)}
-              className="absolute top-3 right-3 text-gray-600 hover:text-red-400 transition-colors text-xs"
-            >
-              Remove
-            </button>
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Event name">
-                <input
-                  type="text"
-                  value={event.name}
-                  onChange={e => updateEvent(i, 'name', e.target.value)}
-                  className={inputCls}
-                  placeholder="e.g. Peaks Challenge"
-                />
-              </Field>
-              <Field label="Date">
-                <input
-                  type="date"
-                  value={event.date}
-                  onChange={e => updateEvent(i, 'date', e.target.value)}
-                  className={inputCls}
-                />
-              </Field>
-            </div>
-            <Field label="Goal">
-              <input
-                type="text"
-                value={event.goal}
-                onChange={e => updateEvent(i, 'goal', e.target.value)}
-                className={inputCls}
-                placeholder="e.g. Sub 8:30, finish strong, top 10"
-              />
-            </Field>
-          </div>
         ))}
       </div>
 
-      <div className="flex justify-end">
-        <button
-          onClick={save}
-          disabled={saving}
-          className="px-6 py-2.5 rounded-lg bg-orange-500 hover:bg-orange-400 disabled:opacity-50 text-white text-sm font-medium transition-colors"
-        >
-          {saving ? 'Saving…' : saved ? 'Saved ✓' : 'Save profile'}
-        </button>
+      {/* Tab content */}
+      <div className="flex-1 overflow-y-auto scroll-touch">
+        <div className="max-w-2xl mx-auto px-4 pt-4 pb-10 space-y-5">
+
+          {/* ── PROFILE TAB ── */}
+          {tab === 'profile' && (
+            <>
+              {/* Basic info */}
+              <div className="bg-gray-900 rounded-xl p-5 space-y-4 border border-gray-800">
+                <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Basic Info</h2>
+                <div className="grid grid-cols-2 gap-4">
+                  <Field label="Name">
+                    <input
+                      type="text"
+                      value={profile.name}
+                      onChange={e => update('name', e.target.value)}
+                      className={inputCls}
+                      placeholder="Your name"
+                    />
+                  </Field>
+                  <Field label="Weight (kg)" hint="Used for w/kg calculations">
+                    <input
+                      type="number"
+                      value={profile.weight_kg ?? ''}
+                      onChange={e => update('weight_kg', e.target.value ? Number(e.target.value) : null)}
+                      className={inputCls}
+                      placeholder="e.g. 75"
+                      min={30}
+                      max={200}
+                      step={0.1}
+                    />
+                  </Field>
+                </div>
+                <Field label="Timezone" hint="Used for weekly summaries and date calculations">
+                  <select
+                    value={profile.timezone ?? 'Australia/Sydney'}
+                    onChange={e => update('timezone', e.target.value)}
+                    className={inputCls}
+                  >
+                    {TIMEZONES.map(tz => (
+                      <option key={tz.value} value={tz.value}>{tz.label}</option>
+                    ))}
+                  </select>
+                </Field>
+              </div>
+
+              {/* FTP */}
+              <div className="bg-gray-900 rounded-xl p-5 space-y-4 border border-gray-800">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Power — FTP</h2>
+                  <span className="text-orange-400 font-bold text-lg">{displayFtp}W active</span>
+                </div>
+
+                <Field label="Manual FTP">
+                  <input
+                    type="number"
+                    value={profile.ftp}
+                    onChange={e => update('ftp', Number(e.target.value))}
+                    className={inputCls}
+                    min={100}
+                    max={600}
+                  />
+                </Field>
+
+                <Field label="Use eFTP instead of manual FTP">
+                  <div className="flex items-center gap-3 mt-1">
+                    <button
+                      onClick={() => update('use_eftp', !profile.use_eftp)}
+                      className={`relative w-10 h-5 rounded-full transition-colors ${profile.use_eftp ? 'bg-orange-500' : 'bg-gray-700'}`}
+                    >
+                      <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${profile.use_eftp ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                    </button>
+                    <span className="text-sm text-gray-400">{profile.use_eftp ? 'Using eFTP' : 'Using manual FTP'}</span>
+                  </div>
+                </Field>
+
+                {profile.use_eftp && (
+                  <Field label="eFTP — estimated from best power (last 14 days)">
+                    <div className="space-y-3 mt-1">
+                      {eftpData && eftpData.best_eftp ? (
+                        <div className="rounded-xl border border-orange-500/30 bg-orange-500/5 p-3 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-lg font-bold text-white">{eftpData.best_eftp}<span className="text-sm font-normal text-gray-400 ml-1">W</span></p>
+                              <p className="text-xs text-gray-500">Best estimate · from {eftpData.best_duration} best power</p>
+                            </div>
+                            <button
+                              onClick={() => update('eftp', eftpData.best_eftp)}
+                              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                                profile.eftp === eftpData.best_eftp
+                                  ? 'bg-orange-500 text-white'
+                                  : 'bg-orange-500/20 text-orange-400 hover:bg-orange-500/30'
+                              }`}
+                            >
+                              {profile.eftp === eftpData.best_eftp ? 'Applied' : 'Use this'}
+                            </button>
+                          </div>
+                          <div className="border-t border-orange-500/20 pt-2 space-y-1">
+                            {eftpData.estimates.map(e => (
+                              <div key={e.duration_label} className="flex items-center justify-between text-xs">
+                                <span className="text-gray-500">{e.duration_label} best</span>
+                                <span className="text-gray-400 tabular-nums">
+                                  {e.best_watts}W × {(e.multiplier * 100).toFixed(0)}% = {' '}
+                                  <span className={e.eftp === eftpData.best_eftp ? 'text-orange-400 font-semibold' : 'text-gray-300'}>
+                                    {e.eftp}W
+                                  </span>
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-gray-600 py-1">No power stream data in the last 14 days</p>
+                      )}
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-gray-500 flex-shrink-0">Override manually:</span>
+                        <input
+                          type="number"
+                          value={profile.eftp ?? ''}
+                          onChange={e => update('eftp', e.target.value ? Number(e.target.value) : null)}
+                          className="w-24 bg-gray-900 border border-gray-700 rounded-lg px-2 py-1 text-sm text-white focus:outline-none focus:border-orange-500"
+                          placeholder="W"
+                          min={100}
+                          max={600}
+                        />
+                        {profile.eftp && eftpData?.best_eftp && profile.eftp !== eftpData.best_eftp && (
+                          <span className="text-xs text-gray-600">Current: {profile.eftp}W</span>
+                        )}
+                      </div>
+                    </div>
+                  </Field>
+                )}
+              </div>
+
+              {/* Zone Settings */}
+              <div className="bg-gray-900 rounded-xl p-5 space-y-5 border border-gray-800">
+                <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Zone Settings</h2>
+
+                {/* HR Zones */}
+                <div className="space-y-3">
+                  <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wider">Heart Rate Zones</h3>
+                  <Field label="Max HR (bpm)" hint="Required to calculate HR zones">
+                    <input
+                      type="number"
+                      value={profile.max_hr ?? ''}
+                      onChange={e => update('max_hr', e.target.value ? Number(e.target.value) : null)}
+                      className={inputCls}
+                      placeholder="e.g. 185"
+                      min={100}
+                      max={230}
+                    />
+                  </Field>
+                  <Field label="HR zone calculation">
+                    <div className="flex items-center gap-3 mt-1">
+                      <button
+                        onClick={() => update('hr_zones_auto', !profile.hr_zones_auto)}
+                        className={`relative w-10 h-5 rounded-full transition-colors ${profile.hr_zones_auto ? 'bg-orange-500' : 'bg-gray-700'}`}
+                      >
+                        <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${profile.hr_zones_auto ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                      </button>
+                      <span className="text-sm text-gray-400">{profile.hr_zones_auto ? 'Auto (% of Max HR)' : 'Manual boundaries'}</span>
+                    </div>
+                  </Field>
+                  {!profile.hr_zones_auto && (
+                    <Field label="HR zone upper boundaries (bpm)" hint="Upper boundary for Z1–Z4. Z5 is above Z4.">
+                      <div className="grid grid-cols-4 gap-2">
+                        {['Z1 max', 'Z2 max', 'Z3 max', 'Z4 max'].map((label, i) => (
+                          <div key={i}>
+                            <div className="text-xs text-gray-600 mb-1">{label}</div>
+                            <input
+                              type="number"
+                              value={profile.hr_zone_boundaries?.[i] ?? ''}
+                              onChange={e => {
+                                const b = [...(profile.hr_zone_boundaries ?? [0, 0, 0, 0])];
+                                b[i] = Number(e.target.value);
+                                update('hr_zone_boundaries', b);
+                              }}
+                              className={inputCls}
+                              placeholder="bpm"
+                              min={80}
+                              max={230}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </Field>
+                  )}
+                </div>
+
+                {/* Power Zones */}
+                <div className="space-y-3 pt-2 border-t border-gray-800">
+                  <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wider">Power Zones</h3>
+                  <Field label="Power zone calculation">
+                    <div className="flex items-center gap-3 mt-1">
+                      <button
+                        onClick={() => update('power_zones_auto', !profile.power_zones_auto)}
+                        className={`relative w-10 h-5 rounded-full transition-colors ${profile.power_zones_auto ? 'bg-orange-500' : 'bg-gray-700'}`}
+                      >
+                        <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${profile.power_zones_auto ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                      </button>
+                      <span className="text-sm text-gray-400">{profile.power_zones_auto ? 'Auto (% of FTP)' : 'Manual boundaries'}</span>
+                    </div>
+                  </Field>
+                  {!profile.power_zones_auto && (
+                    <Field label="Power zone upper boundaries (W)" hint="Upper boundary for Z1–Z4. Z5 is above Z4.">
+                      <div className="grid grid-cols-4 gap-2">
+                        {['Z1 max', 'Z2 max', 'Z3 max', 'Z4 max'].map((label, i) => (
+                          <div key={i}>
+                            <div className="text-xs text-gray-600 mb-1">{label}</div>
+                            <input
+                              type="number"
+                              value={profile.power_zone_boundaries?.[i] ?? ''}
+                              onChange={e => {
+                                const b = [...(profile.power_zone_boundaries ?? [0, 0, 0, 0])];
+                                b[i] = Number(e.target.value);
+                                update('power_zone_boundaries', b);
+                              }}
+                              className={inputCls}
+                              placeholder="W"
+                              min={50}
+                              max={1000}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </Field>
+                  )}
+                </div>
+              </div>
+
+              {/* Save */}
+              <div className="flex justify-end">
+                <button onClick={save} disabled={saving} className="px-6 py-2.5 rounded-lg bg-orange-500 hover:bg-orange-400 disabled:opacity-50 text-white text-sm font-medium transition-colors">
+                  {saving ? 'Saving…' : saved ? 'Saved ✓' : 'Save profile'}
+                </button>
+              </div>
+            </>
+          )}
+
+          {/* ── TRAINING PLANS TAB ── */}
+          {tab === 'plans' && <TrainingPlansSettings />}
+
+          {/* ── EVENTS & GOALS TAB ── */}
+          {tab === 'events' && (
+            <>
+              {/* Goals */}
+              <div className="bg-gray-900 rounded-xl p-5 space-y-3 border border-gray-800">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Training Goals</h2>
+                  <button onClick={addGoal} className="text-sm text-orange-400 hover:text-orange-300 transition-colors">
+                    + Add goal
+                  </button>
+                </div>
+
+                {goals.length === 0 && (
+                  <p className="text-sm text-gray-600 py-1">No goals added yet. Goals are used by Coach AI when generating training plans.</p>
+                )}
+
+                <div className="space-y-2">
+                  {goals.map((goal, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={goal}
+                        onChange={e => updateGoal(i, e.target.value)}
+                        className={inputCls}
+                        placeholder="e.g. Complete 3×10 min @ 340W, Improve climbing w/kg, Sub 8:30 at Peaks"
+                      />
+                      <button
+                        onClick={() => removeGoal(i)}
+                        className="flex-shrink-0 text-gray-600 hover:text-red-400 transition-colors px-2 py-1 text-xs"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Events */}
+              <div className="bg-gray-900 rounded-xl p-5 space-y-3 border border-gray-800">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Events</h2>
+                  <button onClick={addEvent} className="text-sm text-orange-400 hover:text-orange-300 transition-colors">
+                    + Add event
+                  </button>
+                </div>
+
+                {profile.events.length === 0 && (
+                  <p className="text-sm text-gray-600 py-1">No events added yet.</p>
+                )}
+
+                <div className="space-y-3">
+                  {profile.events.map((event, i) => (
+                    <div key={i} className="border border-gray-800 rounded-xl p-4 space-y-3 relative">
+                      <button
+                        onClick={() => removeEvent(i)}
+                        className="absolute top-3 right-3 text-gray-600 hover:text-red-400 transition-colors text-xs px-1"
+                      >
+                        ✕ Remove
+                      </button>
+                      <div className="grid grid-cols-2 gap-3 pr-16">
+                        <Field label="Event name">
+                          <input
+                            type="text"
+                            value={event.name}
+                            onChange={e => updateEvent(i, 'name', e.target.value)}
+                            className={inputCls}
+                            placeholder="e.g. Peaks Challenge"
+                          />
+                        </Field>
+                        <Field label="Date">
+                          <input
+                            type="date"
+                            value={event.date}
+                            onChange={e => updateEvent(i, 'date', e.target.value)}
+                            className={inputCls}
+                          />
+                        </Field>
+                      </div>
+                      <Field label="Goal for this event">
+                        <input
+                          type="text"
+                          value={event.goal}
+                          onChange={e => updateEvent(i, 'goal', e.target.value)}
+                          className={inputCls}
+                          placeholder="e.g. Sub 8:30, finish strong, top 10"
+                        />
+                      </Field>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Save */}
+              <div className="flex justify-end">
+                <button onClick={save} disabled={saving} className="px-6 py-2.5 rounded-lg bg-orange-500 hover:bg-orange-400 disabled:opacity-50 text-white text-sm font-medium transition-colors">
+                  {saving ? 'Saving…' : saved ? 'Saved ✓' : 'Save'}
+                </button>
+              </div>
+            </>
+          )}
+
+        </div>
       </div>
-
-      {/* Training Plans — managed here, shown on Training tab */}
-      <TrainingPlansSettings />
-
-      <div className="pb-8" />
     </div>
   );
 }

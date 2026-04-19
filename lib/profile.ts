@@ -21,7 +21,8 @@ export interface AthleteProfile {
   use_eftp: boolean;
   eftp: number | null;
   weight_kg: number | null;
-  training_goals: string;
+  training_goals: string;  // legacy free-text, kept for backward compat
+  goals: string[];         // structured list of training goals
   events: EventGoal[];
   power_targets: PowerTarget[];
   training_notes: string;
@@ -42,6 +43,7 @@ const DEFAULTS: AthleteProfile = {
   eftp: null,
   weight_kg: null,
   training_goals: '',
+  goals: [],
   events: [],
   power_targets: [],
   training_notes: '',

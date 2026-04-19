@@ -129,7 +129,7 @@ Generated: ${today.toISOString().slice(0, 10)}
 - Name: ${profile.name}
 - FTP: ${FTP}W${profile.use_eftp && profile.eftp ? ` (eFTP-derived, raw FTP ${profile.ftp}W)` : ''}
 ${profile.weight_kg ? `- Weight: ${profile.weight_kg}kg\n` : ''}\
-${profile.training_goals ? `- Training Goals: ${profile.training_goals}\n` : ''}\
+${(profile.goals?.length > 0) ? profile.goals.map(g => `- Goal: ${g}`).join('\n') + '\n' : (profile.training_goals ? `- Training Goals: ${profile.training_goals}\n` : '')}\
 ${profile.events.length > 0 ? profile.events.map(e => {
   const days = Math.ceil((new Date(e.date).getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
   return `- Event: ${e.name} on ${e.date} (${days} days away)${e.goal ? ` — Goal: ${e.goal}` : ''}`;
