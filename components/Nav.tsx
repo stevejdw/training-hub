@@ -102,8 +102,20 @@ export default function Nav() {
       </header>
 
       {/* ── Mobile: fixed bottom tab bar ── */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-gray-950 border-t border-gray-800">
-        {/* Tab items row — fixed 56px tall */}
+      {/*
+        On iOS with viewportFit:cover, `bottom:0` lands at the safe-area
+        boundary (~34px above the physical screen edge), leaving a gap.
+        Pulling the nav down by safe-area-inset-bottom makes it extend to
+        the physical edge, while padding-bottom pushes the icons back up
+        into the visible zone.
+      */}
+      <nav
+        className="md:hidden fixed left-0 right-0 z-50 bg-gray-950 border-t border-gray-800"
+        style={{
+          bottom: 'calc(-1 * env(safe-area-inset-bottom, 0px))',
+          paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+        }}
+      >
         <div className="flex h-14">
           {links.map(({ href, label, icon }) => {
             const active = pathname.startsWith(href);
@@ -120,7 +132,6 @@ export default function Nav() {
               </Link>
             );
           })}
-          {/* Gear icon on mobile */}
           <Link
             href="/profile"
             className={`flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors ${
@@ -131,8 +142,6 @@ export default function Nav() {
             <span className="text-[10px] font-medium tracking-wide">Settings</span>
           </Link>
         </div>
-        {/* Safe-area spacer — fills the home-indicator region with nav background */}
-        <div style={{ height: 'env(safe-area-inset-bottom, 0px)' }} />
       </nav>
     </>
   );
