@@ -10,8 +10,9 @@ import {
 } from 'recharts';
 import { SPORT_FILTER_LABELS, CYCLING_TYPES, SportFilter, sportColor, sportLabel } from '@/lib/sport-types';
 import DashboardBestPower from './DashboardBestPower';
+import ActivitiesList from './ActivitiesList';
 
-type Tab    = 'training' | 'power' | 'fitness';
+type Tab    = 'training' | 'power' | 'fitness' | 'activities';
 type Period = 'week' | 'month' | 'year';
 type Metric = 'tss' | 'km' | 'hours' | 'activities';
 
@@ -79,6 +80,15 @@ const NAV: { key: Tab; label: string; icon: React.ReactNode }[] = [
     icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+      </svg>
+    ),
+  },
+  {
+    key: 'activities',
+    label: 'Activities',
+    icon: (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
       </svg>
     ),
   },
@@ -270,7 +280,7 @@ function TrainingTab() {
       ) : data ? (() => {
         const from = periodStart(period, offset);
         const filtersQ = selected.length > 0 ? selected.join(',') : 'All';
-        const href = `/activities?filters=${encodeURIComponent(filtersQ)}&from=${from}`;
+        const href = `/dashboard?tab=activities&filters=${encodeURIComponent(filtersQ)}&from=${from}`;
         return (
           <div className="grid grid-cols-5 gap-2">
             <StatCard label="Rides"  value={String(data.summary.activities ?? 0)} href={href} />
@@ -569,12 +579,16 @@ export default function DashboardHome() {
       </div>
 
       {/* Main content */}
-      <div className="flex-1 overflow-y-auto scroll-touch min-w-0">
-        <div className="px-4 py-4">
-          {tab === 'training' && <TrainingTab />}
-          {tab === 'power'    && <PowerTab />}
-          {tab === 'fitness'  && <FitnessTab />}
-        </div>
+      <div className="flex-1 overflow-hidden min-w-0">
+        {tab === 'activities' ? (
+          <ActivitiesList />
+        ) : (
+          <div className="h-full overflow-y-auto scroll-touch px-4 py-4">
+            {tab === 'training' && <TrainingTab />}
+            {tab === 'power'    && <PowerTab />}
+            {tab === 'fitness'  && <FitnessTab />}
+          </div>
+        )}
       </div>
 
     </div>

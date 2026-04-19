@@ -240,7 +240,7 @@ export default function FeedPage() {
         <div>
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Recent Rides</h2>
-            <Link href="/activities" className="text-xs text-orange-400 hover:text-orange-300 transition-colors">
+            <Link href="/dashboard?tab=activities" className="text-xs text-orange-400 hover:text-orange-300 transition-colors">
               All activities →
             </Link>
           </div>
