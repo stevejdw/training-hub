@@ -55,10 +55,21 @@ body {
     top: env(safe-area-inset-top, 0px);
     left: 0;
     right: 0;
-    /* 56px (h-14) icon row + safe-area spacer div inside the nav */
-    bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+    /* 56px (h-14) icon row + safe-area height */
+    bottom: calc(56px + env(safe-area-inset-bottom, 34px));
     height: auto;
     overflow: hidden;
+  }
+}
+
+/* Mobile bottom nav — pulls the bar below the safe-area boundary so its
+   background fills the home-indicator zone on iPhone. */
+@media (max-width: 767px) {
+  .mobile-nav {
+    /* Overshoot past the safe-area bottom so no gap ever shows */
+    bottom: calc(-1 * env(safe-area-inset-bottom, 34px));
+    /* Push icons back up so they sit above the home indicator */
+    padding-bottom: env(safe-area-inset-bottom, 34px);
   }
 }
 
