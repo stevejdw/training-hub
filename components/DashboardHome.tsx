@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import React from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import {
@@ -55,43 +54,11 @@ const METRIC_OPTS: { key: Metric; label: string; unit: string }[] = [
   { key: 'tss',        label: 'TSS',       unit: ''   },
 ];
 
-const NAV: { key: Tab; label: string; icon: React.ReactNode }[] = [
-  {
-    key: 'training',
-    label: 'Training',
-    icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
-      </svg>
-    ),
-  },
-  {
-    key: 'power',
-    label: 'Best Efforts',
-    icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-      </svg>
-    ),
-  },
-  {
-    key: 'fitness',
-    label: 'Fitness',
-    icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-      </svg>
-    ),
-  },
-  {
-    key: 'activities',
-    label: 'Activities',
-    icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-      </svg>
-    ),
-  },
+const NAV: { key: Tab; label: string }[] = [
+  { key: 'activities', label: 'Activities'  },
+  { key: 'training',   label: 'Progress'    },
+  { key: 'power',      label: 'Best Efforts' },
+  { key: 'fitness',    label: 'Fitness'     },
 ];
 
 /** Returns the ISO date string (YYYY-MM-DD) for the start of the current
@@ -209,21 +176,6 @@ function TrainingTab() {
 
   return (
     <div className="space-y-4">
-      {/* Period selector */}
-      <div className="flex bg-gray-800 rounded-xl p-1 gap-1">
-        {(['week', 'month', 'year'] as Period[]).map(p => (
-          <button
-            key={p}
-            onClick={() => changePeriod(p)}
-            className={`flex-1 py-1.5 rounded-lg text-sm font-medium transition-colors capitalize ${
-              period === p ? 'bg-orange-500 text-white' : 'text-gray-400 hover:text-white'
-            }`}
-          >
-            {p === 'week' ? 'Week' : p === 'month' ? 'Month' : 'Year'}
-          </button>
-        ))}
-      </div>
-
       {/* Period navigation */}
       <div className="flex items-center justify-between">
         <button
@@ -369,6 +321,21 @@ function TrainingTab() {
             </BarChart>
           </ResponsiveContainer>
         )}
+      </div>
+
+      {/* Period selector — below chart */}
+      <div className="flex bg-gray-800 rounded-xl p-1 gap-1">
+        {(['week', 'month', 'year'] as Period[]).map(p => (
+          <button
+            key={p}
+            onClick={() => changePeriod(p)}
+            className={`flex-1 py-1.5 rounded-lg text-sm font-medium transition-colors capitalize ${
+              period === p ? 'bg-orange-500 text-white' : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            {p === 'week' ? 'Week' : p === 'month' ? 'Month' : 'Year'}
+          </button>
+        ))}
       </div>
 
       {/* Legend */}
@@ -527,58 +494,30 @@ function FitnessTab() {
 
 export default function DashboardHome() {
   const searchParams = useSearchParams();
-  const initialTab = (searchParams.get('tab') as Tab | null) ?? 'training';
-  const [tab,      setTab]      = useState<Tab>(initialTab);
-  const [expanded, setExpanded] = useState(false);
+  const initialTab = (searchParams.get('tab') as Tab | null) ?? 'activities';
+  const [tab, setTab] = useState<Tab>(initialTab);
 
   return (
-    <div className="h-full flex">
+    <div className="h-full flex flex-col">
 
-      {/* Left sidebar */}
-      <div
-        className={`flex-shrink-0 border-r border-gray-800 flex flex-col transition-all duration-200 ${
-          expanded ? 'w-36' : 'w-14'
-        }`}
-      >
-        {/* Toggle button */}
-        <button
-          onClick={() => setExpanded(e => !e)}
-          className="flex items-center justify-center h-11 text-gray-500 hover:text-white transition-colors border-b border-gray-800"
-          title={expanded ? 'Collapse' : 'Expand'}
-        >
-          <svg
-            className={`w-4 h-4 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
-            fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+      {/* Horizontal tab bar */}
+      <div className="flex-shrink-0 flex border-b border-gray-800 overflow-x-auto">
+        {NAV.map(({ key, label }) => (
+          <button
+            key={key}
+            onClick={() => setTab(key)}
+            className={`px-5 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors -mb-px ${
+              tab === key
+                ? 'border-orange-500 text-white'
+                : 'border-transparent text-gray-500 hover:text-gray-300 hover:border-gray-600'
+            }`}
           >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-          </svg>
-        </button>
-
-        {/* Nav items */}
-        <nav className="flex flex-col py-3 px-1.5 gap-1">
-          {NAV.map(({ key, label, icon }) => (
-            <button
-              key={key}
-              onClick={() => setTab(key)}
-              title={!expanded ? label : undefined}
-              className={`flex items-center gap-2.5 px-2 py-2.5 rounded-lg transition-colors ${
-                expanded ? '' : 'justify-center'
-              } ${
-                tab === key
-                  ? 'bg-orange-500/15 text-orange-400 border border-orange-500/30'
-                  : 'text-gray-500 hover:text-white hover:bg-gray-800'
-              }`}
-            >
-              <span className="flex-shrink-0">{icon}</span>
-              {expanded && (
-                <span className="text-xs font-medium truncate">{label}</span>
-              )}
-            </button>
-          ))}
-        </nav>
+            {label}
+          </button>
+        ))}
       </div>
 
-      {/* Main content */}
+      {/* Content */}
       <div className="flex-1 overflow-hidden min-w-0">
         {tab === 'activities' ? (
           <ActivitiesList />
