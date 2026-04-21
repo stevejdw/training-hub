@@ -18,7 +18,29 @@ def get_access_token():
         "refresh_token": STRAVA_REFRESH_TOKEN,
         "grant_type": "refresh_token"
     })
-    return r.json()["access_token"]
+    if r.status_code != 200:
+        raise SystemExit(
+            f"Strava token refresh failed: HTTP {r.status_code}\n"
+            f"Response body: {r.text[:500]}\n"
+            f"Likely cause: STRAVA_REFRESH_TOKEN GitHub secret is stale. "
+            f"Copy the current value from Vercel env vars and update the secret."
+        )
+    try:
+        d = r.json()
+    except ValueError:
+        raise SystemExit(f"Strava token refresh returned non-JSON: {r.text[:500]}")
+    if "access_token" not in d:
+        raise SystemExit(f"Strava token refresh missing access_token. Response: {d}")
+    new_refresh = d.get("refresh_token")
+    if new_refresh and new_refresh != STRAVA_REFRESH_TOKEN:
+        print("=" * 72)
+        print("!! STRAVA ROTATED YOUR REFRESH TOKEN")
+        print(f"   Old (in secret): {STRAVA_REFRESH_TOKEN[:10]}...")
+        print(f"   New (from Strava): {new_refresh}")
+        print("   Update BOTH: GitHub secret STRAVA_REFRESH_TOKEN and Vercel env var.")
+        print("   Future runs will fail until you do.")
+        print("=" * 72)
+    return d["access_token"]
 
 def calculate_tss(moving_time, weighted_watts, ftp):
     if not weighted_watts or not ftp:

@@ -3,8 +3,12 @@ Backfill power and HR streams for activities that don't yet have a stored stream
 Creates the activity_streams table if it doesn't exist.
 Safe to re-run — uses ON CONFLICT DO UPDATE.
 
-Set BACKFILL_LIMIT env var to control how many activities to process (default 50).
-Set BACKFILL_ALL=1 to process every eligible activity.
+Self-paces against Strava's rate limits using response headers:
+  - 100 requests / 15 min window  -> sleeps when ≥90 used
+  - 1000 requests / day           -> stops at 950 used
+
+Set BACKFILL_LIMIT to cap activities per run (default 100).
+Set BACKFILL_ALL=1 to process every eligible activity (multi-day safe — just re-run).
 """
 import os
 import time
@@ -18,6 +22,9 @@ DATABASE_URL         = os.environ["DATABASE_URL"]
 LIMIT                = int(os.environ.get("BACKFILL_LIMIT", "100"))
 BACKFILL_ALL         = os.environ.get("BACKFILL_ALL", "0") == "1"
 
+# Stop with headroom before hitting daily limit so other app calls still work
+DAILY_LIMIT_STOP_AT = 950
+
 def get_access_token():
     r = requests.post("https://www.strava.com/oauth/token", data={
         "client_id":     STRAVA_CLIENT_ID,
@@ -25,18 +32,82 @@ def get_access_token():
         "refresh_token": STRAVA_REFRESH_TOKEN,
         "grant_type":    "refresh_token",
     })
-    return r.json()["access_token"]
+    if r.status_code != 200:
+        raise SystemExit(
+            f"Strava token refresh failed: HTTP {r.status_code}\n"
+            f"Response body: {r.text[:500]}\n"
+            f"Likely cause: STRAVA_REFRESH_TOKEN GitHub secret is stale. "
+            f"Copy the current value from Vercel env vars and update the secret."
+        )
+    try:
+        d = r.json()
+    except ValueError:
+        raise SystemExit(f"Strava token refresh returned non-JSON: {r.text[:500]}")
+    if "access_token" not in d:
+        raise SystemExit(f"Strava token refresh missing access_token. Response: {d}")
+    new_refresh = d.get("refresh_token")
+    if new_refresh and new_refresh != STRAVA_REFRESH_TOKEN:
+        print("=" * 72)
+        print("!! STRAVA ROTATED YOUR REFRESH TOKEN")
+        print(f"   Old (in secret): {STRAVA_REFRESH_TOKEN[:10]}...")
+        print(f"   New (from Strava): {new_refresh}")
+        print("   Update BOTH: GitHub secret STRAVA_REFRESH_TOKEN and Vercel env var.")
+        print("   Future runs will fail until you do.")
+        print("=" * 72)
+    return d["access_token"]
+
+# Track rate limit state across calls
+rate_state = {"window_used": 0, "daily_used": 0}
+
+def update_rate_state(response):
+    """Parse X-RateLimit-Usage header and update state."""
+    usage = response.headers.get("X-RateLimit-Usage", "")
+    if usage:
+        parts = usage.split(",")
+        if len(parts) == 2:
+            try:
+                rate_state["window_used"] = int(parts[0].strip())
+                rate_state["daily_used"]  = int(parts[1].strip())
+            except ValueError:
+                pass
+
+def check_rate_limits():
+    """
+    Sleep if approaching the 15-min window limit (≥90 of 100).
+    Returns False if the daily limit is reached and we should stop.
+    """
+    if rate_state["daily_used"] >= DAILY_LIMIT_STOP_AT:
+        print(f"  Daily limit reached ({rate_state['daily_used']} calls used) — stopping for today.")
+        return False
+    if rate_state["window_used"] >= 90:
+        wait = 905  # 15 min + 5s buffer
+        print(f"  15-min window at {rate_state['window_used']}/100 — sleeping {wait}s...")
+        time.sleep(wait)
+    return True
 
 def fetch_streams(token, activity_id):
+    """Fetch watts+hr streams. Returns (watts, hr, daily_done)."""
     r = requests.get(
         f"https://www.strava.com/api/v3/activities/{activity_id}/streams",
         headers={"Authorization": f"Bearer {token}"},
         params={"keys": "watts,heartrate", "key_by_type": "true"},
     )
+    update_rate_state(r)
+    if r.status_code == 429:
+        print("  Got 429 — sleeping 15 min then retrying once...")
+        time.sleep(905)
+        r = requests.get(
+            f"https://www.strava.com/api/v3/activities/{activity_id}/streams",
+            headers={"Authorization": f"Bearer {token}"},
+            params={"keys": "watts,heartrate", "key_by_type": "true"},
+        )
+        update_rate_state(r)
+    if not check_rate_limits():
+        return None, None, True
     if r.status_code != 200:
-        return None, None
+        return None, None, False
     data = r.json()
-    return data.get("watts", {}).get("data"), data.get("heartrate", {}).get("data")
+    return data.get("watts", {}).get("data"), data.get("heartrate", {}).get("data"), False
 
 def backfill():
     token = get_access_token()
@@ -79,14 +150,19 @@ def backfill():
 
     activities = cur.fetchall()
     print(f"Activities to backfill: {len(activities)}")
+    print(f"Will self-pace and stop at {DAILY_LIMIT_STOP_AT} daily Strava calls.")
 
     ok = skip = fail = 0
+    processed = 0
     for activity_id, name in activities:
-        watts, hr = fetch_streams(token, activity_id)
+        watts, hr, daily_done = fetch_streams(token, activity_id)
+        if daily_done:
+            print(f"\nStopped early: daily rate limit reached after {processed} activities.")
+            break
         if not watts and not hr:
-            print(f"  SKIP  {name} — no streams")
+            print(f"  SKIP  {name} — no streams  (window={rate_state['window_used']}, day={rate_state['daily_used']})")
             skip += 1
-            time.sleep(0.3)
+            processed += 1
             continue
 
         cur.execute("""
@@ -97,13 +173,16 @@ def backfill():
                     hr    = COALESCE(EXCLUDED.hr,    activity_streams.hr)
         """, (activity_id, watts, hr))
         conn.commit()
-        print(f"  OK    {name} (W:{len(watts or [])} HR:{len(hr or [])} pts)")
+        print(f"  OK    {name} (W:{len(watts or [])} HR:{len(hr or [])} pts)  (window={rate_state['window_used']}, day={rate_state['daily_used']})")
         ok += 1
-        time.sleep(0.5)
+        processed += 1
 
     cur.close()
     conn.close()
+    remaining = len(activities) - processed
     print(f"\nDone. ok={ok}  skipped={skip}  failed={fail}")
+    if remaining > 0:
+        print(f"{remaining} activities still pending — re-run tomorrow (daily limit resets at 00:00 UTC).")
 
 if __name__ == "__main__":
     backfill()
