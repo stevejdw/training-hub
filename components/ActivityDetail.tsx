@@ -110,7 +110,6 @@ export default function ActivityDetail({ id }: { id: string }) {
   const [segments,   setSegments]   = useState<SegmentEffort[]>([]);
   const [segLoading, setSegLoading] = useState(false);
   const [segFetched, setSegFetched] = useState(false);
-  const [segSyncing, setSegSyncing] = useState(false);
   type LapSortKey = 'index' | 'distance' | 'moving_time' | 'average_watts' | 'normalized_power' | 'average_heartrate' | 'max_heartrate';
   const [lapSort, setLapSort] = useState<{ key: LapSortKey; dir: 'asc' | 'desc' }>({ key: 'index', dir: 'asc' });
 
@@ -140,15 +139,6 @@ export default function ActivityDetail({ id }: { id: string }) {
       .then(d => { setSegments(d.efforts ?? []); setSegFetched(true); setSegLoading(false); })
       .catch(() => { setSegFetched(true); setSegLoading(false); });
   }, [tab, id, segFetched]);
-
-  function syncSegments() {
-    setSegSyncing(true);
-    setSegFetched(false);
-    fetch(`/api/activities/${id}/segments`, { method: 'POST' })
-      .then(r => r.json())
-      .then(d => { setSegments(d.efforts ?? []); setSegFetched(true); setSegSyncing(false); })
-      .catch(() => { setSegFetched(true); setSegSyncing(false); });
-  }
 
   if (loading) {
     return (
@@ -276,21 +266,6 @@ export default function ActivityDetail({ id }: { id: string }) {
                 {t.label}
               </button>
             ))}
-            <button
-              onClick={syncSegments}
-              disabled={segSyncing}
-              title="Re-sync starred segments for this activity"
-              className="ml-auto mr-1 flex items-center gap-1.5 text-xs text-gray-500 hover:text-orange-400 disabled:opacity-40 transition-colors px-2 py-1.5"
-            >
-              <svg
-                className={`w-3.5 h-3.5 ${segSyncing ? 'animate-spin' : ''}`}
-                fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
-              >
-                <path strokeLinecap="round" strokeLinejoin="round"
-                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-              {segSyncing ? 'Syncing…' : 'Sync Segments'}
-            </button>
           </div>
         </div>
 

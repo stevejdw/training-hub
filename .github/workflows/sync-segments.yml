@@ -10,7 +10,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Refresh starred segments
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
         run: |
-          curl -X POST "${{ secrets.APP_URL }}/api/segments/starred" \
+          if [ -z "$APP_URL" ]; then
+            echo "ERROR: APP_URL secret is not set"
+            exit 1
+          fi
+          # Strip any accidental whitespace/newlines in the secret
+          URL=$(echo "$APP_URL" | tr -d '[:space:]')
+          echo "Posting to ${URL}/api/segments/starred"
+          curl -v -X POST "${URL}/api/segments/starred" \
             --fail --retry 3 --retry-delay 10 \
-            -H "Content-Type: application/json"
+            -H "Content-Type: application/json" \
+            --max-time 60

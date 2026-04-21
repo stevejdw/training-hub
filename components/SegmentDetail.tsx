@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo, useRef } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import {
@@ -77,12 +77,8 @@ export default function SegmentDetail({ id }: { id: string }) {
   const [error,    setError]    = useState(false);
   const [sortKey,   setSortKey]   = useState<SortKey>('start_date');
   const [sortDir,   setSortDir]   = useState<SortDir>('desc');
-  const [syncInfo,  setSyncInfo]  = useState<string | null>(null);
   const [remaining, setRemaining] = useState(0);
-  const [scanning,  setScanning]  = useState(false);
-  const [scanTotal, setScanTotal] = useState(0);   // total scanned in current run
   const [debug, setDebug] = useState<Record<string, unknown> | null>(null);
-  const stopRef = useRef(false);
 
   useEffect(() => {
     fetch(`/api/segments/${id}`)
@@ -429,60 +425,7 @@ export default function SegmentDetail({ id }: { id: string }) {
             </div>
           )}
 
-          {/* Load more / progress */}
-          {!effLoad && (syncInfo || remaining > 0) && (
-            <div className="mt-3 flex items-center gap-3 flex-wrap">
-              {syncInfo && <p className="text-xs text-gray-500">{syncInfo}</p>}
-              {remaining > 0 && !scanning && (
-                <button
-                  onClick={async () => {
-                    stopRef.current = false;
-                    setScanning(true);
-                    setScanTotal(0);
-                    setSyncInfo(null);
-                    let totalScanned = 0;
-                    let rem = remaining;
-                    while (rem > 0 && !stopRef.current) {
-                      try {
-                        const r = await fetch(`/api/segments/${id}/efforts`, { method: 'POST' });
-                        const d = await r.json() as {
-                          efforts?: Effort[];
-                          processed?: number;
-                          repaired?: number;
-                          remaining?: number;
-                        };
-                        setEfforts(d.efforts ?? []);
-                        rem = d.remaining ?? 0;
-                        setRemaining(rem);
-                        totalScanned += d.processed ?? 0;
-                        setScanTotal(totalScanned);
-                      } catch {
-                        break;
-                      }
-                    }
-                    setScanning(false);
-                    if (totalScanned > 0) setSyncInfo(`${totalScanned} activities scanned`);
-                  }}
-                  className="text-xs text-orange-400 hover:text-orange-300 border border-orange-500/30 rounded px-3 py-1.5 transition-colors"
-                >
-                  Scan all history ({remaining.toLocaleString()} activities)
-                </button>
-              )}
-              {scanning && (
-                <>
-                  <span className="text-xs text-gray-400">
-                    Scanning… {scanTotal > 0 ? `${scanTotal.toLocaleString()} done, ${remaining.toLocaleString()} remaining` : remaining.toLocaleString() + ' remaining'}
-                  </span>
-                  <button
-                    onClick={() => { stopRef.current = true; }}
-                    className="text-xs text-red-400 hover:text-red-300 border border-red-500/30 rounded px-3 py-1.5 transition-colors"
-                  >
-                    Stop
-                  </button>
-                </>
-              )}
-            </div>
-          )}
+          {/* progress hint intentionally removed — backfill runs via scheduled workflow */}
         </div>
 
       </div>
