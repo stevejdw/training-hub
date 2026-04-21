@@ -8,7 +8,7 @@ export const maxDuration = 60;
  * POST /api/activities/backfill
  *
  * Fetches segment efforts from Strava for up to 20 activities that haven't
- * been scanned yet, processing them in parallel (4 at a time).
+ * been scanned yet, processing them in parallel (2 at a time).
  * Returns { processed, remaining } so the caller can loop until done.
  *
  * GET /api/activities/backfill
@@ -37,12 +37,12 @@ export async function POST() {
   try {
     const token = await getStravaToken();
 
-    // Grab 8 unscanned activities
+    // Grab 20 unscanned activities (at concurrency 2, ~40s within Vercel's 60s budget)
     const pending = await client.query(`
       SELECT id FROM activities
       WHERE segments_synced_at IS NULL
       ORDER BY start_date DESC
-      LIMIT 8
+      LIMIT 20
     `);
 
     if (pending.rows.length === 0) {
