@@ -133,7 +133,11 @@ def main():
             body = resp.read().decode("utf-8")
             print(f"Resend OK ({resp.status}): {body[:200]}")
     except urllib.error.HTTPError as e:
-        print(f"Resend HTTP error {e.code}: {e.read().decode('utf-8', 'replace')[:500]}")
+        body = e.read().decode('utf-8', 'replace')
+        print(f"Resend HTTP error {e.code}")
+        print(f"Response headers: {dict(e.headers)}")
+        print(f"Response body (full): {body}")
+        print(f"Request: from={EMAIL_FROM} to={EMAIL_TO}")
         sys.exit(1)
     except Exception as e:
         print(f"Resend failed: {e}")
