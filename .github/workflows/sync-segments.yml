@@ -17,10 +17,21 @@ jobs:
             echo "ERROR: APP_URL secret is not set"
             exit 1
           fi
-          # Strip any accidental whitespace/newlines in the secret
           URL=$(echo "$APP_URL" | tr -d '[:space:]')
           echo "Posting to ${URL}/api/segments/starred"
-          curl -v -X POST "${URL}/api/segments/starred" \
-            --fail --retry 3 --retry-delay 10 \
+
+          # Capture body + status separately so we see WHY it failed
+          http_code=$(curl -sS -o /tmp/resp.txt -w "%{http_code}" \
+            -X POST "${URL}/api/segments/starred" \
             -H "Content-Type: application/json" \
-            --max-time 60
+            --max-time 120)
+
+          echo "HTTP status: $http_code"
+          echo "--- response body ---"
+          cat /tmp/resp.txt
+          echo ""
+          echo "--- end body ---"
+
+          if [ "$http_code" != "200" ]; then
+            exit 1
+          fi
