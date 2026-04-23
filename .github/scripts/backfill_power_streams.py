@@ -25,6 +25,33 @@ BACKFILL_ALL         = os.environ.get("BACKFILL_ALL", "0") == "1"
 # Stop with headroom before hitting daily limit so other app calls still work
 DAILY_LIMIT_STOP_AT = 950
 
+def connect_db():
+    """Open Neon connection with TCP keepalives so idle waits don't drop us."""
+    return psycopg2.connect(
+        DATABASE_URL,
+        keepalives=1,
+        keepalives_idle=30,
+        keepalives_interval=10,
+        keepalives_count=5,
+    )
+
+# Managed DB handle so rate-limit sleeps can cleanly cycle the connection
+_db = {"conn": None, "cur": None}
+
+def _pre_sleep_close():
+    try:
+        if _db["cur"]: _db["cur"].close()
+        if _db["conn"]: _db["conn"].close()
+    except Exception as e:
+        print(f"  (pre-sleep close ignored: {e})")
+    _db["cur"] = None
+    _db["conn"] = None
+
+def _post_sleep_reopen():
+    _db["conn"] = connect_db()
+    _db["cur"]  = _db["conn"].cursor()
+    print("  DB reconnected after sleep.")
+
 def get_access_token():
     r = requests.post("https://www.strava.com/oauth/token", data={
         "client_id":     STRAVA_CLIENT_ID,
@@ -82,7 +109,9 @@ def check_rate_limits():
     if rate_state["window_used"] >= 90:
         wait = 905  # 15 min + 5s buffer
         print(f"  15-min window at {rate_state['window_used']}/100 — sleeping {wait}s...")
+        _pre_sleep_close()
         time.sleep(wait)
+        _post_sleep_reopen()
     return True
 
 def fetch_streams(token, activity_id):
@@ -95,7 +124,9 @@ def fetch_streams(token, activity_id):
     update_rate_state(r)
     if r.status_code == 429:
         print("  Got 429 — sleeping 15 min then retrying once...")
+        _pre_sleep_close()
         time.sleep(905)
+        _post_sleep_reopen()
         r = requests.get(
             f"https://www.strava.com/api/v3/activities/{activity_id}/streams",
             headers={"Authorization": f"Bearer {token}"},
@@ -111,11 +142,11 @@ def fetch_streams(token, activity_id):
 
 def backfill():
     token = get_access_token()
-    conn  = psycopg2.connect(DATABASE_URL)
-    cur   = conn.cursor()
+    _db["conn"] = connect_db()
+    _db["cur"]  = _db["conn"].cursor()
 
     # Create table + ensure hr column exists
-    cur.execute("""
+    _db["cur"].execute("""
         CREATE TABLE IF NOT EXISTS activity_streams (
             activity_id BIGINT PRIMARY KEY REFERENCES activities(id) ON DELETE CASCADE,
             watts       INT[],
@@ -123,13 +154,13 @@ def backfill():
             created_at  TIMESTAMPTZ DEFAULT now()
         )
     """)
-    cur.execute("ALTER TABLE activity_streams ADD COLUMN IF NOT EXISTS hr INT[]")
-    conn.commit()
+    _db["cur"].execute("ALTER TABLE activity_streams ADD COLUMN IF NOT EXISTS hr INT[]")
+    _db["conn"].commit()
     print("activity_streams table ready")
 
     # Fetch activities with power or HR data that don't yet have a stored stream
     if BACKFILL_ALL:
-        cur.execute("""
+        _db["cur"].execute("""
             SELECT a.id, a.name
             FROM activities a
             LEFT JOIN activity_streams s ON s.activity_id = a.id
@@ -138,7 +169,7 @@ def backfill():
             ORDER BY a.start_date DESC
         """)
     else:
-        cur.execute("""
+        _db["cur"].execute("""
             SELECT a.id, a.name
             FROM activities a
             LEFT JOIN activity_streams s ON s.activity_id = a.id
@@ -148,7 +179,7 @@ def backfill():
             LIMIT %s
         """, (LIMIT,))
 
-    activities = cur.fetchall()
+    activities = _db["cur"].fetchall()
     print(f"Activities to backfill: {len(activities)}")
     print(f"Will self-pace and stop at {DAILY_LIMIT_STOP_AT} daily Strava calls.")
 
@@ -165,20 +196,28 @@ def backfill():
             processed += 1
             continue
 
-        cur.execute("""
+        insert_sql = """
             INSERT INTO activity_streams (activity_id, watts, hr)
             VALUES (%s, %s, %s)
             ON CONFLICT (activity_id) DO UPDATE
                 SET watts = COALESCE(EXCLUDED.watts, activity_streams.watts),
                     hr    = COALESCE(EXCLUDED.hr,    activity_streams.hr)
-        """, (activity_id, watts, hr))
-        conn.commit()
+        """
+        try:
+            _db["cur"].execute(insert_sql, (activity_id, watts, hr))
+            _db["conn"].commit()
+        except psycopg2.OperationalError as e:
+            print(f"  DB dropped ({e}) — reconnecting and retrying once...")
+            _pre_sleep_close()
+            _post_sleep_reopen()
+            _db["cur"].execute(insert_sql, (activity_id, watts, hr))
+            _db["conn"].commit()
         print(f"  OK    {name} (W:{len(watts or [])} HR:{len(hr or [])} pts)  (window={rate_state['window_used']}, day={rate_state['daily_used']})")
         ok += 1
         processed += 1
 
-    cur.close()
-    conn.close()
+    _db["cur"].close()
+    _db["conn"].close()
     remaining = len(activities) - processed
     print(f"\nDone. ok={ok}  skipped={skip}  failed={fail}")
     if remaining > 0:
