@@ -4,17 +4,20 @@ on:
   workflow_dispatch:
     inputs:
       limit:
-        description: 'Max activities without laps to process (newest first, ~500/day max)'
+        description: 'Max activities per run (each uses 2 Strava calls: laps + streams)'
         required: false
-        default: '500'
+        default: '30'
   schedule:
-    # Run daily at 2am AEST (4pm UTC) until all laps are backfilled
-    - cron: '0 16 * * *'
+    # Every 15 minutes, like segment backfill. Each run processes ~30 activities
+    # (60 API calls, under the 100/15-min ceiling so no mid-run sleeps).
+    # Script stops itself once daily cap of 950 calls is reached; subsequent
+    # runs that day exit fast.
+    - cron: '*/15 * * * *'
 
 jobs:
   backfill:
     runs-on: ubuntu-latest
-    timeout-minutes: 360
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
@@ -32,5 +35,5 @@ jobs:
           STRAVA_CLIENT_SECRET: ${{ secrets.STRAVA_CLIENT_SECRET }}
           STRAVA_REFRESH_TOKEN: ${{ secrets.STRAVA_REFRESH_TOKEN }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          BACKFILL_LIMIT: ${{ github.event.inputs.limit || '500' }}
+          BACKFILL_LIMIT: ${{ github.event.inputs.limit || '30' }}
         run: python .github/scripts/backfill_laps.py
