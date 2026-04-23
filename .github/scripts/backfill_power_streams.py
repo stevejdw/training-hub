@@ -190,11 +190,13 @@ def backfill():
         if daily_done:
             print(f"\nStopped early: daily rate limit reached after {processed} activities.")
             break
-        if not watts and not hr:
-            print(f"  SKIP  {name} — no streams  (window={rate_state['window_used']}, day={rate_state['daily_used']})")
-            skip += 1
-            processed += 1
-            continue
+        # Always write a row — even an empty one — so we don't re-query Strava
+        # for activities that genuinely have no streams (e-bikes, old imports,
+        # non-power-meter rides with estimated summary watts). Empty arrays act
+        # as a "we asked and there was nothing" marker.
+        watts_to_store = watts if watts else []
+        hr_to_store    = hr    if hr    else []
+        is_empty       = not watts and not hr
 
         insert_sql = """
             INSERT INTO activity_streams (activity_id, watts, hr)
@@ -204,16 +206,20 @@ def backfill():
                     hr    = COALESCE(EXCLUDED.hr,    activity_streams.hr)
         """
         try:
-            _db["cur"].execute(insert_sql, (activity_id, watts, hr))
+            _db["cur"].execute(insert_sql, (activity_id, watts_to_store, hr_to_store))
             _db["conn"].commit()
         except psycopg2.OperationalError as e:
             print(f"  DB dropped ({e}) — reconnecting and retrying once...")
             _pre_sleep_close()
             _post_sleep_reopen()
-            _db["cur"].execute(insert_sql, (activity_id, watts, hr))
+            _db["cur"].execute(insert_sql, (activity_id, watts_to_store, hr_to_store))
             _db["conn"].commit()
-        print(f"  OK    {name} (W:{len(watts or [])} HR:{len(hr or [])} pts)  (window={rate_state['window_used']}, day={rate_state['daily_used']})")
-        ok += 1
+        if is_empty:
+            print(f"  EMPTY {name} — marked as no-streams  (window={rate_state['window_used']}, day={rate_state['daily_used']})")
+            skip += 1
+        else:
+            print(f"  OK    {name} (W:{len(watts or [])} HR:{len(hr or [])} pts)  (window={rate_state['window_used']}, day={rate_state['daily_used']})")
+            ok += 1
         processed += 1
 
     _db["cur"].close()
