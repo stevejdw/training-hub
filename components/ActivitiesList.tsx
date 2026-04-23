@@ -1,9 +1,18 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { SPORT_FILTER_LABELS, SportFilter, sportLabel, sportColor } from '@/lib/sport-types';
+
+function timeAgo(iso: string): string {
+  const diff = (Date.now() - new Date(iso).getTime()) / 1000; // seconds
+  if (diff < 60)         return 'just now';
+  if (diff < 3600)       return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400)      return `${Math.floor(diff / 3600)}h ago`;
+  if (diff < 86400 * 7)  return `${Math.floor(diff / 86400)}d ago`;
+  return new Date(iso).toLocaleDateString();
+}
 
 interface Activity {
   id: number;
@@ -75,8 +84,20 @@ export default function ActivitiesList() {
   const [showFilters, setShowFilters] = useState(false);
 
   // Manual sync state
-  const [syncing,    setSyncing]    = useState(false);
-  const [syncResult, setSyncResult] = useState<string | null>(null);
+  const [syncing,     setSyncing]     = useState(false);
+  const [syncResult,  setSyncResult]  = useState<string | null>(null);
+  const [lastSync,    setLastSync]    = useState<string | null>(null);
+
+  // Fetch last-synced timestamp on mount and after every manual sync
+  const refreshLastSync = useCallback(async () => {
+    try {
+      const r = await fetch('/api/sync', { method: 'GET' });
+      const d = await r.json() as { last_sync: string | null };
+      setLastSync(d.last_sync);
+    } catch { /* non-fatal */ }
+  }, []);
+
+  useEffect(() => { refreshLastSync(); }, [refreshLastSync]);
 
   async function handleSync() {
     if (syncing) return;
@@ -114,6 +135,7 @@ export default function ActivitiesList() {
         setPage(1);
         setSelected(prev => [...prev]); // trigger re-fetch
       }
+      refreshLastSync();
     } catch (err) {
       setSyncResult(`Sync failed: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
@@ -228,6 +250,16 @@ export default function ActivitiesList() {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 4h18M6 8h12M9 12h6M11 16h2" />
               </svg>
             </button>
+
+            {/* Last-synced indicator */}
+            {lastSync && (
+              <span
+                className="text-[11px] text-gray-500 whitespace-nowrap"
+                title={new Date(lastSync).toLocaleString()}
+              >
+                Synced {timeAgo(lastSync)}
+              </span>
+            )}
 
             {/* Sync */}
             <button

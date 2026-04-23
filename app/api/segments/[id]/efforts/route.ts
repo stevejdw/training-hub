@@ -20,13 +20,14 @@ async function backfillWind(segmentId: string): Promise<void> {
     const seg = segRes.rows[0];
     if (!seg?.start_lat || !seg?.start_lng) return;
 
-    // Efforts missing wind data that are old enough for archive data (> 5 days)
+    // All efforts missing wind data (use historical-forecast API which covers
+    // both historical reanalysis and recent days — no 5-day lag like the
+    // plain archive API).
     const effortsRes = await client.query(`
       SELECT id, start_date
       FROM segment_efforts
       WHERE segment_id = $1
         AND wind_speed IS NULL
-        AND start_date < NOW() - INTERVAL '5 days'
       ORDER BY start_date ASC
     `, [segmentId]);
 
@@ -38,7 +39,8 @@ async function backfillWind(segmentId: string): Promise<void> {
     const maxDate = dates[dates.length - 1];
     const fmtDate = (d: Date) => d.toISOString().slice(0, 10);
 
-    const url = new URL('https://archive-api.open-meteo.com/v1/archive');
+    // historical-forecast-api supports past + present seamlessly
+    const url = new URL('https://historical-forecast-api.open-meteo.com/v1/forecast');
     url.searchParams.set('latitude',        String(seg.start_lat));
     url.searchParams.set('longitude',       String(seg.start_lng));
     url.searchParams.set('start_date',      fmtDate(minDate));
