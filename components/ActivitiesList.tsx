@@ -82,12 +82,31 @@ export default function ActivitiesList() {
     if (syncing) return;
     setSyncing(true);
     setSyncResult(null);
-    try {
+
+    // Cold-lambda + cold-Neon-SSL sometimes makes the first request flake.
+    // Retry once silently before surfacing an error.
+    async function doSync(): Promise<{ synced?: number; names?: string[]; error?: string }> {
       const r = await fetch('/api/sync', { method: 'POST' });
-      const d = await r.json() as { synced?: number; names?: string[]; error?: string };
-      if (d.error) {
-        setSyncResult(`Error: ${d.error}`);
-      } else if (d.synced === 0) {
+      const text = await r.text();
+      try {
+        return JSON.parse(text) as { synced?: number; names?: string[]; error?: string };
+      } catch {
+        throw new Error(`HTTP ${r.status}: ${text.slice(0, 200)}`);
+      }
+    }
+
+    let d: { synced?: number; names?: string[]; error?: string };
+    try {
+      try {
+        d = await doSync();
+        if (d.error) throw new Error(d.error);
+      } catch {
+        // warm the lambda and retry once
+        await new Promise(res => setTimeout(res, 500));
+        d = await doSync();
+        if (d.error) throw new Error(d.error);
+      }
+      if (d.synced === 0) {
         setSyncResult('Already up to date');
       } else {
         setSyncResult(`✓ Synced ${d.synced} new activit${d.synced === 1 ? 'y' : 'ies'}`);
@@ -95,11 +114,11 @@ export default function ActivitiesList() {
         setPage(1);
         setSelected(prev => [...prev]); // trigger re-fetch
       }
-    } catch {
-      setSyncResult('Sync failed');
+    } catch (err) {
+      setSyncResult(`Sync failed: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setSyncing(false);
-      setTimeout(() => setSyncResult(null), 4000);
+      setTimeout(() => setSyncResult(null), 6000);
     }
   }
 

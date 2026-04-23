@@ -5,7 +5,17 @@ const CLIENT_ID     = process.env.STRAVA_CLIENT_ID!;
 const CLIENT_SECRET = process.env.STRAVA_CLIENT_SECRET!;
 const REFRESH_TOKEN = process.env.STRAVA_REFRESH_TOKEN!;
 
+// Cache the access token for the lifetime of this lambda instance.
+// Strava access tokens are valid for 6 hours — plenty. Re-fetching on every
+// syncActivity() call was adding ~200-500 ms per activity and creating
+// pointless OAuth traffic.
+let _tokenCache: { token: string; expiresAt: number } | null = null;
+
 export async function getStravaToken(): Promise<string> {
+  const now = Math.floor(Date.now() / 1000);
+  if (_tokenCache && _tokenCache.expiresAt - 60 > now) {
+    return _tokenCache.token;
+  }
   const r = await fetch('https://www.strava.com/oauth/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -16,7 +26,12 @@ export async function getStravaToken(): Promise<string> {
       grant_type:    'refresh_token',
     }),
   });
-  const d = await r.json() as { access_token: string };
+  if (!r.ok) {
+    const body = await r.text().catch(() => '');
+    throw new Error(`Strava token refresh failed: HTTP ${r.status} ${body.slice(0, 200)}`);
+  }
+  const d = await r.json() as { access_token: string; expires_at: number };
+  _tokenCache = { token: d.access_token, expiresAt: d.expires_at };
   return d.access_token;
 }
 
