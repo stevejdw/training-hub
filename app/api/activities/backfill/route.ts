@@ -35,22 +35,23 @@ export async function POST() {
   let remaining = 0;
 
   // Hard wall-clock budget — Vercel caps at 60s, leave headroom for final
-  // queries + response serialization. Stop starting new batches past 45s.
+  // queries + response serialization.
   const startedAt = Date.now();
-  const TIME_BUDGET_MS = 45_000;
+  const TIME_BUDGET_MS = 40_000;
+  const timeLeft = () => TIME_BUDGET_MS - (Date.now() - startedAt);
 
   try {
     const token = await getStravaToken();
 
-    // Grab 10 unscanned activities. At concurrency 3 that's ~4 batches, each
-    // dominated by Strava's per-request latency (~1-3s) + N segment-effort
-    // DB writes. Activities with many efforts can balloon past 5s, so we
-    // cap the batch to stay safely inside the 60s function budget.
+    // Grab 5 unscanned activities. An activity with many starred-segment
+    // efforts causes N serial INSERTs (one per effort), and some rides have
+    // 30+ efforts — that single activity alone can take 10-15s. Keep the
+    // batch small and rely on the 15-min cron to chew through the backlog.
     const pending = await client.query(`
       SELECT id FROM activities
       WHERE segments_synced_at IS NULL
       ORDER BY start_date DESC
-      LIMIT 10
+      LIMIT 5
     `);
 
     if (pending.rows.length === 0) {
@@ -58,24 +59,28 @@ export async function POST() {
     }
 
     const ids: number[] = pending.rows.map((r: { id: number }) => r.id);
-    const CONCURRENCY = 3;
+    const CONCURRENCY = 2;
 
     let rateLimited = false;
+    let budgetExceeded = false;
 
     for (let i = 0; i < ids.length; i += CONCURRENCY) {
-      if (rateLimited) break;
-      if (Date.now() - startedAt > TIME_BUDGET_MS) {
-        console.log(`[backfill] time budget reached after ${processed} activities — deferring rest to next run`);
+      if (rateLimited || budgetExceeded) break;
+      if (timeLeft() < 8_000) {
+        budgetExceeded = true;
+        console.log(`[backfill] time budget tight (${timeLeft()}ms left) after ${processed} activities`);
         break;
       }
       const batch = ids.slice(i, i + CONCURRENCY);
       await Promise.all(batch.map(async (activityId) => {
+        // Skip starting new work if we're already out of runway
+        if (timeLeft() < 3_000) { budgetExceeded = true; return; }
         try {
           const res = await fetch(
             `https://www.strava.com/api/v3/activities/${activityId}`,
             {
               headers: { Authorization: `Bearer ${token}` },
-              signal: AbortSignal.timeout(8000),
+              signal: AbortSignal.timeout(6000),
             }
           );
 
@@ -88,21 +93,15 @@ export async function POST() {
           if (res.ok) {
             const a = await res.json() as Record<string, unknown>;
             const segEfforts = (a.segment_efforts as Record<string, unknown>[] | null) ?? [];
+
+            // Batch all efforts for this activity into a single INSERT to
+            // avoid N serial round-trips to Neon. Activities with 30+ efforts
+            // used to dominate the function budget here.
+            const rows: unknown[][] = [];
             for (const se of segEfforts) {
               const seg = se.segment as Record<string, unknown> | null;
               if (!seg?.id) continue;
-              await client.query(`
-                INSERT INTO segment_efforts
-                  (id, activity_id, segment_id, name, elapsed_time, moving_time,
-                   start_date, distance, average_watts, average_heartrate,
-                   max_heartrate, pr_rank, kom_rank)
-                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
-                ON CONFLICT (id) DO UPDATE SET
-                  segment_id    = EXCLUDED.segment_id,
-                  pr_rank       = EXCLUDED.pr_rank,
-                  kom_rank      = EXCLUDED.kom_rank,
-                  max_heartrate = EXCLUDED.max_heartrate
-              `, [
+              rows.push([
                 se.id, activityId, seg.id,
                 se.name ?? seg.name,
                 se.elapsed_time, se.moving_time,
@@ -113,6 +112,31 @@ export async function POST() {
                 (se.pr_rank           as number | null) ?? null,
                 (se.kom_rank          as number | null) ?? null,
               ]);
+            }
+            if (rows.length > 0) {
+              const COLS = 13;
+              const values: string[] = [];
+              const params: unknown[] = [];
+              rows.forEach((r, idx) => {
+                const base = idx * COLS;
+                values.push(
+                  `($${base+1},$${base+2},$${base+3},$${base+4},$${base+5},$${base+6},$${base+7},$${base+8},$${base+9},$${base+10},$${base+11},$${base+12},$${base+13})`
+                );
+                params.push(...r);
+              });
+              await client.query(
+                `INSERT INTO segment_efforts
+                   (id, activity_id, segment_id, name, elapsed_time, moving_time,
+                    start_date, distance, average_watts, average_heartrate,
+                    max_heartrate, pr_rank, kom_rank)
+                 VALUES ${values.join(',')}
+                 ON CONFLICT (id) DO UPDATE SET
+                   segment_id    = EXCLUDED.segment_id,
+                   pr_rank       = EXCLUDED.pr_rank,
+                   kom_rank      = EXCLUDED.kom_rank,
+                   max_heartrate = EXCLUDED.max_heartrate`,
+                params
+              );
             }
           }
 
