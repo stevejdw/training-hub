@@ -43,15 +43,14 @@ export async function POST() {
   try {
     const token = await getStravaToken();
 
-    // Grab 5 unscanned activities. An activity with many starred-segment
-    // efforts causes N serial INSERTs (one per effort), and some rides have
-    // 30+ efforts — that single activity alone can take 10-15s. Keep the
-    // batch small and rely on the 15-min cron to chew through the backlog.
+    // Grab 15 unscanned activities. With batch-inserted efforts the per-
+    // activity cost is ~1-2s (Strava fetch) + 1 DB round-trip, so 15 at
+    // concurrency 3 lands comfortably inside the 40s budget.
     const pending = await client.query(`
       SELECT id FROM activities
       WHERE segments_synced_at IS NULL
       ORDER BY start_date DESC
-      LIMIT 5
+      LIMIT 15
     `);
 
     if (pending.rows.length === 0) {
@@ -59,7 +58,7 @@ export async function POST() {
     }
 
     const ids: number[] = pending.rows.map((r: { id: number }) => r.id);
-    const CONCURRENCY = 2;
+    const CONCURRENCY = 3;
 
     let rateLimited = false;
     let budgetExceeded = false;
