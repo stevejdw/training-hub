@@ -116,17 +116,18 @@ export default function TrainingPlanner() {
 
       {/* Mobile tab bar */}
       <div className="md:hidden flex-shrink-0 flex border-b border-gray-800 overflow-x-auto">
-        {TABS.map(({ key, label }) => (
+        {TABS.map(({ key, label, icon }) => (
           <button
             key={key}
             onClick={() => setMainTab(key)}
-            className={`px-5 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors -mb-px ${
+            className={`flex items-center gap-1.5 px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors -mb-px ${
               mainTab === key
                 ? 'border-orange-500 text-white'
                 : 'border-transparent text-gray-500 hover:text-gray-300 hover:border-gray-600'
             }`}
           >
-            {label}
+            {icon}
+            <span>{label}</span>
           </button>
         ))}
       </div>
