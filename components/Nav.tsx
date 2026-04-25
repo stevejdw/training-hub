@@ -55,7 +55,7 @@ const PROFILE_MENU = [
   { href: '/dashboard?tab=settings&settingsTab=events',  label: 'Events & Goals' },
 ];
 
-function ProfileMenu({ mobile = false }: { mobile?: boolean }) {
+function ProfileMenu() {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -67,40 +67,10 @@ function ProfileMenu({ mobile = false }: { mobile?: boolean }) {
     return () => document.removeEventListener('mousedown', onDocClick);
   }, []);
 
-  if (mobile) {
-    return (
-      <div ref={ref} className="flex-1 relative">
-        <button
-          onClick={() => setOpen(o => !o)}
-          className={`w-full h-full flex flex-col items-center justify-center gap-0.5 transition-colors ${
-            open ? 'text-orange-500' : 'text-gray-500'
-          }`}
-        >
-          <PersonIcon />
-          <span className="text-[10px] font-medium tracking-wide">Profile</span>
-        </button>
-        {open && (
-          <div className="absolute bottom-full right-2 mb-2 w-48 bg-gray-900 border border-gray-700 rounded-xl shadow-2xl py-1 z-50">
-            {PROFILE_MENU.map(({ href, label }) => (
-              <Link
-                key={href}
-                href={href}
-                onClick={() => setOpen(false)}
-                className="block px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-800 hover:text-white transition-colors"
-              >
-                {label}
-              </Link>
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  }
-
   return (
     <div
       ref={ref}
-      className="relative ml-auto"
+      className="relative"
       onMouseEnter={() => setOpen(true)}
       onMouseLeave={() => setOpen(false)}
     >
@@ -163,8 +133,18 @@ export default function Nav() {
             );
           })}
         </nav>
-        <ProfileMenu />
+        <div className="ml-auto">
+          <ProfileMenu />
+        </div>
       </header>
+
+      {/* ── Mobile: persistent top-right profile icon ── */}
+      <div
+        className="md:hidden fixed top-0 right-0 z-50 p-2"
+        style={{ paddingTop: 'calc(env(safe-area-inset-top) + 0.5rem)' }}
+      >
+        <ProfileMenu />
+      </div>
 
       {/* ── Mobile: fixed bottom tab bar ── */}
       {/*
@@ -191,7 +171,6 @@ export default function Nav() {
               </Link>
             );
           })}
-          <ProfileMenu mobile />
         </div>
       </nav>
     </>
