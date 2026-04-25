@@ -392,15 +392,15 @@ export default function DashboardHome() {
   const [tab, setTab] = useState<Tab>(initialTab);
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col md:flex-row">
 
-      {/* Horizontal tab bar */}
-      <div className="flex-shrink-0 flex border-b border-gray-800 overflow-x-auto md:px-8 md:gap-2 md:max-w-7xl md:mx-auto md:w-full">
+      {/* Mobile: horizontal tab bar at top */}
+      <div className="md:hidden flex-shrink-0 flex border-b border-gray-800 overflow-x-auto">
         {NAV.map(({ key, label }) => (
           <button
             key={key}
             onClick={() => setTab(key)}
-            className={`px-5 md:px-6 py-3 md:py-4 text-sm md:text-base font-medium whitespace-nowrap border-b-2 transition-colors -mb-px ${
+            className={`px-5 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors -mb-px ${
               tab === key
                 ? 'border-orange-500 text-white'
                 : 'border-transparent text-gray-500 hover:text-gray-300 hover:border-gray-600'
@@ -410,6 +410,26 @@ export default function DashboardHome() {
           </button>
         ))}
       </div>
+
+      {/* Desktop: vertical sub-tab sidebar */}
+      <aside className="hidden md:flex flex-col flex-shrink-0 w-52 border-r border-gray-800 bg-gray-950/50 py-6 px-3 gap-1">
+        <div className="px-3 pb-3 text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+          Dashboard
+        </div>
+        {NAV.map(({ key, label }) => (
+          <button
+            key={key}
+            onClick={() => setTab(key)}
+            className={`text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+              tab === key
+                ? 'bg-orange-500/15 text-orange-400 border-l-2 border-orange-500 pl-[10px]'
+                : 'text-gray-400 hover:text-white hover:bg-gray-800/60'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </aside>
 
       {/* Content */}
       <div className="flex-1 overflow-hidden min-w-0">
