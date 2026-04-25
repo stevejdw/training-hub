@@ -200,7 +200,7 @@ export default function ActivitiesList() {
   }, [selected, page, sortBy, sortDir, dateFrom, dateTo, minMins, maxMins, minKm, maxKm]);
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col md:max-w-5xl md:mx-auto md:w-full">
 
       {/* Top bar */}
       <div className="border-b border-gray-800 px-3 py-2.5 flex-shrink-0 space-y-2">

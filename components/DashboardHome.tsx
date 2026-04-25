@@ -83,10 +83,10 @@ function periodStart(period: Period, offset: number): string {
 
 function StatCard({ label, value, href }: { label: string; value: string; href?: string }) {
   const inner = (
-    <div className={`bg-gray-800 rounded-xl p-3 flex flex-col gap-0.5 min-w-[80px] transition-colors ${href ? 'group-hover:bg-gray-700 cursor-pointer' : ''}`}>
-      <span className="text-[10px] text-gray-500 uppercase tracking-wider">{label}</span>
-      <span className="text-lg font-bold text-white leading-tight">{value}</span>
-      {href && <span className="text-[10px] text-orange-400 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity">View →</span>}
+    <div className={`bg-gray-800 rounded-xl p-3 md:p-5 flex flex-col gap-0.5 md:gap-1 min-w-[80px] transition-colors ${href ? 'group-hover:bg-gray-700 cursor-pointer' : ''}`}>
+      <span className="text-[10px] md:text-xs text-gray-500 uppercase tracking-wider">{label}</span>
+      <span className="text-lg md:text-2xl font-bold text-white leading-tight">{value}</span>
+      {href && <span className="text-[10px] md:text-xs text-orange-400 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity">View →</span>}
     </div>
   );
   if (href) return <Link href={href} className="group">{inner}</Link>;
@@ -215,13 +215,18 @@ function TrainingTab() {
         const filtersQ = selected.length > 0 ? selected.join(',') : 'All';
         const href = `/dashboard?tab=activities&filters=${encodeURIComponent(filtersQ)}&from=${from}`;
         return (
-          <div className="space-y-2">
-            <div className="grid grid-cols-3 gap-2">
+          <div className="space-y-2 md:space-y-0">
+            {/* Mobile: 3+2 layout. Desktop: single 5-column row. */}
+            <div className="grid grid-cols-3 md:grid-cols-5 gap-2 md:gap-3">
               <StatCard label="Rides" value={String(data.summary.activities ?? 0)} href={href} />
               <StatCard label="km"    value={String(data.summary.km ?? 0)}         href={href} />
               <StatCard label="Hours" value={String(data.summary.hours ?? 0)}      href={href} />
+              <div className="hidden md:contents">
+                <StatCard label="TSS"    value={String(data.summary.tss ?? 0)}       href={href} />
+                <StatCard label="Elev m" value={String(data.summary.elevation ?? 0)} href={href} />
+              </div>
             </div>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-2 md:hidden">
               <StatCard label="TSS"    value={String(data.summary.tss ?? 0)}       href={href} />
               <StatCard label="Elev m" value={String(data.summary.elevation ?? 0)} href={href} />
             </div>
@@ -230,7 +235,7 @@ function TrainingTab() {
       })() : null}
 
       {/* Sport filters — evenly spread above chart */}
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-4 md:grid-cols-8 gap-2">
         {TYPE_FILTERS.map(f => (
           <button
             key={f}
@@ -247,7 +252,7 @@ function TrainingTab() {
       </div>
 
       {/* Metric toggle — evenly spread above chart */}
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-4 md:grid-cols-8 gap-2">
         {METRIC_OPTS.map(m => (
           <button
             key={m.key}
@@ -303,15 +308,16 @@ function TrainingTab() {
       </div>
 
       {/* Bar chart */}
-      <div className="bg-gray-800/60 rounded-xl p-3">
+      <div className="bg-gray-800/60 rounded-xl p-3 md:p-5">
         {error ? (
-          <div className="h-48 flex items-center justify-center">
+          <div className="h-48 md:h-80 flex items-center justify-center">
             <p className="text-red-400 text-xs text-center px-4">{error}</p>
           </div>
         ) : loading && !data ? (
-          <div className="h-48 animate-pulse bg-gray-800 rounded-lg" />
+          <div className="h-48 md:h-80 animate-pulse bg-gray-800 rounded-lg" />
         ) : (
-          <ResponsiveContainer width="100%" height={220}>
+          <div className="h-[220px] md:h-[340px]">
+          <ResponsiveContainer width="100%" height="100%">
             <BarChart data={flatBars} margin={{ top: 20, right: 4, left: 4, bottom: 0 }} barCategoryGap="25%">
               <XAxis
                 dataKey="label"
@@ -361,6 +367,7 @@ function TrainingTab() {
               />
             </BarChart>
           </ResponsiveContainer>
+          </div>
         )}
       </div>
 
@@ -388,12 +395,12 @@ export default function DashboardHome() {
     <div className="h-full flex flex-col">
 
       {/* Horizontal tab bar */}
-      <div className="flex-shrink-0 flex border-b border-gray-800 overflow-x-auto">
+      <div className="flex-shrink-0 flex border-b border-gray-800 overflow-x-auto md:px-8 md:gap-2 md:max-w-7xl md:mx-auto md:w-full">
         {NAV.map(({ key, label }) => (
           <button
             key={key}
             onClick={() => setTab(key)}
-            className={`px-5 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors -mb-px ${
+            className={`px-5 md:px-6 py-3 md:py-4 text-sm md:text-base font-medium whitespace-nowrap border-b-2 transition-colors -mb-px ${
               tab === key
                 ? 'border-orange-500 text-white'
                 : 'border-transparent text-gray-500 hover:text-gray-300 hover:border-gray-600'
@@ -410,8 +417,10 @@ export default function DashboardHome() {
         {tab === 'activities' && <ActivitiesList />}
         {tab === 'settings'   && <ProfileEditor initialTab={settingsTab} />}
         {tab === 'progress'   && (
-          <div className="h-full overflow-y-auto scroll-touch px-4 py-4">
-            <TrainingTab />
+          <div className="h-full overflow-y-auto scroll-touch px-4 py-4 md:px-8 md:py-8">
+            <div className="md:max-w-6xl md:mx-auto">
+              <TrainingTab />
+            </div>
           </div>
         )}
       </div>
