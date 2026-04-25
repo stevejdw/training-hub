@@ -50,9 +50,33 @@ const PersonIcon = () => (
 );
 
 const PROFILE_MENU = [
-  { href: '/dashboard?tab=settings&settingsTab=profile', label: 'Profile' },
-  { href: '/dashboard?tab=settings&settingsTab=plans',   label: 'Training Plans' },
-  { href: '/dashboard?tab=settings&settingsTab=events',  label: 'Events & Goals' },
+  {
+    href: '/dashboard?tab=settings&settingsTab=profile',
+    label: 'Profile',
+    icon: (
+      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+      </svg>
+    ),
+  },
+  {
+    href: '/dashboard?tab=settings&settingsTab=plans',
+    label: 'Training Plans',
+    icon: (
+      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+      </svg>
+    ),
+  },
+  {
+    href: '/dashboard?tab=settings&settingsTab=events',
+    label: 'Events & Goals',
+    icon: (
+      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+      </svg>
+    ),
+  },
 ];
 
 function ProfileMenu() {
@@ -86,14 +110,15 @@ function ProfileMenu() {
       {open && (
         <div className="absolute right-0 top-full pt-1 w-52 z-50">
           <div className="bg-gray-900 border border-gray-700 rounded-xl shadow-2xl py-1">
-            {PROFILE_MENU.map(({ href, label }) => (
+            {PROFILE_MENU.map(({ href, label, icon }) => (
               <Link
                 key={href}
                 href={href}
                 onClick={() => setOpen(false)}
-                className="block px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-800 hover:text-white transition-colors"
+                className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-800 hover:text-white transition-colors"
               >
-                {label}
+                <span className="text-gray-500">{icon}</span>
+                <span>{label}</span>
               </Link>
             ))}
           </div>
