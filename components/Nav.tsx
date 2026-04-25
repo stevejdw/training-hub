@@ -108,8 +108,8 @@ function ProfileMenu() {
         <PersonIcon />
       </button>
       {open && (
-        <div className="absolute right-0 top-full pt-1 w-52 z-50">
-          <div className="bg-gray-900 border border-gray-700 rounded-xl shadow-2xl py-1">
+        <div className="absolute right-0 top-full pt-1 z-50">
+          <div className="bg-gray-900 border border-gray-700 rounded-xl shadow-2xl py-1 whitespace-nowrap">
             {PROFILE_MENU.map(({ href, label, icon }) => (
               <Link
                 key={href}
