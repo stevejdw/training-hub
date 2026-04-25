@@ -174,9 +174,20 @@ export default function ActivityDetail({ id }: { id: string }) {
     <div className="h-full overflow-y-auto scroll-touch">
       <div className="max-w-4xl mx-auto px-4 py-6 space-y-5">
 
-        <Link href="/dashboard?tab=activities" className="text-sm text-gray-500 hover:text-orange-400 transition-colors">
-          ← Activities
-        </Link>
+        <div className="flex items-center justify-between gap-3">
+          <Link href="/dashboard?tab=activities" className="text-sm text-gray-500 hover:text-orange-400 transition-colors">
+            ← Activities
+          </Link>
+          <Link
+            href={`/chat?prompt=${encodeURIComponent(`Give me a brief, insight-focused review of "${activity.name}" (id ${id}). Do NOT summarise the lap data or repeat numbers I can read myself. Instead: compare the power intervals, HR response, and laps in this specific session to similar sessions over the last 4 weeks — highlight the trend (improving, plateau, regressing) and any decoupling or shifts in HR drift. Then connect the finding to my current training goals from my profile (event, target power, weaknesses) and tell me what to focus on next. Keep it to one concise paragraph. Insight on training progress is the priority.`)}`}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-500/15 hover:bg-orange-500/25 text-orange-400 text-xs font-medium transition-colors border border-orange-500/30"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+            </svg>
+            Get Coach feedback
+          </Link>
+        </div>
 
         {/* Header + Map */}
         <div className="flex gap-4 items-start">

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -20,10 +21,17 @@ const MAX_STORED = 50;
 
 const DEFAULT_QUESTIONS = [
   {
-    label: 'Provide feedback on the last ride',
-    prompt: 'Provide detailed feedback on the last ride. Work through each lap individually using the lap data — for each lap reference the actual Avg Watts, NP, Avg HR, Max HR, and duration. Identify which laps were hard efforts vs recovery, comment on pacing strategy, and note any HR/power decoupling across the ride. Then give overall observations on how this session fits the training plan and any changes to fitness.',
+    label: 'Feedback on the last ride',
+    prompt: 'Give me a brief, insight-focused review of my most recent ride. Do NOT summarise the lap data or repeat numbers I can read myself. Instead: compare the power intervals, HR response, and laps in this session to similar sessions over the last 4 weeks — highlight the trend (improving, plateau, regressing) and any decoupling or shifts in HR drift. Then connect the finding to my current training goals from my profile (event, target power, weaknesses) and tell me what to focus on next. Keep it to one concise paragraph. Insight on training progress is the priority.',
   },
 ];
+
+/** Builds the activity-specific feedback prompt used by the
+ *  "Get Coach feedback" button on individual activity pages. */
+export function activityFeedbackPrompt(activityId: string | number, activityName?: string): string {
+  const ref = activityName ? `"${activityName}" (id ${activityId})` : `activity id ${activityId}`;
+  return `Give me a brief, insight-focused review of ${ref}. Do NOT summarise the lap data or repeat numbers I can read myself. Instead: compare the power intervals, HR response, and laps in this specific session to similar sessions over the last 4 weeks — highlight the trend (improving, plateau, regressing) and any decoupling or shifts in HR drift. Then connect the finding to my current training goals from my profile (event, target power, weaknesses) and tell me what to focus on next. Keep it to one concise paragraph. Insight on training progress is the priority.`;
+}
 
 function loadPrompts(): Record<string, string> {
   if (typeof window === 'undefined') return {};
@@ -115,6 +123,9 @@ export default function ChatInterface() {
   const [editDraft, setEditDraft] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const sentInitialRef = useRef(false);
 
   // Load sessions and custom prompts from localStorage on mount
   useEffect(() => {
@@ -253,6 +264,19 @@ export default function ChatInterface() {
       sendMessage(input);
     }
   }
+
+  // Auto-send a prompt passed via ?prompt= (used by the Get Coach
+  // Feedback button on activity pages). Fires once per mount.
+  useEffect(() => {
+    if (sentInitialRef.current) return;
+    const initialPrompt = searchParams.get('prompt');
+    if (!initialPrompt) return;
+    sentInitialRef.current = true;
+    // Clear the param so a refresh doesn't re-fire the prompt.
+    router.replace('/chat');
+    sendMessage(initialPrompt);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   return (
     <div className="flex h-full relative overflow-hidden">
