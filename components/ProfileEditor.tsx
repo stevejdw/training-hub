@@ -58,8 +58,8 @@ function Field({ label, children, hint }: { label: string; children: React.React
 
 const inputCls = 'w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-orange-500 transition-colors';
 
-export default function ProfileEditor() {
-  const [tab,      setTab]      = useState<SettingsTab>('profile');
+export default function ProfileEditor({ initialTab = 'profile' }: { initialTab?: SettingsTab } = {}) {
+  const [tab,      setTab]      = useState<SettingsTab>(initialTab);
   const [profile,  setProfile]  = useState<AthleteProfile | null>(null);
   const [eftpData, setEftpData] = useState<EftpData | null>(null);
   const [saving,       setSaving]       = useState(false);

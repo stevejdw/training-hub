@@ -58,7 +58,6 @@ const NAV: { key: Tab; label: string }[] = [
   { key: 'feed',       label: 'Feed'        },
   { key: 'activities', label: 'Activities'  },
   { key: 'progress',   label: 'Progress'    },
-  { key: 'settings',   label: 'Settings'    },
 ];
 
 /** Returns the ISO date string (YYYY-MM-DD) for the start of the current
@@ -382,6 +381,7 @@ function TrainingTab() {
 export default function DashboardHome() {
   const searchParams = useSearchParams();
   const initialTab = (searchParams.get('tab') as Tab | null) ?? 'feed';
+  const settingsTab = (searchParams.get('settingsTab') as 'profile' | 'plans' | 'events' | null) ?? 'profile';
   const [tab, setTab] = useState<Tab>(initialTab);
 
   return (
@@ -408,7 +408,7 @@ export default function DashboardHome() {
       <div className="flex-1 overflow-hidden min-w-0">
         {tab === 'feed'       && <FeedPage />}
         {tab === 'activities' && <ActivitiesList />}
-        {tab === 'settings'   && <ProfileEditor />}
+        {tab === 'settings'   && <ProfileEditor initialTab={settingsTab} />}
         {tab === 'progress'   && (
           <div className="h-full overflow-y-auto scroll-touch px-4 py-4">
             <TrainingTab />

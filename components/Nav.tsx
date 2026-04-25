@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useState, useRef, useEffect } from 'react';
 
 const links = [
   {
@@ -42,12 +43,95 @@ const links = [
   },
 ];
 
-const GearIcon = () => (
-  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+const PersonIcon = () => (
+  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
   </svg>
 );
+
+const PROFILE_MENU = [
+  { href: '/dashboard?tab=settings&settingsTab=profile', label: 'Profile' },
+  { href: '/dashboard?tab=settings&settingsTab=plans',   label: 'Training Plans' },
+  { href: '/dashboard?tab=settings&settingsTab=events',  label: 'Events & Goals' },
+];
+
+function ProfileMenu({ mobile = false }: { mobile?: boolean }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function onDocClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, []);
+
+  if (mobile) {
+    return (
+      <div ref={ref} className="flex-1 relative">
+        <button
+          onClick={() => setOpen(o => !o)}
+          className={`w-full h-full flex flex-col items-center justify-center gap-0.5 transition-colors ${
+            open ? 'text-orange-500' : 'text-gray-500'
+          }`}
+        >
+          <PersonIcon />
+          <span className="text-[10px] font-medium tracking-wide">Profile</span>
+        </button>
+        {open && (
+          <div className="absolute bottom-full right-2 mb-2 w-48 bg-gray-900 border border-gray-700 rounded-xl shadow-2xl py-1 z-50">
+            {PROFILE_MENU.map(({ href, label }) => (
+              <Link
+                key={href}
+                href={href}
+                onClick={() => setOpen(false)}
+                className="block px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-800 hover:text-white transition-colors"
+              >
+                {label}
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      ref={ref}
+      className="relative ml-auto"
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+    >
+      <button
+        onClick={() => setOpen(o => !o)}
+        className={`flex items-center justify-center w-9 h-9 rounded-full transition-colors ${
+          open ? 'bg-gray-800 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800'
+        }`}
+        aria-label="Profile menu"
+      >
+        <PersonIcon />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full pt-1 w-52 z-50">
+          <div className="bg-gray-900 border border-gray-700 rounded-xl shadow-2xl py-1">
+            {PROFILE_MENU.map(({ href, label }) => (
+              <Link
+                key={href}
+                href={href}
+                onClick={() => setOpen(false)}
+                className="block px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-800 hover:text-white transition-colors"
+              >
+                {label}
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function Nav() {
   const pathname = usePathname();
@@ -60,7 +144,7 @@ export default function Nav() {
           <span className="text-xl">🚴</span>
           <span className="font-semibold text-white tracking-tight">Training Hub</span>
         </Link>
-        <nav className="flex gap-1 flex-1">
+        <nav className="flex gap-1">
           {links.map(({ href, label, icon }) => {
             const active = pathname.startsWith(href);
             return (
@@ -79,6 +163,7 @@ export default function Nav() {
             );
           })}
         </nav>
+        <ProfileMenu />
       </header>
 
       {/* ── Mobile: fixed bottom tab bar ── */}
@@ -106,6 +191,7 @@ export default function Nav() {
               </Link>
             );
           })}
+          <ProfileMenu mobile />
         </div>
       </nav>
     </>
