@@ -35,10 +35,31 @@ interface ActivitySummary {
   intensity_factor: number | null;
 }
 
-const TABS: { key: MainTab; label: string }[] = [
-  { key: 'summary',      label: 'Summary'       },
-  { key: 'best-efforts', label: 'Best Efforts'  },
-  { key: 'plan',         label: 'Training Plan' },
+const TABS: { key: MainTab; label: string; icon: React.ReactNode }[] = [
+  {
+    key: 'summary', label: 'Summary',
+    icon: (
+      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+      </svg>
+    ),
+  },
+  {
+    key: 'best-efforts', label: 'Best Efforts',
+    icon: (
+      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.539 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.196-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118L2.072 10.1c-.783-.57-.38-1.81.588-1.81h4.915a1 1 0 00.95-.69l1.519-4.673z" />
+      </svg>
+    ),
+  },
+  {
+    key: 'plan', label: 'Training Plan',
+    icon: (
+      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+      </svg>
+    ),
+  },
 ];
 
 export default function TrainingPlanner() {
@@ -91,10 +112,10 @@ export default function TrainingPlanner() {
   }
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col md:flex-row">
 
-      {/* Tab bar — fixed, never scrolls */}
-      <div className="flex-shrink-0 flex border-b border-gray-800 overflow-x-auto">
+      {/* Mobile tab bar */}
+      <div className="md:hidden flex-shrink-0 flex border-b border-gray-800 overflow-x-auto">
         {TABS.map(({ key, label }) => (
           <button
             key={key}
@@ -110,9 +131,30 @@ export default function TrainingPlanner() {
         ))}
       </div>
 
+      {/* Desktop sidebar */}
+      <aside className="hidden md:flex flex-col flex-shrink-0 w-56 border-r border-gray-800 bg-gray-950/50 py-6 px-3 gap-1">
+        <div className="px-3 pb-3 text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+          Training
+        </div>
+        {TABS.map(({ key, label, icon }) => (
+          <button
+            key={key}
+            onClick={() => setMainTab(key)}
+            className={`flex items-center gap-2.5 text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+              mainTab === key
+                ? 'bg-orange-500/15 text-orange-400 border-l-2 border-orange-500 pl-[10px]'
+                : 'text-gray-400 hover:text-white hover:bg-gray-800/60'
+            }`}
+          >
+            {icon}
+            <span>{label}</span>
+          </button>
+        ))}
+      </aside>
+
       {/* Scrollable content */}
-      <div className="flex-1 overflow-y-auto scroll-touch">
-        <div className="max-w-2xl mx-auto px-4 py-4 space-y-4">
+      <div className="flex-1 overflow-y-auto scroll-touch min-w-0">
+        <div className="max-w-2xl md:max-w-5xl mx-auto px-4 py-4 md:px-8 md:py-8 space-y-4">
 
           {/* Summary tab */}
           {mainTab === 'summary' && <SummaryTab />}
