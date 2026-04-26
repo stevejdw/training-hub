@@ -22,15 +22,17 @@ const MAX_STORED = 50;
 const DEFAULT_QUESTIONS = [
   {
     label: 'Feedback on the last ride',
-    prompt: 'Give me a brief, insight-focused review of my most recent ride. Do NOT summarise the lap data or repeat numbers I can read myself. Instead: compare the power intervals, HR response, and laps in this session to similar sessions over the last 4 weeks — highlight the trend (improving, plateau, regressing) and any decoupling or shifts in HR drift. Then connect the finding to my current training goals from my profile (event, target power, weaknesses) and tell me what to focus on next. Keep it to one concise paragraph. Insight on training progress is the priority.',
+    prompt: 'Coach feedback on my last ride.',
   },
 ];
 
 /** Builds the activity-specific feedback prompt used by the
- *  "Get Coach feedback" button on individual activity pages. */
+ *  "Get Coach feedback" button on individual activity pages. The
+ *  full insight-focused behaviour lives in the system prompt; we
+ *  keep the user message short so the chat bubble stays clean. */
 export function activityFeedbackPrompt(activityId: string | number, activityName?: string): string {
   const ref = activityName ? `"${activityName}" (id ${activityId})` : `activity id ${activityId}`;
-  return `Give me a brief, insight-focused review of ${ref}. Do NOT summarise the lap data or repeat numbers I can read myself. Instead: compare the power intervals, HR response, and laps in this specific session to similar sessions over the last 4 weeks — highlight the trend (improving, plateau, regressing) and any decoupling or shifts in HR drift. Then connect the finding to my current training goals from my profile (event, target power, weaknesses) and tell me what to focus on next. Keep it to one concise paragraph. Insight on training progress is the priority.`;
+  return `Coach feedback on ${ref}.`;
 }
 
 function loadPrompts(): Record<string, string> {

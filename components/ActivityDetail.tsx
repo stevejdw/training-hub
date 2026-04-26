@@ -179,7 +179,7 @@ export default function ActivityDetail({ id }: { id: string }) {
             ← Activities
           </Link>
           <Link
-            href={`/chat?prompt=${encodeURIComponent(`Give me a brief, insight-focused review of "${activity.name}" (id ${id}). Do NOT summarise the lap data or repeat numbers I can read myself. Instead: compare the power intervals, HR response, and laps in this specific session to similar sessions over the last 4 weeks — highlight the trend (improving, plateau, regressing) and any decoupling or shifts in HR drift. Then connect the finding to my current training goals from my profile (event, target power, weaknesses) and tell me what to focus on next. Keep it to one concise paragraph. Insight on training progress is the priority.`)}`}
+            href={`/chat?prompt=${encodeURIComponent(`Coach feedback on "${activity.name}" (id ${id}).`)}`}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-500/15 hover:bg-orange-500/25 text-orange-400 text-xs font-medium transition-colors border border-orange-500/30"
           >
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
