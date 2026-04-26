@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import ChatInterface from '@/components/ChatInterface';
 
 export const metadata = {
@@ -7,7 +8,9 @@ export const metadata = {
 export default function ChatPage() {
   return (
     <div className="h-full">
-      <ChatInterface />
+      <Suspense>
+        <ChatInterface />
+      </Suspense>
     </div>
   );
 }
