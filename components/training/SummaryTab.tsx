@@ -96,101 +96,109 @@ function WeekCard({ week, isFirst }: { week: WeekRow; isFirst: boolean }) {
   const current = isCurrentWeek(week.week_start);
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
+  const dot = alignmentDot(totalTSS, week.target_tss ?? 0);
+
   return (
     <div className={`rounded-xl overflow-hidden border ${current ? 'border-orange-500/40' : 'border-gray-800'}`}>
-      {/* Week header */}
-      <div className={`flex items-center justify-between px-4 py-2.5 ${current ? 'bg-orange-500/10' : 'bg-gray-800/60'}`}>
-        <div className="flex items-center gap-2">
+      {/* Compact header: week label + alignment dot */}
+      <div className={`flex items-center justify-between px-3 py-1.5 ${current ? 'bg-orange-500/10' : 'bg-gray-800/60'}`}>
+        <div className="flex items-center gap-2 min-w-0">
           {current && <span className="w-1.5 h-1.5 rounded-full bg-orange-500 flex-shrink-0" />}
-          <span className={`text-sm font-semibold ${current ? 'text-orange-400' : 'text-gray-300'}`}>
+          <span className={`text-sm font-semibold truncate ${current ? 'text-orange-400' : 'text-gray-300'}`}>
             {isFirst && current ? 'This week' : weekLabel}
           </span>
           {isFirst && current && (
-            <span className="text-xs text-gray-500">{weekLabel}</span>
+            <span className="text-[11px] text-gray-500 flex-shrink-0 hidden sm:inline">{weekLabel}</span>
           )}
         </div>
-        <div className="flex items-center gap-3 text-xs text-gray-400">
-          {rideCount > 0 && (
-            <>
-              <span>{rideCount} ride{rideCount !== 1 ? 's' : ''}</span>
-              <span>{fmtHrs(totalTime)}</span>
-              <span>{fmtKm(totalDist)}</span>
-              {totalTSS > 0 && <span className="text-gray-500">{totalTSS} TSS</span>}
-            </>
-          )}
-          {(() => {
-            const dot = alignmentDot(totalTSS, week.target_tss ?? 0);
-            if (!dot) return null;
-            return (
-              <span
-                title={`Plan target: ${week.target_tss} TSS — ${dot.label}`}
-                className="flex items-center gap-1.5"
-              >
-                <span className={`w-2.5 h-2.5 rounded-full ${dot.color}`} />
-                <span className="text-[10px] text-gray-500 uppercase tracking-wider">{dot.label}</span>
-              </span>
-            );
-          })()}
-        </div>
+        {dot && (
+          <span
+            title={`Plan target: ${week.target_tss} TSS — ${dot.label}`}
+            className="flex items-center gap-1.5 flex-shrink-0"
+          >
+            <span className={`w-2.5 h-2.5 rounded-full ${dot.color}`} />
+            <span className="text-[10px] text-gray-500 uppercase tracking-wider">{dot.label}</span>
+          </span>
+        )}
       </div>
 
-      {/* Day rows */}
-      <div className="divide-y divide-gray-800">
+      {/* Horizontal row: Mon — Sun cells + prominent Total cell */}
+      <div className="grid grid-cols-[repeat(7,minmax(0,1fr))_minmax(112px,1.6fr)]">
         {dates.map((date, i) => {
           const acts = actsByDate.get(date) ?? [];
-          const isToday = date === todayStr;
+          const isToday  = date === todayStr;
           const isFuture = date > todayStr;
+          const dayKm   = acts.reduce((s, a) => s + a.distance, 0) / 1000;
+          const dayMin  = acts.reduce((s, a) => s + a.moving_time, 0) / 60;
+          const dayTSS  = acts.reduce((s, a) => s + a.tss, 0);
+          const primary = acts[0];
+          const href    = primary ? `/activities/${primary.id}` : undefined;
+          const Wrapper = (props: { children: React.ReactNode }) =>
+            href
+              ? <a href={href} className="block h-full hover:bg-gray-800/60 transition-colors">{props.children}</a>
+              : <div className="h-full">{props.children}</div>;
 
           return (
             <div
               key={date}
-              className={`flex items-start gap-3 px-4 py-2 ${
-                isToday ? 'bg-gray-800/40' : isFuture ? 'opacity-40' : ''
-              }`}
+              className={`border-r border-gray-800 ${isToday ? 'bg-gray-800/40' : ''} ${isFuture ? 'opacity-40' : ''}`}
             >
-              {/* Day label */}
-              <div className="w-10 flex-shrink-0 pt-0.5">
-                <span className={`text-xs font-medium ${isToday ? 'text-orange-400' : 'text-gray-500'}`}>
-                  {DAY_LABELS[i]}
-                </span>
-                <div className={`text-[10px] ${isToday ? 'text-orange-400/70' : 'text-gray-600'}`}>
-                  {Number(date.slice(8, 10))}
-                </div>
-              </div>
-
-              {/* Activities */}
-              <div className="flex-1 min-w-0 space-y-1">
-                {acts.length === 0 ? (
-                  <div className="h-5 flex items-center">
-                    <span className="text-[11px] text-gray-700">—</span>
+              <Wrapper>
+                <div className="px-1.5 py-2 flex flex-col items-center gap-0.5 min-h-[64px]">
+                  <div className={`text-[10px] font-medium uppercase tracking-wider ${isToday ? 'text-orange-400' : 'text-gray-500'}`}>
+                    {DAY_LABELS[i]}
                   </div>
-                ) : (
-                  acts.map(a => (
-                    <a
-                      key={a.id}
-                      href={`/activities/${a.id}`}
-                      className="flex items-center gap-2 group"
-                    >
-                      <span className="text-green-500 flex-shrink-0">
-                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                        </svg>
+                  <div className={`text-[10px] ${isToday ? 'text-orange-400/70' : 'text-gray-600'} mb-0.5`}>
+                    {Number(date.slice(8, 10))}
+                  </div>
+                  {acts.length === 0 ? (
+                    <span className="text-gray-700 text-[10px]">—</span>
+                  ) : (
+                    <>
+                      <span className="text-base leading-none" title={acts.map(a => `${a.name} · ${a.tss} TSS`).join('\n')}>
+                        {sportEmoji(primary.sport_type)}
+                        {acts.length > 1 && <span className="text-[9px] text-gray-500 ml-0.5">×{acts.length}</span>}
                       </span>
-                      <span className="text-xs text-gray-300 truncate group-hover:text-white transition-colors">
-                        {sportEmoji(a.sport_type)} {a.name}
-                      </span>
-                      <span className="text-[10px] text-gray-600 flex-shrink-0 ml-auto flex gap-2">
-                        <span>{fmtHrs(a.moving_time)}</span>
-                        {a.distance > 0 && <span>{fmtKm(a.distance)}</span>}
-                        {a.tss > 0 && <span>{a.tss} TSS</span>}
-                      </span>
-                    </a>
-                  ))
-                )}
-              </div>
+                      <div className="text-[10px] text-gray-300 leading-tight text-center">
+                        {dayKm > 0 && <span>{Math.round(dayKm)}km</span>}
+                        {dayKm > 0 && dayMin > 0 && <span className="text-gray-600 mx-0.5">·</span>}
+                        {dayMin > 0 && <span>{Math.round(dayMin)}m</span>}
+                      </div>
+                      {dayTSS > 0 && (
+                        <div className="text-[10px] text-gray-500">{dayTSS}</div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </Wrapper>
             </div>
           );
         })}
+
+        {/* Total — prominent */}
+        <div className={`px-3 py-2 flex flex-col justify-center gap-0.5 ${current ? 'bg-orange-500/15' : 'bg-gray-800/60'}`}>
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">Total</div>
+          {rideCount > 0 ? (
+            <>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-lg font-bold text-white leading-none">{Math.round(totalDist / 1000)}</span>
+                <span className="text-[10px] text-gray-500 uppercase">km</span>
+              </div>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-base font-bold text-white leading-none">{fmtHrs(totalTime)}</span>
+              </div>
+              <div className="flex items-baseline gap-1.5">
+                <span className={`text-sm font-bold leading-none ${current ? 'text-orange-300' : 'text-gray-300'}`}>{totalTSS}</span>
+                <span className="text-[10px] text-gray-500 uppercase">TSS</span>
+                {week.target_tss ? (
+                  <span className="text-[10px] text-gray-600 ml-auto">/ {week.target_tss}</span>
+                ) : null}
+              </div>
+            </>
+          ) : (
+            <span className="text-xs text-gray-600">No rides</span>
+          )}
+        </div>
       </div>
     </div>
   );
