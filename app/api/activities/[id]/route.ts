@@ -1,5 +1,29 @@
 import pool from '@/lib/db';
 
+export async function PATCH(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  const body = await req.json().catch(() => ({})) as { name?: string };
+  const name = (body.name ?? '').trim();
+  if (!name) return Response.json({ error: 'name required' }, { status: 400 });
+
+  const client = await pool.connect();
+  try {
+    const r = await client.query(
+      `UPDATE activities SET name = $1, updated_at = NOW() WHERE id = $2 RETURNING id, name`,
+      [name, id]
+    );
+    if (r.rowCount === 0) return Response.json({ error: 'not found' }, { status: 404 });
+    return Response.json({ ok: true, activity: r.rows[0] });
+  } catch (err) {
+    return Response.json({ error: String(err) }, { status: 500 });
+  } finally {
+    client.release();
+  }
+}
+
 export async function GET(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }

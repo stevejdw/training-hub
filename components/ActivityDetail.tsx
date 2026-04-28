@@ -114,6 +114,34 @@ export default function ActivityDetail({ id }: { id: string }) {
   const [segFetched, setSegFetched] = useState(false);
   type LapSortKey = 'index' | 'distance' | 'moving_time' | 'average_watts' | 'normalized_power' | 'average_heartrate' | 'max_heartrate';
   const [lapSort, setLapSort] = useState<{ key: LapSortKey; dir: 'asc' | 'desc' }>({ key: 'index', dir: 'asc' });
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft,   setNameDraft]   = useState('');
+
+  async function saveName() {
+    if (!activity) return;
+    const next = nameDraft.trim();
+    if (!next || next === activity.name) { setEditingName(false); return; }
+    const r = await fetch(`/api/activities/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: next }),
+    });
+    if (r.ok) setActivity(a => a ? { ...a, name: next } : a);
+    setEditingName(false);
+  }
+
+  async function renameGear() {
+    if (!activity?.gear_id) return;
+    const current = activity.gear_name ?? '';
+    const next = window.prompt('Rename gear', current);
+    if (!next || next.trim() === current) return;
+    const r = await fetch(`/api/gear/${encodeURIComponent(activity.gear_id)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nickname: next.trim() }),
+    });
+    if (r.ok) setActivity(a => a ? { ...a, gear_name: next.trim() } : a);
+  }
 
   useEffect(() => {
     fetch(`/api/activities/${id}`)
@@ -205,17 +233,44 @@ export default function ActivityDetail({ id }: { id: string }) {
                 {date.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' })}
               </span>
               {activity.gear_name && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-gray-800 text-gray-300 border border-gray-700">
+                <button
+                  onClick={renameGear}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-gray-800 text-gray-300 border border-gray-700 hover:border-orange-500/60 hover:text-white transition-colors"
+                  title="Click to rename gear"
+                >
                   <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M5 17.5a3 3 0 100-6 3 3 0 000 6zm14 0a3 3 0 100-6 3 3 0 000 6zM5 14.5l4-7h6l4 7M9 7.5h6" />
                   </svg>
                   {activity.gear_name}
-                </span>
+                </button>
               )}
             </div>
 
-            {/* Activity name */}
-            <h1 className="text-xl font-bold text-white mb-4 leading-tight">{activity.name}</h1>
+            {/* Activity name (click to edit) */}
+            {editingName ? (
+              <input
+                autoFocus
+                value={nameDraft}
+                onChange={e => setNameDraft(e.target.value)}
+                onBlur={saveName}
+                onKeyDown={e => {
+                  if (e.key === 'Enter')  { e.preventDefault(); saveName(); }
+                  if (e.key === 'Escape') { setEditingName(false); }
+                }}
+                className="w-full text-xl font-bold text-white mb-4 leading-tight bg-gray-800 border border-orange-500 rounded-lg px-2 py-1 focus:outline-none"
+              />
+            ) : (
+              <h1
+                onClick={() => { setNameDraft(activity.name); setEditingName(true); }}
+                className="text-xl font-bold text-white mb-4 leading-tight cursor-text hover:bg-gray-800/40 rounded-lg -mx-2 px-2 py-1 transition-colors group inline-flex items-center gap-2 max-w-full"
+                title="Click to rename"
+              >
+                <span className="truncate">{activity.name}</span>
+                <svg className="w-4 h-4 text-gray-600 opacity-0 group-hover:opacity-100 flex-shrink-0 transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+              </h1>
+            )}
 
             {/* Key stats strip */}
             <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">

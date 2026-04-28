@@ -60,11 +60,21 @@ export async function GET(req: NextRequest) {
     if (minKm > 0) { conditions.push(`a.distance >= $${p++}`); queryParams.push(minKm * 1000); }
     if (maxKm > 0) { conditions.push(`a.distance <= $${p++}`); queryParams.push(maxKm * 1000); }
 
-    // Gear filter (comma-separated list of gear ids)
-    const gearIds = gearParam.split(',').map(s => s.trim()).filter(Boolean);
-    if (gearIds.length > 0) {
-      conditions.push(`a.gear_id = ANY($${p++}::text[])`);
-      queryParams.push(gearIds);
+    // Gear filter (comma-separated list of gear ids; the special token
+    // `__none__` matches activities with no gear assigned).
+    const gearTokens = gearParam.split(',').map(s => s.trim()).filter(Boolean);
+    if (gearTokens.length > 0) {
+      const includeNone = gearTokens.includes('__none__');
+      const ids = gearTokens.filter(t => t !== '__none__');
+      const parts: string[] = [];
+      if (ids.length > 0) {
+        parts.push(`a.gear_id = ANY($${p++}::text[])`);
+        queryParams.push(ids);
+      }
+      if (includeNone) {
+        parts.push(`a.gear_id IS NULL`);
+      }
+      conditions.push(`(${parts.join(' OR ')})`);
     }
 
     const where = `WHERE ${conditions.join(' AND ')}`;

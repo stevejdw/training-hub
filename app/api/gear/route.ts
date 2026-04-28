@@ -16,7 +16,13 @@ export async function GET() {
       HAVING COUNT(a.id) > 0
       ORDER BY activity_count DESC, g.nickname NULLS LAST, g.name NULLS LAST
     `);
-    return Response.json({ gear: res.rows });
+    const noGear = await client.query(
+      `SELECT COUNT(*)::int AS n FROM activities WHERE gear_id IS NULL`
+    );
+    return Response.json({
+      gear: res.rows,
+      noGearCount: noGear.rows[0]?.n ?? 0,
+    });
   } catch (err) {
     return Response.json({ gear: [], error: String(err) }, { status: 500 });
   } finally {
