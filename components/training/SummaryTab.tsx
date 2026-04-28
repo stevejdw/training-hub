@@ -15,7 +15,17 @@ interface ActivityRow {
 interface WeekRow {
   week_start: string;
   week_end: string;
+  target_tss?: number;
   activities: ActivityRow[];
+}
+
+function alignmentDot(actualTSS: number, targetTSS: number) {
+  if (!targetTSS) return null;
+  const ratio = actualTSS / targetTSS;
+  // ±15% on plan = green, ±15-40% = orange, else yellow
+  if (ratio >= 0.85 && ratio <= 1.15) return { color: 'bg-green-500',  label: 'On plan'  };
+  if (ratio >= 0.60 && ratio <= 1.40) return { color: 'bg-orange-500', label: 'Close'    };
+  return { color: 'bg-yellow-500', label: 'Off plan' };
 }
 
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -99,14 +109,29 @@ function WeekCard({ week, isFirst }: { week: WeekRow; isFirst: boolean }) {
             <span className="text-xs text-gray-500">{weekLabel}</span>
           )}
         </div>
-        {rideCount > 0 && (
-          <div className="flex items-center gap-3 text-xs text-gray-400">
-            <span>{rideCount} ride{rideCount !== 1 ? 's' : ''}</span>
-            <span>{fmtHrs(totalTime)}</span>
-            <span>{fmtKm(totalDist)}</span>
-            {totalTSS > 0 && <span className="text-gray-500">{totalTSS} TSS</span>}
-          </div>
-        )}
+        <div className="flex items-center gap-3 text-xs text-gray-400">
+          {rideCount > 0 && (
+            <>
+              <span>{rideCount} ride{rideCount !== 1 ? 's' : ''}</span>
+              <span>{fmtHrs(totalTime)}</span>
+              <span>{fmtKm(totalDist)}</span>
+              {totalTSS > 0 && <span className="text-gray-500">{totalTSS} TSS</span>}
+            </>
+          )}
+          {(() => {
+            const dot = alignmentDot(totalTSS, week.target_tss ?? 0);
+            if (!dot) return null;
+            return (
+              <span
+                title={`Plan target: ${week.target_tss} TSS — ${dot.label}`}
+                className="flex items-center gap-1.5"
+              >
+                <span className={`w-2.5 h-2.5 rounded-full ${dot.color}`} />
+                <span className="text-[10px] text-gray-500 uppercase tracking-wider">{dot.label}</span>
+              </span>
+            );
+          })()}
+        </div>
       </div>
 
       {/* Day rows */}

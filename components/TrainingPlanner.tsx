@@ -7,10 +7,12 @@ import { TrainingPlan, TrainingDay } from '@/lib/training-plans';
 import BlockView from './training/BlockView';
 import DayView from './training/DayView';
 import SummaryTab from './training/SummaryTab';
+import ProgressTab from './training/ProgressTab';
+import KeyIntervalsTab from './training/KeyIntervalsTab';
 import EditPlanModal from './training/EditPlanModal';
 import DashboardBestPower from './DashboardBestPower';
 
-type MainTab = 'summary' | 'best-efforts' | 'plan';
+type MainTab = 'summary' | 'progress' | 'intervals' | 'best-efforts' | 'plan';
 type View = { type: 'block' } | { type: 'day'; day: TrainingDay };
 
 interface PlanMeta {
@@ -37,10 +39,26 @@ interface ActivitySummary {
 
 const TABS: { key: MainTab; label: string; icon: React.ReactNode }[] = [
   {
-    key: 'summary', label: 'Summary',
+    key: 'summary', label: 'Training Summary',
     icon: (
       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+      </svg>
+    ),
+  },
+  {
+    key: 'progress', label: 'Progress',
+    icon: (
+      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M3 17l6-6 4 4 8-8M14 7h7v7" />
+      </svg>
+    ),
+  },
+  {
+    key: 'intervals', label: 'Key Intervals',
+    icon: (
+      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
       </svg>
     ),
   },
@@ -65,7 +83,10 @@ const TABS: { key: MainTab; label: string; icon: React.ReactNode }[] = [
 export default function TrainingPlanner() {
   const searchParams = useSearchParams();
   const rawTab = searchParams.get('tab');
-  const initialTab: MainTab = (rawTab === 'summary' || rawTab === 'best-efforts' || rawTab === 'plan') ? rawTab : 'summary';
+  const initialTab: MainTab =
+    (rawTab === 'summary' || rawTab === 'progress' || rawTab === 'intervals' || rawTab === 'best-efforts' || rawTab === 'plan')
+      ? rawTab
+      : 'summary';
   const [mainTab, setMainTab]           = useState<MainTab>(initialTab);
   const [activePlanId, setActivePlanId] = useState<number | null>(null);
   const [plan, setPlan]                 = useState<TrainingPlan | null>(null);
@@ -158,7 +179,9 @@ export default function TrainingPlanner() {
         <div className="max-w-2xl md:max-w-5xl mx-auto px-4 py-4 md:px-8 md:py-8 space-y-4">
 
           {/* Summary tab */}
-          {mainTab === 'summary' && <SummaryTab />}
+          {mainTab === 'summary'   && <SummaryTab />}
+          {mainTab === 'progress'  && <ProgressTab />}
+          {mainTab === 'intervals' && <KeyIntervalsTab />}
 
           {/* Best Efforts tab */}
           {mainTab === 'best-efforts' && <DashboardBestPower />}

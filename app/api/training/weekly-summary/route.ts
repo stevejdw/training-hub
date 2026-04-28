@@ -41,10 +41,22 @@ export async function GET() {
           WHERE sport_type = ANY($2::text[])
             AND (start_date AT TIME ZONE $1)::date >= (SELECT MIN(week_start) FROM weeks)
             AND (start_date AT TIME ZONE $1)::date <= (SELECT MAX(week_end) FROM weeks)
+        ),
+        plan_targets AS (
+          -- Sum tss_target across all training_days inside each week.
+          -- If multiple plans exist we take the most-recent plan's days.
+          SELECT
+            w.week_start,
+            COALESCE(SUM(td.tss_target), 0)::int AS target_tss
+          FROM weeks w
+          LEFT JOIN training_days td ON td.date BETWEEN w.week_start AND w.week_end
+            AND td.plan_id = (SELECT id FROM training_plans ORDER BY created_at DESC LIMIT 1)
+          GROUP BY w.week_start
         )
         SELECT
           w.week_start::text,
           w.week_end::text,
+          COALESCE(pt.target_tss, 0) AS target_tss,
           COALESCE(
             json_agg(
               json_build_object(
@@ -61,7 +73,8 @@ export async function GET() {
           ) AS activities
         FROM weeks w
         LEFT JOIN acts a ON a.act_date BETWEEN w.week_start AND w.week_end
-        GROUP BY w.week_start, w.week_end
+        LEFT JOIN plan_targets pt ON pt.week_start = w.week_start
+        GROUP BY w.week_start, w.week_end, pt.target_tss
         ORDER BY w.week_start DESC
       `, [tz, CYCLING_TYPES]);
 
