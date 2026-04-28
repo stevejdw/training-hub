@@ -1,6 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+
+const CYCLING_TYPES = new Set(['Ride','VirtualRide','GravelRide','MountainBikeRide','EBikeRide','EMountainBikeRide']);
 
 interface ActivityRow {
   id: number;
@@ -42,12 +44,80 @@ function fmtKm(meters: number) {
   return (meters / 1000).toFixed(0) + 'km';
 }
 
-function sportEmoji(sport: string) {
-  if (sport.includes('Virtual')) return '💻';
-  if (sport.includes('Gravel')) return '🪨';
-  if (sport.includes('Mountain') || sport.includes('MTB')) return '⛰️';
-  if (sport.includes('EBike') || sport.includes('EMountain')) return '⚡';
-  return '🚴';
+function sportShort(sport: string): string {
+  if (sport.includes('Virtual')) return 'Virtual';
+  if (sport.includes('Gravel')) return 'Gravel';
+  if (sport.includes('EBike') || sport.includes('EMountain')) return 'eBike';
+  if (sport.includes('Mountain') || sport.includes('MTB')) return 'MTB';
+  return 'Ride';
+}
+
+function ActivityLine({ a }: { a: ActivityRow }) {
+  const km = (a.distance / 1000);
+  const min = Math.round(a.moving_time / 60);
+  return (
+    <a
+      href={`/activities/${a.id}`}
+      className="block px-1 py-0.5 rounded hover:bg-gray-700/60 transition-colors"
+      title={a.name}
+    >
+      <div className="text-[10px] text-gray-300 leading-tight font-medium truncate">{sportShort(a.sport_type)}</div>
+      <div className="text-[10px] text-gray-400 leading-tight">
+        {km > 0 && <span>{km >= 100 ? Math.round(km) : km.toFixed(0)}k</span>}
+        {km > 0 && min > 0 && <span className="text-gray-600 mx-0.5">·</span>}
+        {min > 0 && <span>{min}m</span>}
+        {a.tss > 0 && <span className="text-gray-500 ml-1">{a.tss}T</span>}
+      </div>
+    </a>
+  );
+}
+
+function MoreActivitiesPopover({ acts }: { acts: ActivityRow[] }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onClick);
+    return () => document.removeEventListener('mousedown', onClick);
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={(e) => { e.stopPropagation(); setOpen(o => !o); }}
+        className="text-[10px] text-orange-400 hover:text-orange-300 transition-colors"
+      >
+        +{acts.length} more
+      </button>
+      {open && (
+        <div className="absolute z-30 left-1/2 -translate-x-1/2 mt-1 w-44 bg-gray-900 border border-gray-700 rounded-lg shadow-2xl py-1">
+          {acts.map(a => {
+            const km = a.distance / 1000;
+            const min = Math.round(a.moving_time / 60);
+            return (
+              <a
+                key={a.id}
+                href={`/activities/${a.id}`}
+                className="block px-3 py-2 hover:bg-gray-800 transition-colors"
+              >
+                <div className="text-xs text-gray-200 truncate font-medium">{a.name}</div>
+                <div className="text-[10px] text-gray-500 mt-0.5">
+                  {sportShort(a.sport_type)}
+                  {km > 0 && <> · {km >= 100 ? Math.round(km) : km.toFixed(1)} km</>}
+                  {min > 0 && <> · {min} min</>}
+                  {a.tss > 0 && <> · {a.tss} TSS</>}
+                </div>
+              </a>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
 }
 
 // Get the 7 dates for a week starting on week_start (Monday).
@@ -70,17 +140,19 @@ function isCurrentWeek(weekStart: string) {
 
 function WeekCard({ week, isFirst }: { week: WeekRow; isFirst: boolean }) {
   const dates = weekDates(week.week_start);
+  // Defensive client-side filter — only keep cycling activities.
+  const cyclingActs = week.activities.filter(a => CYCLING_TYPES.has(a.sport_type));
   const actsByDate = new Map<string, ActivityRow[]>();
-  for (const a of week.activities) {
+  for (const a of cyclingActs) {
     const arr = actsByDate.get(a.date) ?? [];
     arr.push(a);
     actsByDate.set(a.date, arr);
   }
 
-  const totalTime = week.activities.reduce((s, a) => s + a.moving_time, 0);
-  const totalDist = week.activities.reduce((s, a) => s + a.distance, 0);
-  const totalTSS  = week.activities.reduce((s, a) => s + a.tss, 0);
-  const rideCount = week.activities.length;
+  const totalTime = cyclingActs.reduce((s, a) => s + a.moving_time, 0);
+  const totalDist = cyclingActs.reduce((s, a) => s + a.distance, 0);
+  const totalTSS  = cyclingActs.reduce((s, a) => s + a.tss, 0);
+  const rideCount = cyclingActs.length;
 
   // Format week label: "14–20 Apr" or "14–20 Apr 2025"
   // Use UTC dates to avoid timezone shifting
@@ -125,52 +197,40 @@ function WeekCard({ week, isFirst }: { week: WeekRow; isFirst: boolean }) {
       {/* Horizontal row: Mon — Sun cells + prominent Total cell */}
       <div className="grid grid-cols-[repeat(7,minmax(0,1fr))_minmax(112px,1.6fr)]">
         {dates.map((date, i) => {
-          const acts = actsByDate.get(date) ?? [];
+          const acts     = actsByDate.get(date) ?? [];
           const isToday  = date === todayStr;
           const isFuture = date > todayStr;
-          const dayKm   = acts.reduce((s, a) => s + a.distance, 0) / 1000;
-          const dayMin  = acts.reduce((s, a) => s + a.moving_time, 0) / 60;
-          const dayTSS  = acts.reduce((s, a) => s + a.tss, 0);
-          const primary = acts[0];
-          const href    = primary ? `/activities/${primary.id}` : undefined;
-          const Wrapper = (props: { children: React.ReactNode }) =>
-            href
-              ? <a href={href} className="block h-full hover:bg-gray-800/60 transition-colors">{props.children}</a>
-              : <div className="h-full">{props.children}</div>;
+          // Up to 2 visible activities; the rest go in a "+N more" popover.
+          const visible  = acts.slice(0, 2);
+          const overflow = acts.slice(2);
 
           return (
             <div
               key={date}
               className={`border-r border-gray-800 ${isToday ? 'bg-gray-800/40' : ''} ${isFuture ? 'opacity-40' : ''}`}
             >
-              <Wrapper>
-                <div className="px-1.5 py-2 flex flex-col items-center gap-0.5 min-h-[64px]">
-                  <div className={`text-[10px] font-medium uppercase tracking-wider ${isToday ? 'text-orange-400' : 'text-gray-500'}`}>
+              <div className="px-1 py-1.5 flex flex-col items-stretch gap-0.5 min-h-[64px]">
+                <div className="flex items-baseline justify-center gap-1">
+                  <span className={`text-[10px] font-medium uppercase tracking-wider ${isToday ? 'text-orange-400' : 'text-gray-500'}`}>
                     {DAY_LABELS[i]}
-                  </div>
-                  <div className={`text-[10px] ${isToday ? 'text-orange-400/70' : 'text-gray-600'} mb-0.5`}>
+                  </span>
+                  <span className={`text-[9px] ${isToday ? 'text-orange-400/70' : 'text-gray-600'}`}>
                     {Number(date.slice(8, 10))}
-                  </div>
-                  {acts.length === 0 ? (
-                    <span className="text-gray-700 text-[10px]">—</span>
-                  ) : (
-                    <>
-                      <span className="text-base leading-none" title={acts.map(a => `${a.name} · ${a.tss} TSS`).join('\n')}>
-                        {sportEmoji(primary.sport_type)}
-                        {acts.length > 1 && <span className="text-[9px] text-gray-500 ml-0.5">×{acts.length}</span>}
-                      </span>
-                      <div className="text-[10px] text-gray-300 leading-tight text-center">
-                        {dayKm > 0 && <span>{Math.round(dayKm)}km</span>}
-                        {dayKm > 0 && dayMin > 0 && <span className="text-gray-600 mx-0.5">·</span>}
-                        {dayMin > 0 && <span>{Math.round(dayMin)}m</span>}
-                      </div>
-                      {dayTSS > 0 && (
-                        <div className="text-[10px] text-gray-500">{dayTSS}</div>
-                      )}
-                    </>
-                  )}
+                  </span>
                 </div>
-              </Wrapper>
+                {acts.length === 0 ? (
+                  <span className="text-gray-700 text-[10px] text-center mt-1">—</span>
+                ) : (
+                  <>
+                    {visible.map(a => <ActivityLine key={a.id} a={a} />)}
+                    {overflow.length > 0 && (
+                      <div className="text-center pt-0.5">
+                        <MoreActivitiesPopover acts={overflow} />
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
           );
         })}
