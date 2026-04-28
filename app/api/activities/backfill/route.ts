@@ -91,6 +91,27 @@ export async function POST() {
 
           if (res.ok) {
             const a = await res.json() as Record<string, unknown>;
+
+            // Capture gear info from the activity payload (free — already fetched)
+            const gear   = a.gear as { id?: string; name?: string; nickname?: string; retired?: boolean } | null;
+            const gearId = gear?.id ?? (a.gear_id as string | null) ?? null;
+            if (gearId) {
+              await client.query(
+                `INSERT INTO gear (id, name, nickname, retired, synced_at)
+                 VALUES ($1,$2,$3,$4,NOW())
+                 ON CONFLICT (id) DO UPDATE SET
+                   name      = COALESCE(EXCLUDED.name, gear.name),
+                   nickname  = COALESCE(EXCLUDED.nickname, gear.nickname),
+                   retired   = COALESCE(EXCLUDED.retired, gear.retired),
+                   synced_at = NOW()`,
+                [gearId, gear?.name ?? null, gear?.nickname ?? null, gear?.retired ?? null]
+              ).catch(() => {});
+              await client.query(
+                `UPDATE activities SET gear_id = $1 WHERE id = $2 AND gear_id IS DISTINCT FROM $1`,
+                [gearId, activityId]
+              ).catch(() => {});
+            }
+
             const segEfforts = (a.segment_efforts as Record<string, unknown>[] | null) ?? [];
 
             // Batch all efforts for this activity into a single INSERT to

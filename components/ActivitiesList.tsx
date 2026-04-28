@@ -27,6 +27,16 @@ interface Activity {
   tss: number | null;
   total_elevation_gain: number;
   trainer: boolean;
+  gear_id: string | null;
+  gear_name: string | null;
+}
+
+interface GearItem {
+  id: string;
+  name: string | null;
+  nickname: string | null;
+  retired: boolean | null;
+  activity_count: number;
 }
 
 type SortCol = 'start_date' | 'distance' | 'moving_time' | 'average_watts' | 'average_heartrate' | 'tss';
@@ -79,6 +89,25 @@ export default function ActivitiesList() {
   // Data
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading,    setLoading]    = useState(true);
+
+  // Gear filter
+  const [gearList,    setGearList]    = useState<GearItem[]>([]);
+  const [selectedGear, setSelectedGear] = useState<string[]>(() => {
+    const g = searchParams.get('gear');
+    return g ? g.split(',').filter(Boolean) : [];
+  });
+
+  useEffect(() => {
+    fetch('/api/gear')
+      .then(r => r.json())
+      .then(d => setGearList(d.gear ?? []))
+      .catch(() => { /* non-fatal */ });
+  }, []);
+
+  function toggleGear(id: string) {
+    setSelectedGear(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+    setPage(1);
+  }
 
   // Filter panel visibility
   const [showFilters, setShowFilters] = useState(false);
@@ -151,6 +180,7 @@ export default function ActivitiesList() {
 
   function clearAll() {
     setSelected([]);
+    setSelectedGear([]);
     setDateFrom('');
     setDateTo('');
     setMinMins('');
@@ -170,7 +200,7 @@ export default function ActivitiesList() {
     setPage(1);
   }
 
-  const hasActiveFilters = selected.length > 0 || dateFrom || dateTo || minMins || maxMins || minKm || maxKm;
+  const hasActiveFilters = selected.length > 0 || selectedGear.length > 0 || dateFrom || dateTo || minMins || maxMins || minKm || maxKm;
 
   useEffect(() => {
     setLoading(true);
@@ -187,6 +217,7 @@ export default function ActivitiesList() {
     if (maxMins)  params.set('maxMins', maxMins);
     if (minKm)    params.set('minKm',   minKm);
     if (maxKm)    params.set('maxKm',   maxKm);
+    if (selectedGear.length > 0) params.set('gear', selectedGear.join(','));
 
     fetch(`/api/activities?${params}`)
       .then(r => r.json())
@@ -197,7 +228,7 @@ export default function ActivitiesList() {
         setLoading(false);
       })
       .catch(() => setLoading(false));
-  }, [selected, page, sortBy, sortDir, dateFrom, dateTo, minMins, maxMins, minKm, maxKm]);
+  }, [selected, selectedGear, page, sortBy, sortDir, dateFrom, dateTo, minMins, maxMins, minKm, maxKm]);
 
   return (
     <div className="h-full flex flex-col md:max-w-5xl md:mx-auto md:w-full">
@@ -360,6 +391,36 @@ export default function ActivitiesList() {
                 />
               </div>
             </div>
+
+            {/* Gear */}
+            {gearList.length > 0 && (
+              <div className="space-y-1 sm:col-span-2">
+                <p className="text-xs text-gray-500 uppercase tracking-wider">Gear</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {gearList.map(g => {
+                    const label = g.nickname || g.name || g.id;
+                    const isOn  = selectedGear.includes(g.id);
+                    return (
+                      <button
+                        key={g.id}
+                        onClick={() => toggleGear(g.id)}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors whitespace-nowrap ${
+                          isOn
+                            ? 'bg-orange-500 text-white'
+                            : 'bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700'
+                        }`}
+                        title={`${g.activity_count} activities`}
+                      >
+                        {label}
+                        <span className={`ml-1.5 text-[10px] ${isOn ? 'text-orange-100' : 'text-gray-600'}`}>
+                          {g.activity_count}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Clear all */}
             {hasActiveFilters && (

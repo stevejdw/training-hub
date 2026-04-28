@@ -125,18 +125,32 @@ function CustomTooltip({ active, payload, label, metric, unit }: any) {
     if (metric === 'hours') return v >= 10  ? Math.round(v).toString() : v.toFixed(1);
     return Math.round(v).toString();
   };
+
+  // Merge eBike + eMTB into a single line (they share the green colour).
+  const merged: { fill: string; label: string; value: number }[] = [];
+  const indexByLabel: Record<string, number> = {};
+  for (const p of nonZero) {
+    const type = p.dataKey.slice(metric.length + 1);
+    const lbl  = (type === 'EBikeRide' || type === 'EMountainBikeRide')
+      ? 'eBike / eMTB'
+      : sportLabel(type);
+    if (lbl in indexByLabel) {
+      merged[indexByLabel[lbl]].value += Number(p.value);
+    } else {
+      indexByLabel[lbl] = merged.length;
+      merged.push({ fill: p.fill, label: lbl, value: Number(p.value) });
+    }
+  }
+
   return (
     <div className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-xs shadow-lg">
       <p className="text-gray-400 mb-1">{label}</p>
-      {nonZero.map(p => {
-        const type = p.dataKey.slice(metric.length + 1);
-        return (
-          <p key={p.dataKey} style={{ color: p.fill }} className="font-medium">
-            {sportLabel(type)}: {fmt(Number(p.value))}{unit ? ` ${unit}` : ''}
-          </p>
-        );
-      })}
-      {nonZero.length > 1 && (
+      {merged.map(m => (
+        <p key={m.label} style={{ color: m.fill }} className="font-medium">
+          {m.label}: {fmt(m.value)}{unit ? ` ${unit}` : ''}
+        </p>
+      ))}
+      {merged.length > 1 && (
         <p className="text-white font-semibold border-t border-gray-700 mt-1 pt-1">
           Total: {fmt(total)}{unit ? ` ${unit}` : ''}
         </p>
@@ -392,14 +406,29 @@ function TrainingTab() {
         )}
       </div>
 
-      {/* Legend */}
+      {/* Legend — eBike + eMTB share the green colour, so render them
+          as a single combined entry instead of two duplicates. */}
       <div className="flex gap-3 flex-wrap">
-        {CYCLING_TYPES.map(type => (
-          <div key={type} className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ background: sportColor(type) }} />
-            <span className="text-xs text-gray-400">{sportLabel(type)}</span>
-          </div>
-        ))}
+        {(() => {
+          const seen = new Set<string>();
+          const items: { color: string; label: string }[] = [];
+          for (const type of CYCLING_TYPES) {
+            const color = sportColor(type);
+            if (seen.has(color)) continue;
+            seen.add(color);
+            // Custom label for the combined eBike/eMTB green entry
+            const label = (type === 'EBikeRide' || type === 'EMountainBikeRide')
+              ? 'eBike / eMTB'
+              : sportLabel(type);
+            items.push({ color, label });
+          }
+          return items.map(({ color, label }) => (
+            <div key={label} className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ background: color }} />
+              <span className="text-xs text-gray-400">{label}</span>
+            </div>
+          ));
+        })()}
       </div>
 
     </div>

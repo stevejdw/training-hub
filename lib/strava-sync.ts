@@ -163,8 +163,25 @@ export async function syncActivity(activityId: number): Promise<void> {
   const ifVal    = np ? Math.round((np / ftp) * 1000) / 1000 : null;
   const polyline = (a.map as Record<string, string> | null)?.summary_polyline ?? null;
 
+  // Gear (bike) — Strava activity detail includes nested `gear` { id, name, nickname, retired }
+  const gear   = a.gear as { id?: string; name?: string; nickname?: string; retired?: boolean } | null;
+  const gearId = gear?.id ?? (a.gear_id as string | null) ?? null;
+
   const client = await pool.connect();
   try {
+    // Upsert gear first if present (FK-style soft link via gear_id)
+    if (gearId) {
+      await client.query(`
+        INSERT INTO gear (id, name, nickname, retired, synced_at)
+        VALUES ($1, $2, $3, $4, NOW())
+        ON CONFLICT (id) DO UPDATE SET
+          name      = COALESCE(EXCLUDED.name, gear.name),
+          nickname  = COALESCE(EXCLUDED.nickname, gear.nickname),
+          retired   = COALESCE(EXCLUDED.retired, gear.retired),
+          synced_at = NOW()
+      `, [gearId, gear?.name ?? null, gear?.nickname ?? null, gear?.retired ?? null]).catch(() => {});
+    }
+
     // Upsert activity
     await client.query(`
       INSERT INTO activities (
@@ -173,9 +190,10 @@ export async function syncActivity(activityId: number): Promise<void> {
         average_watts, weighted_average_watts, max_watts,
         kilojoules, average_heartrate, max_heartrate,
         suffer_score, trainer, average_speed,
-        tss, intensity_factor, normalized_power, summary_polyline
+        tss, intensity_factor, normalized_power, summary_polyline,
+        gear_id
       ) VALUES (
-        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21
+        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22
       )
       ON CONFLICT (id) DO UPDATE SET
         name             = EXCLUDED.name,
@@ -183,6 +201,7 @@ export async function syncActivity(activityId: number): Promise<void> {
         intensity_factor = EXCLUDED.intensity_factor,
         normalized_power = EXCLUDED.normalized_power,
         summary_polyline = EXCLUDED.summary_polyline,
+        gear_id          = EXCLUDED.gear_id,
         updated_at       = NOW()
     `, [
       a.id, a.name,
@@ -194,6 +213,7 @@ export async function syncActivity(activityId: number): Promise<void> {
       a.kilojoules, a.average_heartrate, a.max_heartrate,
       a.suffer_score, a.trainer ?? false, a.average_speed,
       tss, ifVal, np, polyline,
+      gearId,
     ]);
 
     // Ensure hr column exists (idempotent)

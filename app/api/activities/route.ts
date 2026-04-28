@@ -18,6 +18,7 @@ export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams;
 
   const filtersParam  = sp.get('filters') ?? sp.get('filter') ?? 'All';
+  const gearParam     = sp.get('gear') ?? '';
   const from          = sp.get('from');       // ISO date
   const dateTo        = sp.get('dateTo');     // ISO date
   const minMins       = parseInt(sp.get('minMins') ?? '0', 10);
@@ -44,34 +45,45 @@ export async function GET(req: NextRequest) {
     let p = 1;
 
     // Always cycling only
-    conditions.push(`sport_type = ANY($${p++}::text[])`);
+    conditions.push(`a.sport_type = ANY($${p++}::text[])`);
     queryParams.push(types.length > 0 ? types : CYCLING_TYPES);
 
     // Date filters
-    if (from)    { conditions.push(`(start_date AT TIME ZONE 'Australia/Sydney')::date >= $${p++}`); queryParams.push(from); }
-    if (dateTo)  { conditions.push(`(start_date AT TIME ZONE 'Australia/Sydney')::date <= $${p++}`); queryParams.push(dateTo); }
+    if (from)    { conditions.push(`(a.start_date AT TIME ZONE 'Australia/Sydney')::date >= $${p++}`); queryParams.push(from); }
+    if (dateTo)  { conditions.push(`(a.start_date AT TIME ZONE 'Australia/Sydney')::date <= $${p++}`); queryParams.push(dateTo); }
 
     // Duration filters (in minutes → seconds)
-    if (minMins > 0) { conditions.push(`moving_time >= $${p++}`); queryParams.push(minMins * 60); }
-    if (maxMins > 0) { conditions.push(`moving_time <= $${p++}`); queryParams.push(maxMins * 60); }
+    if (minMins > 0) { conditions.push(`a.moving_time >= $${p++}`); queryParams.push(minMins * 60); }
+    if (maxMins > 0) { conditions.push(`a.moving_time <= $${p++}`); queryParams.push(maxMins * 60); }
 
     // Distance filters (km → metres)
-    if (minKm > 0) { conditions.push(`distance >= $${p++}`); queryParams.push(minKm * 1000); }
-    if (maxKm > 0) { conditions.push(`distance <= $${p++}`); queryParams.push(maxKm * 1000); }
+    if (minKm > 0) { conditions.push(`a.distance >= $${p++}`); queryParams.push(minKm * 1000); }
+    if (maxKm > 0) { conditions.push(`a.distance <= $${p++}`); queryParams.push(maxKm * 1000); }
+
+    // Gear filter (comma-separated list of gear ids)
+    const gearIds = gearParam.split(',').map(s => s.trim()).filter(Boolean);
+    if (gearIds.length > 0) {
+      conditions.push(`a.gear_id = ANY($${p++}::text[])`);
+      queryParams.push(gearIds);
+    }
 
     const where = `WHERE ${conditions.join(' AND ')}`;
 
     const [activities, count] = await Promise.all([
       client.query(
-        `SELECT id, name, sport_type, start_date, distance, moving_time,
-                average_watts, normalized_power, average_heartrate, tss,
-                total_elevation_gain, trainer
-         FROM activities ${where}
-         ORDER BY ${sortBy} ${sortDir} NULLS LAST
+        `SELECT a.id, a.name, a.sport_type, a.start_date, a.distance, a.moving_time,
+                a.average_watts, a.normalized_power, a.average_heartrate, a.tss,
+                a.total_elevation_gain, a.trainer,
+                a.gear_id,
+                COALESCE(g.nickname, g.name) AS gear_name
+         FROM activities a
+         LEFT JOIN gear g ON g.id = a.gear_id
+         ${where}
+         ORDER BY a.${sortBy} ${sortDir} NULLS LAST
          LIMIT $${p++} OFFSET $${p++}`,
         [...queryParams, limit, offset]
       ),
-      client.query(`SELECT COUNT(*) AS total FROM activities ${where}`, queryParams),
+      client.query(`SELECT COUNT(*) AS total FROM activities a ${where}`, queryParams),
     ]);
 
     return Response.json({
