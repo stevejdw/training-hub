@@ -10,6 +10,7 @@ import { SPORT_FILTER_LABELS, CYCLING_TYPES, SportFilter, sportColor, sportLabel
 import ActivitiesList from './ActivitiesList';
 import FeedPage from './FeedPage';
 import ProfileEditor from './ProfileEditor';
+import MobileTabBar from './MobileTabBar';
 
 type Tab    = 'feed' | 'activities' | 'progress' | 'settings';
 type Period = 'week' | 'month' | 'year';
@@ -444,23 +445,8 @@ export default function DashboardHome() {
   return (
     <div className="h-full flex flex-col md:flex-row">
 
-      {/* Mobile: horizontal tab bar at top */}
-      <div className="md:hidden flex-shrink-0 flex border-b border-gray-800 overflow-x-auto">
-        {NAV.map(({ key, label, icon }) => (
-          <button
-            key={key}
-            onClick={() => setTab(key)}
-            className={`flex items-center gap-1.5 px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors -mb-px ${
-              tab === key
-                ? 'border-orange-500 text-white'
-                : 'border-transparent text-gray-500 hover:text-gray-300 hover:border-gray-600'
-            }`}
-          >
-            {icon}
-            <span>{label}</span>
-          </button>
-        ))}
-      </div>
+      {/* Mobile: horizontal tab bar with overflow */}
+      <MobileTabBar tabs={NAV} active={tab} onSelect={setTab} />
 
       {/* Desktop: vertical sub-tab sidebar */}
       <aside className="hidden md:flex flex-col flex-shrink-0 w-56 border-r border-gray-800 bg-gray-950/50 py-6 px-3 gap-1">

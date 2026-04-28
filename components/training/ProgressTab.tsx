@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend,
 } from 'recharts';
 import { SPORT_FILTER_LABELS, SportFilter } from '@/lib/sport-types';
+import { useCachedFetch } from '@/lib/use-cached-fetch';
 
 type Period = 'wtd' | 'mtd' | 'ytd';
 type Metric = 'time' | 'km';
@@ -35,19 +36,13 @@ export default function ProgressTab() {
   const [period,   setPeriod]   = useState<Period>('wtd');
   const [metric,   setMetric]   = useState<Metric>('time');
   const [selected, setSelected] = useState<SportFilter[]>([]);
-  const [data,    setData]    = useState<ProgressResponse | null>(null);
-  const [loading, setLoading] = useState(true);
 
   const filtersParam = selected.length > 0 ? selected.join(',') : 'All';
-
-  useEffect(() => {
-    setLoading(true);
-    const qs = new URLSearchParams({ period, metric, filters: filtersParam });
-    fetch(`/api/training/progress?${qs}`)
-      .then(r => r.json())
-      .then((d: ProgressResponse) => { setData(d); setLoading(false); })
-      .catch(() => setLoading(false));
-  }, [period, metric, filtersParam]);
+  const qs = `period=${period}&metric=${metric}&filters=${encodeURIComponent(filtersParam)}`;
+  const { data, loading } = useCachedFetch<ProgressResponse>(
+    `/api/training/progress?${qs}`,
+    `cache-training-progress-${qs}`,
+  );
 
   function toggleFilter(f: SportFilter) {
     setSelected(p => p.includes(f) ? p.filter(x => x !== f) : [...p, f]);

@@ -11,6 +11,7 @@ import ProgressTab from './training/ProgressTab';
 import KeyIntervalsTab from './training/KeyIntervalsTab';
 import EditPlanModal from './training/EditPlanModal';
 import DashboardBestPower from './DashboardBestPower';
+import MobileTabBar from './MobileTabBar';
 
 type MainTab = 'summary' | 'progress' | 'intervals' | 'best-efforts' | 'plan';
 type View = { type: 'block' } | { type: 'day'; day: TrainingDay };
@@ -135,23 +136,8 @@ export default function TrainingPlanner() {
   return (
     <div className="h-full flex flex-col md:flex-row">
 
-      {/* Mobile tab bar */}
-      <div className="md:hidden flex-shrink-0 flex border-b border-gray-800 overflow-x-auto">
-        {TABS.map(({ key, label, icon }) => (
-          <button
-            key={key}
-            onClick={() => setMainTab(key)}
-            className={`flex items-center gap-1.5 px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors -mb-px ${
-              mainTab === key
-                ? 'border-orange-500 text-white'
-                : 'border-transparent text-gray-500 hover:text-gray-300 hover:border-gray-600'
-            }`}
-          >
-            {icon}
-            <span>{label}</span>
-          </button>
-        ))}
-      </div>
+      {/* Mobile tab bar with overflow */}
+      <MobileTabBar tabs={TABS} active={mainTab} onSelect={setMainTab} />
 
       {/* Desktop sidebar */}
       <aside className="hidden md:flex flex-col flex-shrink-0 w-56 border-r border-gray-800 bg-gray-950/50 py-6 px-3 gap-1">

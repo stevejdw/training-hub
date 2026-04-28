@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ResponsiveContainer, LineChart, Line, YAxis, ReferenceLine, Tooltip } from 'recharts';
+import { useCachedFetch } from '@/lib/use-cached-fetch';
 
 interface Target {
   key:          string;
@@ -105,15 +105,10 @@ function IntervalCard({ target, current, weekly }: { target: Target; current: nu
 }
 
 export default function KeyIntervalsTab() {
-  const [data, setData]       = useState<ProgressData | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetch('/api/training/power-progress')
-      .then(r => r.json())
-      .then((d: ProgressData) => { setData(d); setLoading(false); })
-      .catch(() => setLoading(false));
-  }, []);
+  const { data, loading } = useCachedFetch<ProgressData>(
+    '/api/training/power-progress',
+    'cache-training-power-progress',
+  );
 
   if (loading) {
     return (
