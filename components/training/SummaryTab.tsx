@@ -72,6 +72,51 @@ function ActivityLine({ a }: { a: ActivityRow }) {
   );
 }
 
+/** Wraps a tappable cell that opens the same multi-activity popover when
+ *  pressed. Used by the mobile day-strip when a day has 2+ rides. */
+function DayPopoverWrapper({ acts, children }: { acts: ActivityRow[]; children: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, [open]);
+  return (
+    <div ref={ref} className="relative">
+      <button onClick={() => setOpen(o => !o)} className="block w-full text-left">
+        {children}
+      </button>
+      {open && (
+        <div className="absolute z-30 left-1/2 -translate-x-1/2 mt-1 w-44 bg-gray-900 border border-gray-700 rounded-lg shadow-2xl py-1">
+          {acts.map(a => {
+            const km = a.distance / 1000;
+            const min = Math.round(a.moving_time / 60);
+            return (
+              <a
+                key={a.id}
+                href={`/activities/${a.id}`}
+                className="block px-3 py-2 hover:bg-gray-800 transition-colors"
+              >
+                <div className="text-xs text-gray-200 truncate font-medium">{a.name}</div>
+                <div className="text-[10px] text-gray-500 mt-0.5">
+                  {sportShort(a.sport_type)}
+                  {km > 0 && <> · {km >= 100 ? Math.round(km) : km.toFixed(1)} km</>}
+                  {min > 0 && <> · {min} min</>}
+                  {a.tss > 0 && <> · {a.tss} TSS</>}
+                </div>
+              </a>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function MoreActivitiesPopover({ acts }: { acts: ActivityRow[] }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -170,6 +215,9 @@ function WeekCard({ week, isFirst }: { week: WeekRow; isFirst: boolean }) {
 
   const dot = alignmentDot(totalTSS, week.target_tss ?? 0);
 
+  // Mobile-only single-letter day labels to avoid overlap.
+  const SHORT_DAY_LABELS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+
   return (
     <div className={`rounded-xl overflow-hidden border ${current ? 'border-orange-500/40' : 'border-gray-800'}`}>
       {/* Compact header: week label + alignment dot */}
@@ -194,8 +242,77 @@ function WeekCard({ week, isFirst }: { week: WeekRow; isFirst: boolean }) {
         )}
       </div>
 
-      {/* Horizontal row: Mon — Sun cells + prominent Total cell */}
-      <div className="grid grid-cols-[repeat(7,minmax(0,1fr))_minmax(112px,1.6fr)]">
+      {/* ── Mobile layout: Total prominent at top, then a compact 7-day strip ── */}
+      <div className="md:hidden">
+        {/* Big Total */}
+        <div className={`flex items-center justify-between px-4 py-3 ${current ? 'bg-orange-500/10' : 'bg-gray-800/40'}`}>
+          {rideCount > 0 ? (
+            <>
+              <div className="flex items-baseline gap-1">
+                <span className="text-2xl font-bold text-white leading-none">{Math.round(totalDist / 1000)}</span>
+                <span className="text-[11px] text-gray-500 uppercase">km</span>
+              </div>
+              <div className="flex items-baseline gap-1">
+                <span className="text-2xl font-bold text-white leading-none">{fmtHrs(totalTime)}</span>
+              </div>
+              <div className="flex items-baseline gap-1">
+                <span className={`text-2xl font-bold leading-none ${current ? 'text-orange-300' : 'text-gray-200'}`}>{totalTSS}</span>
+                <span className="text-[11px] text-gray-500 uppercase">tss</span>
+                {week.target_tss ? (
+                  <span className="text-[10px] text-gray-600 ml-1">/ {week.target_tss}</span>
+                ) : null}
+              </div>
+            </>
+          ) : (
+            <span className="text-sm text-gray-600">No rides this week</span>
+          )}
+        </div>
+        {/* Compact 7-day strip */}
+        <div className="grid grid-cols-7 border-t border-gray-800">
+          {dates.map((date, i) => {
+            const acts     = actsByDate.get(date) ?? [];
+            const isToday  = date === todayStr;
+            const isFuture = date > todayStr;
+            const dayKm    = acts.reduce((s, a) => s + a.distance, 0) / 1000;
+            const hasActs  = acts.length > 0;
+            const cellInner = (
+              <div className={`flex flex-col items-center py-1.5 ${i < 6 ? 'border-r border-gray-800' : ''} ${isToday ? 'bg-gray-800/40' : ''} ${isFuture ? 'opacity-40' : ''}`}>
+                <span className={`text-[10px] font-medium ${isToday ? 'text-orange-400' : 'text-gray-500'}`}>
+                  {SHORT_DAY_LABELS[i]}
+                </span>
+                <span className={`text-[10px] ${isToday ? 'text-orange-400/70' : 'text-gray-600'}`}>
+                  {Number(date.slice(8, 10))}
+                </span>
+                <span className={`mt-1 text-[11px] font-semibold ${hasActs ? 'text-gray-200' : 'text-gray-700'}`}>
+                  {hasActs ? `${Math.round(dayKm)}` : '—'}
+                </span>
+                {hasActs && acts.length > 1 && (
+                  <span className="text-[8px] text-gray-500 mt-0.5">×{acts.length}</span>
+                )}
+              </div>
+            );
+            // Tap → if 1 ride, navigate; if 2+, open MoreActivitiesPopover
+            if (acts.length === 1) {
+              return (
+                <a key={date} href={`/activities/${acts[0].id}`} className="block">
+                  {cellInner}
+                </a>
+              );
+            }
+            if (acts.length >= 2) {
+              return (
+                <div key={date}>
+                  <DayPopoverWrapper acts={acts}>{cellInner}</DayPopoverWrapper>
+                </div>
+              );
+            }
+            return <div key={date}>{cellInner}</div>;
+          })}
+        </div>
+      </div>
+
+      {/* ── Desktop layout: original 7 day cells + Total ── */}
+      <div className="hidden md:grid md:grid-cols-[repeat(7,minmax(0,1fr))_minmax(112px,1.6fr)]">
         {dates.map((date, i) => {
           const acts     = actsByDate.get(date) ?? [];
           const isToday  = date === todayStr;

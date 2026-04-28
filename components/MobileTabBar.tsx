@@ -30,8 +30,8 @@ export default function MobileTabBar<K extends string>({
 
   useEffect(() => {
     if (!wrapRef.current) return;
-    const CELL_PX = 96; // each tab cell width target
-    const MORE_PX = 88; // "More" cell width target
+    const CELL_PX = 92; // each tab cell width target
+    const MORE_PX = 64; // "More" cell width target (compact stacked layout)
 
     const update = () => {
       const w = wrapRef.current?.clientWidth ?? 0;
@@ -69,13 +69,15 @@ export default function MobileTabBar<K extends string>({
   return (
     <div
       ref={wrapRef}
-      className="md:hidden flex-shrink-0 flex border-b border-gray-800 relative"
+      // Right padding reserves space for the fixed top-right Profile icon
+      // so the rightmost tab cell never sits under it.
+      className="md:hidden flex-shrink-0 flex border-b border-gray-800 relative pr-12"
     >
       {visible.map(({ key, label, icon }) => (
         <button
           key={key}
           onClick={() => onSelect(key)}
-          className={`flex-1 min-w-0 flex items-center justify-center gap-1.5 px-2 py-3 text-sm font-medium border-b-2 transition-colors -mb-px ${
+          className={`flex-1 min-w-0 flex items-center justify-center gap-1.5 px-1 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
             active === key
               ? 'border-orange-500 text-white'
               : 'border-transparent text-gray-500 hover:text-gray-300 hover:border-gray-600'
@@ -90,7 +92,7 @@ export default function MobileTabBar<K extends string>({
         <div className="flex-1 min-w-0 relative" data-mobile-tab-more>
           <button
             onClick={() => setMoreOpen(o => !o)}
-            className={`w-full h-full flex items-center justify-center gap-1.5 px-2 py-3 text-sm font-medium border-b-2 transition-colors -mb-px ${
+            className={`w-full h-full flex flex-col items-center justify-center gap-0.5 py-1.5 text-[11px] font-medium border-b-2 transition-colors -mb-px ${
               activeInOverflow || moreOpen
                 ? 'border-orange-500 text-white'
                 : 'border-transparent text-gray-500 hover:text-gray-300 hover:border-gray-600'
@@ -101,7 +103,7 @@ export default function MobileTabBar<K extends string>({
               <circle cx="12" cy="12" r="1.6" fill="currentColor" />
               <circle cx="19" cy="12" r="1.6" fill="currentColor" />
             </svg>
-            <span className="truncate">More</span>
+            <span className="truncate leading-none">More</span>
           </button>
           {moreOpen && (
             <div className="absolute right-0 top-full mt-1 w-56 bg-gray-900 border border-gray-700 rounded-xl shadow-2xl py-1 z-50">
