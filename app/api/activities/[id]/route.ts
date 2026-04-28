@@ -8,7 +8,10 @@ export async function GET(
   const client = await pool.connect();
   try {
     const activityResult = await client.query(
-      `SELECT * FROM activities WHERE id = $1`,
+      `SELECT a.*, COALESCE(g.nickname, g.name) AS gear_name
+       FROM activities a
+       LEFT JOIN gear g ON g.id = a.gear_id
+       WHERE a.id = $1`,
       [id]
     );
     if (activityResult.rows.length === 0) {

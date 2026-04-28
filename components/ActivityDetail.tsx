@@ -65,6 +65,8 @@ interface Activity {
   normalized_power: number | null;
   summary_polyline: string | null;
   average_speed: number | null;
+  gear_id: string | null;
+  gear_name: string | null;
 }
 
 interface Lap {
@@ -192,8 +194,8 @@ export default function ActivityDetail({ id }: { id: string }) {
         {/* Header + Map */}
         <div className="flex gap-4 items-start">
           <div className="flex-1 min-w-0">
-            {/* Sport badge + date */}
-            <div className="flex items-center gap-2 mb-2">
+            {/* Sport badge + date + gear */}
+            <div className="flex items-center gap-2 mb-2 flex-wrap">
               <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ background: color + '20', color }}>
                 {sportLabel(activity.sport_type)}{activity.trainer ? ' · Indoor' : ''}
               </span>
@@ -202,6 +204,14 @@ export default function ActivityDetail({ id }: { id: string }) {
                 {' · '}
                 {date.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' })}
               </span>
+              {activity.gear_name && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-gray-800 text-gray-300 border border-gray-700">
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 17.5a3 3 0 100-6 3 3 0 000 6zm14 0a3 3 0 100-6 3 3 0 000 6zM5 14.5l4-7h6l4 7M9 7.5h6" />
+                  </svg>
+                  {activity.gear_name}
+                </span>
+              )}
             </div>
 
             {/* Activity name */}
