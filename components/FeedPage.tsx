@@ -32,7 +32,14 @@ interface PowerHighlight {
   isNew: boolean;
 }
 
-interface WTD { rides: number; km: number; hours: number; tss: number; elevation: number }
+interface PeriodStats { rides: number; km: number; hours: number; tss: number; elevation: number }
+
+type StatPeriod = 'wtd' | 'mtd' | 'ytd';
+const STAT_PERIODS: { key: StatPeriod; label: string }[] = [
+  { key: 'wtd', label: 'Week to Date'  },
+  { key: 'mtd', label: 'Month to Date' },
+  { key: 'ytd', label: 'Year to Date'  },
+];
 
 interface NextSession {
   id: number;
@@ -51,7 +58,9 @@ interface FeedData {
   fitness: { ctl: number; atl: number; tsb: number };
   powerHighlights: PowerHighlight[];
   lastCyclingRideId: number | null;
-  wtd: WTD | null;
+  wtd: PeriodStats | null;
+  mtd: PeriodStats | null;
+  ytd: PeriodStats | null;
 }
 
 function fmt(s: number) {
@@ -155,6 +164,17 @@ function CoachingTip() {
 }
 
 export default function FeedPage() {
+  const [statPeriod, setStatPeriod] = useState<StatPeriod>('wtd');
+  const swipeStartX = useRef<number | null>(null);
+
+  function handleStatSwipe(dir: 'left' | 'right') {
+    const idx  = STAT_PERIODS.findIndex(p => p.key === statPeriod);
+    const next = dir === 'left'
+      ? STAT_PERIODS[Math.min(STAT_PERIODS.length - 1, idx + 1)]
+      : STAT_PERIODS[Math.max(0, idx - 1)];
+    if (next && next.key !== statPeriod) setStatPeriod(next.key);
+  }
+
   const [data, setData] = useState<FeedData | null>(() => {
     // Hydrate from cache instantly — no loading flicker
     if (typeof window === 'undefined') return null;
@@ -189,7 +209,8 @@ export default function FeedPage() {
     );
   }
 
-  const { recentRides = [], nextEvent, nextSession, fitness, powerHighlights = [], wtd } = data ?? {};
+  const { recentRides = [], nextEvent, nextSession, fitness, powerHighlights = [], wtd, mtd, ytd } = data ?? {};
+  const activeStat = statPeriod === 'mtd' ? mtd : statPeriod === 'ytd' ? ytd : wtd;
   const newPRs   = powerHighlights.filter(p => p.isNew);
   const tsbLabel = (fitness?.tsb ?? 0) >= 5 ? 'Fresh' : (fitness?.tsb ?? 0) <= -20 ? 'Fatigued' : 'Neutral';
   const tsbColor = (fitness?.tsb ?? 0) >= 5 ? 'text-green-400' : (fitness?.tsb ?? 0) <= -20 ? 'text-red-400' : 'text-yellow-400';
@@ -261,26 +282,52 @@ export default function FeedPage() {
           )}
         </div>
 
-        {/* Week to Date */}
-        {wtd && (
-          <div className="bg-gray-800/60 rounded-2xl px-4 py-3">
-            <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-2">Week to Date</p>
-            <div className="grid grid-cols-5 gap-1">
-              {[
-                { label: 'Rides',  value: String(wtd.rides)      },
-                { label: 'km',     value: String(wtd.km)         },
-                { label: 'Hours',  value: String(wtd.hours)      },
-                { label: 'TSS',    value: String(wtd.tss)        },
-                { label: 'Elev m', value: String(wtd.elevation)  },
-              ].map(({ label, value }) => (
-                <div key={label} className="text-center">
-                  <p className="text-sm font-bold text-white leading-tight">{value}</p>
-                  <p className="text-[10px] text-gray-500 mt-0.5">{label}</p>
-                </div>
+        {/* Period stats — swipeable WTD / MTD / YTD */}
+        <div
+          className="bg-gray-800/60 rounded-2xl px-4 py-3 select-none touch-pan-y"
+          onTouchStart={e => { swipeStartX.current = e.touches[0].clientX; }}
+          onTouchEnd={e => {
+            if (swipeStartX.current === null) return;
+            const dx = e.changedTouches[0].clientX - swipeStartX.current;
+            swipeStartX.current = null;
+            if (Math.abs(dx) > 40) handleStatSwipe(dx < 0 ? 'left' : 'right');
+          }}
+        >
+          {/* Period label + dot indicators */}
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
+              {STAT_PERIODS.find(p => p.key === statPeriod)?.label}
+            </p>
+            <div className="flex items-center gap-1.5">
+              {STAT_PERIODS.map(p => (
+                <button
+                  key={p.key}
+                  onClick={() => setStatPeriod(p.key)}
+                  className={`transition-all rounded-full ${
+                    statPeriod === p.key ? 'w-4 h-1.5 bg-orange-500' : 'w-1.5 h-1.5 bg-gray-600 hover:bg-gray-500'
+                  }`}
+                  aria-label={p.label}
+                />
               ))}
             </div>
           </div>
-        )}
+          <div className="grid grid-cols-5 gap-1">
+            {activeStat ? [
+              { label: 'Rides',  value: String(activeStat.rides)     },
+              { label: 'km',     value: String(activeStat.km)        },
+              { label: 'Hours',  value: String(activeStat.hours)     },
+              { label: 'TSS',    value: String(activeStat.tss)       },
+              { label: 'Elev m', value: String(activeStat.elevation) },
+            ].map(({ label, value }) => (
+              <div key={label} className="text-center">
+                <p className="text-sm font-bold text-white leading-tight">{value}</p>
+                <p className="text-[10px] text-gray-500 mt-0.5">{label}</p>
+              </div>
+            )) : (
+              <div className="col-span-5 h-8 bg-gray-700/40 rounded animate-pulse" />
+            )}
+          </div>
+        </div>
 
         {/* Fitness snapshot */}
         {fitness && (

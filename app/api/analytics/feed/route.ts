@@ -75,7 +75,7 @@ export async function GET() {
     `);
     const nextSession = nextSessionRes.rows[0] ?? null;
 
-    const wtdRes = await client.query(`
+    const statsQuery = (truncUnit: string) => client.query(`
       SELECT
         COUNT(*)                                   AS rides,
         ROUND(COALESCE(SUM(distance)/1000, 0)::numeric, 1) AS km,
@@ -84,8 +84,13 @@ export async function GET() {
         ROUND(COALESCE(SUM(total_elevation_gain), 0)::numeric) AS elevation
       FROM activities
       WHERE sport_type NOT ILIKE '%walk%'
-        AND start_date >= date_trunc('week', NOW() AT TIME ZONE '${tz}') AT TIME ZONE '${tz}'
+        AND start_date >= date_trunc('${truncUnit}', NOW() AT TIME ZONE '${tz}') AT TIME ZONE '${tz}'
     `);
+    const [wtdRes, mtdRes, ytdRes] = await Promise.all([
+      statsQuery('week'),
+      statsQuery('month'),
+      statsQuery('year'),
+    ]);
 
     const dailyTss = dailyTssRes.rows.map(r => ({ date: String(r.date), tss: Number(r.tss) }));
     const fitness = calculateFitness(dailyTss);
@@ -157,7 +162,13 @@ export async function GET() {
       }
     }
 
-    const wtd = wtdRes.rows[0];
+    const toStats = (row: Record<string, unknown>) => ({
+      rides:     Number(row.rides),
+      km:        Number(row.km),
+      hours:     Number(row.hours),
+      tss:       Number(row.tss),
+      elevation: Number(row.elevation),
+    });
     return Response.json({
       recentRides: ridesRes.rows,
       nextEvent: nextEvent ? { ...nextEvent, daysAway } : null,
@@ -165,13 +176,9 @@ export async function GET() {
       fitness,
       powerHighlights,
       lastCyclingRideId: lastCyclingRide?.id ?? null,
-      wtd: {
-        rides:     Number(wtd.rides),
-        km:        Number(wtd.km),
-        hours:     Number(wtd.hours),
-        tss:       Number(wtd.tss),
-        elevation: Number(wtd.elevation),
-      },
+      wtd: toStats(wtdRes.rows[0]),
+      mtd: toStats(mtdRes.rows[0]),
+      ytd: toStats(ytdRes.rows[0]),
     });
   } catch (err) {
     console.error('Analytics feed error:', err);
