@@ -5,7 +5,6 @@ import { TrainingPlan, TrainingDay } from '@/lib/training-plans';
 import BlockView from '@/components/training/BlockView';
 import DayView from '@/components/training/DayView';
 import EditPlanModal from '@/components/training/EditPlanModal';
-import TrainingPlansSettings from '@/components/training/TrainingPlansSettings';
 
 interface PlanMeta { id: number; name: string; goal: string; created_at: string }
 
@@ -71,34 +70,40 @@ export default function TrainingPlanTab() {
 
   return (
     <div className="space-y-5">
-      {/* Manage plans (create / edit / delete / set active) */}
-      <TrainingPlansSettings />
 
-      {/* Active plan header */}
+      {/* Plan title + goal */}
       {plan && view.type === 'block' && (() => {
         const m = plan.name.match(/^(\d+)\s*[Ww]eeks?\s*[Pp]lan\s*[:\-–]\s*(.+)$/);
-        const weekBadge = m ? `${m[1]} Weeks` : null;
+        const weekBadge = m ? `${m[1]}-Week Plan` : null;
         const title     = m ? m[2].trim() : plan.name;
         return (
           <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               {weekBadge && (
-                <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-orange-500/15 text-orange-400 text-[11px] font-semibold uppercase tracking-wider mb-1.5">
+                <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-orange-500/15 text-orange-400 text-[11px] font-semibold uppercase tracking-wider mb-2">
                   {weekBadge}
                 </span>
               )}
-              <h2 className="text-xl font-bold text-white leading-tight">{title}</h2>
-              {plan.goal && <p className="text-sm text-gray-400 mt-1 leading-snug">{plan.goal}</p>}
+              <h2 className="text-2xl font-bold text-white leading-tight">{title}</h2>
+              {plan.goal && <p className="text-base text-gray-400 mt-1.5 leading-snug">{plan.goal}</p>}
             </div>
             <button
               onClick={() => setEditingPlan(true)}
-              className="flex-shrink-0 mt-0.5 px-3 py-1.5 text-xs text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
+              className="flex-shrink-0 mt-1 px-3 py-1.5 text-xs text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
             >
               Edit
             </button>
           </div>
         );
       })()}
+
+      {/* No plan message */}
+      {!loadingPlan && !plan && (
+        <div className="bg-gray-800/40 border border-gray-700 border-dashed rounded-2xl p-8 text-center">
+          <p className="text-sm text-gray-400">No active training plan.</p>
+          <p className="text-xs text-gray-600 mt-1">Go to Training Plans to create or activate one.</p>
+        </div>
+      )}
 
       {loadingPlan && (
         <div className="space-y-3">
