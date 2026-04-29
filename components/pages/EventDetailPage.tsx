@@ -182,6 +182,18 @@ export default function EventDetailPage({ eventId }: Props) {
     router.push('/events');
   }
 
+  /** Save current state to profile (so ClimbDetailPage reads fresh data) then navigate to climb. */
+  function viewClimb(idx: number) {
+    if (!profile) return;
+    // Flush local state into profile context so ClimbDetailPage sees up-to-date route + climbs
+    const updated = buildUpdatedEvent();
+    const events  = profile.events.map(e => (e.id ?? '') === eventId ? updated : e);
+    const merged  = { ...profile, events };
+    setProfile(merged);   // synchronous context update — ClimbDetailPage sees this immediately
+    save(merged);         // async DB persist
+    router.push(`/events/${eventId}/climb/${idx}`);
+  }
+
   function deleteEvent() {
     if (!profile || !confirm('Delete this event?')) return;
     const events = profile.events.filter(e => (e.id ?? '') !== eventId);
@@ -325,18 +337,21 @@ export default function EventDetailPage({ eventId }: Props) {
                       );
                     }}
                   />
-                  {/* All climbs — subtle */}
-                  {climbs.map((c, i) => (
-                    <ReferenceArea
-                      key={i}
-                      x1={c.start_km} x2={c.end_km}
-                      fill={selectedClimbIdx === i ? '#f97316' : '#ef4444'}
-                      fillOpacity={selectedClimbIdx === i ? 0.22 : 0.09}
-                      stroke={selectedClimbIdx === i ? '#f97316' : '#ef4444'}
-                      strokeOpacity={selectedClimbIdx === i ? 0.8 : 0.25}
-                      strokeWidth={1}
-                    />
-                  ))}
+                  {/* All climbs — use key that includes selection so Recharts re-renders on change */}
+                  {climbs.map((c, i) => {
+                    const sel = selectedClimbIdx === i;
+                    return (
+                      <ReferenceArea
+                        key={`climb-${i}-${sel}`}
+                        x1={c.start_km} x2={c.end_km}
+                        fill={sel ? '#f97316' : '#ef4444'}
+                        fillOpacity={sel ? 0.35 : 0.20}
+                        stroke={sel ? '#f97316' : '#ef4444'}
+                        strokeOpacity={sel ? 1 : 0.5}
+                        strokeWidth={sel ? 2 : 1}
+                      />
+                    );
+                  })}
                   <Area type="monotone" dataKey="alt" stroke="#f97316" strokeWidth={2} fill="url(#elevGradDetail)" dot={false} activeDot={{ r: 3 }} />
                 </AreaChart>
               </ResponsiveContainer>
@@ -380,13 +395,12 @@ export default function EventDetailPage({ eventId }: Props) {
                             </span>
                             <span className="text-sm font-semibold text-white truncate">{c.name}</span>
                           </div>
-                          <Link
-                            href={`/events/${eventId}/climb/${i}`}
-                            onClick={e => e.stopPropagation()}
+                          <button
+                            onClick={e => { e.stopPropagation(); viewClimb(i); }}
                             className="flex-shrink-0 text-xs text-orange-400 hover:text-orange-300 transition-colors"
                           >
                             View →
-                          </Link>
+                          </button>
                         </div>
 
                         <div className="mt-2 grid grid-cols-4 gap-1 text-center">

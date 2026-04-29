@@ -28,14 +28,18 @@ export default function ClimbDetailPage({ eventId, climbIdx }: Props) {
     if (climb?.target_watts) setTargetWatts(climb.target_watts);
   }, [climb?.target_watts]);
 
-  // Slice route streams to just this climb
+  // Slice route streams to just this climb (small tolerance for rounding at boundaries)
   const chartData = useMemo(() => {
     if (!route || !climb) return [];
+    const tol = 0.15; // km tolerance for rounding mismatches
     const pts: { km: number; alt: number }[] = [];
     for (let i = 0; i < route.stream_distance_km.length; i++) {
       const d = route.stream_distance_km[i];
-      if (d >= climb.start_km && d <= climb.end_km) {
-        pts.push({ km: Math.round((d - climb.start_km) * 10) / 10, alt: route.stream_altitude_m[i] });
+      if (d >= climb.start_km - tol && d <= climb.end_km + tol) {
+        pts.push({
+          km:  Math.round(Math.max(0, d - climb.start_km) * 10) / 10,
+          alt: route.stream_altitude_m[i],
+        });
       }
     }
     return pts;
@@ -75,11 +79,31 @@ export default function ClimbDetailPage({ eventId, climbIdx }: Props) {
     router.push(`/events/${eventId}`);
   }
 
-  if (!profile || !event || !climb) {
+  if (!profile || !event) {
     return (
       <div className="h-full flex flex-col">
         <PageHeader icon={iconFor('events')} title="Climb" />
         <div className="flex-1 flex items-center justify-center text-gray-600 text-sm">Loading…</div>
+      </div>
+    );
+  }
+
+  if (!climb) {
+    return (
+      <div className="h-full flex flex-col">
+        <PageHeader icon={iconFor('events')} title="Climb" />
+        <div className="flex-shrink-0 px-4 py-2 border-b border-gray-800/60">
+          <Link href={`/events/${eventId}`} className="text-sm text-gray-500 hover:text-orange-400 transition-colors">
+            ← {event.name || 'Event'}
+          </Link>
+        </div>
+        <div className="flex-1 flex flex-col items-center justify-center gap-3 px-8 text-center">
+          <p className="text-gray-400 text-sm">Climb data not saved yet.</p>
+          <p className="text-gray-600 text-xs">Go back to the event, load a Strava course, then tap "View →" on a climb to open it here.</p>
+          <Link href={`/events/${eventId}`} className="mt-2 px-4 py-2 bg-orange-500/20 text-orange-400 rounded-lg text-sm hover:bg-orange-500/30 transition-colors">
+            ← Back to Event
+          </Link>
+        </div>
       </div>
     );
   }
