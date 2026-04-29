@@ -1,11 +1,12 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend,
 } from 'recharts';
 import { SPORT_FILTER_LABELS, SportFilter } from '@/lib/sport-types';
 import { useCachedFetch } from '@/lib/use-cached-fetch';
+import TrainingCalendar from './TrainingCalendar';
 
 type Period = 'wtd' | 'mtd' | 'ytd';
 type Metric = 'time' | 'km';
@@ -56,11 +57,24 @@ function fmtRange(start: string, end: string, period: Period): string {
   return `${M[sm-1]} ${sd} – ${M[em-1]} ${ed}`;
 }
 
+const PERIOD_ORDER: Period[] = ['wtd', 'mtd', 'ytd'];
+
 export default function ProgressTab() {
   const [period,   setPeriod]   = useState<Period>('wtd');
   const [metric,   setMetric]   = useState<Metric>('time');
   const [selected, setSelected] = useState<SportFilter[]>([]);
   const [offset,   setOffset]   = useState(0); // 0 = current period, -1 = previous, etc.
+
+  // Swipe state for period selector
+  const swipeStartX = useRef<number | null>(null);
+
+  function handlePeriodSwipe(dir: 'left' | 'right') {
+    const idx  = PERIOD_ORDER.indexOf(period);
+    const next = dir === 'left'
+      ? PERIOD_ORDER[Math.min(PERIOD_ORDER.length - 1, idx + 1)]
+      : PERIOD_ORDER[Math.max(0, idx - 1)];
+    if (next !== period) { setPeriod(next); setOffset(0); }
+  }
 
   const filtersParam = selected.length > 0 ? selected.join(',') : 'All';
   const qs = `period=${period}&metric=${metric}&filters=${encodeURIComponent(filtersParam)}&offset=${offset}`;
@@ -104,8 +118,17 @@ export default function ProgressTab() {
   return (
     <div className="space-y-4">
 
-      {/* Period type: WTD / MTD / YTD — top of screen */}
-      <div className="flex bg-gray-800 rounded-xl p-1 gap-1">
+      {/* Period type: WTD / MTD / YTD — top of screen, swipeable */}
+      <div
+        className="flex bg-gray-800 rounded-xl p-1 gap-1 select-none touch-pan-y"
+        onTouchStart={e => { swipeStartX.current = e.touches[0].clientX; }}
+        onTouchEnd={e => {
+          if (swipeStartX.current === null) return;
+          const dx = e.changedTouches[0].clientX - swipeStartX.current;
+          swipeStartX.current = null;
+          if (Math.abs(dx) > 40) handlePeriodSwipe(dx < 0 ? 'left' : 'right');
+        }}
+      >
         {PERIODS.map(p => (
           <button
             key={p.key}
@@ -236,6 +259,11 @@ export default function ProgressTab() {
             </svg>
           </button>
         </div>
+      </div>
+
+      {/* Training calendar — recent 8 weeks */}
+      <div className="border-t border-gray-800/60 pt-4">
+        <TrainingCalendar numWeeks={8} />
       </div>
 
     </div>

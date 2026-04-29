@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import {
@@ -183,7 +183,18 @@ function TrainingTab() {
   });
   const [error, setError] = useState<string | null>(null);
 
+  const swipeStartX = useRef<number | null>(null);
+  const PERIOD_ORDER: Period[] = ['week', 'month', 'year'];
+
   function changePeriod(p: Period) { setPeriod(p); setOffset(0); }
+
+  function handleStatSwipe(dir: 'left' | 'right') {
+    const idx  = PERIOD_ORDER.indexOf(period);
+    const next = dir === 'left'
+      ? PERIOD_ORDER[Math.min(PERIOD_ORDER.length - 1, idx + 1)]
+      : PERIOD_ORDER[Math.max(0, idx - 1)];
+    if (next !== period) changePeriod(next);
+  }
 
   function toggleFilter(f: SportFilter) {
     setSelected(prev => prev.includes(f) ? prev.filter(x => x !== f) : [...prev, f]);
@@ -236,39 +247,71 @@ function TrainingTab() {
 
   return (
     <div className="space-y-4">
-      {/* Summary cards — 3 top, 2 bottom */}
-      {loading && !data ? (
-        <div className="space-y-2">
-          <div className="grid grid-cols-3 gap-2">
-            {Array.from({ length: 3 }).map((_, i) => <div key={i} className="bg-gray-800 rounded-xl p-3 h-16 animate-pulse" />)}
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            {Array.from({ length: 2 }).map((_, i) => <div key={i} className="bg-gray-800 rounded-xl p-3 h-16 animate-pulse" />)}
-          </div>
+      {/* Summary cards — swipeable left/right to change period (Week→Month→Year) */}
+      <div
+        className="select-none touch-pan-y"
+        onTouchStart={e => { swipeStartX.current = e.touches[0].clientX; }}
+        onTouchEnd={e => {
+          if (swipeStartX.current === null) return;
+          const dx = e.changedTouches[0].clientX - swipeStartX.current;
+          swipeStartX.current = null;
+          if (Math.abs(dx) > 40) handleStatSwipe(dx < 0 ? 'left' : 'right');
+        }}
+      >
+        {/* Period indicator dots */}
+        <div className="flex items-center justify-center gap-1.5 mb-2">
+          {(['week', 'month', 'year'] as Period[]).map(p => (
+            <button
+              key={p}
+              onClick={() => changePeriod(p)}
+              className={`transition-all rounded-full ${
+                period === p ? 'w-4 h-1.5 bg-orange-500' : 'w-1.5 h-1.5 bg-gray-700 hover:bg-gray-500'
+              }`}
+              aria-label={p}
+            />
+          ))}
         </div>
-      ) : data ? (() => {
-        const from = periodStart(period, offset);
-        const filtersQ = selected.length > 0 ? selected.join(',') : 'All';
-        const href = `/dashboard?tab=activities&filters=${encodeURIComponent(filtersQ)}&from=${from}`;
-        return (
-          <div className="space-y-2 md:space-y-0">
-            {/* Mobile: 3+2 layout. Desktop: single 5-column row. */}
-            <div className="grid grid-cols-3 md:grid-cols-5 gap-2 md:gap-3">
-              <StatCard label="Rides" value={String(data.summary.activities ?? 0)} href={href} />
-              <StatCard label="km"    value={String(data.summary.km ?? 0)}         href={href} />
-              <StatCard label="Hours" value={String(data.summary.hours ?? 0)}      href={href} />
-              <div className="hidden md:contents">
+
+        {/* Period label */}
+        <div className="text-center mb-2">
+          <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+            {period === 'week' ? 'Week to date' : period === 'month' ? 'Month to date' : 'Year to date'}
+          </span>
+        </div>
+
+        {loading && !data ? (
+          <div className="space-y-2">
+            <div className="grid grid-cols-3 gap-2">
+              {Array.from({ length: 3 }).map((_, i) => <div key={i} className="bg-gray-800 rounded-xl p-3 h-16 animate-pulse" />)}
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {Array.from({ length: 2 }).map((_, i) => <div key={i} className="bg-gray-800 rounded-xl p-3 h-16 animate-pulse" />)}
+            </div>
+          </div>
+        ) : data ? (() => {
+          const from = periodStart(period, offset);
+          const filtersQ = selected.length > 0 ? selected.join(',') : 'All';
+          const href = `/dashboard?tab=activities&filters=${encodeURIComponent(filtersQ)}&from=${from}`;
+          return (
+            <div className="space-y-2 md:space-y-0">
+              {/* Mobile: 3+2 layout. Desktop: single 5-column row. */}
+              <div className="grid grid-cols-3 md:grid-cols-5 gap-2 md:gap-3">
+                <StatCard label="Rides" value={String(data.summary.activities ?? 0)} href={href} />
+                <StatCard label="km"    value={String(data.summary.km ?? 0)}         href={href} />
+                <StatCard label="Hours" value={String(data.summary.hours ?? 0)}      href={href} />
+                <div className="hidden md:contents">
+                  <StatCard label="TSS"    value={String(data.summary.tss ?? 0)}       href={href} />
+                  <StatCard label="Elev m" value={String(data.summary.elevation ?? 0)} href={href} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2 md:hidden">
                 <StatCard label="TSS"    value={String(data.summary.tss ?? 0)}       href={href} />
                 <StatCard label="Elev m" value={String(data.summary.elevation ?? 0)} href={href} />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-2 md:hidden">
-              <StatCard label="TSS"    value={String(data.summary.tss ?? 0)}       href={href} />
-              <StatCard label="Elev m" value={String(data.summary.elevation ?? 0)} href={href} />
-            </div>
-          </div>
-        );
-      })() : null}
+          );
+        })() : null}
+      </div>
 
       {/* Sport filters — evenly spread above chart */}
       <div className="grid grid-cols-4 md:grid-cols-8 gap-2">
