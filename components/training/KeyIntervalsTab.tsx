@@ -82,7 +82,7 @@ function ExpandModal({ target, current, weekly, effectiveTarget, onClose }: Expa
 
   return (
     <div
-      className="fixed inset-0 z-[60] bg-black/70 backdrop-blur-sm flex items-end md:items-center justify-center p-4"
+      className="fixed inset-0 z-[60] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
       onClick={onClose}
     >
       <div
@@ -196,7 +196,7 @@ function BulkEditModal({ targets, overrides, onCancel, onSave }: BulkEditModalPr
 
   return (
     <div
-      className="fixed inset-0 z-[60] bg-black/70 backdrop-blur-sm flex items-end md:items-center justify-center p-4"
+      className="fixed inset-0 z-[60] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
       onClick={onCancel}
     >
       <div
