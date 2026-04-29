@@ -167,7 +167,7 @@ export async function GET(req: NextRequest) {
         };
       });
 
-      return Response.json({ weeks: calendarWeeks, today });
+      return Response.json({ weeks: calendarWeeks.reverse(), today });
     } finally {
       client.release();
     }
