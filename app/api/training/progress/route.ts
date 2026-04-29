@@ -41,7 +41,7 @@ export async function GET(req: NextRequest) {
   try {
     // Get today's date in the user's timezone
     const today = (await client.query(
-      `SELECT (NOW() AT TIME ZONE $1)::date AS d`, [tz]
+      `SELECT ((NOW() AT TIME ZONE $1)::date)::text AS d`, [tz]
     )).rows[0].d as string;
 
     // ── Compute period boundaries in TypeScript ───────────────────────
