@@ -3,26 +3,47 @@ import { getProfile, effectiveFtp } from './profile';
 
 const CLIENT_ID     = process.env.STRAVA_CLIENT_ID!;
 const CLIENT_SECRET = process.env.STRAVA_CLIENT_SECRET!;
-const REFRESH_TOKEN = process.env.STRAVA_REFRESH_TOKEN!;
+const REFRESH_TOKEN = process.env.STRAVA_REFRESH_TOKEN!;   // fallback only
 
-// Cache the access token for the lifetime of this lambda instance.
-// Strava access tokens are valid for 6 hours — plenty. Re-fetching on every
-// syncActivity() call was adding ~200-500 ms per activity and creating
-// pointless OAuth traffic.
+// In-memory cache for the current access token.
 let _tokenCache: { token: string; expiresAt: number } | null = null;
+
+/** Look up the refresh token to use.
+ *  Prefers a DB-stored token (written by /api/strava/callback after a
+ *  full re-auth with read + read_all + activity:read_all scopes) over the
+ *  env-var STRAVA_REFRESH_TOKEN which may have been issued with narrower scopes. */
+async function getRefreshToken(): Promise<string> {
+  try {
+    const client = await pool.connect();
+    try {
+      const res = await client.query<{ refresh_token: string }>(
+        `SELECT refresh_token FROM strava_tokens WHERE id = 1 LIMIT 1`
+      );
+      if (res.rows[0]?.refresh_token) return res.rows[0].refresh_token;
+    } catch {
+      // table doesn't exist yet — fall through to env var
+    } finally {
+      client.release();
+    }
+  } catch { /* DB not available */ }
+  return REFRESH_TOKEN;
+}
 
 export async function getStravaToken(): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
   if (_tokenCache && _tokenCache.expiresAt - 60 > now) {
     return _tokenCache.token;
   }
+
+  const refreshToken = await getRefreshToken();
+
   const r = await fetch('https://www.strava.com/oauth/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       client_id:     CLIENT_ID,
       client_secret: CLIENT_SECRET,
-      refresh_token: REFRESH_TOKEN,
+      refresh_token: refreshToken,
       grant_type:    'refresh_token',
     }),
   });
@@ -30,7 +51,19 @@ export async function getStravaToken(): Promise<string> {
     const body = await r.text().catch(() => '');
     throw new Error(`Strava token refresh failed: HTTP ${r.status} ${body.slice(0, 200)}`);
   }
-  const d = await r.json() as { access_token: string; expires_at: number };
+  const d = await r.json() as { access_token: string; refresh_token: string; expires_at: number };
+
+  // Persist the rotated refresh token back to DB if we're using DB storage
+  try {
+    const client = await pool.connect();
+    try {
+      await client.query(`
+        UPDATE strava_tokens SET refresh_token = $1, updated_at = NOW() WHERE id = 1
+      `, [d.refresh_token]);
+    } catch { /* ignore if table doesn't exist */ }
+    finally { client.release(); }
+  } catch { /* ignore */ }
+
   _tokenCache = { token: d.access_token, expiresAt: d.expires_at };
   return d.access_token;
 }
