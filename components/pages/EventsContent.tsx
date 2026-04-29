@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { EventGoal } from '@/lib/profile';
 import { fmtTime } from '@/lib/pacing';
 import { iconFor } from '@/components/nav-items';
@@ -124,6 +124,23 @@ export default function EventsContent() {
   const router = useRouter();
   const { profile, setProfile, save } = useProfileEdit();
   const [adding, setAdding] = useState(false);
+
+  // Backfill IDs for events that pre-date the id field
+  useEffect(() => {
+    if (!profile) return;
+    const needsBackfill = profile.events.some(e => !e.id);
+    if (!needsBackfill) return;
+    let counter = 0;
+    const updated = {
+      ...profile,
+      events: profile.events.map(e =>
+        e.id ? e : { ...e, id: `${Date.now().toString(36)}-${counter++}` }
+      ),
+    };
+    setProfile(updated);
+    save(updated);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile?.events.length]);
 
   if (!profile) {
     return (
