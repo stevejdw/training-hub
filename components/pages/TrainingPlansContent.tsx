@@ -6,6 +6,7 @@ import BlockView from '@/components/training/BlockView';
 import DayView from '@/components/training/DayView';
 import EditPlanModal from '@/components/training/EditPlanModal';
 import TrainingPlansSettings from '@/components/training/TrainingPlansSettings';
+import { iconFor } from '@/components/nav-items';
 import { PageShell } from '@/lib/use-profile-edit';
 
 interface PlanMeta { id: number; name: string; goal: string; created_at: string }
@@ -67,7 +68,7 @@ export default function TrainingPlansContent() {
   }
 
   return (
-    <PageShell title="Training Plans">
+    <PageShell title="Training Plans" icon={iconFor("training-plans")}>
       {/* Manage plans (create / edit / delete / set active) */}
       <TrainingPlansSettings />
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { type ThemePreference, getThemePreference, setThemePreference } from '@/components/ThemeProvider';
+import { iconFor } from '@/components/nav-items';
 import { PageShell, useProfileEdit } from '@/lib/use-profile-edit';
 
 export default function SettingsContent() {
@@ -16,11 +17,11 @@ export default function SettingsContent() {
   }
 
   if (!profile) {
-    return <PageShell title="Settings"><div className="text-gray-500 text-sm">Loading…</div></PageShell>;
+    return <PageShell title="Settings" icon={iconFor("settings")}><div className="text-gray-500 text-sm">Loading…</div></PageShell>;
   }
 
   return (
-    <PageShell title="Settings">
+    <PageShell title="Settings" icon={iconFor("settings")}>
       {/* Appearance */}
       <div className="bg-gray-900 rounded-xl p-5 space-y-3 border border-gray-800">
         <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Appearance</h2>

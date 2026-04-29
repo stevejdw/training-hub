@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { PowerTarget } from '@/lib/profile';
+import { iconFor } from '@/components/nav-items';
 import { PageShell, inputCls, useProfileEdit } from '@/lib/use-profile-edit';
 
 const TIMEZONES = [
@@ -60,7 +61,7 @@ export default function ProfileContent() {
   }, []);
 
   if (!profile) {
-    return <PageShell title="Profile"><div className="text-gray-500 text-sm">Loading…</div></PageShell>;
+    return <PageShell title="Profile" icon={iconFor("profile")}><div className="text-gray-500 text-sm">Loading…</div></PageShell>;
   }
 
   const displayFtp = profile.use_eftp && profile.eftp ? profile.eftp : profile.ftp;
@@ -80,7 +81,7 @@ export default function ProfileContent() {
   }
 
   return (
-    <PageShell title="Profile">
+    <PageShell title="Profile" icon={iconFor("profile")}>
       {/* Basic info */}
       <Card title="Basic Info">
         <div className="grid grid-cols-2 gap-4">

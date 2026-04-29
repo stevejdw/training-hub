@@ -1,12 +1,13 @@
 'use client';
 
+import { iconFor } from '@/components/nav-items';
 import { PageShell, inputCls, useProfileEdit } from '@/lib/use-profile-edit';
 
 export default function GoalsContent() {
   const { profile, setProfile, save, saving, saved } = useProfileEdit();
 
   if (!profile) {
-    return <PageShell title="Goals"><div className="text-gray-500 text-sm">Loading…</div></PageShell>;
+    return <PageShell title="Goals" icon={iconFor("goals")}><div className="text-gray-500 text-sm">Loading…</div></PageShell>;
   }
 
   const goals = profile.goals ?? [];
@@ -25,7 +26,7 @@ export default function GoalsContent() {
   }
 
   return (
-    <PageShell title="Goals">
+    <PageShell title="Goals" icon={iconFor("goals")}>
       <div className="bg-gray-900 rounded-xl p-5 space-y-3 border border-gray-800">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Training Goals</h2>

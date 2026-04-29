@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import PageHeader from '@/components/PageHeader';
 import { AthleteProfile } from '@/lib/profile';
 
 /** Shared hook for the per-page profile editors (Profile, Settings, Goals,
@@ -52,13 +53,15 @@ export function useProfileEdit() {
 export const inputCls = 'w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-orange-500 transition-colors';
 
 /** Common page wrapper used by all account-style pages. */
-export function PageShell({ title, children }: { title: string; children: React.ReactNode }) {
+export function PageShell({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div className="h-full overflow-y-auto scroll-touch">
-      <div className="max-w-2xl mx-auto px-4 py-6 md:px-8 md:py-8 space-y-5">
-        <h1 className="text-xl md:text-2xl font-bold text-white">{title}</h1>
-        {children}
-        <div className="h-20" />
+    <div className="h-full flex flex-col">
+      <PageHeader icon={icon} title={title} />
+      <div className="flex-1 overflow-y-auto scroll-touch">
+        <div className="max-w-2xl mx-auto px-4 py-5 md:px-8 md:py-8 space-y-5">
+          {children}
+          <div className="h-20" />
+        </div>
       </div>
     </div>
   );

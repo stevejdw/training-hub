@@ -159,6 +159,11 @@ export function resolveBarItems(middle: string[]): NavItem[] {
   return [...(first ? [first] : []), ...middleItems, ...(last ? [last] : [])];
 }
 
+/** Look up a nav item's icon by key, for use in PageHeader on each page. */
+export function iconFor(key: string): NavItem['icon'] | null {
+  return ALL_NAV_ITEMS.find(i => i.key === key)?.icon ?? null;
+}
+
 /** Build the active-state matchPrefixes for the More tab: anything that
  *  isn't visible in the bar should still light up More when you're there. */
 export function moreMatchPrefixes(middle: string[]): string[] {

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import EventPacingModal from '@/components/EventPacingModal';
 import { EventGoal } from '@/lib/profile';
 import { fmtTime } from '@/lib/pacing';
+import { iconFor } from '@/components/nav-items';
 import { PageShell, inputCls, useProfileEdit } from '@/lib/use-profile-edit';
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -20,7 +21,7 @@ export default function EventsContent() {
   const [pacingEvent, setPacingEvent] = useState<EventGoal | null>(null);
 
   if (!profile) {
-    return <PageShell title="Events"><div className="text-gray-500 text-sm">Loading…</div></PageShell>;
+    return <PageShell title="Events" icon={iconFor("events")}><div className="text-gray-500 text-sm">Loading…</div></PageShell>;
   }
 
   function addEvent() {
@@ -37,7 +38,7 @@ export default function EventsContent() {
   }
 
   return (
-    <PageShell title="Events">
+    <PageShell title="Events" icon={iconFor("events")}>
       <div className="bg-gray-900 rounded-xl p-5 space-y-3 border border-gray-800">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Upcoming Events</h2>

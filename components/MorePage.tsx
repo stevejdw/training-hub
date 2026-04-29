@@ -2,12 +2,14 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import PageHeader from './PageHeader';
 import {
   ALL_NAV_ITEMS,
   DEFAULT_MIDDLE,
   MAX_MIDDLE_MOBILE,
   NAV_EVENT,
   NavItem,
+  iconFor,
   loadMiddle,
 } from './nav-items';
 
@@ -61,11 +63,10 @@ export default function MorePage() {
   const overflow = ALL_NAV_ITEMS.filter(i => !i.pinned && !visible.has(i.key));
 
   return (
-    <div className="h-full overflow-y-auto scroll-touch">
-      <div className="max-w-2xl md:max-w-3xl mx-auto">
-        <div className="px-4 py-4 md:py-6 text-center md:text-left">
-          <h1 className="text-xl md:text-2xl font-bold text-white">More</h1>
-        </div>
+    <div className="h-full flex flex-col">
+      <PageHeader icon={iconFor('more')} title="More" />
+      <div className="flex-1 overflow-y-auto scroll-touch">
+        <div className="max-w-2xl md:max-w-3xl mx-auto">
 
         {overflow.length > 0 && (
           <div className="bg-gray-900 border-y border-gray-800 mb-2 divide-y divide-gray-800/60">
@@ -77,7 +78,8 @@ export default function MorePage() {
           <ItemRow item={editMenuItem} />
         </div>
 
-        <div className="h-20" />
+          <div className="h-20" />
+        </div>
       </div>
     </div>
   );
