@@ -30,14 +30,27 @@ export function useCachedFetch<T>(url: string, cacheKey: string) {
   useEffect(() => {
     let cancelled = false;
     fetch(url)
-      .then(r => r.json())
+      .then(async r => {
+        const d = await r.json();
+        if (!r.ok) throw new Error((d && (d as { error?: string }).error) || `HTTP ${r.status}`);
+        return d as T;
+      })
       .then((d: T) => {
         if (cancelled) return;
         setData(d);
+        // Only cache successful responses — never persist error payloads,
+        // otherwise a transient 500 sticks around forever in localStorage.
         try { localStorage.setItem(cacheKey, JSON.stringify(d)); } catch { /* full quota etc */ }
         setLoading(false);
       })
-      .catch(e => { if (!cancelled) { setError(String(e)); setLoading(false); } });
+      .catch(e => {
+        if (cancelled) return;
+        // Drop any previously-cached error payload so the next mount won't
+        // try to render it (older versions did cache errors).
+        try { localStorage.removeItem(cacheKey); } catch {}
+        setError(String(e));
+        setLoading(false);
+      });
     return () => { cancelled = true; };
   }, [url, cacheKey]);
 

@@ -73,9 +73,11 @@ export default function ProgressTab() {
     setSelected(p => p.includes(f) ? p.filter(x => x !== f) : [...p, f]);
   }
 
-  // Merge current + prior into a single chart series aligned by day-of-period index
+  // Merge current + prior into a single chart series aligned by day-of-period index.
+  // Guard against malformed/error payloads (a previously-cached 500 response
+  // can land here as {error: "..."} rather than {current, prior}).
   const chartData = useMemo(() => {
-    if (!data) return [];
+    if (!data?.current?.points || !data?.prior?.points) return [];
     const len = Math.max(data.current.points.length, data.prior.points.length);
     const rows: { idx: number; label: string; current: number | null; prior: number | null }[] = [];
     for (let i = 0; i < len; i++) {
@@ -93,8 +95,8 @@ export default function ProgressTab() {
   }, [data]);
 
   const unit       = METRICS.find(m => m.key === metric)!.unit;
-  const curTotal   = data?.current.total ?? 0;
-  const priorTotal = data?.prior.total   ?? 0;
+  const curTotal   = data?.current?.total ?? 0;
+  const priorTotal = data?.prior?.total   ?? 0;
   const delta      = curTotal - priorTotal;
   const deltaPct   = priorTotal > 0 ? ((delta / priorTotal) * 100) : null;
   const deltaColor = delta > 0 ? 'text-green-400' : delta < 0 ? 'text-red-400' : 'text-gray-400';
@@ -213,7 +215,7 @@ export default function ProgressTab() {
           </button>
 
           <span className="text-sm text-gray-200 font-medium tabular-nums">
-            {data
+            {data?.current
               ? fmtRange(data.current.start, data.current.end, period)
               : <span className="text-gray-600">—</span>
             }
