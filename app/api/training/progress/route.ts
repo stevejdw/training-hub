@@ -10,19 +10,21 @@ type Metric = 'time' | 'km';
 
 interface DayPoint { date: string; value: number; cum: number }
 
-/** Returns day-by-day cumulative progress for the current period and the
- *  same-length prior period, filtered to selected sport types.
+/** Returns day-by-day cumulative progress for the requested period (with offset
+ *  for back-navigation) and the period immediately before it.
  *
  *  Query params:
  *    period   = wtd | mtd | ytd                     (default wtd)
  *    metric   = time | km                            (default time, hours)
  *    filters  = comma-separated SportFilter labels   (default All)
+ *    offset   = integer ≤ 0 — how many periods back  (default 0 = current)
  */
 export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams;
   const period   = (sp.get('period') ?? 'wtd') as Period;
   const metric   = (sp.get('metric') ?? 'time') as Metric;
   const filters  = sp.get('filters') ?? 'All';
+  const offset   = Math.min(0, parseInt(sp.get('offset') ?? '0', 10));
 
   const labels = filters.split(',').map(s => s.trim()) as SportFilter[];
   const types: string[] = [];
@@ -37,54 +39,62 @@ export async function GET(req: NextRequest) {
 
   const client = await pool.connect();
   try {
-    // Compute current and prior period start/end (inclusive) in the user's TZ
+    // Get today's date in the user's timezone
     const today = (await client.query(
       `SELECT (NOW() AT TIME ZONE $1)::date AS d`, [tz]
     )).rows[0].d as string;
 
-    const r = await client.query(
-      `WITH bounds AS (
-        SELECT $1::date AS today
-      ),
-      rng AS (
-        SELECT
-          CASE $2::text
-            WHEN 'wtd' THEN today - ((EXTRACT(DOW FROM today)::int + 6) % 7)::int
-            WHEN 'mtd' THEN date_trunc('month', today)::date
-            WHEN 'ytd' THEN date_trunc('year',  today)::date
-          END AS cur_start,
-          today AS cur_end
-        FROM bounds
-      ),
-      rng2 AS (
-        SELECT
-          cur_start,
-          cur_end,
-          (cur_end - cur_start) AS len_days
-        FROM rng
-      ),
-      prior AS (
-        SELECT
-          CASE $2::text
-            WHEN 'wtd' THEN cur_start - INTERVAL '7 days'
-            WHEN 'mtd' THEN (date_trunc('month', cur_start - INTERVAL '1 day'))::date
-            WHEN 'ytd' THEN (date_trunc('year',  cur_start - INTERVAL '1 day'))::date
-          END::date AS prior_start,
-          CASE $2::text
-            WHEN 'wtd' THEN (cur_start - INTERVAL '1 day')::date
-            WHEN 'mtd' THEN ((date_trunc('month', cur_start - INTERVAL '1 day')) + (cur_end - cur_start) * INTERVAL '1 day')::date
-            WHEN 'ytd' THEN ((date_trunc('year',  cur_start - INTERVAL '1 day')) + (cur_end - cur_start) * INTERVAL '1 day')::date
-          END::date AS prior_end
-        FROM rng2
-      )
-      SELECT (SELECT cur_start::text FROM rng2) AS cur_start,
-             (SELECT cur_end::text   FROM rng2) AS cur_end,
-             (SELECT prior_start::text FROM prior) AS prior_start,
-             (SELECT prior_end::text   FROM prior) AS prior_end`,
-      [today, period]
-    );
-    const { cur_start, cur_end, prior_start, prior_end } = r.rows[0];
+    // ── Compute period boundaries in TypeScript ───────────────────────
+    function addDays(d: string, n: number): string {
+      const [yr, mo, dy] = d.split('-').map(Number);
+      const dt = new Date(Date.UTC(yr, mo - 1, dy + n));
+      return dt.toISOString().slice(0, 10);
+    }
 
+    /** Day-of-week where 0 = Monday, 6 = Sunday */
+    function dowMon(d: string): number {
+      const [yr, mo, dy] = d.split('-').map(Number);
+      return (new Date(Date.UTC(yr, mo - 1, dy)).getUTCDay() + 6) % 7;
+    }
+
+    /** Last day of the month that contains `d`, offset by `n` months */
+    function endOfMonthOffset(d: string, n: number): string {
+      const [yr, mo] = d.split('-').map(Number);
+      // Date.UTC(yr, mo + n, 0) → last day of month (mo + n - 1)
+      return new Date(Date.UTC(yr, mo + n, 0)).toISOString().slice(0, 10);
+    }
+
+    /** First day of month offset by `n` months from the month of `d` */
+    function monthStartOffset(d: string, n: number): string {
+      const [yr, mo] = d.split('-').map(Number);
+      return new Date(Date.UTC(yr, mo - 1 + n, 1)).toISOString().slice(0, 10);
+    }
+
+    let cur_start: string, cur_end: string, prior_start: string, prior_end: string;
+
+    if (period === 'wtd') {
+      // Shift Monday of this week by `offset` weeks
+      const thisMonday = addDays(today, -dowMon(today));
+      cur_start = addDays(thisMonday, offset * 7);
+      cur_end   = offset === 0 ? today : addDays(cur_start, 6);
+      prior_start = addDays(cur_start, -7);
+      prior_end   = addDays(cur_start, -1);
+
+    } else if (period === 'mtd') {
+      cur_start = monthStartOffset(today, offset);
+      cur_end   = offset === 0 ? today : endOfMonthOffset(today, offset);
+      prior_start = monthStartOffset(today, offset - 1);
+      prior_end   = addDays(cur_start, -1);
+
+    } else { // ytd
+      const curYear = parseInt(today.slice(0, 4)) + offset;
+      cur_start   = `${curYear}-01-01`;
+      cur_end     = offset === 0 ? today : `${curYear}-12-31`;
+      prior_start = `${curYear - 1}-01-01`;
+      prior_end   = addDays(cur_start, -1);
+    }
+
+    // ── Fetch day-by-day buckets ───────────────────────────────────────
     async function bucketise(start: string, end: string): Promise<DayPoint[]> {
       const q = await client.query(
         `WITH days AS (
@@ -121,7 +131,7 @@ export async function GET(req: NextRequest) {
     const priorTotal = prior.length   ? prior[prior.length - 1].cum     : 0;
 
     return Response.json({
-      period, metric, filters,
+      period, metric, filters, offset,
       current: { start: cur_start, end: cur_end, total: curTotal, points: current },
       prior:   { start: prior_start, end: prior_end, total: priorTotal, points: prior },
     });

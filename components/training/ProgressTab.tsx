@@ -32,13 +32,38 @@ function fmt(v: number, metric: Metric): string {
   return v >= 100 ? Math.round(v).toString() : v.toFixed(1);
 }
 
+/** Format a date range for display below the chart. */
+function fmtRange(start: string, end: string, period: Period): string {
+  const M = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const [sy, sm, sd] = start.split('-').map(Number);
+  const [ey, em, ed] = end.split('-').map(Number);
+
+  if (period === 'ytd') {
+    // Full year: just show "2025"
+    if (sy === ey && sm === 1 && sd === 1 && em === 12 && ed === 31) return String(sy);
+    if (sy === ey) return `${M[sm-1]} ${sd} – ${M[em-1]} ${ed}, ${sy}`;
+    return `${M[sm-1]} ${sd}, ${sy} – ${M[em-1]} ${ed}, ${ey}`;
+  }
+  if (period === 'mtd') {
+    // Full month: "Apr 2026"
+    const lastDay = new Date(Date.UTC(ey, em, 0)).getUTCDate();
+    if (sm === em && sy === ey && sd === 1 && ed === lastDay) return `${M[sm-1]} ${sy}`;
+    if (sm === em && sy === ey) return `${M[sm-1]} ${sd} – ${ed}, ${sy}`;
+    return `${M[sm-1]} ${sd} – ${M[em-1]} ${ed}`;
+  }
+  // wtd — same month: "Apr 21 – 27", cross-month: "Apr 28 – May 4"
+  if (sm === em && sy === ey) return `${M[sm-1]} ${sd} – ${ed}`;
+  return `${M[sm-1]} ${sd} – ${M[em-1]} ${ed}`;
+}
+
 export default function ProgressTab() {
   const [period,   setPeriod]   = useState<Period>('wtd');
   const [metric,   setMetric]   = useState<Metric>('time');
   const [selected, setSelected] = useState<SportFilter[]>([]);
+  const [offset,   setOffset]   = useState(0); // 0 = current period, -1 = previous, etc.
 
   const filtersParam = selected.length > 0 ? selected.join(',') : 'All';
-  const qs = `period=${period}&metric=${metric}&filters=${encodeURIComponent(filtersParam)}`;
+  const qs = `period=${period}&metric=${metric}&filters=${encodeURIComponent(filtersParam)}&offset=${offset}`;
   const { data, loading } = useCachedFetch<ProgressResponse>(
     `/api/training/progress?${qs}`,
     `cache-training-progress-${qs}`,
@@ -48,9 +73,7 @@ export default function ProgressTab() {
     setSelected(p => p.includes(f) ? p.filter(x => x !== f) : [...p, f]);
   }
 
-  // Merge current + prior into a single chart series, indexed by day-of-period.
-  // Prior dates are aligned by index, not real date, so the two cumulative
-  // lines overlay neatly.
+  // Merge current + prior into a single chart series aligned by day-of-period index
   const chartData = useMemo(() => {
     if (!data) return [];
     const len = Math.max(data.current.points.length, data.prior.points.length);
@@ -69,7 +92,7 @@ export default function ProgressTab() {
     return rows;
   }, [data]);
 
-  const unit = METRICS.find(m => m.key === metric)!.unit;
+  const unit       = METRICS.find(m => m.key === metric)!.unit;
   const curTotal   = data?.current.total ?? 0;
   const priorTotal = data?.prior.total   ?? 0;
   const delta      = curTotal - priorTotal;
@@ -78,21 +101,6 @@ export default function ProgressTab() {
 
   return (
     <div className="space-y-4">
-
-      {/* Period selector */}
-      <div className="flex bg-gray-800 rounded-xl p-1 gap-1">
-        {PERIODS.map(p => (
-          <button
-            key={p.key}
-            onClick={() => setPeriod(p.key)}
-            className={`flex-1 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-              period === p.key ? 'bg-orange-500 text-white' : 'text-gray-400 hover:text-white'
-            }`}
-          >
-            {p.label}
-          </button>
-        ))}
-      </div>
 
       {/* Metric toggle */}
       <div className="grid grid-cols-2 gap-2">
@@ -135,7 +143,7 @@ export default function ProgressTab() {
           <div className="text-xl font-bold text-white">{fmt(curTotal, metric)}<span className="text-xs text-gray-400 ml-1">{unit}</span></div>
         </div>
         <div className="bg-gray-800 rounded-xl p-3">
-          <div className="text-[10px] text-gray-500 uppercase tracking-wider">Prior {period.toUpperCase()}</div>
+          <div className="text-[10px] text-gray-500 uppercase tracking-wider">Prior</div>
           <div className="text-xl font-bold text-gray-400">{fmt(priorTotal, metric)}<span className="text-xs text-gray-500 ml-1">{unit}</span></div>
         </div>
         <div className="bg-gray-800 rounded-xl p-3">
@@ -174,6 +182,60 @@ export default function ProgressTab() {
           </div>
         )}
       </div>
+
+      {/* Period selector + date-range navigation — below chart */}
+      <div className="space-y-2.5">
+        {/* Period type: WTD / MTD / YTD */}
+        <div className="flex bg-gray-800 rounded-xl p-1 gap-1">
+          {PERIODS.map(p => (
+            <button
+              key={p.key}
+              onClick={() => { setPeriod(p.key); setOffset(0); }}
+              className={`flex-1 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                period === p.key ? 'bg-orange-500 text-white' : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Back / forward arrows with date range label */}
+        <div className="flex items-center justify-between">
+          <button
+            onClick={() => setOffset(o => o - 1)}
+            className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
+            aria-label="Previous period"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+
+          <span className="text-sm text-gray-200 font-medium tabular-nums">
+            {data
+              ? fmtRange(data.current.start, data.current.end, period)
+              : <span className="text-gray-600">—</span>
+            }
+          </span>
+
+          <button
+            onClick={() => setOffset(o => Math.min(0, o + 1))}
+            disabled={offset >= 0}
+            className={`p-2 rounded-lg transition-colors ${
+              offset >= 0
+                ? 'text-gray-700 cursor-not-allowed'
+                : 'text-gray-400 hover:text-white hover:bg-gray-800'
+            }`}
+            aria-label="Next period"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
     </div>
   );
 }

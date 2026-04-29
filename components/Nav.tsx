@@ -44,10 +44,21 @@ const NAV_ITEMS = [
     ),
   },
   {
+    key: 'training',
+    href: '/training',
+    label: 'Training',
+    matchPrefixes: ['/training'],
+    icon: (
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+      </svg>
+    ),
+  },
+  {
     key: 'more',
     href: '/more',
     label: 'More',
-    matchPrefixes: ['/more', '/training', '/chat', '/profile', '/settings'],
+    matchPrefixes: ['/more', '/chat', '/profile', '/settings'],
     icon: (
       <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
         <circle cx="6"  cy="12" r="1.7" fill="currentColor" stroke="none" />
@@ -96,7 +107,7 @@ export default function Nav() {
 
       {/* ── Mobile: fixed bottom tab bar ── */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-gray-950 border-t border-gray-800">
-        <div className="flex h-14 pb-3">
+        <div className="flex h-[73px] pb-4">
           {NAV_ITEMS.map(({ key, href, label, icon, matchPrefixes }) => {
             const active = isActive(matchPrefixes, pathname);
             return (
