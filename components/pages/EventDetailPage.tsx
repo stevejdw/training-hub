@@ -335,7 +335,7 @@ export default function EventDetailPage({ eventId }: Props) {
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
-                  <XAxis dataKey="km" tick={{ fill: '#6b7280', fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={v => `${v}km`} interval="preserveStartEnd" />
+                  <XAxis dataKey="km" type="number" domain={['dataMin', 'dataMax']} tick={{ fill: '#6b7280', fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={v => `${v}km`} interval="preserveStartEnd" />
                   <YAxis tick={{ fill: '#6b7280', fontSize: 10 }} axisLine={false} tickLine={false} width={36} tickFormatter={v => `${v}m`} />
                   <Tooltip
                     content={({ active, payload }) => {
