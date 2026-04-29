@@ -98,22 +98,33 @@ export function estimateTime(input: PacingInput): number {
 }
 
 export interface DetectedClimb {
-  start_km:      number;
-  end_km:        number;
-  distance_km:   number;
+  start_km:       number;
+  end_km:         number;
+  distance_km:    number;
   elevation_gain: number;
-  avg_gradient:  number;
+  avg_gradient:   number;
+}
+
+/** Check if a climb segment meets the quality thresholds. */
+function qualifiesAsKeyClimb(distKm: number, gainM: number, gradPct: number): boolean {
+  if (gradPct >= 10 && distKm >= 0.4  && gainM >= 50)  return true;
+  if (gradPct >= 7  && distKm >= 0.6  && gainM >= 70)  return true;
+  if (gradPct >= 5  && distKm >= 0.7  && gainM >= 70)  return true;
+  if (gradPct >= 3  && distKm >= 1.2  && gainM >= 100) return true;
+  return false;
 }
 
 /**
- * Auto-detect significant climbs from elevation profile.
- * A climb must have: average gradient > minGradPct%, total gain > minGainM.
+ * Auto-detect significant climbs from elevation profile using multi-tier thresholds.
+ * A climb qualifies if any of these hold:
+ *   >3% avg, >1.2 km, >100 m gain
+ *   >5% avg, >0.7 km, >70 m gain
+ *   >7% avg, >0.6 km, >70 m gain
+ *   >10% avg, >0.4 km, >50 m gain
  */
 export function detectClimbs(
-  distKm:   number[],
-  altM:     number[],
-  minGradPct = 3,
-  minGainM   = 80,
+  distKm: number[],
+  altM:   number[],
 ): DetectedClimb[] {
   const n = Math.min(distKm.length, altM.length);
   if (n < 2) return [];
@@ -129,16 +140,16 @@ export function detectClimbs(
     smoothed[i] = cnt ? sum / cnt : altM[i];
   }
 
-  // Mark each segment as climbing if smoothed gradient >= threshold
+  // Mark each segment as climbing if smoothed gradient >= 2% (low threshold to catch all candidates)
   const isClimbing = Array(n).fill(false);
   for (let i = 1; i < n; i++) {
     const dDist = (distKm[i] - distKm[i - 1]) * 1000;
     const dAlt  = smoothed[i] - smoothed[i - 1];
-    if (dDist > 0 && (dAlt / dDist) * 100 >= minGradPct) isClimbing[i] = true;
+    if (dDist > 0 && (dAlt / dDist) * 100 >= 2) isClimbing[i] = true;
   }
 
   // Group consecutive climbing segments
-  const climbs: DetectedClimb[] = [];
+  const rawClimbs: DetectedClimb[] = [];
   let startIdx: number | null = null;
 
   for (let i = 1; i <= n; i++) {
@@ -146,36 +157,36 @@ export function detectClimbs(
     if (climbing && startIdx === null) {
       startIdx = i - 1;
     } else if (!climbing && startIdx !== null) {
-      // End of a climbing section
       const endIdx = i - 1;
       const gain   = altM[endIdx] - altM[startIdx];
       const dist   = distKm[endIdx] - distKm[startIdx];
-      if (gain >= minGainM && dist > 0) {
-        climbs.push({
-          start_km:      Math.round(distKm[startIdx] * 10) / 10,
-          end_km:        Math.round(distKm[endIdx]   * 10) / 10,
-          distance_km:   Math.round(dist * 10) / 10,
+      const avgGrad = dist > 0 ? (gain / (dist * 1000)) * 100 : 0;
+      if (gain > 0 && dist > 0 && qualifiesAsKeyClimb(dist, gain, avgGrad)) {
+        rawClimbs.push({
+          start_km:       Math.round(distKm[startIdx] * 10) / 10,
+          end_km:         Math.round(distKm[endIdx]   * 10) / 10,
+          distance_km:    Math.round(dist * 10) / 10,
           elevation_gain: Math.round(gain),
-          avg_gradient:  Math.round((gain / (dist * 1000)) * 1000) / 10,
+          avg_gradient:   Math.round(avgGrad * 10) / 10,
         });
       }
       startIdx = null;
     }
   }
 
-  // Merge climbs that are very close together (< 2km gap)
+  // Merge climbs that are very close together (< 2 km gap)
   const merged: DetectedClimb[] = [];
-  for (const c of climbs) {
+  for (const c of rawClimbs) {
     const prev = merged[merged.length - 1];
     if (prev && c.start_km - prev.end_km < 2) {
-      const gain = (prev.elevation_gain + c.elevation_gain);
+      const gain = prev.elevation_gain + c.elevation_gain;
       const dist = c.end_km - prev.start_km;
       merged[merged.length - 1] = {
-        start_km:      prev.start_km,
-        end_km:        c.end_km,
-        distance_km:   Math.round(dist * 10) / 10,
+        start_km:       prev.start_km,
+        end_km:         c.end_km,
+        distance_km:    Math.round(dist * 10) / 10,
         elevation_gain: gain,
-        avg_gradient:  Math.round((gain / (dist * 1000)) * 1000) / 10,
+        avg_gradient:   Math.round((gain / (dist * 1000)) * 1000) / 10,
       };
     } else {
       merged.push(c);
@@ -183,6 +194,150 @@ export function detectClimbs(
   }
 
   return merged;
+}
+
+// ─── Pacing segments ───────────────────────────────────────────────────────
+
+export interface PacingSegment {
+  label:          string;
+  type:           'flat' | 'descent' | 'climb';
+  climb_idx?:     number;
+  start_km:       number;
+  end_km:         number;
+  distance_km:    number;
+  elevation_gain: number;   // net m (negative = descent)
+  ascent_m:       number;   // total m gained (always ≥ 0)
+  avg_gradient:   number;   // % (negative = downhill)
+  target_watts:   number;
+  est_time_min:   number;
+}
+
+interface ClimbRef {
+  name:         string;
+  start_km:     number;
+  end_km:       number;
+  target_watts: number;
+}
+
+/** Build a list of pacing segments from the full route + climb list. */
+export function buildPacingSegments(
+  streamDistKm:  number[],
+  streamAltM:    number[],
+  totalDistKm:   number,
+  climbs:        ClimbRef[],
+  flatWatts:     number,
+  descentWatts:  number,
+  riderKg:       number,
+  bikeKg:        number,
+): PacingSegment[] {
+  const sorted = [...climbs].sort((a, b) => a.start_km - b.start_km);
+
+  // Build interval list: [start, end, climbIdx | undefined]
+  const intervals: { s: number; e: number; ci?: number }[] = [];
+  let cursor = 0;
+  for (let i = 0; i < sorted.length; i++) {
+    if (sorted[i].start_km > cursor + 0.1) {
+      intervals.push({ s: cursor, e: sorted[i].start_km });
+    }
+    intervals.push({ s: sorted[i].start_km, e: sorted[i].end_km, ci: i });
+    cursor = sorted[i].end_km;
+  }
+  if (cursor < totalDistKm - 0.1) {
+    intervals.push({ s: cursor, e: totalDistKm });
+  }
+
+  const segs: PacingSegment[] = [];
+  for (const { s: startKm, e: endKm, ci } of intervals) {
+    if (endKm <= startKm + 0.05) continue;
+
+    // Slice streams to this interval
+    const sliceD: number[] = [];
+    const sliceA: number[] = [];
+    for (let i = 0; i < streamDistKm.length; i++) {
+      if (streamDistKm[i] >= startKm && streamDistKm[i] <= endKm) {
+        sliceD.push(streamDistKm[i]);
+        sliceA.push(streamAltM[i]);
+      }
+    }
+    if (sliceD.length < 2) continue;
+
+    // Elevation stats
+    const netGain = sliceA[sliceA.length - 1] - sliceA[0];
+    let ascent = 0;
+    for (let i = 1; i < sliceA.length; i++) {
+      const diff = sliceA[i] - sliceA[i - 1];
+      if (diff > 0) ascent += diff;
+    }
+    const distKm    = endKm - startKm;
+    const avgGrad   = distKm > 0 ? (netGain / (distKm * 1000)) * 100 : 0;
+
+    // Determine type + watts
+    const isClimb = ci !== undefined;
+    let type:   PacingSegment['type'];
+    let label:  string;
+    let watts:  number;
+
+    if (isClimb) {
+      type  = 'climb';
+      label = sorted[ci!].name;
+      watts = sorted[ci!].target_watts;
+    } else if (avgGrad < -1.5) {
+      type  = 'descent';
+      label = 'Descent';
+      watts = descentWatts;
+    } else {
+      type  = 'flat';
+      label = 'Flat / Rolling';
+      watts = flatWatts;
+    }
+
+    // Time estimate using physics model on actual gradient profile
+    const estTime = estimateTime({
+      stream_distance_km: sliceD,
+      stream_altitude_m:  sliceA,
+      flat_watts:         isClimb ? watts : flatWatts,
+      descent_watts:      isClimb ? watts : descentWatts,
+      climbs:             [],
+      rider_weight_kg:    riderKg,
+      bike_weight_kg:     bikeKg,
+    });
+
+    segs.push({
+      label,
+      type,
+      climb_idx:      ci,
+      start_km:       Math.round(startKm * 10) / 10,
+      end_km:         Math.round(endKm    * 10) / 10,
+      distance_km:    Math.round(distKm   * 10) / 10,
+      elevation_gain: Math.round(netGain),
+      ascent_m:       Math.round(ascent),
+      avg_gradient:   Math.round(avgGrad  * 10) / 10,
+      target_watts:   watts,
+      est_time_min:   estTime,
+    });
+  }
+
+  return segs;
+}
+
+/** Normalised Power from discrete power-block segments (time-weighted 4th power). */
+export function calcNP(segs: PacingSegment[]): number {
+  const totalT = segs.reduce((s, seg) => s + seg.est_time_min, 0);
+  if (totalT === 0) return 0;
+  const sum4 = segs.reduce((s, seg) => s + Math.pow(seg.target_watts, 4) * seg.est_time_min, 0);
+  return Math.round(Math.pow(sum4 / totalT, 0.25));
+}
+
+/** Time-weighted average watts. */
+export function calcAvgWatts(segs: PacingSegment[]): number {
+  const totalT = segs.reduce((s, seg) => s + seg.est_time_min, 0);
+  if (totalT === 0) return 0;
+  return Math.round(segs.reduce((s, seg) => s + seg.target_watts * seg.est_time_min, 0) / totalT);
+}
+
+/** Calories (kcal ≈ kJ mechanical work for cycling at ~25% efficiency). */
+export function calcCalories(avgWatts: number, durationMin: number): number {
+  return Math.round(avgWatts * durationMin * 60 / 1000);
 }
 
 /** Format minutes as H:MM or HH:MM */

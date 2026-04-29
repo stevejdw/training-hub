@@ -70,6 +70,42 @@ export default function SettingsContent() {
         />
       </div>
 
+      {/* Physical — used for event pacing calculations */}
+      <div className="bg-gray-900 rounded-xl p-5 space-y-3 border border-gray-800">
+        <div>
+          <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Physical</h2>
+          <p className="text-xs text-gray-500 mt-1">Used for climb time estimates and pacing strategy calculations.</p>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-[10px] text-gray-500 uppercase tracking-wider mb-1">Rider Weight (kg)</label>
+            <input
+              type="number"
+              value={profile.weight_kg ?? ''}
+              onChange={e => update('weight_kg', e.target.value ? Number(e.target.value) : null)}
+              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-orange-500"
+              placeholder="75"
+              step={0.5}
+              min={40}
+              max={150}
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] text-gray-500 uppercase tracking-wider mb-1">Bike Weight (kg)</label>
+            <input
+              type="number"
+              value={profile.bike_weight_kg ?? ''}
+              onChange={e => update('bike_weight_kg', e.target.value ? Number(e.target.value) : null)}
+              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-orange-500"
+              placeholder="8"
+              step={0.5}
+              min={3}
+              max={20}
+            />
+          </div>
+        </div>
+      </div>
+
       {/* Strava Connection */}
       <div className="bg-gray-900 rounded-xl p-5 space-y-3 border border-gray-800">
         <div>
