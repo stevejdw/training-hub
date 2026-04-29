@@ -1,11 +1,7 @@
-import ProfileEditor from '@/components/ProfileEditor';
+import ProfileContent from '@/components/pages/ProfileContent';
 
 export const metadata = { title: 'Profile | Training Hub' };
 
 export default function ProfilePage() {
-  return (
-    <div className="h-full">
-      <ProfileEditor />
-    </div>
-  );
+  return <ProfileContent />;
 }

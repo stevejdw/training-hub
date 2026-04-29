@@ -6,6 +6,7 @@ import {
   ALL_NAV_ITEMS,
   DEFAULT_MIDDLE,
   MAX_MIDDLE,
+  MAX_MIDDLE_MOBILE,
   NavItem,
   loadMiddle,
   saveMiddle,
@@ -71,13 +72,32 @@ export default function EditMenuBar() {
         <div>
           <h1 className="text-xl md:text-2xl font-bold text-white">Edit Menu Bar</h1>
           <p className="text-sm text-gray-400 mt-1">
-            Pick up to {MAX_MIDDLE} items between Home and More. Use the arrows to reorder.
-            Items you remove are still reachable from More.
+            Pick up to {MAX_MIDDLE} items. Mobile shows the first {MAX_MIDDLE_MOBILE} of them in
+            the bottom bar; desktop shows them all. Items not in the bar are still reachable
+            from More.
           </p>
         </div>
 
-        {/* Live preview of the bar */}
-        <BarPreview keys={[first.key, ...middle, last.key]} />
+        {/* Live previews */}
+        <div className="space-y-3">
+          <div>
+            <p className="text-[10px] text-gray-500 uppercase tracking-wider px-1 mb-1.5">Mobile preview</p>
+            <BarPreview keys={[first.key, ...middle.slice(0, MAX_MIDDLE_MOBILE), last.key]} />
+          </div>
+          <div>
+            <p className="text-[10px] text-gray-500 uppercase tracking-wider px-1 mb-1.5">Desktop preview</p>
+            <BarPreview
+              keys={(() => {
+                const allMid = ALL_NAV_ITEMS.filter(i => !i.pinned).map(i => i.key);
+                const overflow = allMid.some(k => !middle.includes(k));
+                return overflow
+                  ? [first.key, ...middle, last.key]
+                  : [first.key, ...middle];
+              })()}
+              desktop
+            />
+          </div>
+        </div>
 
         {/* In-bar list */}
         <section className="space-y-2">
@@ -195,10 +215,26 @@ function PinnedRow({ item, note }: { item: NavItem; note: string }) {
   );
 }
 
-function BarPreview({ keys }: { keys: string[] }) {
+function BarPreview({ keys, desktop = false }: { keys: string[]; desktop?: boolean }) {
   const items = keys
     .map(k => ALL_NAV_ITEMS.find(i => i.key === k))
     .filter((i): i is NavItem => !!i);
+  if (desktop) {
+    return (
+      <div className="bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 flex items-center gap-1 overflow-x-auto">
+        <span className="text-base mr-2 flex-shrink-0">🚴</span>
+        {items.map(({ key, label, icon }) => (
+          <div
+            key={key}
+            className="flex items-center gap-2 px-2.5 py-1 rounded-lg text-xs text-gray-400 flex-shrink-0"
+          >
+            <span className="opacity-80 [&_svg]:w-4 [&_svg]:h-4">{icon}</span>
+            <span>{label}</span>
+          </div>
+        ))}
+      </div>
+    );
+  }
   return (
     <div className="bg-gray-950 border border-gray-800 rounded-2xl p-2">
       <div className="flex h-[73px] pb-4">

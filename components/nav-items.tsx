@@ -37,8 +37,32 @@ const performanceIcon = (
 );
 
 const trainingIcon = (
+  // Training (Progress) — line graph
+  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M3 17l6-6 4 4 8-8M14 7h7v7" />
+  </svg>
+);
+
+const trainingPlansIcon = (
+  // Calendar / planner
   <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+  </svg>
+);
+
+const eventsIcon = (
+  // Trophy
+  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M8 21h8m-4-4v4m6-17v3a4 4 0 01-4 4h-4a4 4 0 01-4-4V4h12zM4 5v2a3 3 0 003 3M20 5v2a3 3 0 01-3 3" />
+  </svg>
+);
+
+const goalsIcon = (
+  // Target / bullseye
+  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+    <circle cx="12" cy="12" r="9" />
+    <circle cx="12" cy="12" r="5" />
+    <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
   </svg>
 );
 
@@ -70,20 +94,26 @@ const moreIcon = (
 );
 
 export const ALL_NAV_ITEMS: NavItem[] = [
-  { key: 'home',        href: '/home',        label: 'Home',        matchPrefixes: ['/home', '/feed'],          icon: homeIcon,        pinned: 'first' },
-  { key: 'activities',  href: '/activities',  label: 'Activities',  matchPrefixes: ['/activities'],             icon: activitiesIcon },
-  { key: 'performance', href: '/performance', label: 'Performance', matchPrefixes: ['/performance', '/fitness'], icon: performanceIcon },
-  { key: 'training',    href: '/training',    label: 'Training',    matchPrefixes: ['/training'],               icon: trainingIcon },
-  { key: 'chat',        href: '/chat',        label: 'Coach AI',    matchPrefixes: ['/chat'],                   icon: chatIcon },
-  { key: 'profile',     href: '/profile',     label: 'Profile',     matchPrefixes: ['/profile'],                icon: profileIcon },
-  { key: 'settings',    href: '/settings',    label: 'Settings',    matchPrefixes: ['/settings'],               icon: settingsIcon },
-  { key: 'more',        href: '/more',        label: 'More',        matchPrefixes: ['/more'],                   icon: moreIcon,        pinned: 'last' },
+  { key: 'home',           href: '/home',           label: 'Home',           matchPrefixes: ['/home', '/feed'],           icon: homeIcon,         pinned: 'first' },
+  { key: 'activities',     href: '/activities',     label: 'Activities',     matchPrefixes: ['/activities'],              icon: activitiesIcon },
+  { key: 'performance',    href: '/performance',    label: 'Performance',    matchPrefixes: ['/performance', '/fitness'], icon: performanceIcon },
+  { key: 'training',       href: '/training',       label: 'Training',       matchPrefixes: ['/training'],                icon: trainingIcon },
+  { key: 'training-plans', href: '/training-plans', label: 'Training Plans', matchPrefixes: ['/training-plans'],          icon: trainingPlansIcon },
+  { key: 'events',         href: '/events',         label: 'Events',         matchPrefixes: ['/events'],                  icon: eventsIcon },
+  { key: 'goals',          href: '/goals',          label: 'Goals',          matchPrefixes: ['/goals'],                   icon: goalsIcon },
+  { key: 'chat',           href: '/chat',           label: 'Coach AI',       matchPrefixes: ['/chat'],                    icon: chatIcon },
+  { key: 'profile',        href: '/profile',        label: 'Profile',        matchPrefixes: ['/profile'],                 icon: profileIcon },
+  { key: 'settings',       href: '/settings',       label: 'Settings',       matchPrefixes: ['/settings'],                icon: settingsIcon },
+  { key: 'more',           href: '/more',           label: 'More',           matchPrefixes: ['/more'],                    icon: moreIcon,         pinned: 'last' },
 ];
 
 export const STORAGE_KEY    = 'nav-bar-config';
 export const NAV_EVENT      = 'nav-config-changed';
 export const DEFAULT_MIDDLE = ['activities', 'performance', 'training'];
-export const MAX_MIDDLE     = 3;
+/** Maximum number of middle slots a user can configure. Mobile shows the
+ *  first MAX_MIDDLE_MOBILE; desktop shows all of them. */
+export const MAX_MIDDLE        = 6;
+export const MAX_MIDDLE_MOBILE = 3;
 
 const middleKeys = new Set(ALL_NAV_ITEMS.filter(i => !i.pinned).map(i => i.key));
 
