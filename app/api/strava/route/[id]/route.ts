@@ -46,7 +46,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     const altM   = downsample(altStream,  MAX_POINTS).map((a: number) => Math.round(a * 10) / 10);
 
     const cached: CachedRoute = {
-      id:                  String(routeData.id),
+      // Use the original string ID we fetched with, NOT routeData.id parsed from JSON —
+      // Strava route IDs are 64-bit integers that JavaScript silently rounds when parsed as a number.
+      id:                  routeId,
       name:                routeData.name ?? 'Unnamed route',
       distance_m:          routeData.distance ?? 0,
       elevation_gain:      routeData.elevation_gain ?? 0,

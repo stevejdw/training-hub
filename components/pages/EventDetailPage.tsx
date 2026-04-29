@@ -282,30 +282,43 @@ export default function EventDetailPage({ eventId }: Props) {
           {/* ── Strava course ─────────────────────────────────────── */}
           <section className="bg-gray-900 border border-gray-800 rounded-2xl p-4 space-y-3">
             <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Strava Course</h2>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={routeInput}
-                onChange={e => setRouteInput(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && loadRoute()}
-                placeholder="Route URL or ID"
-                className={inputCls + ' flex-1'}
-              />
-              <button
-                onClick={loadRoute}
-                disabled={loadingRoute}
-                className="flex-shrink-0 px-4 py-2 bg-orange-500 hover:bg-orange-400 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors"
-              >
-                {loadingRoute ? '…' : 'Load'}
-              </button>
-            </div>
-            {routeError && <p className="text-red-400 text-xs">{routeError}</p>}
-            {route && (
-              <div className="flex items-center gap-4 pt-1 flex-wrap">
-                <span className="text-sm font-semibold text-white">{route.name}</span>
-                <span className="text-xs text-gray-400">{totalKm} km</span>
-                <span className="text-xs text-gray-400">{totalGain} m elevation</span>
+
+            {route ? (
+              /* Course loaded — show summary + remove option */
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-white truncate">{route.name}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">{totalKm} km · {totalGain} m elevation</p>
+                </div>
+                <button
+                  onClick={() => { setRoute(null); setClimbs([]); setAutoDetected(false); setRouteInput(''); }}
+                  className="flex-shrink-0 text-xs text-gray-500 hover:text-red-400 transition-colors"
+                >
+                  Remove
+                </button>
               </div>
+            ) : (
+              /* No course — show input + load */
+              <>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={routeInput}
+                    onChange={e => setRouteInput(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && loadRoute()}
+                    placeholder="Strava route URL or ID"
+                    className={inputCls + ' flex-1'}
+                  />
+                  <button
+                    onClick={loadRoute}
+                    disabled={loadingRoute}
+                    className="flex-shrink-0 px-4 py-2 bg-orange-500 hover:bg-orange-400 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors"
+                  >
+                    {loadingRoute ? '…' : 'Load'}
+                  </button>
+                </div>
+                {routeError && <p className="text-red-400 text-xs">{routeError}</p>}
+              </>
             )}
           </section>
 
@@ -337,17 +350,21 @@ export default function EventDetailPage({ eventId }: Props) {
                       );
                     }}
                   />
-                  {/* All climbs — use key that includes selection so Recharts re-renders on change */}
+                  {/* Climb highlights — only selected is visible; others hide when any is selected */}
                   {climbs.map((c, i) => {
-                    const sel = selectedClimbIdx === i;
+                    const sel      = selectedClimbIdx === i;
+                    const anySel   = selectedClimbIdx !== null;
+                    // When nothing selected: subtle red for all; when one selected: only that one lit up
+                    const fOpacity = sel ? 0.35 : anySel ? 0 : 0.12;
+                    const sOpacity = sel ? 1    : anySel ? 0 : 0.35;
                     return (
                       <ReferenceArea
                         key={`climb-${i}-${sel}`}
                         x1={c.start_km} x2={c.end_km}
                         fill={sel ? '#f97316' : '#ef4444'}
-                        fillOpacity={sel ? 0.35 : 0.20}
+                        fillOpacity={fOpacity}
                         stroke={sel ? '#f97316' : '#ef4444'}
-                        strokeOpacity={sel ? 1 : 0.5}
+                        strokeOpacity={sOpacity}
                         strokeWidth={sel ? 2 : 1}
                       />
                     );
