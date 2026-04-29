@@ -96,7 +96,7 @@ export default function FitnessTab() {
                 : 'bg-gray-800 text-gray-500 hover:text-gray-300'
             }`}
           >
-            {d === 365 ? '1Y' : `${d}D`}
+            {d === 30 ? '30 days' : d === 90 ? '90 days' : d === 180 ? '6 months' : '1 year'}
           </button>
         ))}
       </div>
