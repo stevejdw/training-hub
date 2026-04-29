@@ -29,9 +29,11 @@ export interface PacingStrategy {
 }
 
 export interface EventGoal {
-  name: string;
-  date: string;   // YYYY-MM-DD
-  goal: string;
+  id?:               string;   // stable slug — set on creation
+  name:              string;
+  date:              string;   // YYYY-MM-DD
+  goal:              string;
+  location?:         string;
   strava_route_id?:  string;
   route?:            CachedRoute | null;
   pacing_strategy?:  PacingStrategy | null;
