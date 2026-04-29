@@ -32,11 +32,11 @@ interface ProgressData {
 type Timeframe = '30d' | '90d' | '6m' | '1y' | 'all';
 
 const TIMEFRAMES: { key: Timeframe; label: string; days: number; weeks: number }[] = [
-  { key: '30d', label: '30d', days: 30,    weeks: 5   },
-  { key: '90d', label: '90d', days: 90,    weeks: 13  },
-  { key: '6m',  label: '6mo', days: 180,   weeks: 26  },
-  { key: '1y',  label: '1y',  days: 365,   weeks: 52  },
-  { key: 'all', label: 'All', days: 99999, weeks: 999 },
+  { key: '30d', label: '30 days',   days: 30,    weeks: 5   },
+  { key: '90d', label: '90 days',   days: 90,    weeks: 13  },
+  { key: '6m',  label: '6 months',  days: 180,   weeks: 26  },
+  { key: '1y',  label: '1 year',    days: 365,   weeks: 52  },
+  { key: 'all', label: 'All time',  days: 99999, weeks: 999 },
 ];
 
 const DEFAULT_DURATIONS = [180, 300, 600, 1200, 1800, 3600];
