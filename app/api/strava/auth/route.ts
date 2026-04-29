@@ -13,7 +13,10 @@ export async function GET(req: NextRequest) {
     return Response.json({ error: 'STRAVA_CLIENT_ID env var not set' }, { status: 500 });
   }
 
-  const origin      = req.nextUrl.origin;
+  // Prefer an explicit env var so the redirect URI is stable across
+  // preview deployments and matches what's registered in the Strava app.
+  const origin = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '')
+    ?? (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : req.nextUrl.origin);
   const redirectUri = `${origin}/api/strava/callback`;
 
   const url = new URL('https://www.strava.com/oauth/authorize');
