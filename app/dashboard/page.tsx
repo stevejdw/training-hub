@@ -1,12 +1,28 @@
-import { Suspense } from 'react';
-import DashboardHome from '@/components/DashboardHome';
+import { redirect } from 'next/navigation';
 
-export const metadata = { title: 'Analytics | Training Hub' };
+/** /dashboard is legacy — redirect to /home (Feed). The old `?tab=`
+ *  values map to the new top-level routes:
+ *    feed       → /home
+ *    activities → /activities
+ *    progress   → /performance
+ *    settings   → /settings
+ */
+export default async function LegacyDashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const sp = await searchParams;
+  const tab = typeof sp.tab === 'string' ? sp.tab : 'feed';
 
-export default function DashboardPage() {
-  return (
-    <Suspense>
-      <DashboardHome />
-    </Suspense>
-  );
+  if (tab === 'activities') {
+    const qs = new URLSearchParams();
+    for (const [k, v] of Object.entries(sp)) {
+      if (k !== 'tab' && typeof v === 'string') qs.set(k, v);
+    }
+    redirect(`/activities${qs.toString() ? `?${qs.toString()}` : ''}`);
+  }
+  if (tab === 'progress')  redirect('/training?tab=progress');
+  if (tab === 'settings')  redirect('/settings');
+  redirect('/home');
 }

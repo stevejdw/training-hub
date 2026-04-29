@@ -1,12 +1,6 @@
-import { Suspense } from 'react';
-import FitnessPage from '@/components/FitnessPage';
+import { redirect } from 'next/navigation';
 
-export const metadata = { title: 'Fitness | Training Hub' };
-
-export default function FitnessRoute() {
-  return (
-    <Suspense>
-      <FitnessPage />
-    </Suspense>
-  );
+/** /fitness is legacy — fitness lives under Performance now. */
+export default function LegacyFitnessPage() {
+  redirect('/performance?tab=fitness');
 }

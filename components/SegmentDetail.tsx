@@ -141,7 +141,7 @@ export default function SegmentDetail({ id }: { id: string }) {
     return (
       <div className="max-w-4xl mx-auto px-4 py-8 text-center text-gray-400">
         Segment not found.{' '}
-        <Link href="/dashboard?tab=activities" className="text-orange-400 hover:underline">Back</Link>
+        <Link href="/activities" className="text-orange-400 hover:underline">Back</Link>
       </div>
     );
   }
@@ -174,7 +174,7 @@ export default function SegmentDetail({ id }: { id: string }) {
       <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
 
         {/* Back */}
-        <Link href="/dashboard?tab=activities" className="text-sm text-gray-500 hover:text-orange-400 transition-colors">
+        <Link href="/activities" className="text-sm text-gray-500 hover:text-orange-400 transition-colors">
           ← Activities
         </Link>
 

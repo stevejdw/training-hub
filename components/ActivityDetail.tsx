@@ -182,7 +182,7 @@ export default function ActivityDetail({ id }: { id: string }) {
     return (
       <div className="max-w-4xl mx-auto px-4 py-8 text-center text-gray-400">
         Activity not found.{' '}
-        <Link href="/dashboard?tab=activities" className="text-orange-400 hover:underline">Back to activities</Link>
+        <Link href="/activities" className="text-orange-400 hover:underline">Back to activities</Link>
       </div>
     );
   }
@@ -204,20 +204,9 @@ export default function ActivityDetail({ id }: { id: string }) {
     <div className="h-full overflow-y-auto scroll-touch">
       <div className="max-w-4xl mx-auto px-4 py-6 space-y-5">
 
-        <div className="flex items-center justify-between gap-3">
-          <Link href="/dashboard?tab=activities" className="text-sm text-gray-500 hover:text-orange-400 transition-colors">
-            ← Activities
-          </Link>
-          <Link
-            href={`/chat?prompt=${encodeURIComponent(`Coach feedback on "${activity.name}" (id ${id}).`)}`}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-500/15 hover:bg-orange-500/25 text-orange-400 text-xs font-medium transition-colors border border-orange-500/30"
-          >
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-            </svg>
-            Get Coach feedback
-          </Link>
-        </div>
+        <Link href="/activities" className="text-sm text-gray-500 hover:text-orange-400 transition-colors">
+          ← Activities
+        </Link>
 
         {/* Header + Map */}
         <div className="flex gap-4 items-start">
@@ -232,18 +221,6 @@ export default function ActivityDetail({ id }: { id: string }) {
                 {' · '}
                 {date.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' })}
               </span>
-              {activity.gear_name && (
-                <button
-                  onClick={renameGear}
-                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-gray-800 text-gray-300 border border-gray-700 hover:border-orange-500/60 hover:text-white transition-colors"
-                  title="Click to rename gear"
-                >
-                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 17.5a3 3 0 100-6 3 3 0 000 6zm14 0a3 3 0 100-6 3 3 0 000 6zM5 14.5l4-7h6l4 7M9 7.5h6" />
-                  </svg>
-                  {activity.gear_name}
-                </button>
-              )}
             </div>
 
             {/* Activity name (click to edit) */}
@@ -302,10 +279,25 @@ export default function ActivityDetail({ id }: { id: string }) {
                   <div className="text-base font-bold text-white">{Math.round(activity.total_elevation_gain)}<span className="text-xs text-gray-400 ml-1">m</span></div>
                 </div>
               )}
+              {activity.gear_name && (
+                <div>
+                  <div className="text-[10px] text-gray-500 uppercase tracking-wider mb-0.5">Gear</div>
+                  <button
+                    onClick={renameGear}
+                    className="text-base font-bold text-white text-left hover:text-orange-400 transition-colors group inline-flex items-center gap-1.5 max-w-full"
+                    title="Click to rename gear"
+                  >
+                    <span className="truncate">{activity.gear_name}</span>
+                    <svg className="w-3 h-3 text-gray-600 opacity-0 group-hover:opacity-100 flex-shrink-0 transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Map */}
+          {/* Desktop map (side-by-side with stats) */}
           {activity.summary_polyline ? (
             <div className="w-[42%] flex-shrink-0 hidden sm:block">
               <ActivityMap
@@ -316,7 +308,18 @@ export default function ActivityDetail({ id }: { id: string }) {
           ) : null}
         </div>
 
-        {/* Mobile map (full width below header) */}
+        {/* Get Coach feedback — between top stats and the map */}
+        <Link
+          href={`/chat?prompt=${encodeURIComponent(`Coach feedback on "${activity.name}" (id ${id}).`)}`}
+          className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl bg-orange-500/15 hover:bg-orange-500/25 text-orange-400 text-sm font-semibold transition-colors border border-orange-500/30"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+          </svg>
+          Get Coach feedback
+        </Link>
+
+        {/* Mobile map (full width below the button) */}
         {activity.summary_polyline && (
           <div className="sm:hidden">
             <ActivityMap
