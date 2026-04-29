@@ -104,6 +104,21 @@ export default function ProgressTab() {
   return (
     <div className="space-y-4">
 
+      {/* Period type: WTD / MTD / YTD — top of screen */}
+      <div className="flex bg-gray-800 rounded-xl p-1 gap-1">
+        {PERIODS.map(p => (
+          <button
+            key={p.key}
+            onClick={() => { setPeriod(p.key); setOffset(0); }}
+            className={`flex-1 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+              period === p.key ? 'bg-orange-500 text-white' : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
+
       {/* Metric toggle */}
       <div className="grid grid-cols-2 gap-2">
         {METRICS.map(m => (
@@ -185,23 +200,8 @@ export default function ProgressTab() {
         )}
       </div>
 
-      {/* Period selector + date-range navigation — below chart */}
-      <div className="space-y-2.5">
-        {/* Period type: WTD / MTD / YTD */}
-        <div className="flex bg-gray-800 rounded-xl p-1 gap-1">
-          {PERIODS.map(p => (
-            <button
-              key={p.key}
-              onClick={() => { setPeriod(p.key); setOffset(0); }}
-              className={`flex-1 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                period === p.key ? 'bg-orange-500 text-white' : 'text-gray-400 hover:text-white'
-              }`}
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
-
+      {/* Date-range navigation — below chart */}
+      <div>
         {/* Back / forward arrows with date range label */}
         <div className="flex items-center justify-between">
           <button
