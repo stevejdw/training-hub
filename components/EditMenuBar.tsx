@@ -61,18 +61,22 @@ export default function EditMenuBar() {
 
   return (
     <div className="h-full flex flex-col">
-      <div className="flex-shrink-0 flex items-center gap-2.5 px-4 md:px-8 py-3 md:py-4 border-b border-gray-800 bg-gray-950">
-        <span className="text-orange-400 [&_svg]:w-6 [&_svg]:h-6 md:[&_svg]:w-7 md:[&_svg]:h-7 flex-shrink-0">
-          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-          </svg>
-        </span>
-        <h1 className="text-lg md:text-xl font-bold text-white tracking-tight flex-1 truncate">
-          Edit Menu Bar
-        </h1>
-        <Link href="/more" className="text-sm text-gray-500 hover:text-orange-400 transition-colors flex-shrink-0">
-          ← More
-        </Link>
+      <div className="flex-shrink-0 relative flex items-center justify-center px-4 md:px-8 py-3 md:py-4 border-b border-gray-800 bg-gray-950">
+        <div className="flex items-center gap-2.5">
+          <span className="text-orange-400 [&_svg]:w-6 [&_svg]:h-6 md:[&_svg]:w-7 md:[&_svg]:h-7 flex-shrink-0">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+          </span>
+          <h1 className="text-lg md:text-xl font-bold text-white tracking-tight truncate">
+            Edit Menu Bar
+          </h1>
+        </div>
+        <div className="absolute right-4 md:right-8 flex items-center">
+          <Link href="/more" className="text-sm text-gray-500 hover:text-orange-400 transition-colors">
+            ← More
+          </Link>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto scroll-touch">
