@@ -16,8 +16,9 @@ export interface CachedRoute {
   name: string;
   distance_m: number;
   elevation_gain: number;
-  stream_distance_km: number[];  // downsampled, km from start
-  stream_altitude_m:  number[];  // downsampled, meters
+  stream_distance_km: number[];      // downsampled, km from start
+  stream_altitude_m:  number[];      // downsampled, meters
+  stream_latlng?:     [number, number][];  // downsampled [lat, lng] pairs for map
 }
 
 export interface PacingStrategy {

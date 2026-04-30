@@ -38,12 +38,20 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     const streamsData: any[] = streamsRes.ok ? await streamsRes.json() : [];
 
     // Extract streams
-    const distStream: number[] = streamsData.find((s: { type: string }) => s.type === 'distance')?.data ?? [];
-    const altStream:  number[] = streamsData.find((s: { type: string }) => s.type === 'altitude')?.data  ?? [];
+    const distStream:   number[]            = streamsData.find((s: { type: string }) => s.type === 'distance')?.data ?? [];
+    const altStream:    number[]            = streamsData.find((s: { type: string }) => s.type === 'altitude')?.data  ?? [];
+    const latlngStream: [number, number][]  = streamsData.find((s: { type: string }) => s.type === 'latlng')?.data   ?? [];
 
     // Downsample and convert distance to km
-    const distKm = downsample(distStream, MAX_POINTS).map((d: number) => Math.round(d / 10) / 100);
-    const altM   = downsample(altStream,  MAX_POINTS).map((a: number) => Math.round(a * 10) / 10);
+    const distKm  = downsample(distStream,   MAX_POINTS).map((d: number) => Math.round(d / 10) / 100);
+    const altM    = downsample(altStream,    MAX_POINTS).map((a: number) => Math.round(a * 10) / 10);
+    // Latlng: round to 5 decimal places (~1m precision) to keep payload compact
+    const latlng  = downsample(latlngStream, MAX_POINTS).map(
+      ([lat, lng]: [number, number]) => [
+        Math.round(lat * 100000) / 100000,
+        Math.round(lng * 100000) / 100000,
+      ] as [number, number]
+    );
 
     const cached: CachedRoute = {
       // Use the original string ID we fetched with, NOT routeData.id parsed from JSON —
@@ -54,6 +62,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       elevation_gain:      routeData.elevation_gain ?? 0,
       stream_distance_km:  distKm,
       stream_altitude_m:   altM,
+      stream_latlng:       latlng.length ? latlng : undefined,
     };
 
     return Response.json(cached);

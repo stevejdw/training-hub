@@ -129,8 +129,9 @@ export function detectClimbs(
   const n = Math.min(distKm.length, altM.length);
   if (n < 2) return [];
 
-  // Smooth altitude with a ~2km rolling window so small dips don't break climbs
-  const SMOOTH_KM = 1.5;
+  // Smooth altitude with a 1km rolling window — smaller than before so valley→climb
+  // transitions aren't blurred, which was causing short-but-real climbs to be missed.
+  const SMOOTH_KM = 1.0;
   const smoothed  = altM.slice();
   for (let i = 0; i < n; i++) {
     let sum = 0, cnt = 0;
@@ -140,12 +141,14 @@ export function detectClimbs(
     smoothed[i] = cnt ? sum / cnt : altM[i];
   }
 
-  // Mark each segment as climbing if smoothed gradient >= 2% (low threshold to catch all candidates)
+  // Mark each segment as climbing if smoothed gradient >= 1.5% — lower than before so
+  // we pick up candidates like a 4km/170m/4.25% climb that has a shallow start.
+  // The qualifiesAsKeyClimb filter below prevents false positives.
   const isClimbing = Array(n).fill(false);
   for (let i = 1; i < n; i++) {
     const dDist = (distKm[i] - distKm[i - 1]) * 1000;
     const dAlt  = smoothed[i] - smoothed[i - 1];
-    if (dDist > 0 && (dAlt / dDist) * 100 >= 2) isClimbing[i] = true;
+    if (dDist > 0 && (dAlt / dDist) * 100 >= 1.5) isClimbing[i] = true;
   }
 
   // Group consecutive climbing segments
