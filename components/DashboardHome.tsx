@@ -389,20 +389,31 @@ function TrainingTab() {
       {/* Bar chart */}
       <div className="bg-gray-800/60 rounded-xl p-3 md:p-5">
         {error ? (
-          <div className="h-48 md:h-80 flex items-center justify-center">
+          <div className="h-56 md:h-80 flex items-center justify-center">
             <p className="text-red-400 text-xs text-center px-4">{error}</p>
           </div>
         ) : loading && !data ? (
-          <div className="h-48 md:h-80 animate-pulse bg-gray-800 rounded-lg" />
+          <div className="h-56 md:h-80 animate-pulse bg-gray-800 rounded-lg" />
         ) : (
-          <div className="h-[220px] md:h-[340px]">
+          <div className={period === 'year' ? 'h-[260px] md:h-[360px]' : 'h-[240px] md:h-[340px]'}>
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={flatBars} margin={{ top: 20, right: 4, left: 4, bottom: 0 }} barCategoryGap="25%">
+            <BarChart
+              data={flatBars}
+              margin={{ top: 24, right: 4, left: 4, bottom: period === 'year' ? 16 : 0 }}
+              barCategoryGap={period === 'week' ? '30%' : period === 'month' ? '28%' : '20%'}
+            >
               <XAxis
                 dataKey="label"
-                tick={{ fill: '#9ca3af', fontSize: 11 }}
+                tick={{
+                  fill: '#9ca3af',
+                  fontSize: period === 'year' ? 10 : 11,
+                  ...(period === 'year' ? { dy: 4 } : {}),
+                }}
                 axisLine={false}
                 tickLine={false}
+                angle={period === 'year' ? -35 : 0}
+                textAnchor={period === 'year' ? 'end' : 'middle'}
+                interval={0}
               />
               <YAxis hide />
               <Tooltip
@@ -415,7 +426,7 @@ function TrainingTab() {
                   dataKey={`${metric}_${type}`}
                   stackId="a"
                   fill={sportColor(type)}
-                  radius={i === CYCLING_TYPES.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
+                  radius={i === CYCLING_TYPES.length - 1 ? [3, 3, 0, 0] : [0, 0, 0, 0]}
                 />
               ))}
               <Bar
@@ -430,16 +441,19 @@ function TrainingTab() {
                   const { x, y, width } = props;
                   const total = Number(props[metric]) || 0;
                   if (!total) return <g />;
+                  const label = barLabel(total);
+                  // Skip label if bar is too narrow to fit text cleanly
+                  if (width < 18) return <g />;
                   return (
                     <text
                       x={x + width / 2}
-                      y={y - 5}
+                      y={y - 6}
                       textAnchor="middle"
-                      fill="#d1d5db"
-                      fontSize={10}
-                      fontWeight={500}
+                      fill="#e5e7eb"
+                      fontSize={period === 'year' ? 9 : 10}
+                      fontWeight={600}
                     >
-                      {barLabel(total)}
+                      {label}
                     </text>
                   );
                 }}

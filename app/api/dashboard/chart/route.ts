@@ -122,11 +122,9 @@ function buildBars(period: Period, start: Date, end: Date, rawRows: Record<strin
     const daysInMonth = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 0)).getUTCDate();
     const numWeeks = Math.ceil(daysInMonth / 7);
     for (let w = 1; w <= numWeeks; w++) {
-      const key      = String(w);
-      const byType   = byKey.get(key) ?? {};
-      const dayStart = (w - 1) * 7 + 1;
-      const dayEnd   = Math.min(w * 7, daysInMonth);
-      rows.push({ label: `${dayStart}–${dayEnd}`, date: key, ...sumTypeData(byType), byType });
+      const key    = String(w);
+      const byType = byKey.get(key) ?? {};
+      rows.push({ label: `W${w}`, date: key, ...sumTypeData(byType), byType });
     }
     return rows;
   }
