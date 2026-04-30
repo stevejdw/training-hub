@@ -187,6 +187,11 @@ export default function EventDetailPage({ eventId }: Props) {
   const [flatWatts,     setFlatWatts]     = useState(DEFAULT_FLAT_WATTS);
   const [descentWatts,  setDescentWatts]  = useState(DEFAULT_DESCENT_WATTS);
 
+  // ── Add-climb form ──
+  const [showAddClimb, setShowAddClimb] = useState(false);
+  const [addStart,     setAddStart]     = useState('');
+  const [addEnd,       setAddEnd]       = useState('');
+
   const riderKg = profile?.weight_kg      ?? 75;
   const bikeKg  = profile?.bike_weight_kg ?? 8;
 
@@ -332,6 +337,64 @@ export default function EventDetailPage({ eventId }: Props) {
 
   function updateClimbWatts(i: number, watts: number) {
     setClimbs(prev => prev.map((c, idx) => idx === i ? { ...c, target_watts: watts } : c));
+  }
+
+  // ── Climb management ──
+  function deleteClimb(i: number) {
+    setClimbs(prev => {
+      const next = prev.filter((_, idx) => idx !== i).map((c, idx) => ({ ...c, name: `Climb ${idx + 1}` }));
+      return next;
+    });
+    setSelectedClimb(null);
+  }
+
+  function resetClimbs() {
+    if (!route) return;
+    const detected = detectClimbs(route.stream_distance_km, route.stream_altitude_m);
+    const newClimbs = detected.map((c, i) => ({
+      ...c, name: `Climb ${i + 1}`, target_watts: Math.round(flatWatts * 0.88),
+    }));
+    setClimbs(newClimbs);
+    setSelectedClimb(null);
+    setShowAddClimb(false);
+  }
+
+  function addCustomClimb() {
+    if (!route) return;
+    const s = parseFloat(addStart);
+    const e = parseFloat(addEnd);
+    if (isNaN(s) || isNaN(e) || e <= s) return;
+
+    // Derive stats from route stream
+    const d   = route.stream_distance_km;
+    const a   = route.stream_altitude_m;
+    let firstAlt: number | null = null, lastAlt = 0;
+    for (let i = 0; i < d.length; i++) {
+      if (d[i] < s || d[i] > e) continue;
+      if (firstAlt === null) firstAlt = a[i];
+      lastAlt = a[i];
+    }
+    const dist    = Math.round((e - s) * 10) / 10;
+    const net     = firstAlt !== null ? lastAlt - firstAlt : 0;
+    const avgGrad = dist > 0 ? Math.round((net / (dist * 1000)) * 1000) / 10 : 0;
+
+    const newClimb: EventClimb = {
+      name:           '',
+      start_km:       Math.round(s * 10) / 10,
+      end_km:         Math.round(e * 10) / 10,
+      distance_km:    dist,
+      elevation_gain: Math.round(net),
+      avg_gradient:   avgGrad,
+      target_watts:   Math.round(flatWatts * 0.88),
+    };
+
+    setClimbs(prev => {
+      const next = [...prev, newClimb].sort((a, b) => a.start_km - b.start_km).map((c, i) => ({
+        ...c, name: `Climb ${i + 1}`,
+      }));
+      return next;
+    });
+    setAddStart(''); setAddEnd(''); setShowAddClimb(false);
   }
 
   // ── Days/color ──
@@ -625,50 +688,124 @@ export default function EventDetailPage({ eventId }: Props) {
               </button>
 
               {/* Expanded climb list */}
-              {climbsOpen && climbs.length > 0 && (
-                <div className="border-t border-gray-800 divide-y divide-gray-800/60">
-                  {climbs.map((c, i) => {
-                    const isSelected = selectedClimb === i;
-                    return (
-                      <div key={i} className={`p-3 transition-colors ${isSelected ? 'bg-orange-500/8' : ''}`}>
-                        <div className="flex items-center justify-between gap-2">
+              {climbsOpen && (
+                <div className="border-t border-gray-800">
+                  {climbs.length > 0 && (
+                    <div className="divide-y divide-gray-800/60">
+                      {climbs.map((c, i) => {
+                        const isSelected = selectedClimb === i;
+                        return (
+                          <div key={i} className={`p-3 transition-colors ${isSelected ? 'bg-orange-500/8' : ''}`}>
+                            <div className="flex items-center justify-between gap-2">
+                              <button
+                                onClick={() => setSelectedClimb(isSelected ? null : i)}
+                                className="flex items-center gap-2 min-w-0 flex-1"
+                              >
+                                <span className={`flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${isSelected ? 'bg-orange-500 text-white' : 'bg-gray-800 text-gray-400'}`}>
+                                  {i + 1}
+                                </span>
+                                <span className="text-sm font-semibold text-white truncate">{c.name}</span>
+                              </button>
+                              <div className="flex items-center gap-3 flex-shrink-0">
+                                <button
+                                  onClick={() => viewClimb(i)}
+                                  className="text-xs text-orange-400 hover:text-orange-300 transition-colors"
+                                >
+                                  View →
+                                </button>
+                                <button
+                                  onClick={() => deleteClimb(i)}
+                                  className="text-gray-600 hover:text-red-400 transition-colors text-sm leading-none"
+                                  title="Remove climb"
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            </div>
+                            <div className="mt-2 grid grid-cols-4 gap-1 text-center pl-7">
+                              <div>
+                                <p className="text-[9px] text-gray-600 uppercase tracking-wider">From start</p>
+                                <p className="text-xs font-medium text-gray-300">{c.start_km} km</p>
+                              </div>
+                              <div>
+                                <p className="text-[9px] text-gray-600 uppercase tracking-wider">Length</p>
+                                <p className="text-xs font-medium text-gray-300">{c.distance_km} km</p>
+                              </div>
+                              <div>
+                                <p className="text-[9px] text-gray-600 uppercase tracking-wider">Ascent</p>
+                                <p className="text-xs font-medium text-orange-400">{c.elevation_gain} m</p>
+                              </div>
+                              <div>
+                                <p className="text-[9px] text-gray-600 uppercase tracking-wider">Gradient</p>
+                                <p className="text-xs font-medium text-gray-300">{c.avg_gradient}%</p>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Add climb form */}
+                  <div className="p-3 border-t border-gray-800/60 space-y-2">
+                    {showAddClimb ? (
+                      <div className="space-y-2">
+                        <p className="text-[10px] text-gray-500 uppercase tracking-wider">Add climb</p>
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1">
+                            <label className="text-[9px] text-gray-600 uppercase tracking-wider block mb-1">Start km</label>
+                            <input
+                              type="number"
+                              value={addStart}
+                              onChange={e => setAddStart(e.target.value)}
+                              placeholder="e.g. 73.9"
+                              className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-orange-500"
+                              step="0.1" min="0"
+                            />
+                          </div>
+                          <div className="flex-1">
+                            <label className="text-[9px] text-gray-600 uppercase tracking-wider block mb-1">End km</label>
+                            <input
+                              type="number"
+                              value={addEnd}
+                              onChange={e => setAddEnd(e.target.value)}
+                              placeholder="e.g. 83.9"
+                              className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-orange-500"
+                              step="0.1" min="0"
+                            />
+                          </div>
                           <button
-                            onClick={() => setSelectedClimb(isSelected ? null : i)}
-                            className="flex items-center gap-2 min-w-0"
+                            onClick={addCustomClimb}
+                            disabled={!addStart || !addEnd}
+                            className="flex-shrink-0 mt-4 px-3 py-1.5 bg-orange-500 hover:bg-orange-400 disabled:opacity-40 text-white text-xs font-medium rounded-lg transition-colors"
                           >
-                            <span className={`flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${isSelected ? 'bg-orange-500 text-white' : 'bg-gray-800 text-gray-400'}`}>
-                              {i + 1}
-                            </span>
-                            <span className="text-sm font-semibold text-white truncate">{c.name}</span>
+                            Add
                           </button>
                           <button
-                            onClick={() => viewClimb(i)}
-                            className="flex-shrink-0 text-xs text-orange-400 hover:text-orange-300 transition-colors"
+                            onClick={() => { setShowAddClimb(false); setAddStart(''); setAddEnd(''); }}
+                            className="flex-shrink-0 mt-4 text-gray-600 hover:text-gray-400 text-sm leading-none"
                           >
-                            View →
+                            ×
                           </button>
-                        </div>
-                        <div className="mt-2 grid grid-cols-4 gap-1 text-center pl-7">
-                          <div>
-                            <p className="text-[9px] text-gray-600 uppercase tracking-wider">From start</p>
-                            <p className="text-xs font-medium text-gray-300">{c.start_km} km</p>
-                          </div>
-                          <div>
-                            <p className="text-[9px] text-gray-600 uppercase tracking-wider">Length</p>
-                            <p className="text-xs font-medium text-gray-300">{c.distance_km} km</p>
-                          </div>
-                          <div>
-                            <p className="text-[9px] text-gray-600 uppercase tracking-wider">Ascent</p>
-                            <p className="text-xs font-medium text-orange-400">{c.elevation_gain} m</p>
-                          </div>
-                          <div>
-                            <p className="text-[9px] text-gray-600 uppercase tracking-wider">Gradient</p>
-                            <p className="text-xs font-medium text-gray-300">{c.avg_gradient}%</p>
-                          </div>
                         </div>
                       </div>
-                    );
-                  })}
+                    ) : (
+                      <div className="flex items-center justify-between">
+                        <button
+                          onClick={() => setShowAddClimb(true)}
+                          className="text-xs text-orange-400 hover:text-orange-300 transition-colors flex items-center gap-1"
+                        >
+                          <span className="text-base leading-none">+</span> Add climb
+                        </button>
+                        <button
+                          onClick={resetClimbs}
+                          className="text-xs text-gray-600 hover:text-gray-400 transition-colors"
+                        >
+                          Reset to auto-detect
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </section>

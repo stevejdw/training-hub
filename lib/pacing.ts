@@ -121,17 +121,18 @@ export interface DetectedClimb {
  * Check if a climb segment meets the quality thresholds.
  *
  * Tuned for the Peaks Challenge route (8 known climbs):
- *   33.6 km · 73.9 km · 83.9 km · 93.9 km · 146 km · 166.6 km · 200 km · 215 km
+ *   33.6 km · 73.9 km · 83.9 km · 93.9 km · 146.7 km · 166.6 km · 200 km · 215 km
  *
- * Tiers ordered steepest-first so a segment only needs to satisfy one row.
+ * Tiers ordered steepest-first; a segment qualifies by satisfying any one row.
+ * Thresholds are intentionally conservative to avoid false positives —
+ * use the "Add climb" button on the event page to add any missed climbs manually.
  */
 function qualifiesAsKeyClimb(distKm: number, gainM: number, gradPct: number): boolean {
-  if (gradPct >= 10 && distKm >= 0.3  && gainM >= 40)  return true; // short wall
-  if (gradPct >= 7  && distKm >= 0.5  && gainM >= 60)  return true;
-  if (gradPct >= 5  && distKm >= 0.6  && gainM >= 60)  return true;
-  if (gradPct >= 3  && distKm >= 1.0  && gainM >= 80)  return true;
-  if (gradPct >= 2  && distKm >= 4.0  && gainM >= 80)  return true; // long gentle climbs
-  if (gradPct >= 1.5 && distKm >= 8.0 && gainM >= 80)  return true; // very long shallow
+  if (gradPct >= 10 && distKm >= 0.4  && gainM >= 50)  return true; // short steep wall
+  if (gradPct >= 7  && distKm >= 0.6  && gainM >= 70)  return true;
+  if (gradPct >= 5  && distKm >= 0.7  && gainM >= 70)  return true;
+  if (gradPct >= 3  && distKm >= 1.2  && gainM >= 100) return true;
+  if (gradPct >= 2  && distKm >= 5.0  && gainM >= 100) return true; // long gentle
   return false;
 }
 
