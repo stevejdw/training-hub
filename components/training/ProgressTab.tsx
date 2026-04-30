@@ -86,29 +86,70 @@ export default function ProgressTab() {
     setSelected(p => p.includes(f) ? p.filter(x => x !== f) : [...p, f]);
   }
 
+  // Line chart: cumulative day-by-day (fine for all periods — line smooths density)
   const chartData = useMemo(() => {
     if (!data?.current?.points || !data?.prior?.points) return [];
     const len = Math.max(data.current.points.length, data.prior.points.length);
     const rows: {
       idx: number; label: string;
       current: number | null; prior: number | null;
-      currentDaily: number | null; priorDaily: number | null;
     }[] = [];
     for (let i = 0; i < len; i++) {
       const c = data.current.points[i];
       const p = data.prior.points[i];
       const label = c?.date ? c.date.slice(5) : (p?.date ?? `day ${i + 1}`);
-      rows.push({
-        idx: i + 1,
-        label,
-        current:      c ? c.cum   : null,
-        prior:        p ? p.cum   : null,
-        currentDaily: c ? c.value : null,
-        priorDaily:   p ? p.value : null,
-      });
+      rows.push({ idx: i + 1, label, current: c?.cum ?? null, prior: p?.cum ?? null });
     }
     return rows;
   }, [data]);
+
+  // Bar chart: aggregated per period for readability
+  //   WTD → 7 daily bars  (Mon … Sun)
+  //   MTD → 4–5 weekly bars (W1 … W4/W5)
+  //   YTD → 12 monthly bars (Jan … Dec)
+  const barData = useMemo(() => {
+    if (!data?.current?.points) return [];
+    const DAYS   = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+    const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+    if (period === 'wtd') {
+      return data.current.points.map((p, i) => ({
+        label:   DAYS[i] ?? p.date.slice(5),
+        current: Math.round(p.value * 10) / 10,
+        prior:   Math.round((data.prior?.points[i]?.value ?? 0) * 10) / 10,
+      }));
+    }
+
+    if (period === 'mtd') {
+      const weeks: { label: string; current: number; prior: number }[] = [];
+      for (const p of data.current.points) {
+        const wk = Math.ceil(parseInt(p.date.slice(8), 10) / 7);
+        const idx = wk - 1;
+        if (!weeks[idx]) weeks[idx] = { label: `W${wk}`, current: 0, prior: 0 };
+        weeks[idx].current = Math.round((weeks[idx].current + p.value) * 10) / 10;
+      }
+      for (const p of (data.prior?.points ?? [])) {
+        const wk = Math.ceil(parseInt(p.date.slice(8), 10) / 7);
+        const idx = wk - 1;
+        if (!weeks[idx]) weeks[idx] = { label: `W${wk}`, current: 0, prior: 0 };
+        weeks[idx].prior = Math.round((weeks[idx].prior + p.value) * 10) / 10;
+      }
+      return weeks.filter(Boolean);
+    }
+
+    // ytd
+    const months: { label: string; current: number; prior: number }[] =
+      MONTHS.map(l => ({ label: l, current: 0, prior: 0 }));
+    for (const p of data.current.points) {
+      const mo = parseInt(p.date.slice(5, 7), 10) - 1;
+      months[mo].current = Math.round((months[mo].current + p.value) * 10) / 10;
+    }
+    for (const p of (data.prior?.points ?? [])) {
+      const mo = parseInt(p.date.slice(5, 7), 10) - 1;
+      months[mo].prior = Math.round((months[mo].prior + p.value) * 10) / 10;
+    }
+    return months;
+  }, [data, period]);
 
   const unit       = METRICS.find(m => m.key === metric)!.unit;
   const curTotal   = data?.current?.total ?? 0;
@@ -238,17 +279,29 @@ export default function ProgressTab() {
                   <Line type="monotone" dataKey="prior"   stroke="#6b7280" strokeWidth={1.5} strokeDasharray="4 4" dot={false} name="Prior" />
                 </LineChart>
               ) : (
-                <BarChart data={chartData} margin={{ top: 10, right: 12, left: 0, bottom: 0 }} barCategoryGap="25%">
+                <BarChart
+                  data={barData}
+                  margin={{ top: 10, right: 12, left: 0, bottom: period === 'ytd' ? 18 : 0 }}
+                  barCategoryGap={period === 'ytd' ? '18%' : '25%'}
+                >
                   <CartesianGrid stroke="#1f2937" strokeDasharray="3 3" />
-                  <XAxis dataKey="label" tick={{ fill: '#9ca3af', fontSize: 10 }} axisLine={false} tickLine={false} />
+                  <XAxis
+                    dataKey="label"
+                    tick={{ fill: '#9ca3af', fontSize: period === 'ytd' ? 10 : 11 }}
+                    axisLine={false}
+                    tickLine={false}
+                    angle={period === 'ytd' ? -35 : 0}
+                    textAnchor={period === 'ytd' ? 'end' : 'middle'}
+                    interval={0}
+                  />
                   <YAxis tick={{ fill: '#9ca3af', fontSize: 10 }} axisLine={false} tickLine={false} />
                   <Tooltip
                     {...tooltipStyle}
                     formatter={(v) => `${fmt(Number(v) || 0, metric)} ${unit}`}
                   />
                   <Legend wrapperStyle={{ fontSize: 11, color: '#9ca3af' }} />
-                  <Bar dataKey="currentDaily" fill="#f97316" name="Current" radius={[3, 3, 0, 0]} />
-                  <Bar dataKey="priorDaily"   fill="#4b5563" name="Prior"   radius={[3, 3, 0, 0]} />
+                  <Bar dataKey="current" fill="#f97316" name="Current" radius={[3, 3, 0, 0]} />
+                  <Bar dataKey="prior"   fill="#4b5563" name="Prior"   radius={[3, 3, 0, 0]} />
                 </BarChart>
               )}
             </ResponsiveContainer>
