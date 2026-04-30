@@ -88,6 +88,118 @@ function calculateTss(movingTime: number, np: number, ftp: number): number | nul
   return Math.round((movingTime * np * IF) / (ftp * 3600) * 100 * 10) / 10;
 }
 
+/**
+ * Fetch a page of historical activities from Strava (before the oldest stored
+ * activity, or before a supplied epoch) and bulk-insert the summary data.
+ *
+ * Strategy: use the fast list endpoint (100 activities per call, one round-trip
+ * to Strava + one bulk upsert) so a single Vercel invocation can cover ~100
+ * activities.  Streams / laps / segment efforts are left for the existing
+ * segment-backfill mechanism (segments_synced_at = NULL flags them for pickup).
+ *
+ * @param beforeEpoch  Unix epoch to pass as `before=` param.  If omitted the
+ *                     oldest start_date already in the DB is used.
+ * @returns { synced, hasMore, nextBefore } where nextBefore is the epoch of
+ *          the oldest activity fetched this batch (use for the next call).
+ */
+export async function syncHistoricalBatch(beforeEpoch?: number): Promise<{
+  synced:      number;
+  hasMore:     boolean;
+  nextBefore:  number | null;
+  oldestDate:  string | null;
+}> {
+  const token = await getStravaToken();
+
+  // Resolve beforeEpoch from DB if not supplied
+  if (!beforeEpoch) {
+    const c = await pool.connect();
+    try {
+      const res = await c.query(
+        `SELECT EXTRACT(EPOCH FROM MIN(start_date))::bigint AS epoch FROM activities`
+      );
+      beforeEpoch = Number(res.rows[0]?.epoch ?? 0) || undefined;
+    } finally {
+      c.release();
+    }
+  }
+
+  const qs = new URLSearchParams({ per_page: '100', page: '1' });
+  if (beforeEpoch) qs.set('before', String(beforeEpoch));
+
+  const listRes = await fetch(`https://www.strava.com/api/v3/athlete/activities?${qs}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!listRes.ok) {
+    const body = await listRes.text().catch(() => '');
+    throw new Error(`Strava activities list failed: ${listRes.status} ${body.slice(0, 200)}`);
+  }
+
+  const list = await listRes.json() as Record<string, unknown>[];
+  if (list.length === 0) {
+    return { synced: 0, hasMore: false, nextBefore: null, oldestDate: null };
+  }
+
+  const profile = await getProfile();
+  const ftp     = effectiveFtp(profile);
+
+  // Bulk upsert: summary activities already carry most fields we need.
+  // We intentionally do NOT fetch individual detail/streams here — that keeps
+  // this endpoint well within the 60s Vercel timeout even for 100 activities.
+  const client = await pool.connect();
+  try {
+    for (const a of list) {
+      const np      = (a.weighted_average_watts as number | null) ?? null;
+      const movingT = a.moving_time as number;
+      const tss     = np ? calculateTss(movingT, np, ftp) : null;
+      const ifVal   = np ? Math.round((np / ftp) * 1000) / 1000 : null;
+      const polyline = (a.map as Record<string, string> | null)?.summary_polyline ?? null;
+      const gearId   = (a.gear_id as string | null) ?? null;
+
+      await client.query(`
+        INSERT INTO activities (
+          id, name, sport_type, start_date, elapsed_time,
+          moving_time, distance, total_elevation_gain,
+          average_watts, weighted_average_watts, max_watts,
+          kilojoules, average_heartrate, max_heartrate,
+          suffer_score, trainer, average_speed,
+          tss, intensity_factor, normalized_power, summary_polyline,
+          gear_id
+        ) VALUES (
+          $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22
+        )
+        ON CONFLICT (id) DO NOTHING
+      `, [
+        a.id, a.name,
+        (a.sport_type ?? a.type) as string,
+        a.start_date,
+        a.elapsed_time, movingT,
+        a.distance, a.total_elevation_gain,
+        a.average_watts, np, a.max_watts,
+        a.kilojoules, a.average_heartrate, a.max_heartrate,
+        a.suffer_score, a.trainer ?? false, a.average_speed,
+        tss, ifVal, np, polyline,
+        gearId,
+      ]);
+    }
+  } finally {
+    client.release();
+  }
+
+  // The list is newest-first; the last item is the oldest.
+  const oldest       = list[list.length - 1];
+  const oldestDate   = String(oldest.start_date ?? '');
+  const oldestEpoch  = oldest.start_date
+    ? Math.floor(new Date(String(oldest.start_date)).getTime() / 1000) - 1
+    : null;
+
+  return {
+    synced:      list.length,
+    hasMore:     list.length === 100,
+    nextBefore:  oldestEpoch,
+    oldestDate,
+  };
+}
+
 /** Fetch activities newer than the latest one in the DB and sync each one fully. */
 export async function syncRecentActivities(): Promise<{ synced: number; names: string[] }> {
   const token = await getStravaToken();

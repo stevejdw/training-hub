@@ -5,15 +5,105 @@ import { type ThemePreference, getThemePreference, setThemePreference } from '@/
 import { iconFor } from '@/components/nav-items';
 import { PageShell, useProfileEdit } from '@/lib/use-profile-edit';
 
+interface HistoryStatus {
+  total:       number;
+  oldestDate:  string | null;
+  newestDate:  string | null;
+  oldestEpoch: number;
+}
+
+function fmtDate(iso: string | null): string {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
 export default function SettingsContent() {
   const { profile, update, save, saving, saved } = useProfileEdit();
   const [theme, setTheme] = useState<ThemePreference>('dark');
 
+  // History import state
+  const [historyStatus, setHistoryStatus]   = useState<HistoryStatus | null>(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyBusy, setHistoryBusy]       = useState(false);
+  const [historyLog, setHistoryLog]         = useState<string[]>([]);
+  const [historyDone, setHistoryDone]       = useState(false);
+
   useEffect(() => { setTheme(getThemePreference()); }, []);
+
+  // Load history status on mount
+  useEffect(() => {
+    setHistoryLoading(true);
+    fetch('/api/strava/history')
+      .then(r => r.json())
+      .then((d: HistoryStatus) => setHistoryStatus(d))
+      .catch(() => {})
+      .finally(() => setHistoryLoading(false));
+  }, []);
 
   function changeTheme(t: ThemePreference) {
     setTheme(t);
     setThemePreference(t);
+  }
+
+  async function runHistoryImport() {
+    if (historyBusy) return;
+    setHistoryBusy(true);
+    setHistoryDone(false);
+    setHistoryLog([]);
+
+    let before: number | undefined = historyStatus?.oldestEpoch || undefined;
+    let totalSynced = 0;
+
+    try {
+      // Loop: fetch batch → if hasMore, use nextBefore for next call
+      // Cap at 10 batches (1 000 activities) per button press to avoid
+      // an infinite loop in the browser.
+      for (let pass = 0; pass < 10; pass++) {
+        const res  = await fetch('/api/strava/history', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify(before ? { before } : {}),
+        });
+        const data = await res.json() as {
+          synced:     number;
+          hasMore:    boolean;
+          nextBefore: number | null;
+          oldestDate: string | null;
+          error?:     string;
+        };
+
+        if (data.error) {
+          setHistoryLog(l => [...l, `Error: ${data.error}`]);
+          break;
+        }
+
+        totalSynced += data.synced;
+        setHistoryLog(l => [
+          ...l,
+          `Imported ${data.synced} activities${data.oldestDate ? ` (oldest: ${fmtDate(data.oldestDate)})` : ''}`,
+        ]);
+
+        if (!data.hasMore || !data.nextBefore) {
+          setHistoryLog(l => [...l, `Done — ${totalSynced} activities imported total.`]);
+          setHistoryDone(true);
+          break;
+        }
+        before = data.nextBefore;
+      }
+
+      if (!historyDone && totalSynced > 0) {
+        setHistoryLog(l => [...l, `Paused after 1 000 activities. Press Import again to continue.`]);
+      }
+
+      // Refresh status
+      const statusRes = await fetch('/api/strava/history');
+      const status    = await statusRes.json() as HistoryStatus;
+      setHistoryStatus(status);
+    } catch (err) {
+      setHistoryLog(l => [...l, `Failed: ${String(err)}`]);
+    } finally {
+      setHistoryBusy(false);
+    }
   }
 
   if (!profile) {
@@ -107,7 +197,7 @@ export default function SettingsContent() {
       </div>
 
       {/* Strava Connection */}
-      <div className="bg-gray-900 rounded-xl p-5 space-y-3 border border-gray-800">
+      <div className="bg-gray-900 rounded-xl p-5 space-y-4 border border-gray-800">
         <div>
           <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Strava Connection</h2>
           <p className="text-xs text-gray-500 mt-1">
@@ -123,6 +213,66 @@ export default function SettingsContent() {
           </svg>
           Reconnect Strava
         </a>
+
+        {/* Activity history import */}
+        <div className="border-t border-gray-800 pt-4 space-y-3">
+          <div>
+            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Import Activity History</h3>
+            <p className="text-xs text-gray-500 mt-1">
+              Pull in older activities from Strava that aren&apos;t yet in the database.
+              Imports up to 1 000 activities per press, oldest first.
+            </p>
+          </div>
+
+          {/* Status strip */}
+          {historyLoading ? (
+            <p className="text-xs text-gray-600">Loading…</p>
+          ) : historyStatus ? (
+            <div className="grid grid-cols-3 gap-2">
+              <div className="bg-gray-800 rounded-lg p-2.5 text-center">
+                <p className="text-[10px] text-gray-500 uppercase tracking-wider">Stored</p>
+                <p className="text-base font-bold text-white mt-0.5">{historyStatus.total.toLocaleString()}</p>
+              </div>
+              <div className="bg-gray-800 rounded-lg p-2.5 text-center">
+                <p className="text-[10px] text-gray-500 uppercase tracking-wider">Newest</p>
+                <p className="text-[11px] font-semibold text-white mt-0.5">{fmtDate(historyStatus.newestDate)}</p>
+              </div>
+              <div className="bg-gray-800 rounded-lg p-2.5 text-center">
+                <p className="text-[10px] text-gray-500 uppercase tracking-wider">Oldest</p>
+                <p className="text-[11px] font-semibold text-white mt-0.5">{fmtDate(historyStatus.oldestDate)}</p>
+              </div>
+            </div>
+          ) : null}
+
+          <button
+            onClick={runHistoryImport}
+            disabled={historyBusy}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-white text-sm font-medium transition-colors"
+          >
+            {historyBusy ? (
+              <>
+                <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                  <circle cx="12" cy="12" r="10" strokeOpacity={0.25} />
+                  <path d="M12 2a10 10 0 0 1 10 10" />
+                </svg>
+                Importing…
+              </>
+            ) : historyDone ? (
+              'Import complete ✓'
+            ) : (
+              'Import older activities'
+            )}
+          </button>
+
+          {/* Progress log */}
+          {historyLog.length > 0 && (
+            <div className="bg-gray-950 rounded-lg p-3 space-y-1 max-h-32 overflow-y-auto">
+              {historyLog.map((line, i) => (
+                <p key={i} className="text-[11px] text-gray-400 font-mono">{line}</p>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="flex justify-end">
