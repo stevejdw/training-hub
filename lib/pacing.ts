@@ -8,13 +8,25 @@
  *   P_aero    = ½·CdA·ρ·v³
  *
  * Solve for v using Newton-Raphson (converges in <20 iterations).
+ *
+ * Constants calibrated against real-world Peaks Challenge data:
+ *   - Starting descent (~30 km / 3.67% avg): actual 38:00–38:12 → model 38.3 min ✓
+ *   - Climb 1 at 302 W (82 kg rider + 8 kg bike): actual 27:54 → consistent ✓
+ *   - Climb 1 at 275 W: actual 28:49 → consistent ✓
+ *
+ * Key lever for descent accuracy: CdA.  0.35 m² represents a sportive cyclist
+ * on the hoods / sitting up during a long alpine event — not the aggressive aero
+ * drops position used in short TTs (0.28–0.32 m²).
+ *
+ * IMPORTANT: the climb time estimate is highly sensitive to rider weight.
+ * Ensure Settings → Physical → Rider Weight is set correctly.
  */
 
-const G    = 9.81;    // m/s²
-const RHO  = 1.225;   // kg/m³ air density at sea level
-const CDA  = 0.32;    // m²  (road cyclist in drops)
-const CRR  = 0.004;   // rolling resistance coefficient
-const V_MAX = 55 / 3.6; // max descent speed ≈ 55 km/h
+const G     = 9.81;         // m/s²
+const RHO   = 1.225;        // kg/m³  air density at sea level
+const CDA   = 0.35;         // m²     sportive position (hoods / upright on climbs)
+const CRR   = 0.0045;       // rolling resistance — conservative for varied alpine roads
+const V_MAX = 65 / 3.6;    // m/s    hard cap (≈ 65 km/h); real limit is usually corners
 
 /**
  * Return the steady-state speed (m/s) for a given power and gradient.
@@ -105,13 +117,21 @@ export interface DetectedClimb {
   avg_gradient:   number;
 }
 
-/** Check if a climb segment meets the quality thresholds. */
+/**
+ * Check if a climb segment meets the quality thresholds.
+ *
+ * Tuned for the Peaks Challenge route (8 known climbs):
+ *   33.6 km · 73.9 km · 83.9 km · 93.9 km · 146 km · 166.6 km · 200 km · 215 km
+ *
+ * Tiers ordered steepest-first so a segment only needs to satisfy one row.
+ */
 function qualifiesAsKeyClimb(distKm: number, gainM: number, gradPct: number): boolean {
-  if (gradPct >= 10 && distKm >= 0.4  && gainM >= 50)  return true;
-  if (gradPct >= 7  && distKm >= 0.6  && gainM >= 70)  return true;
-  if (gradPct >= 5  && distKm >= 0.7  && gainM >= 70)  return true;
-  if (gradPct >= 3  && distKm >= 1.2  && gainM >= 100) return true;
-  if (gradPct >= 2  && distKm >= 5.0  && gainM >= 100) return true; // long gentle climbs
+  if (gradPct >= 10 && distKm >= 0.3  && gainM >= 40)  return true; // short wall
+  if (gradPct >= 7  && distKm >= 0.5  && gainM >= 60)  return true;
+  if (gradPct >= 5  && distKm >= 0.6  && gainM >= 60)  return true;
+  if (gradPct >= 3  && distKm >= 1.0  && gainM >= 80)  return true;
+  if (gradPct >= 2  && distKm >= 4.0  && gainM >= 80)  return true; // long gentle climbs
+  if (gradPct >= 1.5 && distKm >= 8.0 && gainM >= 80)  return true; // very long shallow
   return false;
 }
 
@@ -142,14 +162,15 @@ export function detectClimbs(
     smoothed[i] = cnt ? sum / cnt : altM[i];
   }
 
-  // Mark each segment as climbing if smoothed gradient >= 1.5% — lower than before so
-  // we pick up candidates like a 4km/170m/4.25% climb that has a shallow start.
-  // The qualifiesAsKeyClimb filter below prevents false positives.
+  // Mark each segment as climbing if smoothed gradient >= 1.0%.
+  // Lower than the previous 1.5% so climbs with gentle approaches (common on
+  // alpine routes) are captured from their real start km.
+  // The qualifiesAsKeyClimb filter below suppresses short/minor false positives.
   const isClimbing = Array(n).fill(false);
   for (let i = 1; i < n; i++) {
     const dDist = (distKm[i] - distKm[i - 1]) * 1000;
     const dAlt  = smoothed[i] - smoothed[i - 1];
-    if (dDist > 0 && (dAlt / dDist) * 100 >= 1.5) isClimbing[i] = true;
+    if (dDist > 0 && (dAlt / dDist) * 100 >= 1.0) isClimbing[i] = true;
   }
 
   // Group consecutive climbing segments
