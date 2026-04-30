@@ -161,7 +161,7 @@ function CustomTooltip({ active, payload, label, metric, unit }: any) {
 }
 
 const CHART_CACHE_KEY = (period: Period, offset: number, filters: string) =>
-  `cache-chart-${period}-${offset}-${filters}`;
+  `cache-chart-v2-${period}-${offset}-${filters}`;
 const INITIAL_CHART_KEY = CHART_CACHE_KEY('week', 0, 'All');
 
 function TrainingTab() {
