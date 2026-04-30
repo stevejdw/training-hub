@@ -423,18 +423,9 @@ export default function EventDetailPage({ eventId }: Props) {
   // ══════════════════════════════════════════════════════════════════════════
   //  VIEW MODE
   // ══════════════════════════════════════════════════════════════════════════
-  const editBtn = (
-    <button
-      onClick={() => setEditing(true)}
-      className="px-3 py-1.5 text-sm text-gray-400 hover:text-orange-400 border border-gray-700 hover:border-orange-500/50 rounded-lg transition-colors"
-    >
-      Edit
-    </button>
-  );
-
   return (
     <div className="h-full flex flex-col">
-      <PageHeader icon={iconFor('events')} title={name || 'Event'} right={editBtn} />
+      <PageHeader icon={iconFor('events')} title={name || 'Event'} />
 
       <div className="flex-shrink-0 px-4 md:px-8 py-2 border-b border-gray-800/60 flex items-center justify-between">
         <Link href="/events" className="text-sm text-gray-500 hover:text-orange-400 transition-colors">← Events</Link>
@@ -446,8 +437,16 @@ export default function EventDetailPage({ eventId }: Props) {
 
           {/* ── Event summary ─────────────────────────────────── */}
           <section className="bg-gray-900 border border-gray-800 rounded-2xl p-4 space-y-2">
-            {/* Name + goal */}
-            <h2 className="text-xl font-bold text-white leading-tight">{name || 'Unnamed Event'}</h2>
+            {/* Name row + Edit button */}
+            <div className="flex items-start justify-between gap-3">
+              <h2 className="text-xl font-bold text-white leading-tight flex-1">{name || 'Unnamed Event'}</h2>
+              <button
+                onClick={() => setEditing(true)}
+                className="flex-shrink-0 text-xs text-gray-400 hover:text-orange-400 border border-gray-700 hover:border-orange-500/50 rounded-lg px-2.5 py-1.5 transition-colors mt-0.5"
+              >
+                Edit
+              </button>
+            </div>
             {goal && <p className="text-sm text-orange-300">{goal}</p>}
 
             {/* Date + location */}
@@ -485,18 +484,29 @@ export default function EventDetailPage({ eventId }: Props) {
           </section>
 
           {/* ── Course map ────────────────────────────────────── */}
-          {route?.stream_latlng && route.stream_latlng.length > 1 && (
+          {route && (
             <section className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
-              <CourseMap
-                latlng={route.stream_latlng}
-                climbs={climbs}
-                distKm={route.stream_distance_km}
-              />
-              <p className="px-3 pb-2 pt-1 text-[10px] text-gray-600">
-                <span className="inline-block w-2 h-2 rounded-full bg-green-500 mr-1" />Start
-                <span className="inline-block w-2 h-2 rounded-full bg-red-500 ml-3 mr-1" />Finish
-                <span className="inline-block w-2 h-2 rounded-full bg-red-500 ml-3 mr-1 opacity-60" />Climbs
-              </p>
+              {route.stream_latlng && route.stream_latlng.length > 1 ? (
+                <>
+                  <CourseMap
+                    latlng={route.stream_latlng}
+                    climbs={climbs}
+                    distKm={route.stream_distance_km}
+                  />
+                  <p className="px-3 pb-2 pt-1 text-[10px] text-gray-600 flex items-center gap-3">
+                    <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-green-500" />Start</span>
+                    <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-red-500" />Finish</span>
+                    <span className="flex items-center gap-1"><span className="inline-block w-2.5 h-1 rounded-full bg-red-500 opacity-70" />Climbs</span>
+                  </p>
+                </>
+              ) : (
+                <div className="flex items-center justify-between px-4 py-3">
+                  <p className="text-xs text-gray-600">Map unavailable — remove &amp; re-load course in Edit to enable</p>
+                  <button onClick={() => setEditing(true)} className="text-xs text-orange-400 hover:text-orange-300 transition-colors flex-shrink-0 ml-3">
+                    Edit →
+                  </button>
+                </div>
+              )}
             </section>
           )}
 
