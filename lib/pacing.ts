@@ -111,6 +111,7 @@ function qualifiesAsKeyClimb(distKm: number, gainM: number, gradPct: number): bo
   if (gradPct >= 7  && distKm >= 0.6  && gainM >= 70)  return true;
   if (gradPct >= 5  && distKm >= 0.7  && gainM >= 70)  return true;
   if (gradPct >= 3  && distKm >= 1.2  && gainM >= 100) return true;
+  if (gradPct >= 2  && distKm >= 5.0  && gainM >= 100) return true; // long gentle climbs
   return false;
 }
 
@@ -129,9 +130,9 @@ export function detectClimbs(
   const n = Math.min(distKm.length, altM.length);
   if (n < 2) return [];
 
-  // Smooth altitude with a 1km rolling window — smaller than before so valley→climb
-  // transitions aren't blurred, which was causing short-but-real climbs to be missed.
-  const SMOOTH_KM = 1.0;
+  // Smooth altitude with a 0.5km rolling window — keeps valley→climb transitions
+  // sharp so consecutive climbs separated by a short descent are detected separately.
+  const SMOOTH_KM = 0.5;
   const smoothed  = altM.slice();
   for (let i = 0; i < n; i++) {
     let sum = 0, cnt = 0;
@@ -177,11 +178,13 @@ export function detectClimbs(
     }
   }
 
-  // Merge climbs that are very close together (< 2 km gap)
+  // Merge climbs that are very close together (< 0.3 km gap — brief dip only).
+  // Keeping the gap small preserves consecutive distinct climbs (e.g. 10 km + 10 km
+  // separated by a short descent) that a larger window would incorrectly merge.
   const merged: DetectedClimb[] = [];
   for (const c of rawClimbs) {
     const prev = merged[merged.length - 1];
-    if (prev && c.start_km - prev.end_km < 2) {
+    if (prev && c.start_km - prev.end_km < 0.3) {
       const gain = prev.elevation_gain + c.elevation_gain;
       const dist = c.end_km - prev.start_km;
       merged[merged.length - 1] = {

@@ -33,10 +33,11 @@ function fmtDate(dateStr: string): string {
 }
 
 // ─── Course map SVG ───────────────────────────────────────────────────────────
-function CourseMap({ latlng, climbs, distKm }: {
-  latlng: [number, number][];
-  climbs: EventClimb[];
-  distKm: number[];
+function CourseMap({ latlng, climbs, distKm, selectedClimb }: {
+  latlng:        [number, number][];
+  climbs:        EventClimb[];
+  distKm:        number[];
+  selectedClimb: number | null;
 }) {
   if (!latlng.length) return null;
 
@@ -51,7 +52,7 @@ function CourseMap({ latlng, climbs, distKm }: {
 
   const W = 400, H = Math.round(W * latSpan / lngSpan);
   const clampedH = Math.min(Math.max(H, 100), 260);
-  const pad = 14;
+  const pad = 16;
 
   function toX(lng: number) {
     return pad + ((lng - minLng) * cosLat / lngSpan) * (W - 2 * pad);
@@ -62,8 +63,7 @@ function CourseMap({ latlng, climbs, distKm }: {
 
   const routePoints = latlng.map(p => `${toX(p[1]).toFixed(1)},${toY(p[0]).toFixed(1)}`).join(' ');
 
-  // Build climb polylines using the distance array as index guide
-  const totalDist = distKm[distKm.length - 1] || 1;
+  // Build climb polylines from the distance stream
   const climbSegments = climbs.map(c => {
     const pts: string[] = [];
     for (let i = 0; i < distKm.length && i < latlng.length; i++) {
@@ -76,46 +76,80 @@ function CourseMap({ latlng, climbs, distKm }: {
 
   const start = latlng[0];
   const end   = latlng[latlng.length - 1];
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  void totalDist;
+  const anySel = selectedClimb !== null;
 
   return (
-    <svg
-      viewBox={`0 0 ${W} ${clampedH}`}
-      className="w-full rounded-xl"
-      style={{ background: '#0f172a' }}
-    >
-      {/* Route */}
+    <svg viewBox={`0 0 ${W} ${clampedH}`} className="w-full rounded-xl">
+      {/* ── Light map background ── */}
+      <rect width={W} height={clampedH} fill="#eef2f7" />
+      {/* Subtle grid lines to give a map feel */}
+      {Array.from({ length: 5 }, (_, i) => (
+        <line key={`h${i}`} x1={0} y1={(clampedH / 4) * i} x2={W} y2={(clampedH / 4) * i}
+          stroke="#d1dae6" strokeWidth="0.5" />
+      ))}
+      {Array.from({ length: 7 }, (_, i) => (
+        <line key={`v${i}`} x1={(W / 6) * i} y1={0} x2={(W / 6) * i} y2={clampedH}
+          stroke="#d1dae6" strokeWidth="0.5" />
+      ))}
+
+      {/* ── Route ── */}
       <polyline
         points={routePoints}
         fill="none"
-        stroke="#f97316"
+        stroke="#1d4ed8"
         strokeWidth="2.5"
         strokeLinecap="round"
         strokeLinejoin="round"
-        strokeOpacity="0.7"
+        strokeOpacity="0.75"
       />
-      {/* Climbs overlay */}
-      {climbSegments.map((pts, i) =>
-        pts.length > 1 ? (
+
+      {/* ── Climb overlays — non-selected first, selected on top ── */}
+      {climbSegments.map((pts, i) => {
+        if (pts.length < 2) return null;
+        const isSel = selectedClimb === i;
+        if (isSel) return null; // render selected last (on top)
+        return (
           <polyline
             key={i}
             points={pts.join(' ')}
             fill="none"
             stroke="#ef4444"
-            strokeWidth="4"
+            strokeWidth={anySel ? 2.5 : 3.5}
             strokeLinecap="round"
             strokeLinejoin="round"
-            strokeOpacity="0.9"
+            strokeOpacity={anySel ? 0.35 : 0.85}
           />
-        ) : null
+        );
+      })}
+      {/* Selected climb — drawn last so it sits on top */}
+      {selectedClimb !== null && climbSegments[selectedClimb]?.length > 1 && (
+        <>
+          {/* Glow / halo */}
+          <polyline
+            points={climbSegments[selectedClimb].join(' ')}
+            fill="none"
+            stroke="#f97316"
+            strokeWidth="9"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeOpacity="0.25"
+          />
+          {/* Main highlight */}
+          <polyline
+            points={climbSegments[selectedClimb].join(' ')}
+            fill="none"
+            stroke="#f97316"
+            strokeWidth="4.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeOpacity="1"
+          />
+        </>
       )}
-      {/* Start marker */}
-      <circle cx={toX(start[1])} cy={toY(start[0])} r="5" fill="#22c55e" />
-      <circle cx={toX(start[1])} cy={toY(start[0])} r="5" fill="none" stroke="#fff" strokeWidth="1" strokeOpacity="0.5" />
-      {/* End marker */}
-      <circle cx={toX(end[1])} cy={toY(end[0])} r="5" fill="#ef4444" />
-      <circle cx={toX(end[1])} cy={toY(end[0])} r="5" fill="none" stroke="#fff" strokeWidth="1" strokeOpacity="0.5" />
+
+      {/* ── Start / finish markers ── */}
+      <circle cx={toX(start[1])} cy={toY(start[0])} r="6" fill="#22c55e" stroke="#fff" strokeWidth="1.5" />
+      <circle cx={toX(end[1])}   cy={toY(end[0])}   r="6" fill="#dc2626" stroke="#fff" strokeWidth="1.5" />
     </svg>
   );
 }
@@ -492,11 +526,15 @@ export default function EventDetailPage({ eventId }: Props) {
                     latlng={route.stream_latlng}
                     climbs={climbs}
                     distKm={route.stream_distance_km}
+                    selectedClimb={selectedClimb}
                   />
-                  <p className="px-3 pb-2 pt-1 text-[10px] text-gray-600 flex items-center gap-3">
+                  <p className="px-3 pb-2 pt-1 text-[10px] text-gray-500 flex items-center gap-3">
                     <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-green-500" />Start</span>
                     <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-red-500" />Finish</span>
-                    <span className="flex items-center gap-1"><span className="inline-block w-2.5 h-1 rounded-full bg-red-500 opacity-70" />Climbs</span>
+                    <span className="flex items-center gap-1"><span className="inline-block w-3 h-1.5 rounded-sm bg-red-500 opacity-80" />Climbs</span>
+                    {selectedClimb !== null && (
+                      <span className="flex items-center gap-1"><span className="inline-block w-3 h-1.5 rounded-sm bg-orange-500" />{climbs[selectedClimb]?.name}</span>
+                    )}
                   </p>
                 </>
               ) : (
