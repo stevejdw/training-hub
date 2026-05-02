@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { sportLabel, sportColor } from '@/lib/sport-types';
+import ReadinessResponseWidget from './ReadinessResponseWidget';
 
 const ActivityMap = dynamic(() => import('./ActivityMap'), { ssr: false });
 
@@ -358,6 +359,9 @@ export default function FeedPage() {
             </div>
           </Link>
         )}
+
+        {/* Readiness & Response */}
+        <ReadinessResponseWidget />
 
         {/* Coaching Insight */}
         <CoachingTip />

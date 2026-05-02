@@ -122,7 +122,7 @@ export async function POST(req: Request) {
           synced_at       = NOW()
       `, [
         date,
-        toFloatOrNull(row.hrvRMSSD ?? row.hrv_rmssd),
+        toFloatOrNull(row.hrvRMSSD ?? row.hrv_rmssd ?? row.hrv),
         toFloatOrNull(row.hrvSDNN  ?? row.hrv_sdnn),
         toIntOrNull(row.restingHR  ?? row.resting_hr),
         toIntOrNull(row.sleepScore ?? row.sleep_score),

@@ -22,11 +22,14 @@ export async function GET(req: NextRequest) {
 
   let interval: string | null;
   switch (range) {
-    case '90d':  interval = '90 days';  break;
-    case '180d': interval = '180 days'; break;
-    case '365d': interval = '365 days'; break;
-    case 'all':  interval = null;       break;
-    default:     interval = '90 days';
+    case '1m':   interval = '1 month';   break;
+    case '3m':   interval = '3 months';  break;
+    case '6m':   interval = '6 months';  break;
+    case '90d':  interval = '90 days';   break;
+    case '180d': interval = '180 days';  break;
+    case '365d': interval = '365 days';  break;
+    case 'all':  interval = null;        break;
+    default:     interval = '3 months';
   }
 
   const client = await pool.connect();
@@ -39,6 +42,7 @@ export async function GET(req: NextRequest) {
         a.average_watts,
         a.normalized_power,
         a.average_heartrate,
+        a.moving_time,
         s.watts,
         s.hr
       FROM activities a
@@ -92,6 +96,7 @@ export async function GET(req: NextRequest) {
         np:           Math.round(Number(r.normalized_power)),
         avg_watts:    Math.round(Number(r.average_watts)),
         avg_hr:       Math.round(Number(r.average_heartrate)),
+        moving_time:  Number(r.moving_time) || 0,
         vi:           Math.round((Number(r.normalized_power) / Number(r.average_watts)) * 1000) / 1000,
         ef_h1:        Math.round(ef1 * 100) / 100,
         ef_h2:        Math.round(ef2 * 100) / 100,
