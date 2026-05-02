@@ -24,14 +24,14 @@ const DEFAULT_DESCENT_WATTS = 120;
 // Endpoints for climbs 1/6/7 are best estimates — user can fine-tune with the
 // delete/add UI, but these match the actual Peaks Challenge Falls Creek route.
 const PEAKS_CHALLENGE_BOUNDS = [
-  { name: 'Climb 1 – Mt Hotham',    start_km:  33.6, end_km:  63.0 },
-  { name: 'Climb 2',                 start_km:  73.9, end_km:  83.9 },
-  { name: 'Climb 3',                 start_km:  83.9, end_km:  93.9 },
-  { name: 'Climb 4',                 start_km:  93.9, end_km: 103.9 },
-  { name: 'Climb 5',                 start_km: 146.7, end_km: 149.2 },
-  { name: 'Climb 6 – Tawonga Gap',  start_km: 166.6, end_km: 174.0 },
-  { name: 'Climb 7',                 start_km: 200.0, end_km: 210.0 },
-  { name: 'Climb 8 – Falls Creek',  start_km: 215.0, end_km: 224.0 },
+  { name: 'Climb 1 – Tawonga Gap',  start_km:  33.6, end_km:  40.7 },
+  { name: 'Mt Hotham 1',            start_km:  73.9, end_km:  83.9 },
+  { name: 'Mt Hotham 2',            start_km:  83.9, end_km:  93.9 },
+  { name: 'Mt Hotham 3',            start_km:  93.9, end_km: 103.9 },
+  { name: 'Climb 5',                start_km: 146.7, end_km: 149.2 },
+  { name: 'Climb 6',                start_km: 166.6, end_km: 174.0 },
+  { name: 'Climb 7',                start_km: 200.0, end_km: 210.0 },
+  { name: 'Climb 8 – Falls Creek', start_km: 215.0, end_km: 224.0 },
 ] as const;
 
 /** Build an EventClimb from known km bounds, deriving elevation from the GPS stream. */
