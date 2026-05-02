@@ -15,13 +15,23 @@ export default function ActivityMap({ polyline, className, thumbnail }: Props) {
   useEffect(() => {
     if (!mapRef.current || mapInstanceRef.current) return;
 
+    let cancelled = false;
+
     async function init() {
       const L = (await import('leaflet')).default;
       await import('leaflet/dist/leaflet.css');
       const polylineDecode = (await import('polyline')).default;
 
+      if (cancelled || !mapRef.current) return;
+
       const coords = polylineDecode.decode(polyline) as [number, number][];
       if (coords.length === 0) return;
+
+      // Clear any stale Leaflet ID left on the DOM element from a prior
+      // render cycle (React StrictMode double-invokes effects) to prevent
+      // "Map container is already initialized" errors.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      delete (mapRef.current as any)._leaflet_id;
 
       const map = L.map(mapRef.current!, {
         zoomControl: !thumbnail,
@@ -60,6 +70,7 @@ export default function ActivityMap({ polyline, className, thumbnail }: Props) {
     init().catch(console.error);
 
     return () => {
+      cancelled = true;
       if (mapInstanceRef.current) {
         (mapInstanceRef.current as { remove: () => void }).remove();
         mapInstanceRef.current = null;

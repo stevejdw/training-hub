@@ -176,15 +176,18 @@ export default function FeedPage() {
     if (next && next.key !== statPeriod) setStatPeriod(next.key);
   }
 
-  const [data, setData] = useState<FeedData | null>(() => {
-    // Hydrate from cache instantly — no loading flicker
-    if (typeof window === 'undefined') return null;
+  const [data, setData] = useState<FeedData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
     try {
       const cached = localStorage.getItem(FEED_CACHE_KEY);
-      return cached ? JSON.parse(cached) : null;
-    } catch { return null; }
-  });
-  const [loading, setLoading] = useState(!data);
+      if (cached) {
+        setData(JSON.parse(cached) as FeedData);
+        setLoading(false);
+      }
+    } catch { /* ignore */ }
+  }, []);
 
   useEffect(() => {
     fetch('/api/analytics/feed')
