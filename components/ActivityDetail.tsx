@@ -5,6 +5,34 @@ import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { sportLabel, sportColor } from '@/lib/sport-types';
 import ZoneDistribution from './ZoneDistribution';
+import PowerCurveChart from './PowerCurveChart';
+
+const COMPARE_PERIODS = [
+  { key: '30d', label: '30d' },
+  { key: '60d', label: '60d' },
+  { key: '90d', label: '90d' },
+  { key: '6m',  label: '6m'  },
+  { key: '1y',  label: '1y'  },
+  { key: 'all', label: 'All' },
+] as const;
+
+type ComparePeriod = typeof COMPARE_PERIODS[number]['key'];
+
+const COMPARE_LABELS: Record<ComparePeriod, string> = {
+  '30d': 'Last 30 days',
+  '60d': 'Last 60 days',
+  '90d': 'Last 90 days',
+  '6m':  'Last 6 months',
+  '1y':  'Last year',
+  'all': 'All time',
+};
+
+interface CurveDataPoint { label: string; power: number; }
+interface ActivityCurveResponse {
+  activity: CurveDataPoint[];
+  comparison: CurveDataPoint[] | null;
+  ftp: number;
+}
 
 const INTERVALS: { label: string; seconds: number }[] = [
   { label: '1 sec',  seconds: 1 },   { label: '3 sec',  seconds: 3 },
@@ -112,6 +140,9 @@ export default function ActivityDetail({ id }: { id: string }) {
   const [segments,   setSegments]   = useState<SegmentEffort[]>([]);
   const [segLoading, setSegLoading] = useState(false);
   const [segFetched, setSegFetched] = useState(false);
+  const [curvePeriod, setCurvePeriod] = useState<ComparePeriod | 'none'>('none');
+  const [curveData,   setCurveData]   = useState<ActivityCurveResponse | null>(null);
+  const [curveLoading, setCurveLoading] = useState(false);
   type LapSortKey = 'index' | 'distance' | 'moving_time' | 'average_watts' | 'normalized_power' | 'average_heartrate' | 'max_heartrate';
   const [lapSort, setLapSort] = useState<{ key: LapSortKey; dir: 'asc' | 'desc' }>({ key: 'index', dir: 'asc' });
   const [editingName, setEditingName] = useState(false);
@@ -159,6 +190,15 @@ export default function ActivityDetail({ id }: { id: string }) {
       .then(d => { setBpResults(d.results ?? []); setBpLoading(false); })
       .catch(() => { setBpResults([]); setBpLoading(false); });
   }, [id, activity, bpSeconds]);
+
+  useEffect(() => {
+    if (tab !== 'power' || !activity) return;
+    setCurveLoading(true);
+    fetch(`/api/activities/${id}/power-curve?compare=${curvePeriod}`)
+      .then(r => r.json())
+      .then(d => { setCurveData(d); setCurveLoading(false); })
+      .catch(() => setCurveLoading(false));
+  }, [tab, id, activity?.id, curvePeriod]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Lazy-load segments only when Segments tab is opened
   useEffect(() => {
@@ -458,6 +498,71 @@ export default function ActivityDetail({ id }: { id: string }) {
         {tab === 'power' && (
           activity.average_watts ? (
             <div className="space-y-4">
+
+              {/* Power Curve */}
+              <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Power Curve</p>
+                  {curvePeriod !== 'none' && (
+                    <button
+                      onClick={() => setCurvePeriod('none')}
+                      className="text-xs text-gray-600 hover:text-gray-400 transition-colors"
+                    >
+                      Clear compare
+                    </button>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs text-gray-600">Compare vs:</span>
+                  {COMPARE_PERIODS.map(p => (
+                    <button
+                      key={p.key}
+                      onClick={() => setCurvePeriod(prev => prev === p.key ? 'none' : p.key)}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors border ${
+                        curvePeriod === p.key
+                          ? 'bg-blue-500/20 text-blue-400 border-blue-500/50'
+                          : 'bg-gray-800 text-gray-500 hover:text-gray-300 border-transparent'
+                      }`}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+                {curveLoading ? (
+                  <div className="h-52 bg-gray-800/60 rounded-xl animate-pulse" />
+                ) : curveData && curveData.activity.length > 0 ? (
+                  <>
+                    <PowerCurveChart
+                      data={curveData.activity}
+                      compareData={curveData.comparison}
+                      compareLabel={curvePeriod !== 'none' ? COMPARE_LABELS[curvePeriod as ComparePeriod] : undefined}
+                      ftp={curveData.ftp}
+                    />
+                    {curveData.comparison && curvePeriod !== 'none' && (
+                      <p className="text-[10px] text-gray-600">
+                        <span className="text-orange-400">—</span> This ride &nbsp;
+                        <span className="text-gray-500">- -</span> {COMPARE_LABELS[curvePeriod as ComparePeriod]}
+                      </p>
+                    )}
+                  </>
+                ) : curveData ? (
+                  <div className="h-40 flex items-center justify-center text-gray-600 text-sm">
+                    No power stream data for this activity
+                  </div>
+                ) : null}
+              </div>
+
+              {/* Best Efforts */}
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Best Efforts</p>
+                <Link
+                  href={`/performance?tab=power&s=${bpSeconds}`}
+                  className="text-xs text-orange-400 hover:text-orange-300 transition-colors"
+                >
+                  All activities →
+                </Link>
+              </div>
+
               <div className="flex items-center gap-3">
                 <select
                   value={bpSeconds}

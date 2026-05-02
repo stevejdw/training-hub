@@ -27,7 +27,7 @@ interface Props {
 // Merge current + compare data by label so both lines share the same x-axis
 function mergeData(current: DataPoint[], compare?: DataPoint[] | null) {
   const labels = Array.from(new Set([...current.map((d) => d.label), ...(compare?.map((d) => d.label) ?? [])]));
-  const order = ['1s', '5m', '20m', '45m', '75m', '2h', '3h+'];
+  const order = ['1s','5s','15s','30s','1m','2m','5m','10m','20m','30m','45m','60m','75m','90m','2h','3h+'];
   labels.sort((a, b) => order.indexOf(a) - order.indexOf(b));
 
   return labels.map((label) => ({

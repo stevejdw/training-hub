@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { sportLabel, sportColor } from '@/lib/sport-types';
 
@@ -57,7 +58,13 @@ const INITIAL_BP_SECONDS = 600;
 const INITIAL_BP_DAYS = 30;
 
 export default function DashboardBestPower() {
+  const sp = useSearchParams();
   const [seconds, setSeconds] = useState(INITIAL_BP_SECONDS);
+
+  useEffect(() => {
+    const s = parseInt(sp.get('s') ?? '0', 10);
+    if (INTERVALS.some(iv => iv.seconds === s)) setSeconds(s);
+  }, [sp]);
   const [days,    setDays]    = useState(INITIAL_BP_DAYS);
   const [results, setResults] = useState<Result[]>(() => {
     if (typeof window === 'undefined') return [];
