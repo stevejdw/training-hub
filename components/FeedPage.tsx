@@ -295,9 +295,13 @@ export default function FeedPage() {
         >
           {/* Period label + dot indicators */}
           <div className="flex items-center justify-between mb-2">
-            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
-              {STAT_PERIODS.find(p => p.key === statPeriod)?.label}
-            </p>
+            <Link
+              href="/training"
+              className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider hover:text-orange-400 transition-colors"
+              onClick={e => e.stopPropagation()}
+            >
+              {STAT_PERIODS.find(p => p.key === statPeriod)?.label} →
+            </Link>
             <div className="flex items-center gap-1.5">
               {STAT_PERIODS.map(p => (
                 <button

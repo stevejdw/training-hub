@@ -282,15 +282,15 @@ export default function FitnessTab() {
         )}
       </div>
 
-      {/* Weekly TSS chart */}
-      <TssWeekChart />
-
       {/* Legend explainer */}
       <div className="grid grid-cols-3 gap-2 text-xs text-gray-500">
         <div><span className="text-blue-400 font-medium">CTL</span> — Chronic Training Load (42d avg). Your fitness base.</div>
         <div><span className="text-purple-400 font-medium">ATL</span> — Acute Training Load (7d avg). Recent fatigue.</div>
         <div><span className="text-green-400 font-medium">TSB</span> — Form = CTL − ATL. Positive = fresh, negative = tired.</div>
       </div>
+
+      {/* Weekly TSS chart */}
+      <TssWeekChart />
 
     </div>
   );
