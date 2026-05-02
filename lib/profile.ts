@@ -22,11 +22,13 @@ export interface CachedRoute {
 }
 
 export interface PacingStrategy {
-  flat_watts:       number;
-  descent_watts:    number;
-  bike_weight_kg:   number;
-  climbs:           EventClimb[];
-  est_time_min:     number;
+  flat_watts:          number;
+  flat_speed_kmh?:     number;   // optional speed cap for flat sections (km/h)
+  descent_watts:       number;
+  descent_speed_kmh?:  number;   // braking speed cap for descents (km/h)
+  bike_weight_kg:      number;
+  climbs:              EventClimb[];
+  est_time_min:        number;
 }
 
 export interface EventGoal {

@@ -215,6 +215,14 @@ export default function EventDetailPage({ eventId }: Props) {
   const [addStart,     setAddStart]     = useState('');
   const [addEnd,       setAddEnd]       = useState('');
 
+  // ── Inline climb editor ──
+  const [editingClimbIdx, setEditingClimbIdx] = useState<number | null>(null);
+  const [editClimbForm, setEditClimbForm] = useState({ name: '', start_km: '', end_km: '', target_watts: '' });
+
+  // ── Speed targets ──
+  const [descentSpeedKmh, setDescentSpeedKmh] = useState<number | undefined>(undefined);
+  const [flatSpeedKmh,    setFlatSpeedKmh]    = useState<number | undefined>(undefined);
+
   const riderKg = profile?.weight_kg      ?? 75;
   const bikeKg  = profile?.bike_weight_kg ?? 8;
 
@@ -235,6 +243,8 @@ export default function EventDetailPage({ eventId }: Props) {
       setFlatWatts(event.pacing_strategy.flat_watts ?? DEFAULT_FLAT_WATTS);
       setDescentWatts(event.pacing_strategy.descent_watts ?? DEFAULT_DESCENT_WATTS);
       setClimbs(event.pacing_strategy.climbs ?? []);
+      setDescentSpeedKmh(event.pacing_strategy.descent_speed_kmh ?? undefined);
+      setFlatSpeedKmh(event.pacing_strategy.flat_speed_kmh ?? undefined);
       setAutoDetected(true);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -271,8 +281,9 @@ export default function EventDetailPage({ eventId }: Props) {
       route.stream_distance_km, route.stream_altitude_m,
       route.distance_m / 1000, climbs,
       flatWatts, descentWatts, riderKg, bikeKg,
+      descentSpeedKmh, flatSpeedKmh,
     );
-  }, [route, climbs, flatWatts, descentWatts, riderKg, bikeKg]);
+  }, [route, climbs, flatWatts, descentWatts, riderKg, bikeKg, descentSpeedKmh, flatSpeedKmh]);
 
   const estMin = useMemo(() => {
     if (!route) return null;
@@ -280,9 +291,10 @@ export default function EventDetailPage({ eventId }: Props) {
       stream_distance_km: route.stream_distance_km,
       stream_altitude_m:  route.stream_altitude_m,
       flat_watts: flatWatts, descent_watts: descentWatts,
+      flat_speed_kmh: flatSpeedKmh, descent_speed_kmh: descentSpeedKmh,
       climbs, rider_weight_kg: riderKg, bike_weight_kg: bikeKg,
     });
-  }, [route, flatWatts, descentWatts, climbs, riderKg, bikeKg]);
+  }, [route, flatWatts, descentWatts, climbs, riderKg, bikeKg, descentSpeedKmh, flatSpeedKmh]);
 
   const np       = useMemo(() => segments.length ? calcNP(segments)       : null, [segments]);
   const avgWatts = useMemo(() => segments.length ? calcAvgWatts(segments) : null, [segments]);
@@ -311,7 +323,7 @@ export default function EventDetailPage({ eventId }: Props) {
 
   const buildUpdatedEvent = useCallback((): EventGoal => {
     const strategy: PacingStrategy | null = route
-      ? { flat_watts: flatWatts, descent_watts: descentWatts, bike_weight_kg: bikeKg, climbs, est_time_min: estMin ?? 0 }
+      ? { flat_watts: flatWatts, flat_speed_kmh: flatSpeedKmh, descent_watts: descentWatts, descent_speed_kmh: descentSpeedKmh, bike_weight_kg: bikeKg, climbs, est_time_min: estMin ?? 0 }
       : event?.pacing_strategy ?? null;
     return {
       id: eventId, name, date, location, goal,
@@ -353,15 +365,6 @@ export default function EventDetailPage({ eventId }: Props) {
     const merged = { ...profile, events };
     setProfile(merged); save(merged);
     router.push('/events');
-  }
-
-  function viewClimb(idx: number) {
-    if (!profile) return;
-    const updated = buildUpdatedEvent();
-    const events  = profile.events.map(e => (e.id ?? '') === eventId ? updated : e);
-    const merged  = { ...profile, events };
-    setProfile(merged); save(merged);
-    router.push(`/events/${eventId}/climb/${idx}`);
   }
 
   function updateClimbWatts(i: number, watts: number) {
@@ -430,6 +433,54 @@ export default function EventDetailPage({ eventId }: Props) {
       return next;
     });
     setAddStart(''); setAddEnd(''); setShowAddClimb(false);
+  }
+
+  function computeClimbStats(startKm: number, endKm: number) {
+    if (!route) return { distance_km: 0, elevation_gain: 0, avg_gradient: 0 };
+    const d = route.stream_distance_km;
+    const a = route.stream_altitude_m;
+    let firstAlt: number | null = null, lastAlt = 0;
+    for (let i = 0; i < d.length; i++) {
+      if (d[i] < startKm || d[i] > endKm) continue;
+      if (firstAlt === null) firstAlt = a[i];
+      lastAlt = a[i];
+    }
+    const dist    = Math.round((endKm - startKm) * 10) / 10;
+    const net     = firstAlt !== null ? lastAlt - firstAlt : 0;
+    const avgGrad = dist > 0 ? Math.round((net / (dist * 1000)) * 1000) / 10 : 0;
+    return { distance_km: dist, elevation_gain: Math.round(net), avg_gradient: avgGrad };
+  }
+
+  function openClimbEdit(i: number) {
+    const c = climbs[i];
+    setEditingClimbIdx(i);
+    setEditClimbForm({
+      name:         c.name,
+      start_km:     String(c.start_km),
+      end_km:       String(c.end_km),
+      target_watts: String(c.target_watts),
+    });
+    setSelectedClimb(null);
+  }
+
+  function saveClimbEdit() {
+    if (editingClimbIdx === null) return;
+    const s = parseFloat(editClimbForm.start_km);
+    const e = parseFloat(editClimbForm.end_km);
+    if (isNaN(s) || isNaN(e) || e <= s) return;
+    const stats = computeClimbStats(s, e);
+    setClimbs(prev => {
+      const next = [...prev];
+      next[editingClimbIdx] = {
+        ...stats,
+        name:         editClimbForm.name || `Climb ${editingClimbIdx + 1}`,
+        start_km:     Math.round(s * 10) / 10,
+        end_km:       Math.round(e * 10) / 10,
+        target_watts: Number(editClimbForm.target_watts) || flatWatts,
+      };
+      return next;
+    });
+    setEditingClimbIdx(null);
   }
 
   // ── Days/color ──
@@ -729,52 +780,114 @@ export default function EventDetailPage({ eventId }: Props) {
                     <div className="divide-y divide-gray-800/60">
                       {climbs.map((c, i) => {
                         const isSelected = selectedClimb === i;
+                        const isEditing  = editingClimbIdx === i;
                         return (
-                          <div key={i} className={`p-3 transition-colors ${isSelected ? 'bg-orange-500/8' : ''}`}>
-                            <div className="flex items-center justify-between gap-2">
-                              <button
-                                onClick={() => setSelectedClimb(isSelected ? null : i)}
-                                className="flex items-center gap-2 min-w-0 flex-1"
-                              >
-                                <span className={`flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${isSelected ? 'bg-orange-500 text-white' : 'bg-gray-800 text-gray-400'}`}>
-                                  {i + 1}
-                                </span>
-                                <span className="text-sm font-semibold text-white truncate">{c.name}</span>
-                              </button>
-                              <div className="flex items-center gap-3 flex-shrink-0">
-                                <button
-                                  onClick={() => viewClimb(i)}
-                                  className="text-xs text-orange-400 hover:text-orange-300 transition-colors"
-                                >
-                                  View →
-                                </button>
-                                <button
-                                  onClick={() => deleteClimb(i)}
-                                  className="text-gray-600 hover:text-red-400 transition-colors text-sm leading-none"
-                                  title="Remove climb"
-                                >
-                                  ×
-                                </button>
+                          <div key={i} className={`transition-colors ${isEditing ? 'bg-gray-800/40' : isSelected ? 'bg-orange-500/8' : ''}`}>
+                            {isEditing ? (
+                              <div className="p-3 space-y-3">
+                                <div className="grid grid-cols-2 gap-2">
+                                  <div className="col-span-2">
+                                    <label className="text-[9px] text-gray-600 uppercase tracking-wider block mb-1">Name</label>
+                                    <input
+                                      type="text"
+                                      value={editClimbForm.name}
+                                      onChange={e => setEditClimbForm(f => ({ ...f, name: e.target.value }))}
+                                      className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-orange-500"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="text-[9px] text-gray-600 uppercase tracking-wider block mb-1">Start km</label>
+                                    <input
+                                      type="number"
+                                      value={editClimbForm.start_km}
+                                      onChange={e => setEditClimbForm(f => ({ ...f, start_km: e.target.value }))}
+                                      className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-orange-500"
+                                      step="0.1" min="0"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="text-[9px] text-gray-600 uppercase tracking-wider block mb-1">End km</label>
+                                    <input
+                                      type="number"
+                                      value={editClimbForm.end_km}
+                                      onChange={e => setEditClimbForm(f => ({ ...f, end_km: e.target.value }))}
+                                      className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-orange-500"
+                                      step="0.1" min="0"
+                                    />
+                                  </div>
+                                  <div className="col-span-2">
+                                    <label className="text-[9px] text-gray-600 uppercase tracking-wider block mb-1">Target watts</label>
+                                    <input
+                                      type="number"
+                                      value={editClimbForm.target_watts}
+                                      onChange={e => setEditClimbForm(f => ({ ...f, target_watts: e.target.value }))}
+                                      className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-orange-500"
+                                      step="5" min="50" max="600"
+                                    />
+                                  </div>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                  <button
+                                    onClick={() => { deleteClimb(i); setEditingClimbIdx(null); }}
+                                    className="text-xs text-red-400 hover:text-red-300 transition-colors"
+                                  >
+                                    Remove climb
+                                  </button>
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      onClick={() => setEditingClimbIdx(null)}
+                                      className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
+                                    >
+                                      Cancel
+                                    </button>
+                                    <button
+                                      onClick={saveClimbEdit}
+                                      className="px-3 py-1 rounded-lg bg-orange-500/20 text-orange-400 hover:bg-orange-500/30 text-xs transition-colors"
+                                    >
+                                      Save
+                                    </button>
+                                  </div>
+                                </div>
                               </div>
-                            </div>
-                            <div className="mt-2 grid grid-cols-4 gap-1 text-center pl-7">
-                              <div>
-                                <p className="text-[9px] text-gray-600 uppercase tracking-wider">From start</p>
-                                <p className="text-xs font-medium text-gray-300">{c.start_km} km</p>
+                            ) : (
+                              <div className="p-3">
+                                <div className="flex items-center justify-between gap-2">
+                                  <button
+                                    onClick={() => setSelectedClimb(isSelected ? null : i)}
+                                    className="flex items-center gap-2 min-w-0 flex-1"
+                                  >
+                                    <span className={`flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${isSelected ? 'bg-orange-500 text-white' : 'bg-gray-800 text-gray-400'}`}>
+                                      {i + 1}
+                                    </span>
+                                    <span className="text-sm font-semibold text-white truncate">{c.name}</span>
+                                  </button>
+                                  <button
+                                    onClick={() => openClimbEdit(i)}
+                                    className="flex-shrink-0 text-xs text-orange-400 hover:text-orange-300 border border-orange-500/30 hover:border-orange-500/60 rounded px-2 py-0.5 transition-colors"
+                                  >
+                                    Edit
+                                  </button>
+                                </div>
+                                <div className="mt-2 grid grid-cols-4 gap-1 text-center pl-7">
+                                  <div>
+                                    <p className="text-[9px] text-gray-600 uppercase tracking-wider">From start</p>
+                                    <p className="text-xs font-medium text-gray-300">{c.start_km} km</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-[9px] text-gray-600 uppercase tracking-wider">Length</p>
+                                    <p className="text-xs font-medium text-gray-300">{c.distance_km} km</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-[9px] text-gray-600 uppercase tracking-wider">Ascent</p>
+                                    <p className="text-xs font-medium text-orange-400">{c.elevation_gain} m</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-[9px] text-gray-600 uppercase tracking-wider">Gradient</p>
+                                    <p className="text-xs font-medium text-gray-300">{c.avg_gradient}%</p>
+                                  </div>
+                                </div>
                               </div>
-                              <div>
-                                <p className="text-[9px] text-gray-600 uppercase tracking-wider">Length</p>
-                                <p className="text-xs font-medium text-gray-300">{c.distance_km} km</p>
-                              </div>
-                              <div>
-                                <p className="text-[9px] text-gray-600 uppercase tracking-wider">Ascent</p>
-                                <p className="text-xs font-medium text-orange-400">{c.elevation_gain} m</p>
-                              </div>
-                              <div>
-                                <p className="text-[9px] text-gray-600 uppercase tracking-wider">Gradient</p>
-                                <p className="text-xs font-medium text-gray-300">{c.avg_gradient}%</p>
-                              </div>
-                            </div>
+                            )}
                           </div>
                         );
                       })}
@@ -901,30 +1014,49 @@ export default function EventDetailPage({ eventId }: Props) {
 
                   {/* Edit mode */}
                   {editingPacing && (
-                    <div className="space-y-3">
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="text-[10px] text-gray-600 mb-1 block">Flat / Rolling (W)</label>
-                          <input type="number" value={flatWatts} onChange={e => setFlatWatts(Number(e.target.value))} className={inputCls} step={5} min={50} max={600} />
+                    <div className="space-y-4">
+                      <div>
+                        <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-2">Flat / Rolling</p>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-[10px] text-gray-600 mb-1 block">Power (W)</label>
+                            <input type="number" value={flatWatts} onChange={e => setFlatWatts(Number(e.target.value))} className={inputCls} step={5} min={50} max={600} />
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-gray-600 mb-1 block">Speed cap (km/h)</label>
+                            <input type="number" value={flatSpeedKmh ?? ''} onChange={e => setFlatSpeedKmh(e.target.value ? Number(e.target.value) : undefined)} className={inputCls} step={1} min={10} max={80} placeholder="None" />
+                          </div>
                         </div>
-                        <div>
-                          <label className="text-[10px] text-gray-600 mb-1 block">Descent (W)</label>
-                          <input type="number" value={descentWatts} onChange={e => setDescentWatts(Number(e.target.value))} className={inputCls} step={5} min={0} max={400} />
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-2">Downhill</p>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-[10px] text-gray-600 mb-1 block">Power (W)</label>
+                            <input type="number" value={descentWatts} onChange={e => setDescentWatts(Number(e.target.value))} className={inputCls} step={5} min={0} max={400} />
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-gray-600 mb-1 block">Max speed (km/h)</label>
+                            <input type="number" value={descentSpeedKmh ?? ''} onChange={e => setDescentSpeedKmh(e.target.value ? Number(e.target.value) : undefined)} className={inputCls} step={1} min={10} max={100} placeholder="None" />
+                          </div>
                         </div>
                       </div>
                       {climbs.length > 0 && (
-                        <div className="space-y-2">
-                          {climbs.map((c, i) => (
-                            <div key={i} className="flex items-center gap-3 bg-gray-800/50 rounded-lg px-3 py-2">
-                              <span className="flex-1 text-sm text-gray-300 truncate">{c.name}</span>
-                              <span className="text-xs text-gray-500 flex-shrink-0">{c.distance_km} km · {c.avg_gradient}%</span>
-                              <div className="flex items-center gap-1 flex-shrink-0">
-                                <input type="number" value={c.target_watts} onChange={e => updateClimbWatts(i, Number(e.target.value))}
-                                  className="w-16 bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-white text-right focus:outline-none focus:border-orange-500" step={5} min={50} max={600} />
-                                <span className="text-xs text-gray-500">W</span>
+                        <div>
+                          <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-2">Climbs</p>
+                          <div className="space-y-2">
+                            {climbs.map((c, i) => (
+                              <div key={i} className="flex items-center gap-3 bg-gray-800/50 rounded-lg px-3 py-2">
+                                <span className="flex-1 text-sm text-gray-300 truncate">{c.name}</span>
+                                <span className="text-xs text-gray-500 flex-shrink-0">{c.distance_km} km · {c.avg_gradient}%</span>
+                                <div className="flex items-center gap-1 flex-shrink-0">
+                                  <input type="number" value={c.target_watts} onChange={e => updateClimbWatts(i, Number(e.target.value))}
+                                    className="w-16 bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-white text-right focus:outline-none focus:border-orange-500" step={5} min={50} max={600} />
+                                  <span className="text-xs text-gray-500">W</span>
+                                </div>
                               </div>
-                            </div>
-                          ))}
+                            ))}
+                          </div>
                         </div>
                       )}
                       <p className="text-[10px] text-gray-600">Rider: {riderKg} kg · Bike: {bikeKg} kg · System: {riderKg + bikeKg} kg</p>
@@ -949,6 +1081,7 @@ export default function EventDetailPage({ eventId }: Props) {
                               {seg.elevation_gain >= 0 ? '+' : ''}{seg.elevation_gain} m
                             </span>
                             <span className="text-gray-400 w-10 text-right">{seg.target_watts}W</span>
+                            <span className="text-gray-500 w-16 text-right tabular-nums">{seg.avg_speed_kmh} km/h</span>
                             <span className="text-white font-medium w-10 text-right tabular-nums">{fmtTime(seg.est_time_min)}</span>
                           </div>
                         ))}

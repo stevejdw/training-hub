@@ -63,13 +63,15 @@ export interface EventClimbInput {
 }
 
 export interface PacingInput {
-  stream_distance_km: number[];
-  stream_altitude_m:  number[];
-  flat_watts:         number;
-  descent_watts:      number;
-  climbs:             EventClimbInput[];
-  rider_weight_kg:    number;
-  bike_weight_kg:     number;
+  stream_distance_km:  number[];
+  stream_altitude_m:   number[];
+  flat_watts:          number;
+  flat_speed_kmh?:     number;   // optional speed cap for flat sections (km/h)
+  descent_watts:       number;
+  descent_speed_kmh?:  number;   // braking speed cap for descents (km/h)
+  climbs:              EventClimbInput[];
+  rider_weight_kg:     number;
+  bike_weight_kg:      number;
 }
 
 /** Compute total estimated riding time in minutes. */
@@ -78,6 +80,7 @@ export function estimateTime(input: PacingInput): number {
     stream_distance_km, stream_altitude_m,
     flat_watts, descent_watts, climbs,
     rider_weight_kg, bike_weight_kg,
+    descent_speed_kmh, flat_speed_kmh,
   } = input;
 
   const totalKg = rider_weight_kg + bike_weight_kg;
@@ -97,12 +100,22 @@ export function estimateTime(input: PacingInput): number {
     if (climbMatch) {
       watts = climbMatch.target_watts;
     } else if (grad < -0.01) {
-      watts = descent_watts;  // coasting / light pedalling on descents
+      watts = descent_watts;
     } else {
       watts = flat_watts;
     }
 
-    const v   = speedForPower(watts, grad, totalKg);
+    let v = speedForPower(watts, grad, totalKg);
+
+    // Apply speed caps for non-climb sections
+    if (!climbMatch) {
+      if (grad < -0.01 && descent_speed_kmh) {
+        v = Math.min(v, descent_speed_kmh / 3.6);
+      } else if (grad >= -0.01 && flat_speed_kmh) {
+        v = Math.min(v, flat_speed_kmh / 3.6);
+      }
+    }
+
     totalSec += dDist / v;
   }
 
@@ -237,6 +250,7 @@ export interface PacingSegment {
   ascent_m:       number;   // total m gained (always ≥ 0)
   avg_gradient:   number;   // % (negative = downhill)
   target_watts:   number;
+  avg_speed_kmh:  number;   // estimated average speed for this segment
   est_time_min:   number;
 }
 
@@ -249,14 +263,16 @@ interface ClimbRef {
 
 /** Build a list of pacing segments from the full route + climb list. */
 export function buildPacingSegments(
-  streamDistKm:  number[],
-  streamAltM:    number[],
-  totalDistKm:   number,
-  climbs:        ClimbRef[],
-  flatWatts:     number,
-  descentWatts:  number,
-  riderKg:       number,
-  bikeKg:        number,
+  streamDistKm:    number[],
+  streamAltM:      number[],
+  totalDistKm:     number,
+  climbs:          ClimbRef[],
+  flatWatts:       number,
+  descentWatts:    number,
+  riderKg:         number,
+  bikeKg:          number,
+  descentSpeedKmh?: number,
+  flatSpeedKmh?:    number,
 ): PacingSegment[] {
   const sorted = [...climbs].sort((a, b) => a.start_km - b.start_km);
 
@@ -328,7 +344,13 @@ export function buildPacingSegments(
       climbs:             [],
       rider_weight_kg:    riderKg,
       bike_weight_kg:     bikeKg,
+      descent_speed_kmh:  isClimb ? undefined : descentSpeedKmh,
+      flat_speed_kmh:     isClimb ? undefined : flatSpeedKmh,
     });
+
+    const avgSpeedKmh = estTime > 0
+      ? Math.round((distKm / (estTime / 60)) * 10) / 10
+      : 0;
 
     segs.push({
       label,
@@ -341,6 +363,7 @@ export function buildPacingSegments(
       ascent_m:       Math.round(ascent),
       avg_gradient:   Math.round(avgGrad  * 10) / 10,
       target_watts:   watts,
+      avg_speed_kmh:  avgSpeedKmh,
       est_time_min:   estTime,
     });
   }
