@@ -6,7 +6,7 @@ import { SPORT_FILTERS, CYCLING_TYPES, SportFilter } from '@/lib/sport-types';
 export const runtime = 'nodejs';
 
 type Period = 'wtd' | 'mtd' | 'ytd';
-type Metric = 'time' | 'km';
+type Metric = 'time' | 'km' | 'tss';
 
 interface DayPoint { date: string; value: number; cum: number }
 
@@ -104,6 +104,7 @@ export async function GET(req: NextRequest) {
            SELECT (start_date AT TIME ZONE $3)::date AS d,
                   SUM(CASE WHEN $4 = 'time' THEN moving_time::float / 3600.0
                             WHEN $4 = 'km'   THEN distance::float / 1000.0
+                            WHEN $4 = 'tss'  THEN COALESCE(tss, 0)::float
                             ELSE 0 END) AS v
            FROM activities
            WHERE sport_type = ANY($5::text[])

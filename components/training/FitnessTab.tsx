@@ -1,15 +1,145 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid,
+  LineChart, Line, BarChart, Bar,
+  XAxis, YAxis, CartesianGrid,
   ReferenceLine, Legend, Tooltip, ResponsiveContainer,
 } from 'recharts';
+import { useCachedFetch } from '@/lib/use-cached-fetch';
 
 interface FitnessPoint { date: string; atl: number; ctl: number; tsb: number }
 
 const FITNESS_CACHE_KEY = (d: number) => `cache-fitness-${d}`;
 const INITIAL_FITNESS_DAYS = 90;
+
+// ─── Weekly TSS chart ─────────────────────────────────────────────────────────
+interface DayPoint { date: string; value: number; cum: number }
+interface ProgressResponse {
+  current: { start: string; end: string; total: number; points: DayPoint[] };
+  prior:   { start: string; end: string; total: number; points: DayPoint[] };
+}
+
+const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+function fmtWeekRange(start: string): string {
+  const M = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const [sy, sm, sd] = start.split('-').map(Number);
+  const endDate = new Date(Date.UTC(sy, sm - 1, sd + 6));
+  const ed = endDate.getUTCDate(), em = endDate.getUTCMonth();
+  const ey = endDate.getUTCFullYear();
+  if (sm - 1 === em && sy === ey) return `${M[sm-1]} ${sd}–${ed}`;
+  return `${M[sm-1]} ${sd} – ${M[em]} ${ed}`;
+}
+
+function TssWeekChart() {
+  const [offset, setOffset] = useState(0);
+  const swipeRef = useRef<number | null>(null);
+
+  const qs = `period=wtd&metric=tss&filters=All&offset=${offset}`;
+  const { data, loading } = useCachedFetch<ProgressResponse>(
+    `/api/training/progress?${qs}`,
+    `cache-tss-week-${qs}`,
+  );
+
+  const barData = DAYS.map((label, i) => ({
+    label,
+    current: Math.round(data?.current?.points[i]?.value ?? 0),
+    prior:   Math.round(data?.prior?.points[i]?.value   ?? 0),
+  }));
+
+  const curTotal   = Math.round(data?.current?.total ?? 0);
+  const priorTotal = Math.round(data?.prior?.total   ?? 0);
+  const delta      = curTotal - priorTotal;
+  const deltaColor = delta > 0 ? 'text-green-400' : delta < 0 ? 'text-red-400' : 'text-gray-400';
+
+  const weekLabel = data?.current?.start ? fmtWeekRange(data.current.start) : '—';
+
+  return (
+    <div className="bg-gray-900 rounded-xl border border-gray-800 p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Weekly TSS</p>
+        {/* Week navigation */}
+        <div
+          className="flex items-center gap-2 select-none"
+          onTouchStart={e => { swipeRef.current = e.touches[0].clientX; }}
+          onTouchEnd={e => {
+            if (swipeRef.current === null) return;
+            const dx = e.changedTouches[0].clientX - swipeRef.current;
+            swipeRef.current = null;
+            if (dx < -40) setOffset(o => o - 1);          // swipe left → older
+            else if (dx > 40) setOffset(o => Math.min(0, o + 1)); // swipe right → newer
+          }}
+        >
+          <button
+            onClick={() => setOffset(o => o - 1)}
+            className="p-1 rounded text-gray-500 hover:text-white hover:bg-gray-800 transition-colors"
+            aria-label="Previous week"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <span className="text-xs text-gray-300 font-medium tabular-nums w-28 text-center">{weekLabel}</span>
+          <button
+            onClick={() => setOffset(o => Math.min(0, o + 1))}
+            disabled={offset >= 0}
+            className={`p-1 rounded transition-colors ${
+              offset >= 0 ? 'text-gray-700 cursor-not-allowed' : 'text-gray-500 hover:text-white hover:bg-gray-800'
+            }`}
+            aria-label="Next week"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      {/* Totals row */}
+      <div className="grid grid-cols-3 gap-2">
+        <div className="bg-gray-800/60 rounded-lg p-2 text-center">
+          <p className="text-[9px] text-gray-500 uppercase tracking-wider">This week</p>
+          <p className="text-lg font-bold text-orange-400">{curTotal}</p>
+        </div>
+        <div className="bg-gray-800/60 rounded-lg p-2 text-center">
+          <p className="text-[9px] text-gray-500 uppercase tracking-wider">Prior week</p>
+          <p className="text-lg font-bold text-gray-400">{priorTotal}</p>
+        </div>
+        <div className="bg-gray-800/60 rounded-lg p-2 text-center">
+          <p className="text-[9px] text-gray-500 uppercase tracking-wider">Δ</p>
+          <p className={`text-lg font-bold ${deltaColor}`}>{delta >= 0 ? '+' : ''}{delta}</p>
+        </div>
+      </div>
+
+      {/* Bar chart */}
+      {loading ? (
+        <div className="h-40 animate-pulse bg-gray-800 rounded-lg" />
+      ) : (
+        <ResponsiveContainer width="100%" height={160}>
+          <BarChart data={barData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }} barCategoryGap="25%">
+            <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
+            <XAxis dataKey="label" tick={{ fill: '#6b7280', fontSize: 10 }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fill: '#6b7280', fontSize: 10 }} axisLine={false} tickLine={false} width={28} />
+            <Tooltip
+              contentStyle={{ background: '#111827', border: '1px solid #374151', borderRadius: 8, fontSize: 12 }}
+              formatter={(v, name) => [v, name === 'current' ? 'This week' : 'Prior week']}
+            />
+            <Legend
+              formatter={value => (
+                <span style={{ color: '#9ca3af', fontSize: 11 }}>
+                  {value === 'current' ? 'This week' : 'Prior week'}
+                </span>
+              )}
+            />
+            <Bar dataKey="prior"   fill="#374151" name="prior"   radius={[3,3,0,0]} />
+            <Bar dataKey="current" fill="#f97316" name="current" radius={[3,3,0,0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      )}
+    </div>
+  );
+}
 
 export default function FitnessTab() {
   const [data, setData] = useState<FitnessPoint[]>(() => {
@@ -151,6 +281,9 @@ export default function FitnessTab() {
           </ResponsiveContainer>
         )}
       </div>
+
+      {/* Weekly TSS chart */}
+      <TssWeekChart />
 
       {/* Legend explainer */}
       <div className="grid grid-cols-3 gap-2 text-xs text-gray-500">
