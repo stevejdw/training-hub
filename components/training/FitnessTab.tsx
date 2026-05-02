@@ -164,7 +164,8 @@ export default function FitnessTab() {
       else setLoading(true);
     } catch { setLoading(true); }
 
-    fetch(`/api/analytics/fitness?days=${days}`)
+    const param = days < 0 ? 'all' : String(days);
+    fetch(`/api/analytics/fitness?days=${param}`)
       .then(r => r.json())
       .then(d => {
         const arr = d.data ?? [];
@@ -214,9 +215,15 @@ export default function FitnessTab() {
         </div>
       )}
 
-      {/* Range selector */}
-      <div className="flex gap-1.5">
-        {[30, 90, 180, 365].map(d => (
+      {/* Range selector — 'all' uses a sentinel value (-1) for "All time" */}
+      <div className="flex gap-1.5 flex-wrap">
+        {[
+          { d: 30,   label: '30 days'  },
+          { d: 90,   label: '90 days'  },
+          { d: 180,  label: '6 months' },
+          { d: 365,  label: '1 year'   },
+          { d: -1,   label: 'All time' },
+        ].map(({ d, label }) => (
           <button
             key={d}
             onClick={() => setDays(d)}
@@ -226,7 +233,7 @@ export default function FitnessTab() {
                 : 'bg-gray-800 text-gray-500 hover:text-gray-300'
             }`}
           >
-            {d === 30 ? '30 days' : d === 90 ? '90 days' : d === 180 ? '6 months' : '1 year'}
+            {label}
           </button>
         ))}
       </div>

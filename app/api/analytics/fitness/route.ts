@@ -5,7 +5,12 @@ export const runtime = 'nodejs';
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
-  const days = Math.min(365, Math.max(30, Number(searchParams.get('days') ?? 180)));
+  // `days` may be a positive integer (capped at 5 years to bound payload size)
+  // or 'all' which returns the full TSS history.
+  const raw = searchParams.get('days') ?? '180';
+  const days = raw === 'all'
+    ? 365 * 5
+    : Math.min(365 * 5, Math.max(30, Number(raw)));
 
   const client = await pool.connect();
   try {
