@@ -77,126 +77,104 @@ function fmtDate(dateStr: string): string {
   return `${d} ${M[m - 1]}`;
 }
 
-// ─── Course map SVG ───────────────────────────────────────────────────────────
-function CourseMap({ latlng, climbs, distKm, selectedClimb }: {
+// ─── Course map (Leaflet) ─────────────────────────────────────────────────────
+interface CourseMapProps {
   latlng:        [number, number][];
   climbs:        EventClimb[];
   distKm:        number[];
   selectedClimb: number | null;
-}) {
-  if (!latlng.length) return null;
+}
 
-  const lats = latlng.map(p => p[0]);
-  const lngs = latlng.map(p => p[1]);
-  const minLat = Math.min(...lats), maxLat = Math.max(...lats);
-  const minLng = Math.min(...lngs), maxLng = Math.max(...lngs);
+function CourseMap({ latlng, climbs, distKm, selectedClimb }: CourseMapProps) {
+  const containerRef  = useRef<HTMLDivElement>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const mapStateRef   = useRef<{ L: any; map: any; climbGroup: any } | null>(null);
+  const [mapReady, setMapReady] = useState(false);
 
-  const cosLat = Math.cos(((maxLat + minLat) / 2) * Math.PI / 180);
-  const latSpan = maxLat - minLat || 0.01;
-  const lngSpan = (maxLng - minLng) * cosLat || 0.01;
+  // Initialise map once when latlng is available
+  useEffect(() => {
+    if (!containerRef.current || latlng.length < 2) return;
+    if (mapStateRef.current) return; // already initialised
 
-  const W = 400, H = Math.round(W * latSpan / lngSpan);
-  const clampedH = Math.min(Math.max(H, 100), 260);
-  const pad = 16;
+    let cancelled = false;
+    (async () => {
+      const L = (await import('leaflet')).default;
+      await import('leaflet/dist/leaflet.css');
+      if (cancelled || !containerRef.current || mapStateRef.current) return;
 
-  function toX(lng: number) {
-    return pad + ((lng - minLng) * cosLat / lngSpan) * (W - 2 * pad);
-  }
-  function toY(lat: number) {
-    return clampedH - pad - ((lat - minLat) / latSpan) * (clampedH - 2 * pad);
-  }
+      const map = L.map(containerRef.current, {
+        zoomControl: false, attributionControl: false,
+        dragging: false, scrollWheelZoom: false,
+        doubleClickZoom: false, touchZoom: false,
+        keyboard: false, boxZoom: false,
+      });
 
-  const routePoints = latlng.map(p => `${toX(p[1]).toFixed(1)},${toY(p[0]).toFixed(1)}`).join(' ');
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+        maxZoom: 19,
+      }).addTo(map);
 
-  // Build climb polylines from the distance stream
-  const climbSegments = climbs.map(c => {
-    const pts: string[] = [];
-    for (let i = 0; i < distKm.length && i < latlng.length; i++) {
-      if (distKm[i] >= c.start_km - 0.2 && distKm[i] <= c.end_km + 0.2) {
-        pts.push(`${toX(latlng[i][1]).toFixed(1)},${toY(latlng[i][0]).toFixed(1)}`);
+      // Route line
+      const routeLine = L.polyline(latlng, { color: '#1d4ed8', weight: 3, opacity: 0.8 });
+      routeLine.addTo(map);
+      map.fitBounds(routeLine.getBounds(), { padding: [14, 14] });
+
+      // Start / finish markers
+      const dotIcon = (color: string) => L.divIcon({
+        className: '',
+        html: `<div style="width:12px;height:12px;border-radius:50%;background:${color};border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.4)"></div>`,
+        iconSize: [12, 12], iconAnchor: [6, 6],
+      });
+      L.marker(latlng[0],              { icon: dotIcon('#22c55e') }).addTo(map);
+      L.marker(latlng[latlng.length-1],{ icon: dotIcon('#dc2626') }).addTo(map);
+
+      const climbGroup = L.layerGroup().addTo(map);
+      mapStateRef.current = { L, map, climbGroup };
+      setMapReady(true);
+    })();
+
+    return () => {
+      cancelled = true;
+      if (mapStateRef.current) {
+        mapStateRef.current.map.remove();
+        mapStateRef.current = null;
+      }
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [latlng]);
+
+  // Redraw climb overlays whenever climbs or selection changes
+  useEffect(() => {
+    if (!mapReady || !mapStateRef.current) return;
+    const { L, climbGroup } = mapStateRef.current;
+    climbGroup.clearLayers();
+
+    const anySel = selectedClimb !== null;
+    for (let ci = 0; ci < climbs.length; ci++) {
+      const c = climbs[ci];
+      const pts: [number, number][] = [];
+      for (let i = 0; i < distKm.length && i < latlng.length; i++) {
+        if (distKm[i] >= c.start_km - 0.2 && distKm[i] <= c.end_km + 0.2) pts.push(latlng[i]);
+      }
+      if (pts.length < 2) continue;
+
+      const isSel = selectedClimb === ci;
+      if (isSel) {
+        // Glow halo
+        L.polyline(pts, { color: '#f97316', weight: 10, opacity: 0.22 }).addTo(climbGroup);
+        // Main highlight
+        L.polyline(pts, { color: '#f97316', weight: 4.5, opacity: 1 }).addTo(climbGroup);
+      } else {
+        L.polyline(pts, {
+          color:   '#ef4444',
+          weight:  anySel ? 2.5 : 3.5,
+          opacity: anySel ? 0.3  : 0.85,
+        }).addTo(climbGroup);
       }
     }
-    return pts;
-  });
+  }, [mapReady, climbs, distKm, latlng, selectedClimb]);
 
-  const start = latlng[0];
-  const end   = latlng[latlng.length - 1];
-  const anySel = selectedClimb !== null;
-
-  return (
-    <svg viewBox={`0 0 ${W} ${clampedH}`} className="w-full rounded-xl">
-      {/* ── Light map background ── */}
-      <rect width={W} height={clampedH} fill="#eef2f7" />
-      {/* Subtle grid lines to give a map feel */}
-      {Array.from({ length: 5 }, (_, i) => (
-        <line key={`h${i}`} x1={0} y1={(clampedH / 4) * i} x2={W} y2={(clampedH / 4) * i}
-          stroke="#d1dae6" strokeWidth="0.5" />
-      ))}
-      {Array.from({ length: 7 }, (_, i) => (
-        <line key={`v${i}`} x1={(W / 6) * i} y1={0} x2={(W / 6) * i} y2={clampedH}
-          stroke="#d1dae6" strokeWidth="0.5" />
-      ))}
-
-      {/* ── Route ── */}
-      <polyline
-        points={routePoints}
-        fill="none"
-        stroke="#1d4ed8"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeOpacity="0.75"
-      />
-
-      {/* ── Climb overlays — non-selected first, selected on top ── */}
-      {climbSegments.map((pts, i) => {
-        if (pts.length < 2) return null;
-        const isSel = selectedClimb === i;
-        if (isSel) return null; // render selected last (on top)
-        return (
-          <polyline
-            key={i}
-            points={pts.join(' ')}
-            fill="none"
-            stroke="#ef4444"
-            strokeWidth={anySel ? 2.5 : 3.5}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeOpacity={anySel ? 0.35 : 0.85}
-          />
-        );
-      })}
-      {/* Selected climb — drawn last so it sits on top */}
-      {selectedClimb !== null && climbSegments[selectedClimb]?.length > 1 && (
-        <>
-          {/* Glow / halo */}
-          <polyline
-            points={climbSegments[selectedClimb].join(' ')}
-            fill="none"
-            stroke="#f97316"
-            strokeWidth="9"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeOpacity="0.25"
-          />
-          {/* Main highlight */}
-          <polyline
-            points={climbSegments[selectedClimb].join(' ')}
-            fill="none"
-            stroke="#f97316"
-            strokeWidth="4.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeOpacity="1"
-          />
-        </>
-      )}
-
-      {/* ── Start / finish markers ── */}
-      <circle cx={toX(start[1])} cy={toY(start[0])} r="6" fill="#22c55e" stroke="#fff" strokeWidth="1.5" />
-      <circle cx={toX(end[1])}   cy={toY(end[0])}   r="6" fill="#dc2626" stroke="#fff" strokeWidth="1.5" />
-    </svg>
-  );
+  if (!latlng.length) return null;
+  return <div ref={containerRef} className="w-full h-52 rounded-xl overflow-hidden" />;
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
@@ -670,17 +648,17 @@ export default function EventDetailPage({ eventId }: Props) {
 
           {/* ── Elevation profile ─────────────────────────────── */}
           {route && chartData.length > 0 && (
-            <section className="bg-gray-900 border border-gray-800 rounded-2xl p-4 space-y-2">
+            <section className="bg-[#f5f7fa] border border-gray-200 rounded-2xl p-4 space-y-2">
               <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Elevation Profile</h2>
               <ResponsiveContainer width="100%" height={160}>
                 <AreaChart data={chartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
                   <defs>
                     <linearGradient id="elevGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%"  stopColor="#f97316" stopOpacity={0.4} />
-                      <stop offset="95%" stopColor="#f97316" stopOpacity={0.05} />
+                      <stop offset="5%"  stopColor="#1d4ed8" stopOpacity={0.25} />
+                      <stop offset="95%" stopColor="#1d4ed8" stopOpacity={0.04} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#d1d5db" vertical={false} />
                   <XAxis dataKey="km" type="number" domain={['dataMin','dataMax']} tick={{ fill:'#6b7280', fontSize:10 }} axisLine={false} tickLine={false} tickFormatter={v=>`${v}km`} interval="preserveStartEnd" />
                   <YAxis tick={{ fill:'#6b7280', fontSize:10 }} axisLine={false} tickLine={false} width={36} tickFormatter={v=>`${v}m`} />
                   <Tooltip content={({ active, payload }) => {
@@ -688,9 +666,9 @@ export default function EventDetailPage({ eventId }: Props) {
                     const km = payload[0].payload.km as number;
                     const inC = climbs.find(c => km >= c.start_km && km <= c.end_km);
                     return (
-                      <div className="bg-gray-900 border border-gray-700 rounded-lg px-2 py-1 text-xs">
-                        <p className="text-gray-400">{km} km{inC ? ` · ${inC.name}` : ''}</p>
-                        <p className="text-white font-semibold">{payload[0].value} m</p>
+                      <div className="bg-white border border-gray-200 rounded-lg px-2 py-1 text-xs shadow-sm">
+                        <p className="text-gray-500">{km} km{inC ? ` · ${inC.name}` : ''}</p>
+                        <p className="text-gray-900 font-semibold">{payload[0].value} m</p>
                       </div>
                     );
                   }} />
@@ -701,18 +679,18 @@ export default function EventDetailPage({ eventId }: Props) {
                       <ReferenceArea key={`c${i}-${sel}`}
                         x1={c.start_km} x2={c.end_km}
                         fill={sel ? '#f97316' : '#ef4444'}
-                        fillOpacity={sel ? 0.35 : anySel ? 0 : 0.12}
+                        fillOpacity={sel ? 0.25 : anySel ? 0 : 0.1}
                         stroke={sel ? '#f97316' : '#ef4444'}
-                        strokeOpacity={sel ? 1 : anySel ? 0 : 0.3}
+                        strokeOpacity={sel ? 0.9 : anySel ? 0 : 0.25}
                         strokeWidth={sel ? 2 : 1}
                       />
                     );
                   })}
-                  <Area type="monotone" dataKey="alt" stroke="#f97316" strokeWidth={2} fill="url(#elevGrad)" dot={false} activeDot={{ r: 3 }} />
+                  <Area type="monotone" dataKey="alt" stroke="#1d4ed8" strokeWidth={2} fill="url(#elevGrad)" dot={false} activeDot={{ r: 3, fill: '#1d4ed8' }} />
                 </AreaChart>
               </ResponsiveContainer>
               {selectedClimb !== null && climbs[selectedClimb] && (
-                <p className="text-xs text-orange-400 text-center">
+                <p className="text-xs text-orange-500 text-center font-medium">
                   ▲ {climbs[selectedClimb].name} — {climbs[selectedClimb].start_km}–{climbs[selectedClimb].end_km} km
                 </p>
               )}
