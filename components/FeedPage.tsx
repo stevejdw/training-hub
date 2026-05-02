@@ -53,7 +53,7 @@ interface NextSession {
 
 interface FeedData {
   recentRides: RecentRide[];
-  nextEvent: { name: string; date: string; goal: string; daysAway: number } | null;
+  nextEvent: { id: string; name: string; date: string; goal: string; daysAway: number } | null;
   nextSession: NextSession | null;
   fitness: { ctl: number; atl: number; tsb: number };
   powerHighlights: PowerHighlight[];
@@ -273,40 +273,43 @@ export default function FeedPage() {
 
           {/* Next Event — compact badge */}
           {nextEvent && (
-            <div className="flex-shrink-0 w-24 rounded-2xl p-3 bg-orange-500/10 border border-orange-500/25 flex flex-col items-center justify-center text-center gap-0.5">
+            <Link
+              href={`/events/${nextEvent.id}`}
+              className="flex-shrink-0 w-24 rounded-2xl p-3 bg-orange-500/10 border border-orange-500/25 hover:border-orange-500/60 hover:bg-orange-500/15 transition-colors flex flex-col items-center justify-center text-center gap-0.5"
+            >
               <p className="text-[9px] font-semibold text-orange-400 uppercase tracking-wider">Event</p>
               <p className="text-2xl font-black text-orange-400 leading-none">{nextEvent.daysAway}</p>
               <p className="text-[9px] text-orange-400/70">days</p>
               <p className="text-[10px] text-gray-400 font-medium mt-1 leading-tight line-clamp-2">{nextEvent.name}</p>
-            </div>
+            </Link>
           )}
         </div>
 
-        {/* Period stats — swipeable WTD / MTD / YTD */}
-        <div
-          className="bg-gray-800/60 rounded-2xl px-4 py-3 select-none touch-pan-y"
+        {/* Period stats — swipeable WTD / MTD / YTD — whole tile links to /training */}
+        <Link
+          href="/training"
+          className="block bg-gray-800/60 rounded-2xl px-4 py-3 border border-transparent hover:border-gray-700 hover:bg-gray-800/80 transition-colors select-none touch-pan-y group"
           onTouchStart={e => { swipeStartX.current = e.touches[0].clientX; }}
           onTouchEnd={e => {
             if (swipeStartX.current === null) return;
             const dx = e.changedTouches[0].clientX - swipeStartX.current;
             swipeStartX.current = null;
-            if (Math.abs(dx) > 40) handleStatSwipe(dx < 0 ? 'left' : 'right');
+            if (Math.abs(dx) > 40) {
+              e.preventDefault();
+              handleStatSwipe(dx < 0 ? 'left' : 'right');
+            }
           }}
         >
           {/* Period label + dot indicators */}
           <div className="flex items-center justify-between mb-2">
-            <Link
-              href="/training"
-              className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider hover:text-orange-400 transition-colors"
-              onClick={e => e.stopPropagation()}
-            >
+            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider group-hover:text-orange-400 transition-colors">
               {STAT_PERIODS.find(p => p.key === statPeriod)?.label} →
-            </Link>
+            </p>
             <div className="flex items-center gap-1.5">
               {STAT_PERIODS.map(p => (
                 <button
                   key={p.key}
-                  onClick={() => setStatPeriod(p.key)}
+                  onClick={e => { e.preventDefault(); e.stopPropagation(); setStatPeriod(p.key); }}
                   className={`transition-all rounded-full ${
                     statPeriod === p.key ? 'w-4 h-1.5 bg-orange-500' : 'w-1.5 h-1.5 bg-gray-600 hover:bg-gray-500'
                   }`}
@@ -331,13 +334,13 @@ export default function FeedPage() {
               <div className="col-span-5 h-8 bg-gray-700/40 rounded animate-pulse" />
             )}
           </div>
-        </div>
+        </Link>
 
-        {/* Fitness snapshot */}
+        {/* Fitness snapshot — whole tile links to /performance */}
         {fitness && (
-          <Link href="/fitness" className="block group">
-            <div className="bg-gray-800/60 rounded-2xl px-4 py-3">
-              <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-2">Fitness</p>
+          <Link href="/performance" className="block group">
+            <div className="bg-gray-800/60 rounded-2xl px-4 py-3 border border-transparent hover:border-gray-700 hover:bg-gray-800/80 transition-colors">
+              <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-2 group-hover:text-orange-400 transition-colors">Fitness →</p>
               <div className="grid grid-cols-3 gap-2">
                 <div className="text-center">
                   <p className="text-xl font-bold text-blue-400">{fitness.ctl}</p>
@@ -352,7 +355,6 @@ export default function FeedPage() {
                   <p className={`text-[10px] mt-0.5 ${tsbColor}`}>{tsbLabel}</p>
                 </div>
               </div>
-              <p className="text-[10px] text-gray-700 text-right mt-1.5 group-hover:text-gray-500 transition-colors">View fitness history →</p>
             </div>
           </Link>
         )}
