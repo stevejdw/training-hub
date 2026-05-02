@@ -32,7 +32,7 @@ function fmtWeekRange(start: string): string {
   return `${M[sm-1]} ${sd} – ${M[em]} ${ed}`;
 }
 
-function TssWeekChart() {
+export function TssWeekChart() {
   const [offset, setOffset] = useState(0);
   const swipeRef = useRef<number | null>(null);
 
@@ -288,9 +288,6 @@ export default function FitnessTab() {
         <div><span className="text-purple-400 font-medium">ATL</span> — Acute Training Load (7d avg). Recent fatigue.</div>
         <div><span className="text-green-400 font-medium">TSB</span> — Form = CTL − ATL. Positive = fresh, negative = tired.</div>
       </div>
-
-      {/* Weekly TSS chart */}
-      <TssWeekChart />
 
     </div>
   );

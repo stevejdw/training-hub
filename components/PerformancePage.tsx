@@ -3,12 +3,22 @@
 import { useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import SubTabBar from './SubTabBar';
-import FitnessTab from './training/FitnessTab';
-import HRPerformanceTab from './training/HRPerformanceTab';
+import FitnessTab, { TssWeekChart } from './training/FitnessTab';
+import AerobicEfficiencyTab from './training/AerobicEfficiencyTab';
+import ReadinessTab from './training/ReadinessTab';
 import KeyIntervalsTab from './training/KeyIntervalsTab';
 import DashboardBestPower from './DashboardBestPower';
 
 type Tab = 'fitness' | 'power';
+
+function SectionHeading({ title, subtitle }: { title: string; subtitle?: string }) {
+  return (
+    <div className="flex items-baseline gap-2 mb-3">
+      <h2 className="text-sm font-semibold text-white">{title}</h2>
+      {subtitle && <span className="text-[11px] text-gray-500">{subtitle}</span>}
+    </div>
+  );
+}
 
 export default function PerformancePage() {
   const sp = useSearchParams();
@@ -27,27 +37,45 @@ export default function PerformancePage() {
       />
 
       <div className="flex-1 overflow-y-auto scroll-touch">
-        <div className="max-w-2xl md:max-w-5xl mx-auto px-4 py-4 md:px-8 md:py-8 space-y-6">
+        <div className="max-w-2xl md:max-w-5xl mx-auto px-4 py-4 md:px-8 md:py-8 space-y-8">
           {tab === 'fitness' && (
             <>
-              <FitnessTab />
-              <div className="pt-2 border-t border-gray-800/60">
-                <h2 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3">HR Performance</h2>
-                <HRPerformanceTab />
-              </div>
+              {/* ── Fitness Performance ─────────────────────── */}
+              <section>
+                <SectionHeading title="Fitness Performance" subtitle="ATL · CTL · TSB" />
+                <FitnessTab />
+              </section>
+
+              {/* ── Weekly TSS ──────────────────────────────── */}
+              <section className="pt-2 border-t border-gray-800/60">
+                <SectionHeading title="Weekly TSS" subtitle="Training stress per week" />
+                <TssWeekChart />
+              </section>
+
+              {/* ── Aerobic Efficiency ──────────────────────── */}
+              <section className="pt-2 border-t border-gray-800/60">
+                <SectionHeading title="Aerobic Efficiency" subtitle="Power vs HR drift on steady rides" />
+                <AerobicEfficiencyTab />
+              </section>
+
+              {/* ── Readiness ───────────────────────────────── */}
+              <section className="pt-2 border-t border-gray-800/60">
+                <SectionHeading title="Readiness" subtitle="HRV vs Normal Zone" />
+                <ReadinessTab />
+              </section>
             </>
           )}
 
           {tab === 'power' && (
             <>
-              <div>
-                <h2 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3">Key Intervals</h2>
+              <section>
+                <SectionHeading title="Key Intervals" />
                 <KeyIntervalsTab />
-              </div>
-              <div className="pt-2 border-t border-gray-800/60">
-                <h2 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3">Best Efforts</h2>
+              </section>
+              <section className="pt-2 border-t border-gray-800/60">
+                <SectionHeading title="Best Efforts" />
                 <DashboardBestPower />
-              </div>
+              </section>
             </>
           )}
         </div>
