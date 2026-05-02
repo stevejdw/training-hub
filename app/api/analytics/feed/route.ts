@@ -62,14 +62,24 @@ export async function GET() {
 
     const tz = profile.timezone || 'Australia/Sydney';
 
-    // Next non-rest training day from the active plan
+    // Next non-rest training day from the active plan.
+    // Skip today if a cycling activity was already logged today.
     const nextSessionRes = await client.query(`
-      SELECT d.id, d.date, d.title, d.type, d.duration_min, d.tss_target, d.description
+      SELECT d.id, d.date::text AS date, d.title, d.type, d.duration_min, d.tss_target, d.description
       FROM training_days d
       JOIN training_plans p ON p.id = d.plan_id
       WHERE p.id = (SELECT id FROM training_plans ORDER BY created_at DESC LIMIT 1)
         AND d.date >= (NOW() AT TIME ZONE '${tz}')::date
         AND d.type != 'rest'
+        AND NOT (
+          d.date = (NOW() AT TIME ZONE '${tz}')::date
+          AND EXISTS (
+            SELECT 1 FROM activities
+            WHERE (start_date AT TIME ZONE '${tz}')::date = (NOW() AT TIME ZONE '${tz}')::date
+              AND sport_type = ANY(ARRAY['Ride','GravelRide','EMountainBikeRide','MountainBikeRide',
+                                         'EBikeRide','VirtualRide','Workout'])
+          )
+        )
       ORDER BY d.date
       LIMIT 1
     `);
