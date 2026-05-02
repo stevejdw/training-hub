@@ -60,38 +60,37 @@ const INITIAL_BP_DAYS = 30;
 export default function DashboardBestPower() {
   const sp = useSearchParams();
   const [seconds, setSeconds] = useState(INITIAL_BP_SECONDS);
+  const [days,    setDays]    = useState(INITIAL_BP_DAYS);
+  const [results, setResults] = useState<Result[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error,   setError]   = useState<string | null>(null);
 
+  // Sync seconds from URL param once on mount (deep-link support)
   useEffect(() => {
     const s = parseInt(sp.get('s') ?? '0', 10);
     if (INTERVALS.some(iv => iv.seconds === s)) setSeconds(s);
-  }, [sp]);
-  const [days,    setDays]    = useState(INITIAL_BP_DAYS);
-  const [results, setResults] = useState<Result[]>(() => {
-    if (typeof window === 'undefined') return [];
-    try {
-      const s = localStorage.getItem(BP_CACHE_KEY(INITIAL_BP_SECONDS, INITIAL_BP_DAYS));
-      return s ? JSON.parse(s) : [];
-    } catch { return []; }
-  });
-  const [loading, setLoading] = useState(() => {
-    if (typeof window === 'undefined') return true;
-    try { return !localStorage.getItem(BP_CACHE_KEY(INITIAL_BP_SECONDS, INITIAL_BP_DAYS)); }
-    catch { return true; }
-  });
-  const [error, setError] = useState<string | null>(null);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const cacheKey = BP_CACHE_KEY(seconds, days);
     let cachedResults: Result[] | null = null;
     try {
-      const s = localStorage.getItem(cacheKey);
-      if (s) cachedResults = JSON.parse(s);
+      const raw = localStorage.getItem(cacheKey);
+      if (raw) cachedResults = JSON.parse(raw);
     } catch {}
-    setResults(cachedResults ?? []);
-    setLoading(!cachedResults);
+
+    // Show cache immediately, then refresh in background
+    if (cachedResults) {
+      setResults(cachedResults);
+      setLoading(false);
+    } else {
+      setResults([]);
+      setLoading(true);
+    }
     setError(null);
 
-    fetch(`/api/dashboard/best-power?seconds=${seconds}&days=${days}`)
+    const controller = new AbortController();
+    fetch(`/api/dashboard/best-power?seconds=${seconds}&days=${days}`, { signal: controller.signal })
       .then(r => r.json())
       .then(d => {
         if (d.error) { setError(d.error); setResults([]); }
@@ -102,7 +101,13 @@ export default function DashboardBestPower() {
         }
         setLoading(false);
       })
-      .catch(e => { setError(String(e)); setLoading(false); });
+      .catch(e => {
+        if (e instanceof DOMException && e.name === 'AbortError') return;
+        setError(String(e));
+        setLoading(false);
+      });
+
+    return () => controller.abort();
   }, [seconds, days]);
 
   const intervalLabel = INTERVALS.find(i => i.seconds === seconds)?.label ?? '';

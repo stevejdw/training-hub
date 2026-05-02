@@ -182,22 +182,32 @@ export default function ActivityDetail({ id }: { id: string }) {
   }, [id]);
 
   useEffect(() => {
-    if (!activity) return;
+    if (!activity?.id) return;
     setBpLoading(true);
     setBpResults(undefined);
-    fetch(`/api/activities/${id}/best-power?seconds=${bpSeconds}`)
+    const controller = new AbortController();
+    fetch(`/api/activities/${id}/best-power?seconds=${bpSeconds}`, { signal: controller.signal })
       .then(r => r.json())
       .then(d => { setBpResults(d.results ?? []); setBpLoading(false); })
-      .catch(() => { setBpResults([]); setBpLoading(false); });
-  }, [id, activity, bpSeconds]);
+      .catch(e => {
+        if (e instanceof DOMException && e.name === 'AbortError') return;
+        setBpResults([]); setBpLoading(false);
+      });
+    return () => controller.abort();
+  }, [id, activity?.id, bpSeconds]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (tab !== 'power' || !activity) return;
+    if (tab !== 'power' || !activity?.id) return;
     setCurveLoading(true);
-    fetch(`/api/activities/${id}/power-curve?compare=${curvePeriod}`)
+    const controller = new AbortController();
+    fetch(`/api/activities/${id}/power-curve?compare=${curvePeriod}`, { signal: controller.signal })
       .then(r => r.json())
       .then(d => { setCurveData(d); setCurveLoading(false); })
-      .catch(() => setCurveLoading(false));
+      .catch(e => {
+        if (e instanceof DOMException && e.name === 'AbortError') return;
+        setCurveLoading(false);
+      });
+    return () => controller.abort();
   }, [tab, id, activity?.id, curvePeriod]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Lazy-load segments only when Segments tab is opened
