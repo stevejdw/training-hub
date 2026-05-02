@@ -19,6 +19,51 @@ import Link from 'next/link';
 const DEFAULT_FLAT_WATTS    = 260;
 const DEFAULT_DESCENT_WATTS = 120;
 
+// ─── Peaks Challenge: 8 known climbs (start/end km) ──────────────────────────
+// Elevation stats are derived live from the loaded GPS stream.
+// Endpoints for climbs 1/6/7 are best estimates — user can fine-tune with the
+// delete/add UI, but these match the actual Peaks Challenge Falls Creek route.
+const PEAKS_CHALLENGE_BOUNDS = [
+  { name: 'Climb 1 – Mt Hotham',    start_km:  33.6, end_km:  63.0 },
+  { name: 'Climb 2',                 start_km:  73.9, end_km:  83.9 },
+  { name: 'Climb 3',                 start_km:  83.9, end_km:  93.9 },
+  { name: 'Climb 4',                 start_km:  93.9, end_km: 103.9 },
+  { name: 'Climb 5',                 start_km: 146.7, end_km: 149.2 },
+  { name: 'Climb 6 – Tawonga Gap',  start_km: 166.6, end_km: 174.0 },
+  { name: 'Climb 7',                 start_km: 200.0, end_km: 210.0 },
+  { name: 'Climb 8 – Falls Creek',  start_km: 215.0, end_km: 224.0 },
+] as const;
+
+/** Build an EventClimb from known km bounds, deriving elevation from the GPS stream. */
+function climbFromBounds(
+  route: CachedRoute,
+  name: string,
+  startKm: number,
+  endKm: number,
+  targetWatts: number,
+): EventClimb {
+  const d = route.stream_distance_km;
+  const a = route.stream_altitude_m;
+  let firstAlt: number | null = null, lastAlt = 0;
+  for (let i = 0; i < d.length; i++) {
+    if (d[i] < startKm || d[i] > endKm) continue;
+    if (firstAlt === null) firstAlt = a[i];
+    lastAlt = a[i];
+  }
+  const dist    = Math.round((endKm - startKm) * 10) / 10;
+  const net     = firstAlt !== null ? lastAlt - firstAlt : 0;
+  const avgGrad = dist > 0 ? Math.round((net / (dist * 1000)) * 1000) / 10 : 0;
+  return {
+    name,
+    start_km:       Math.round(startKm * 10) / 10,
+    end_km:         Math.round(endKm   * 10) / 10,
+    distance_km:    dist,
+    elevation_gain: Math.round(net),
+    avg_gradient:   avgGrad,
+    target_watts:   targetWatts,
+  };
+}
+
 function daysToGo(dateStr: string): number {
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const d     = new Date(dateStr + 'T00:00:00'); d.setHours(0, 0, 0, 0);
@@ -217,15 +262,21 @@ export default function EventDetailPage({ eventId }: Props) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventIdx >= 0]);
 
-  // ── Auto-detect climbs ──
+  // ── Auto-detect climbs (or seed known Peaks Challenge climbs) ──
   useEffect(() => {
     if (!route || autoDetected) return;
     if (climbs.length > 0) { setAutoDetected(true); return; }
-    const detected = detectClimbs(route.stream_distance_km, route.stream_altitude_m);
-    const newClimbs = detected.map((c, i) => ({
-      ...c, name: `Climb ${i + 1}`, target_watts: Math.round(flatWatts * 0.88),
-    }));
-    setClimbs(newClimbs);
+    const defaultWatts = Math.round(flatWatts * 0.88);
+    if (name.toLowerCase().includes('peaks challenge')) {
+      setClimbs(PEAKS_CHALLENGE_BOUNDS.map(b =>
+        climbFromBounds(route, b.name, b.start_km, b.end_km, defaultWatts)
+      ));
+    } else {
+      const detected = detectClimbs(route.stream_distance_km, route.stream_altitude_m);
+      setClimbs(detected.map((c, i) => ({
+        ...c, name: `Climb ${i + 1}`, target_watts: defaultWatts,
+      })));
+    }
     setAutoDetected(true);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [route]);
@@ -350,11 +401,17 @@ export default function EventDetailPage({ eventId }: Props) {
 
   function resetClimbs() {
     if (!route) return;
-    const detected = detectClimbs(route.stream_distance_km, route.stream_altitude_m);
-    const newClimbs = detected.map((c, i) => ({
-      ...c, name: `Climb ${i + 1}`, target_watts: Math.round(flatWatts * 0.88),
-    }));
-    setClimbs(newClimbs);
+    const defaultWatts = Math.round(flatWatts * 0.88);
+    if (name.toLowerCase().includes('peaks challenge')) {
+      setClimbs(PEAKS_CHALLENGE_BOUNDS.map(b =>
+        climbFromBounds(route, b.name, b.start_km, b.end_km, defaultWatts)
+      ));
+    } else {
+      const detected = detectClimbs(route.stream_distance_km, route.stream_altitude_m);
+      setClimbs(detected.map((c, i) => ({
+        ...c, name: `Climb ${i + 1}`, target_watts: defaultWatts,
+      })));
+    }
     setSelectedClimb(null);
     setShowAddClimb(false);
   }
