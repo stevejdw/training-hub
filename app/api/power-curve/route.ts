@@ -1,4 +1,5 @@
 import pool from '@/lib/db';
+import { getProfile, effectiveFtp } from '@/lib/profile';
 import { NextRequest } from 'next/server';
 
 export type PeriodKey = string; // '4w' | '6w' | '3m' | '6m' | '12m' | 'y:2026' | 'y:2025' | ... | 'all'
@@ -9,10 +10,16 @@ function periodToClause(period: PeriodKey): string {
     return `AND EXTRACT(YEAR FROM start_date AT TIME ZONE 'Australia/Sydney') = ${year}`;
   }
   const intervals: Record<string, string> = {
+    '7d':  '7 days',
+    '30d': '30 days',
+    '60d': '60 days',
+    '90d': '90 days',
+    '6m':  '180 days',
+    '1y':  '365 days',
+    // legacy keys kept for backward compat
     '4w':  '28 days',
     '6w':  '42 days',
     '3m':  '90 days',
-    '6m':  '180 days',
     '12m': '365 days',
   };
   if (intervals[period]) return `AND start_date >= NOW() - INTERVAL '${intervals[period]}'`;
@@ -64,13 +71,17 @@ async function fetchCurve(period: PeriodKey) {
 }
 
 export async function GET(req: NextRequest) {
-  const p1 = req.nextUrl.searchParams.get('p1') ?? '6w';
+  const p1 = req.nextUrl.searchParams.get('p1') ?? '90d';
   const p2 = req.nextUrl.searchParams.get('p2') ?? 'none';
 
   try {
-    const curve1 = await fetchCurve(p1);
+    const [curve1, profile] = await Promise.all([
+      fetchCurve(p1),
+      getProfile(),
+    ]);
     const curve2 = p2 !== 'none' ? await fetchCurve(p2) : null;
-    return Response.json({ curve1, curve2 });
+    const ftp = effectiveFtp(profile);
+    return Response.json({ curve1, curve2, ftp });
   } catch (err) {
     console.error('Power curve error:', err);
     return Response.json({ error: String(err) }, { status: 500 });

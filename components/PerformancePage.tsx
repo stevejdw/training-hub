@@ -7,6 +7,7 @@ import FitnessTab, { TssWeekChart } from './training/FitnessTab';
 import AerobicEfficiencyTab from './training/AerobicEfficiencyTab';
 import ReadinessTab from './training/ReadinessTab';
 import KeyIntervalsTab from './training/KeyIntervalsTab';
+import PowerCurveWidget from './training/PowerCurveWidget';
 import DashboardBestPower from './DashboardBestPower';
 
 type Tab = 'fitness' | 'power';
@@ -71,6 +72,10 @@ export default function PerformancePage() {
               <section>
                 <SectionHeading title="Key Intervals" />
                 <KeyIntervalsTab />
+              </section>
+              <section className="pt-2 border-t border-gray-800/60">
+                <SectionHeading title="Power Curve" subtitle="Best power by duration" />
+                <PowerCurveWidget />
               </section>
               <section className="pt-2 border-t border-gray-800/60">
                 <SectionHeading title="Best Efforts" />

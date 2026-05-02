@@ -46,6 +46,17 @@ interface Effort {
 type SortKey = 'start_date' | 'elapsed_time' | 'average_watts' | 'average_heartrate' | 'max_heartrate' | 'wind_speed';
 type SortDir = 'asc' | 'desc';
 
+interface Filters {
+  dateFrom:  string;
+  dateTo:    string;
+  timeMin:   string;  // mm:ss or m:ss
+  timeMax:   string;
+  powerMin:  string;
+  powerMax:  string;
+}
+
+const EMPTY_FILTERS: Filters = { dateFrom: '', dateTo: '', timeMin: '', timeMax: '', powerMin: '', powerMax: '' };
+
 function fmt(seconds: number): string {
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
@@ -53,6 +64,20 @@ function fmt(seconds: number): string {
   return h > 0
     ? `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
     : `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+/** Parse "m:ss" or "mm:ss" or "h:mm:ss" to seconds. Returns null if unparseable. */
+function parseTime(str: string): number | null {
+  if (!str.trim()) return null;
+  const parts = str.trim().split(':').map(Number);
+  if (parts.some(isNaN)) return null;
+  if (parts.length === 2) return parts[0] * 60 + parts[1];
+  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  return null;
+}
+
+function activeFilterCount(f: Filters): number {
+  return [f.dateFrom, f.dateTo, f.timeMin, f.timeMax, f.powerMin, f.powerMax].filter(Boolean).length;
 }
 
 const CLIMB_CATEGORY: Record<number, string> = {
@@ -69,16 +94,44 @@ function SortIcon({ col, sortKey, sortDir }: { col: SortKey; sortKey: SortKey; s
   return <span className="ml-1 text-orange-400">{sortDir === 'asc' ? '↑' : '↓'}</span>;
 }
 
+/** Placing badge — always reflects time-based rank in the full effort set. */
+function PlaceBadge({ rank }: { rank: number }) {
+  if (rank === 1) return (
+    <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-yellow-500/20 text-yellow-400 text-[10px] font-bold border border-yellow-500/40">1</span>
+  );
+  if (rank === 2) return (
+    <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-gray-400/15 text-gray-300 text-[10px] font-bold border border-gray-500/30">2</span>
+  );
+  if (rank === 3) return (
+    <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-orange-700/20 text-orange-400 text-[10px] font-bold border border-orange-700/30">3</span>
+  );
+  if (rank <= 10) return (
+    <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-green-500/10 text-green-400 text-[10px] font-bold border border-green-500/20">{rank}</span>
+  );
+  return (
+    <span className="inline-flex items-center justify-center w-6 h-6 text-gray-600 text-[10px] tabular-nums">{rank}</span>
+  );
+}
+
+function rowBg(rank: number, isAlt: boolean): string {
+  if (rank === 1) return 'bg-yellow-500/5';
+  if (rank <= 3)  return 'bg-orange-500/5';
+  if (rank <= 10) return 'bg-green-500/4';
+  return isAlt ? 'bg-gray-800/20' : '';
+}
+
 export default function SegmentDetail({ id }: { id: string }) {
-  const [segment,  setSegment]  = useState<Segment | null>(null);
-  const [efforts,  setEfforts]  = useState<Effort[]>([]);
-  const [segLoad,  setSegLoad]  = useState(true);
-  const [effLoad,  setEffLoad]  = useState(true);
-  const [error,    setError]    = useState(false);
-  const [sortKey,   setSortKey]   = useState<SortKey>('start_date');
-  const [sortDir,   setSortDir]   = useState<SortDir>('desc');
+  const [segment,   setSegment]   = useState<Segment | null>(null);
+  const [efforts,   setEfforts]   = useState<Effort[]>([]);
+  const [segLoad,   setSegLoad]   = useState(true);
+  const [effLoad,   setEffLoad]   = useState(true);
+  const [error,     setError]     = useState(false);
+  const [sortKey,   setSortKey]   = useState<SortKey>('elapsed_time');
+  const [sortDir,   setSortDir]   = useState<SortDir>('asc');
   const [remaining, setRemaining] = useState(0);
-  const [debug, setDebug] = useState<Record<string, unknown> | null>(null);
+  const [debug,     setDebug]     = useState<Record<string, unknown> | null>(null);
+  const [filters,   setFilters]   = useState<Filters>(EMPTY_FILTERS);
+  const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
     fetch(`/api/segments/${id}`)
@@ -97,6 +150,14 @@ export default function SegmentDetail({ id }: { id: string }) {
       .catch(err => { setDebug({ fetch_error: String(err) }); setEffLoad(false); });
   }, [id]);
 
+  // Time-based rank map: effortId → rank (1 = fastest, all efforts unfiltered)
+  const timeRankMap = useMemo(() => {
+    const sorted = [...efforts].sort((a, b) => a.elapsed_time - b.elapsed_time);
+    const map: Record<number, number> = {};
+    sorted.forEach((e, i) => { map[e.id] = i + 1; });
+    return map;
+  }, [efforts]);
+
   const sorted = useMemo(() => {
     return [...efforts].sort((a, b) => {
       let av: number | string | null = null;
@@ -106,7 +167,6 @@ export default function SegmentDetail({ id }: { id: string }) {
       } else {
         av = a[sortKey]; bv = b[sortKey];
       }
-      // Nulls always last
       if (av == null && bv == null) return 0;
       if (av == null) return 1;
       if (bv == null) return -1;
@@ -117,17 +177,37 @@ export default function SegmentDetail({ id }: { id: string }) {
     });
   }, [efforts, sortKey, sortDir]);
 
+  const filtered = useMemo(() => {
+    const minSec  = parseTime(filters.timeMin);
+    const maxSec  = parseTime(filters.timeMax);
+    const minW    = filters.powerMin ? Number(filters.powerMin) : null;
+    const maxW    = filters.powerMax ? Number(filters.powerMax) : null;
+    return sorted.filter(e => {
+      if (filters.dateFrom && e.start_date.slice(0, 10) < filters.dateFrom) return false;
+      if (filters.dateTo   && e.start_date.slice(0, 10) > filters.dateTo)   return false;
+      if (minSec !== null && e.elapsed_time < minSec) return false;
+      if (maxSec !== null && e.elapsed_time > maxSec) return false;
+      if (minW !== null && (e.average_watts == null || e.average_watts < minW)) return false;
+      if (maxW !== null && (e.average_watts == null || e.average_watts > maxW)) return false;
+      return true;
+    });
+  }, [sorted, filters]);
+
   function toggleSort(key: SortKey) {
     if (sortKey === key) {
       setSortDir(d => d === 'asc' ? 'desc' : 'asc');
     } else {
       setSortKey(key);
-      // Default direction for each key
       setSortDir(key === 'elapsed_time' ? 'asc' : 'desc');
     }
   }
 
-  const bestTime = efforts.length > 0 ? Math.min(...efforts.map(e => e.elapsed_time)) : null;
+  function setFilter<K extends keyof Filters>(key: K, value: string) {
+    setFilters(f => ({ ...f, [key]: value }));
+  }
+
+  const bestTime   = efforts.length > 0 ? Math.min(...efforts.map(e => e.elapsed_time)) : null;
+  const filterCount = activeFilterCount(filters);
 
   if (segLoad) {
     return (
@@ -167,7 +247,7 @@ export default function SegmentDetail({ id }: { id: string }) {
     }
   }
 
-  const thClass = "px-4 py-3 text-gray-500 font-medium cursor-pointer select-none hover:text-gray-300 transition-colors whitespace-nowrap";
+  const thClass = "px-3 py-3 text-gray-500 font-medium cursor-pointer select-none hover:text-gray-300 transition-colors whitespace-nowrap";
 
   return (
     <div className="h-full overflow-y-auto scroll-touch">
@@ -290,11 +370,133 @@ export default function SegmentDetail({ id }: { id: string }) {
 
         {/* Efforts table */}
         <div>
-          <div className="flex items-center justify-between mb-3">
+          {/* Header row */}
+          <div className="flex items-center justify-between mb-3 gap-3">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-              {effLoad ? 'Loading efforts…' : `Your Efforts (${efforts.length})`}
+              {effLoad ? 'Loading efforts…' : (
+                <>
+                  Your Efforts ({filtered.length}{filtered.length !== efforts.length ? `/${efforts.length}` : ''})
+                </>
+              )}
             </p>
+            {!effLoad && efforts.length > 0 && (
+              <button
+                onClick={() => setShowFilters(f => !f)}
+                className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg border transition-colors ${
+                  showFilters || filterCount > 0
+                    ? 'bg-orange-500/15 text-orange-400 border-orange-500/40'
+                    : 'bg-gray-800 text-gray-500 border-gray-700 hover:text-gray-300'
+                }`}
+              >
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z" />
+                </svg>
+                Filter
+                {filterCount > 0 && (
+                  <span className="bg-orange-500 text-white text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center leading-none">
+                    {filterCount}
+                  </span>
+                )}
+              </button>
+            )}
           </div>
+
+          {/* Filter panel */}
+          {showFilters && (
+            <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 mb-3 space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                {/* Date range */}
+                <div className="col-span-2">
+                  <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1.5">Date range</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[9px] text-gray-600 block mb-1">From</label>
+                      <input
+                        type="date"
+                        value={filters.dateFrom}
+                        onChange={e => setFilter('dateFrom', e.target.value)}
+                        className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-orange-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[9px] text-gray-600 block mb-1">To</label>
+                      <input
+                        type="date"
+                        value={filters.dateTo}
+                        onChange={e => setFilter('dateTo', e.target.value)}
+                        className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-orange-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Time range */}
+                <div>
+                  <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1.5">Time range</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[9px] text-gray-600 block mb-1">Min (m:ss)</label>
+                      <input
+                        type="text"
+                        value={filters.timeMin}
+                        onChange={e => setFilter('timeMin', e.target.value)}
+                        placeholder="e.g. 4:30"
+                        className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-orange-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[9px] text-gray-600 block mb-1">Max (m:ss)</label>
+                      <input
+                        type="text"
+                        value={filters.timeMax}
+                        onChange={e => setFilter('timeMax', e.target.value)}
+                        placeholder="e.g. 6:00"
+                        className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-orange-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Power range */}
+                <div>
+                  <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1.5">Power range (W)</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[9px] text-gray-600 block mb-1">Min</label>
+                      <input
+                        type="number"
+                        value={filters.powerMin}
+                        onChange={e => setFilter('powerMin', e.target.value)}
+                        placeholder="e.g. 250"
+                        className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-orange-500"
+                        min={0}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[9px] text-gray-600 block mb-1">Max</label>
+                      <input
+                        type="number"
+                        value={filters.powerMax}
+                        onChange={e => setFilter('powerMax', e.target.value)}
+                        placeholder="e.g. 350"
+                        className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-orange-500"
+                        min={0}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {filterCount > 0 && (
+                <button
+                  onClick={() => setFilters(EMPTY_FILTERS)}
+                  className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
+                >
+                  Clear all filters
+                </button>
+              )}
+            </div>
+          )}
 
           {effLoad ? (
             <div className="space-y-2">
@@ -329,6 +531,8 @@ export default function SegmentDetail({ id }: { id: string }) {
               <table className="text-sm w-full whitespace-nowrap">
                 <thead>
                   <tr className="border-b border-gray-800">
+                    {/* Placing */}
+                    <th className="px-3 py-3 text-gray-500 font-medium text-center w-8">#</th>
                     <th className={`text-left ${thClass}`} onClick={() => toggleSort('start_date')}>
                       Date <SortIcon col="start_date" sortKey={sortKey} sortDir={sortDir} />
                     </th>
@@ -350,7 +554,8 @@ export default function SegmentDetail({ id }: { id: string }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {sorted.map((e, i) => {
+                  {filtered.map((e, rowIdx) => {
+                    const rank  = timeRankMap[e.id] ?? 999;
                     const isPR  = e.elapsed_time === bestTime;
                     const date  = new Date(e.start_date);
                     const isTop = e.kom_rank != null && e.kom_rank <= 3;
@@ -359,18 +564,21 @@ export default function SegmentDetail({ id }: { id: string }) {
                       <tr
                         key={e.id}
                         onClick={() => e.activity_id && (window.location.href = `/activities/${e.activity_id}`)}
-                        className={`border-b border-gray-800/60 last:border-0 cursor-pointer transition-colors hover:bg-gray-800/60 ${
-                          isPR ? 'bg-yellow-500/5' : i % 2 !== 0 ? 'bg-gray-800/20' : ''
-                        }`}
+                        className={`border-b border-gray-800/60 last:border-0 cursor-pointer transition-colors hover:bg-gray-800/60 ${rowBg(rank, rowIdx % 2 !== 0)}`}
                       >
+                        {/* Placing */}
+                        <td className="px-3 py-3 text-center">
+                          <PlaceBadge rank={rank} />
+                        </td>
+
                         {/* Date */}
-                        <td className="px-4 py-3 text-gray-300 text-left">
+                        <td className="px-3 py-3 text-gray-300 text-left">
                           {date.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
                         </td>
 
                         {/* Time */}
-                        <td className="px-4 py-3 text-right tabular-nums">
-                          <span className={`font-bold ${isPR ? 'text-yellow-300' : 'text-white'}`}>
+                        <td className="px-3 py-3 text-right tabular-nums">
+                          <span className={`font-bold ${rank === 1 ? 'text-yellow-300' : rank <= 3 ? 'text-orange-300' : 'text-white'}`}>
                             {fmt(e.elapsed_time)}
                           </span>
                           {isPR && (
@@ -382,28 +590,28 @@ export default function SegmentDetail({ id }: { id: string }) {
                         </td>
 
                         {/* Power */}
-                        <td className="px-4 py-3 text-right tabular-nums text-gray-300">
+                        <td className="px-3 py-3 text-right tabular-nums text-gray-300">
                           {e.average_watts
                             ? <>{Math.round(e.average_watts)}<span className="text-xs text-gray-500 ml-0.5">W</span></>
                             : <span className="text-gray-600">—</span>}
                         </td>
 
                         {/* Avg HR */}
-                        <td className="px-4 py-3 text-right tabular-nums text-gray-300">
+                        <td className="px-3 py-3 text-right tabular-nums text-gray-300">
                           {e.average_heartrate
                             ? <>{Math.round(e.average_heartrate)}<span className="text-xs text-gray-500 ml-0.5">bpm</span></>
                             : <span className="text-gray-600">—</span>}
                         </td>
 
                         {/* Max HR */}
-                        <td className="px-4 py-3 text-right tabular-nums text-gray-300">
+                        <td className="px-3 py-3 text-right tabular-nums text-gray-300">
                           {e.max_heartrate
                             ? <>{Math.round(e.max_heartrate)}<span className="text-xs text-gray-500 ml-0.5">bpm</span></>
                             : <span className="text-gray-600">—</span>}
                         </td>
 
                         {/* Wind */}
-                        <td className="px-4 py-3 text-right">
+                        <td className="px-3 py-3 text-right">
                           {e.wind_speed != null ? (
                             <span className="text-gray-300 tabular-nums">
                               {e.wind_speed}<span className="text-xs text-gray-500 ml-0.5">km/h</span>
@@ -422,10 +630,15 @@ export default function SegmentDetail({ id }: { id: string }) {
                   })}
                 </tbody>
               </table>
+
+              {filtered.length === 0 && filterCount > 0 && (
+                <div className="py-8 text-center text-gray-500 text-sm">
+                  No efforts match your filters.{' '}
+                  <button onClick={() => setFilters(EMPTY_FILTERS)} className="text-orange-400 hover:text-orange-300 transition-colors">Clear</button>
+                </div>
+              )}
             </div>
           )}
-
-          {/* progress hint intentionally removed — backfill runs via scheduled workflow */}
         </div>
 
       </div>
