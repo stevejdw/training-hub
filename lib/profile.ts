@@ -72,6 +72,10 @@ export interface AthleteProfile {
   bike_weight_kg?: number | null;
   // Coach AI
   coach_persona?: string;
+  // intervals.icu integration
+  intervals_athlete_id?: string;
+  intervals_api_key?: string;
+  intervals_last_synced?: string; // ISO date of most recent wellness record synced
 }
 
 const DEFAULTS: AthleteProfile = {

@@ -17,6 +17,12 @@ function fmtDate(iso: string | null): string {
   return new Date(iso).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
+interface WellnessStatus {
+  total:      number;
+  oldestDate: string | null;
+  newestDate: string | null;
+}
+
 export default function SettingsContent() {
   const { profile, update, save, saving, saved } = useProfileEdit();
   const [theme, setTheme] = useState<ThemePreference>('dark');
@@ -27,6 +33,13 @@ export default function SettingsContent() {
   const [historyBusy, setHistoryBusy]       = useState(false);
   const [historyLog, setHistoryLog]         = useState<string[]>([]);
   const [historyDone, setHistoryDone]       = useState(false);
+
+  // intervals.icu sync state
+  const [wellnessStatus, setWellnessStatus]   = useState<WellnessStatus | null>(null);
+  const [wellnessLoading, setWellnessLoading] = useState(false);
+  const [wellnessBusy, setWellnessBusy]       = useState(false);
+  const [wellnessLog, setWellnessLog]         = useState<string[]>([]);
+  const [intervalsCreds, setIntervalsCreds]   = useState({ id: '', key: '' });
 
   useEffect(() => { setTheme(getThemePreference()); }, []);
 
@@ -39,6 +52,26 @@ export default function SettingsContent() {
       .catch(() => {})
       .finally(() => setHistoryLoading(false));
   }, []);
+
+  // Load wellness status + pre-fill credentials from profile on mount
+  useEffect(() => {
+    setWellnessLoading(true);
+    fetch('/api/intervals/sync')
+      .then(r => r.json())
+      .then((d: WellnessStatus) => setWellnessStatus(d))
+      .catch(() => {})
+      .finally(() => setWellnessLoading(false));
+  }, []);
+
+  // Pre-fill intervals credentials from loaded profile
+  useEffect(() => {
+    if (profile) {
+      setIntervalsCreds({
+        id:  profile.intervals_athlete_id ?? '',
+        key: profile.intervals_api_key    ?? '',
+      });
+    }
+  }, [profile?.intervals_athlete_id, profile?.intervals_api_key]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function changeTheme(t: ThemePreference) {
     setTheme(t);
@@ -103,6 +136,51 @@ export default function SettingsContent() {
       setHistoryLog(l => [...l, `Failed: ${String(err)}`]);
     } finally {
       setHistoryBusy(false);
+    }
+  }
+
+  async function saveIntervalsCreds() {
+    update('intervals_athlete_id', intervalsCreds.id.trim());
+    update('intervals_api_key',    intervalsCreds.key.trim());
+    await save();
+  }
+
+  async function runWellnessSync(days: number) {
+    if (wellnessBusy) return;
+    // Persist credentials first if they differ from profile
+    if (
+      intervalsCreds.id.trim()  !== (profile?.intervals_athlete_id ?? '') ||
+      intervalsCreds.key.trim() !== (profile?.intervals_api_key    ?? '')
+    ) {
+      update('intervals_athlete_id', intervalsCreds.id.trim());
+      update('intervals_api_key',    intervalsCreds.key.trim());
+      await save();
+    }
+
+    setWellnessBusy(true);
+    setWellnessLog([]);
+    try {
+      const res  = await fetch('/api/intervals/sync', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ days }),
+      });
+      const data = await res.json() as { synced?: number; oldestDate?: string; newestDate?: string; error?: string };
+      if (data.error) {
+        setWellnessLog([`Error: ${data.error}`]);
+      } else {
+        setWellnessLog([
+          `Synced ${data.synced ?? 0} records` +
+          (data.oldestDate ? ` (${fmtDate(data.oldestDate)} – ${fmtDate(data.newestDate ?? null)})` : ''),
+        ]);
+        // Refresh status
+        const s = await fetch('/api/intervals/sync').then(r => r.json()) as WellnessStatus;
+        setWellnessStatus(s);
+      }
+    } catch (err) {
+      setWellnessLog([`Failed: ${String(err)}`]);
+    } finally {
+      setWellnessBusy(false);
     }
   }
 
@@ -273,6 +351,100 @@ export default function SettingsContent() {
             </div>
           )}
         </div>
+      </div>
+
+      {/* intervals.icu Integration */}
+      <div className="bg-gray-900 rounded-xl p-5 space-y-4 border border-gray-800">
+        <div>
+          <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">intervals.icu</h2>
+          <p className="text-xs text-gray-500 mt-1">
+            Sync daily HRV, readiness score, and sleep score to power the Readiness dashboard.
+            Find your Athlete ID in your intervals.icu URL: <span className="text-gray-400 font-mono">intervals.icu/athlete/</span><span className="text-orange-400 font-mono">i12345</span>.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div>
+            <label className="block text-[10px] text-gray-500 uppercase tracking-wider mb-1">Athlete ID</label>
+            <input
+              type="text"
+              value={intervalsCreds.id}
+              onChange={e => setIntervalsCreds(c => ({ ...c, id: e.target.value }))}
+              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-orange-500 font-mono"
+              placeholder="i12345"
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] text-gray-500 uppercase tracking-wider mb-1">API Key</label>
+            <input
+              type="password"
+              value={intervalsCreds.key}
+              onChange={e => setIntervalsCreds(c => ({ ...c, key: e.target.value }))}
+              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-orange-500 font-mono"
+              placeholder="••••••••••••••••"
+            />
+          </div>
+        </div>
+
+        {/* Wellness DB status */}
+        {!wellnessLoading && wellnessStatus && wellnessStatus.total > 0 && (
+          <div className="grid grid-cols-3 gap-2">
+            <div className="bg-gray-800 rounded-lg p-2.5 text-center">
+              <p className="text-[10px] text-gray-500 uppercase tracking-wider">Stored</p>
+              <p className="text-base font-bold text-white mt-0.5">{wellnessStatus.total.toLocaleString()}</p>
+            </div>
+            <div className="bg-gray-800 rounded-lg p-2.5 text-center">
+              <p className="text-[10px] text-gray-500 uppercase tracking-wider">Newest</p>
+              <p className="text-[11px] font-semibold text-white mt-0.5">{fmtDate(wellnessStatus.newestDate)}</p>
+            </div>
+            <div className="bg-gray-800 rounded-lg p-2.5 text-center">
+              <p className="text-[10px] text-gray-500 uppercase tracking-wider">Oldest</p>
+              <p className="text-[11px] font-semibold text-white mt-0.5">{fmtDate(wellnessStatus.oldestDate)}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Sync buttons */}
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => runWellnessSync(90)}
+            disabled={wellnessBusy || !intervalsCreds.id || !intervalsCreds.key}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-white text-sm font-medium transition-colors"
+          >
+            {wellnessBusy ? (
+              <>
+                <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                  <circle cx="12" cy="12" r="10" strokeOpacity={0.25} />
+                  <path d="M12 2a10 10 0 0 1 10 10" />
+                </svg>
+                Syncing…
+              </>
+            ) : 'Sync last 90 days'}
+          </button>
+          <button
+            onClick={() => runWellnessSync(365)}
+            disabled={wellnessBusy || !intervalsCreds.id || !intervalsCreds.key}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-gray-800 hover:bg-gray-700 disabled:opacity-50 text-gray-300 text-sm font-medium transition-colors border border-gray-700"
+          >
+            Backfill 1 year
+          </button>
+          <button
+            onClick={saveIntervalsCreds}
+            disabled={saving || !intervalsCreds.id || !intervalsCreds.key}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-orange-500/10 hover:bg-orange-500/20 disabled:opacity-50 text-orange-400 text-sm font-medium transition-colors border border-orange-500/30"
+          >
+            Save credentials
+          </button>
+        </div>
+
+        {/* Sync log */}
+        {wellnessLog.length > 0 && (
+          <div className="bg-gray-950 rounded-lg p-3 space-y-1">
+            {wellnessLog.map((line, i) => (
+              <p key={i} className="text-[11px] text-gray-400 font-mono">{line}</p>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="flex justify-end">
