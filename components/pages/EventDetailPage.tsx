@@ -227,7 +227,8 @@ export default function EventDetailPage({ eventId }: Props) {
   const bikeKg  = profile?.bike_weight_kg ?? 8;
 
   // Track whether we have unsaved edits in edit mode
-  const savedEventRef = useRef(event);
+  const savedEventRef  = useRef(event);
+  const elevationRef   = useRef<HTMLElement>(null);
 
   // ── Populate from profile once loaded ──
   useEffect(() => {
@@ -699,7 +700,7 @@ export default function EventDetailPage({ eventId }: Props) {
 
           {/* ── Elevation profile ─────────────────────────────── */}
           {route && chartData.length > 0 && (
-            <section className="bg-[#f5f7fa] border border-gray-200 rounded-2xl p-4 space-y-2">
+            <section ref={elevationRef} className="bg-[#f5f7fa] border border-gray-200 rounded-2xl p-4 space-y-2">
               <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Elevation Profile</h2>
               <ResponsiveContainer width="100%" height={160}>
                 <AreaChart data={chartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
@@ -773,17 +774,21 @@ export default function EventDetailPage({ eventId }: Props) {
                   {climbs.map((c, i) => {
                     const seg    = segments.find(s => s.type === 'climb' && s.climb_idx === i);
                     const estStr = seg ? fmtTime(seg.est_time_min) : null;
+                    const isSel  = selectedClimb === i;
                     return (
-                      <Link
+                      <button
                         key={i}
-                        href={`/events/${eventId}/climb/${i}`}
-                        className="flex items-center gap-3 px-4 py-3 hover:bg-gray-800/40 transition-colors group"
+                        onClick={() => {
+                          setSelectedClimb(isSel ? null : i);
+                          if (!isSel) elevationRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        }}
+                        className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-800/40 transition-colors group text-left ${isSel ? 'bg-orange-500/5' : ''}`}
                       >
-                        <span className="flex-shrink-0 w-5 h-5 rounded-full bg-gray-800 flex items-center justify-center text-[10px] font-bold text-gray-400 group-hover:bg-orange-500/20 group-hover:text-orange-400 transition-colors">
+                        <span className={`flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold transition-colors ${isSel ? 'bg-orange-500/30 text-orange-400' : 'bg-gray-800 text-gray-400 group-hover:bg-orange-500/20 group-hover:text-orange-400'}`}>
                           {i + 1}
                         </span>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold text-white truncate">{c.name}</p>
+                          <p className={`text-sm font-semibold truncate ${isSel ? 'text-orange-400' : 'text-white'}`}>{c.name}</p>
                           <div className="flex items-center gap-3 mt-0.5 text-[11px] text-gray-500">
                             <span>{c.start_km} km from start</span>
                             <span>{c.distance_km} km</span>
@@ -794,10 +799,7 @@ export default function EventDetailPage({ eventId }: Props) {
                         {estStr && (
                           <span className="flex-shrink-0 text-sm font-bold text-white tabular-nums">{estStr}</span>
                         )}
-                        <svg className="w-3.5 h-3.5 text-gray-600 group-hover:text-orange-400 flex-shrink-0 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                        </svg>
-                      </Link>
+                      </button>
                     );
                   })}
                 </div>
