@@ -210,14 +210,12 @@ export default function EventDetailPage({ eventId }: Props) {
   const [flatWatts,     setFlatWatts]     = useState(DEFAULT_FLAT_WATTS);
   const [descentWatts,  setDescentWatts]  = useState(DEFAULT_DESCENT_WATTS);
 
-  // ── Add-climb form ──
-  const [showAddClimb, setShowAddClimb] = useState(false);
-  const [addStart,     setAddStart]     = useState('');
-  const [addEnd,       setAddEnd]       = useState('');
-
-  // ── Inline climb editor ──
-  const [editingClimbIdx, setEditingClimbIdx] = useState<number | null>(null);
-  const [editClimbForm, setEditClimbForm] = useState({ name: '', start_km: '', end_km: '', target_watts: '' });
+  // ── Key Climbs edit mode ──
+  const [editingClimbs, setEditingClimbs] = useState(false);
+  const [climbDrafts,   setClimbDrafts]   = useState<{ start_km: string; end_km: string }[]>([]);
+  const [showAddClimb,  setShowAddClimb]  = useState(false);
+  const [addStart,      setAddStart]      = useState('');
+  const [addEnd,        setAddEnd]        = useState('');
 
   // ── Speed targets ──
   const [descentSpeedKmh, setDescentSpeedKmh] = useState<number | undefined>(undefined);
@@ -368,16 +366,10 @@ export default function EventDetailPage({ eventId }: Props) {
     router.push('/events');
   }
 
-  function updateClimbWatts(i: number, watts: number) {
-    setClimbs(prev => prev.map((c, idx) => idx === i ? { ...c, target_watts: watts } : c));
-  }
-
   // ── Climb management ──
   function deleteClimb(i: number) {
-    setClimbs(prev => {
-      const next = prev.filter((_, idx) => idx !== i).map((c, idx) => ({ ...c, name: `Climb ${idx + 1}` }));
-      return next;
-    });
+    setClimbs(prev => prev.filter((_, idx) => idx !== i).map((c, idx) => ({ ...c, name: `Climb ${idx + 1}` })));
+    setClimbDrafts(prev => prev.filter((_, idx) => idx !== i));
     setSelectedClimb(null);
   }
 
@@ -427,19 +419,15 @@ export default function EventDetailPage({ eventId }: Props) {
       target_watts:   Math.round(flatWatts * 0.88),
     };
 
-    setClimbs(prev => {
-      const next = [...prev, newClimb].sort((a, b) => a.start_km - b.start_km).map((c, i) => ({
-        ...c, name: `Climb ${i + 1}`,
-      }));
-      return next;
-    });
+    const next = [...climbs, newClimb].sort((a, b) => a.start_km - b.start_km).map((c, i) => ({ ...c, name: `Climb ${i + 1}` }));
+    setClimbs(next);
+    setClimbDrafts(next.map(c => ({ start_km: String(c.start_km), end_km: String(c.end_km) })));
     setAddStart(''); setAddEnd(''); setShowAddClimb(false);
   }
 
   function computeClimbStats(startKm: number, endKm: number) {
     if (!route) return { distance_km: 0, elevation_gain: 0, avg_gradient: 0 };
-    const d = route.stream_distance_km;
-    const a = route.stream_altitude_m;
+    const d = route.stream_distance_km, a = route.stream_altitude_m;
     let firstAlt: number | null = null, lastAlt = 0;
     for (let i = 0; i < d.length; i++) {
       if (d[i] < startKm || d[i] > endKm) continue;
@@ -452,36 +440,37 @@ export default function EventDetailPage({ eventId }: Props) {
     return { distance_km: dist, elevation_gain: Math.round(net), avg_gradient: avgGrad };
   }
 
-  function openClimbEdit(i: number) {
-    const c = climbs[i];
-    setEditingClimbIdx(i);
-    setEditClimbForm({
-      name:         c.name,
-      start_km:     String(c.start_km),
-      end_km:       String(c.end_km),
-      target_watts: String(c.target_watts),
-    });
+  function startClimbEdit() {
+    setClimbDrafts(climbs.map(c => ({ start_km: String(c.start_km), end_km: String(c.end_km) })));
+    setEditingClimbs(true);
     setSelectedClimb(null);
   }
 
-  function saveClimbEdit() {
-    if (editingClimbIdx === null) return;
-    const s = parseFloat(editClimbForm.start_km);
-    const e = parseFloat(editClimbForm.end_km);
-    if (isNaN(s) || isNaN(e) || e <= s) return;
-    const stats = computeClimbStats(s, e);
-    setClimbs(prev => {
-      const next = [...prev];
-      next[editingClimbIdx] = {
-        ...stats,
-        name:         editClimbForm.name || `Climb ${editingClimbIdx + 1}`,
-        start_km:     Math.round(s * 10) / 10,
-        end_km:       Math.round(e * 10) / 10,
-        target_watts: Number(editClimbForm.target_watts) || flatWatts,
-      };
-      return next;
+  function applyClimbEdits() {
+    const updated = climbs.map((c, i) => {
+      const d = climbDrafts[i];
+      if (!d) return c;
+      const s = parseFloat(d.start_km), e = parseFloat(d.end_km);
+      if (isNaN(s) || isNaN(e) || e <= s) return c;
+      const stats = computeClimbStats(Math.round(s * 10) / 10, Math.round(e * 10) / 10);
+      return { ...c, ...stats, start_km: Math.round(s * 10) / 10, end_km: Math.round(e * 10) / 10 };
     });
-    setEditingClimbIdx(null);
+    setClimbs(updated);
+    setEditingClimbs(false);
+    setShowAddClimb(false);
+    persistEventWithClimbs(updated);
+  }
+
+  function persistEventWithClimbs(newClimbs: EventClimb[]) {
+    if (!profile) return;
+    const strategy: PacingStrategy | null = route
+      ? { flat_watts: flatWatts, flat_speed_kmh: flatSpeedKmh, descent_watts: descentWatts,
+          descent_speed_kmh: descentSpeedKmh, bike_weight_kg: bikeKg, climbs: newClimbs, est_time_min: estMin ?? 0 }
+      : event?.pacing_strategy ?? null;
+    const updated = { id: eventId, name, date, location, goal, strava_route_id: route?.id ?? event?.strava_route_id, route: route ?? event?.route ?? null, pacing_strategy: strategy };
+    const events  = profile.events.map(e => (e.id ?? '') === eventId ? updated : e);
+    const merged  = { ...profile, events };
+    setProfile(merged); save(merged);
   }
 
   // ── Days/color ──
@@ -752,29 +741,81 @@ export default function EventDetailPage({ eventId }: Props) {
           {/* ── Key Climbs tile (expandable) ─────────────────── */}
           {route && (
             <section className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
-              <button
-                onClick={() => setClimbsOpen(o => !o)}
-                className="w-full flex items-center justify-between p-4 hover:bg-gray-800/40 transition-colors"
-              >
-                <div className="text-left">
+              {/* Header row */}
+              <div className="flex items-center justify-between p-4">
+                <button
+                  onClick={() => !editingClimbs && setClimbsOpen(o => !o)}
+                  className="flex-1 text-left"
+                >
                   <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Key Climbs</h2>
                   <p className="text-sm text-gray-300 mt-0.5">
                     {climbs.length > 0
                       ? `${climbs.length} climb${climbs.length !== 1 ? 's' : ''} · ${totalClimbAscent.toLocaleString()} m total ascent`
                       : 'No climbs detected'}
                   </p>
-                </div>
-                <svg className={`w-4 h-4 text-gray-500 flex-shrink-0 transition-transform ${climbsOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                </svg>
-              </button>
+                </button>
+                {editingClimbs ? (
+                  <button
+                    onClick={applyClimbEdits}
+                    className="flex-shrink-0 text-xs text-orange-400 hover:text-orange-300 border border-orange-500/30 hover:border-orange-500/60 rounded-lg px-3 py-1.5 transition-colors ml-3"
+                  >
+                    Done
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => { setClimbsOpen(true); startClimbEdit(); }}
+                    className="flex-shrink-0 text-xs text-gray-500 hover:text-orange-400 border border-gray-700 hover:border-orange-500/40 rounded-lg px-3 py-1.5 transition-colors ml-3"
+                  >
+                    Edit
+                  </button>
+                )}
+              </div>
 
-              {climbsOpen && climbs.length > 0 && (
+              {/* Climb list */}
+              {(climbsOpen || editingClimbs) && climbs.length > 0 && (
                 <div className="border-t border-gray-800 divide-y divide-gray-800/60">
                   {climbs.map((c, i) => {
                     const seg    = segments.find(s => s.type === 'climb' && s.climb_idx === i);
                     const estStr = seg ? fmtTime(seg.est_time_min) : null;
                     const isSel  = selectedClimb === i;
+                    if (editingClimbs) {
+                      const draft = climbDrafts[i] ?? { start_km: String(c.start_km), end_km: String(c.end_km) };
+                      return (
+                        <div key={i} className="flex items-center gap-2 px-4 py-2.5">
+                          <span className="flex-shrink-0 w-5 h-5 rounded-full bg-gray-800 flex items-center justify-center text-[10px] font-bold text-gray-400">
+                            {i + 1}
+                          </span>
+                          <p className="text-xs font-medium text-white truncate flex-1 min-w-0">{c.name}</p>
+                          <div className="flex items-center gap-1.5 flex-shrink-0">
+                            <div className="flex flex-col items-end">
+                              <label className="text-[9px] text-gray-600 uppercase tracking-wider mb-0.5">Start km</label>
+                              <input
+                                type="number"
+                                value={draft.start_km}
+                                step="0.1" min="0"
+                                onChange={e => setClimbDrafts(prev => prev.map((d, idx) => idx === i ? { ...d, start_km: e.target.value } : d))}
+                                className="w-16 bg-gray-800 border border-gray-700 rounded px-1.5 py-1 text-xs text-white text-right focus:outline-none focus:border-orange-500 tabular-nums"
+                              />
+                            </div>
+                            <div className="flex flex-col items-end">
+                              <label className="text-[9px] text-gray-600 uppercase tracking-wider mb-0.5">End km</label>
+                              <input
+                                type="number"
+                                value={draft.end_km}
+                                step="0.1" min="0"
+                                onChange={e => setClimbDrafts(prev => prev.map((d, idx) => idx === i ? { ...d, end_km: e.target.value } : d))}
+                                className="w-16 bg-gray-800 border border-gray-700 rounded px-1.5 py-1 text-xs text-white text-right focus:outline-none focus:border-orange-500 tabular-nums"
+                              />
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => deleteClimb(i)}
+                            className="flex-shrink-0 text-gray-600 hover:text-red-400 transition-colors text-lg leading-none ml-1"
+                            title="Remove climb"
+                          >×</button>
+                        </div>
+                      );
+                    }
                     return (
                       <button
                         key={i}
@@ -790,7 +831,7 @@ export default function EventDetailPage({ eventId }: Props) {
                         <div className="flex-1 min-w-0">
                           <p className={`text-sm font-semibold truncate ${isSel ? 'text-orange-400' : 'text-white'}`}>{c.name}</p>
                           <div className="flex items-center gap-3 mt-0.5 text-[11px] text-gray-500">
-                            <span>{c.start_km} km from start</span>
+                            <span>{c.start_km}–{c.end_km} km</span>
                             <span>{c.distance_km} km</span>
                             <span className="text-orange-400">+{c.elevation_gain} m</span>
                             <span>{c.avg_gradient}% avg</span>
@@ -805,9 +846,47 @@ export default function EventDetailPage({ eventId }: Props) {
                 </div>
               )}
 
-              {climbsOpen && climbs.length === 0 && (
+              {/* Edit mode footer: add + refresh */}
+              {editingClimbs && (
+                <div className="border-t border-gray-800/60 p-3">
+                  {showAddClimb ? (
+                    <div className="space-y-2">
+                      <p className="text-[10px] text-gray-500 uppercase tracking-wider">Add climb</p>
+                      <div className="flex items-end gap-2">
+                        <div className="flex-1">
+                          <label className="text-[9px] text-gray-600 uppercase tracking-wider block mb-1">Start km</label>
+                          <input type="number" value={addStart} onChange={e => setAddStart(e.target.value)} placeholder="e.g. 73.9"
+                            className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-orange-500" step="0.1" min="0" />
+                        </div>
+                        <div className="flex-1">
+                          <label className="text-[9px] text-gray-600 uppercase tracking-wider block mb-1">End km</label>
+                          <input type="number" value={addEnd} onChange={e => setAddEnd(e.target.value)} placeholder="e.g. 83.9"
+                            className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-orange-500" step="0.1" min="0" />
+                        </div>
+                        <button onClick={addCustomClimb} disabled={!addStart || !addEnd}
+                          className="flex-shrink-0 px-3 py-1.5 bg-orange-500 hover:bg-orange-400 disabled:opacity-40 text-white text-xs font-medium rounded-lg transition-colors">Add</button>
+                        <button onClick={() => { setShowAddClimb(false); setAddStart(''); setAddEnd(''); }}
+                          className="flex-shrink-0 text-gray-600 hover:text-gray-400 text-xl leading-none pb-0.5">×</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between">
+                      <button onClick={() => setShowAddClimb(true)}
+                        className="text-xs text-orange-400 hover:text-orange-300 transition-colors flex items-center gap-1">
+                        <span className="text-base leading-none">+</span> Add climb
+                      </button>
+                      <button onClick={() => { resetClimbs(); setClimbDrafts([]); }}
+                        className="text-xs text-gray-600 hover:text-gray-400 transition-colors flex items-center gap-1">
+                        ↺ Refresh
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {(climbsOpen || editingClimbs) && climbs.length === 0 && !showAddClimb && (
                 <div className="border-t border-gray-800 px-4 py-4 text-sm text-gray-600">
-                  Load a Strava course to auto-detect climbs.
+                  {editingClimbs ? 'Add climbs below, or use Refresh to auto-detect.' : 'Load a Strava course to auto-detect climbs.'}
                 </div>
               )}
             </section>
