@@ -56,6 +56,19 @@ export function speedForPower(watts: number, grad: number, totalKg: number): num
   return Math.min(Math.max(v, 0.3), V_MAX);
 }
 
+/**
+ * Return the power (watts) required to sustain a given speed on a given gradient.
+ * Inverse of speedForPower — direct calculation, no iteration needed.
+ * @param speedMs  Speed in m/s
+ * @param grad     Slope as a fraction (e.g. 0.06 = 6% climb, -0.05 = 5% descent)
+ * @param totalKg  Rider + bike total mass in kg
+ */
+export function powerForSpeed(speedMs: number, grad: number, totalKg: number): number {
+  const A = totalKg * G * (grad + CRR);
+  const B = 0.5 * CDA * RHO;
+  return Math.max(0, Math.round(A * speedMs + B * speedMs * speedMs * speedMs));
+}
+
 export interface EventClimbInput {
   start_km:    number;
   end_km:      number;

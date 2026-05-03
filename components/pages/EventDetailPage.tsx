@@ -748,359 +748,114 @@ export default function EventDetailPage({ eventId }: Props) {
             </section>
           )}
 
-          {/* ── Key Climbs ────────────────────────────────────── */}
+          {/* ── Key Climbs tile (expandable) ─────────────────── */}
           {route && (
             <section className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
-              {/* Header — always visible, tap to expand */}
               <button
                 onClick={() => setClimbsOpen(o => !o)}
                 className="w-full flex items-center justify-between p-4 hover:bg-gray-800/40 transition-colors"
               >
                 <div className="text-left">
-                  <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                    Key Climbs {climbs.length > 0 && <span className="text-gray-600">({climbs.length})</span>}
-                  </h2>
-                  {climbs.length > 0 ? (
-                    <p className="text-sm text-gray-300 mt-0.5">
-                      {climbs.length} climb{climbs.length !== 1 ? 's' : ''} · {totalClimbAscent.toLocaleString()} m total ascent
-                    </p>
-                  ) : (
-                    <p className="text-sm text-gray-600 mt-0.5">No climbs detected</p>
-                  )}
+                  <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Key Climbs</h2>
+                  <p className="text-sm text-gray-300 mt-0.5">
+                    {climbs.length > 0
+                      ? `${climbs.length} climb${climbs.length !== 1 ? 's' : ''} · ${totalClimbAscent.toLocaleString()} m total ascent`
+                      : 'No climbs detected'}
+                  </p>
                 </div>
                 <svg className={`w-4 h-4 text-gray-500 flex-shrink-0 transition-transform ${climbsOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
                 </svg>
               </button>
 
-              {/* Expanded climb list */}
-              {climbsOpen && (
-                <div className="border-t border-gray-800">
-                  {climbs.length > 0 && (
-                    <div className="divide-y divide-gray-800/60">
-                      {climbs.map((c, i) => {
-                        const isSelected = selectedClimb === i;
-                        const isEditing  = editingClimbIdx === i;
-                        return (
-                          <div key={i} className={`transition-colors ${isEditing ? 'bg-gray-800/40' : isSelected ? 'bg-orange-500/8' : ''}`}>
-                            {isEditing ? (
-                              <div className="p-3 space-y-3">
-                                <div className="grid grid-cols-2 gap-2">
-                                  <div className="col-span-2">
-                                    <label className="text-[9px] text-gray-600 uppercase tracking-wider block mb-1">Name</label>
-                                    <input
-                                      type="text"
-                                      value={editClimbForm.name}
-                                      onChange={e => setEditClimbForm(f => ({ ...f, name: e.target.value }))}
-                                      className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-orange-500"
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="text-[9px] text-gray-600 uppercase tracking-wider block mb-1">Start km</label>
-                                    <input
-                                      type="number"
-                                      value={editClimbForm.start_km}
-                                      onChange={e => setEditClimbForm(f => ({ ...f, start_km: e.target.value }))}
-                                      className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-orange-500"
-                                      step="0.1" min="0"
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="text-[9px] text-gray-600 uppercase tracking-wider block mb-1">End km</label>
-                                    <input
-                                      type="number"
-                                      value={editClimbForm.end_km}
-                                      onChange={e => setEditClimbForm(f => ({ ...f, end_km: e.target.value }))}
-                                      className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-orange-500"
-                                      step="0.1" min="0"
-                                    />
-                                  </div>
-                                  <div className="col-span-2">
-                                    <label className="text-[9px] text-gray-600 uppercase tracking-wider block mb-1">Target watts</label>
-                                    <input
-                                      type="number"
-                                      value={editClimbForm.target_watts}
-                                      onChange={e => setEditClimbForm(f => ({ ...f, target_watts: e.target.value }))}
-                                      className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-orange-500"
-                                      step="5" min="50" max="600"
-                                    />
-                                  </div>
-                                </div>
-                                <div className="flex items-center justify-between">
-                                  <button
-                                    onClick={() => { deleteClimb(i); setEditingClimbIdx(null); }}
-                                    className="text-xs text-red-400 hover:text-red-300 transition-colors"
-                                  >
-                                    Remove climb
-                                  </button>
-                                  <div className="flex items-center gap-2">
-                                    <button
-                                      onClick={() => setEditingClimbIdx(null)}
-                                      className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
-                                    >
-                                      Cancel
-                                    </button>
-                                    <button
-                                      onClick={saveClimbEdit}
-                                      className="px-3 py-1 rounded-lg bg-orange-500/20 text-orange-400 hover:bg-orange-500/30 text-xs transition-colors"
-                                    >
-                                      Save
-                                    </button>
-                                  </div>
-                                </div>
-                              </div>
-                            ) : (
-                              <div className="p-3">
-                                <div className="flex items-center justify-between gap-2">
-                                  <button
-                                    onClick={() => setSelectedClimb(isSelected ? null : i)}
-                                    className="flex items-center gap-2 min-w-0 flex-1"
-                                  >
-                                    <span className={`flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${isSelected ? 'bg-orange-500 text-white' : 'bg-gray-800 text-gray-400'}`}>
-                                      {i + 1}
-                                    </span>
-                                    <span className="text-sm font-semibold text-white truncate">{c.name}</span>
-                                  </button>
-                                  <button
-                                    onClick={() => openClimbEdit(i)}
-                                    className="flex-shrink-0 text-xs text-orange-400 hover:text-orange-300 border border-orange-500/30 hover:border-orange-500/60 rounded px-2 py-0.5 transition-colors"
-                                  >
-                                    Edit
-                                  </button>
-                                </div>
-                                <div className="mt-2 grid grid-cols-4 gap-1 text-center pl-7">
-                                  <div>
-                                    <p className="text-[9px] text-gray-600 uppercase tracking-wider">From start</p>
-                                    <p className="text-xs font-medium text-gray-300">{c.start_km} km</p>
-                                  </div>
-                                  <div>
-                                    <p className="text-[9px] text-gray-600 uppercase tracking-wider">Length</p>
-                                    <p className="text-xs font-medium text-gray-300">{c.distance_km} km</p>
-                                  </div>
-                                  <div>
-                                    <p className="text-[9px] text-gray-600 uppercase tracking-wider">Ascent</p>
-                                    <p className="text-xs font-medium text-orange-400">{c.elevation_gain} m</p>
-                                  </div>
-                                  <div>
-                                    <p className="text-[9px] text-gray-600 uppercase tracking-wider">Gradient</p>
-                                    <p className="text-xs font-medium text-gray-300">{c.avg_gradient}%</p>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
+              {climbsOpen && climbs.length > 0 && (
+                <div className="border-t border-gray-800 divide-y divide-gray-800/60">
+                  {climbs.map((c, i) => {
+                    const seg    = segments.find(s => s.type === 'climb' && s.climb_idx === i);
+                    const estStr = seg ? fmtTime(seg.est_time_min) : null;
+                    return (
+                      <Link
+                        key={i}
+                        href={`/events/${eventId}/climb/${i}`}
+                        className="flex items-center gap-3 px-4 py-3 hover:bg-gray-800/40 transition-colors group"
+                      >
+                        <span className="flex-shrink-0 w-5 h-5 rounded-full bg-gray-800 flex items-center justify-center text-[10px] font-bold text-gray-400 group-hover:bg-orange-500/20 group-hover:text-orange-400 transition-colors">
+                          {i + 1}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-white truncate">{c.name}</p>
+                          <div className="flex items-center gap-3 mt-0.5 text-[11px] text-gray-500">
+                            <span>{c.start_km} km from start</span>
+                            <span>{c.distance_km} km</span>
+                            <span className="text-orange-400">+{c.elevation_gain} m</span>
+                            <span>{c.avg_gradient}% avg</span>
                           </div>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {/* Add climb form */}
-                  <div className="p-3 border-t border-gray-800/60 space-y-2">
-                    {showAddClimb ? (
-                      <div className="space-y-2">
-                        <p className="text-[10px] text-gray-500 uppercase tracking-wider">Add climb</p>
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1">
-                            <label className="text-[9px] text-gray-600 uppercase tracking-wider block mb-1">Start km</label>
-                            <input
-                              type="number"
-                              value={addStart}
-                              onChange={e => setAddStart(e.target.value)}
-                              placeholder="e.g. 73.9"
-                              className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-orange-500"
-                              step="0.1" min="0"
-                            />
-                          </div>
-                          <div className="flex-1">
-                            <label className="text-[9px] text-gray-600 uppercase tracking-wider block mb-1">End km</label>
-                            <input
-                              type="number"
-                              value={addEnd}
-                              onChange={e => setAddEnd(e.target.value)}
-                              placeholder="e.g. 83.9"
-                              className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-orange-500"
-                              step="0.1" min="0"
-                            />
-                          </div>
-                          <button
-                            onClick={addCustomClimb}
-                            disabled={!addStart || !addEnd}
-                            className="flex-shrink-0 mt-4 px-3 py-1.5 bg-orange-500 hover:bg-orange-400 disabled:opacity-40 text-white text-xs font-medium rounded-lg transition-colors"
-                          >
-                            Add
-                          </button>
-                          <button
-                            onClick={() => { setShowAddClimb(false); setAddStart(''); setAddEnd(''); }}
-                            className="flex-shrink-0 mt-4 text-gray-600 hover:text-gray-400 text-sm leading-none"
-                          >
-                            ×
-                          </button>
                         </div>
-                      </div>
-                    ) : (
-                      <div className="flex items-center justify-between">
-                        <button
-                          onClick={() => setShowAddClimb(true)}
-                          className="text-xs text-orange-400 hover:text-orange-300 transition-colors flex items-center gap-1"
-                        >
-                          <span className="text-base leading-none">+</span> Add climb
-                        </button>
-                        <button
-                          onClick={resetClimbs}
-                          className="text-xs text-gray-600 hover:text-gray-400 transition-colors"
-                        >
-                          Reset to auto-detect
-                        </button>
-                      </div>
-                    )}
-                  </div>
+                        {estStr && (
+                          <span className="flex-shrink-0 text-sm font-bold text-white tabular-nums">{estStr}</span>
+                        )}
+                        <svg className="w-3.5 h-3.5 text-gray-600 group-hover:text-orange-400 flex-shrink-0 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                        </svg>
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+
+              {climbsOpen && climbs.length === 0 && (
+                <div className="border-t border-gray-800 px-4 py-4 text-sm text-gray-600">
+                  Load a Strava course to auto-detect climbs.
                 </div>
               )}
             </section>
           )}
 
-          {/* ── Pacing Strategy ───────────────────────────────── */}
+          {/* ── Pacing Strategy tile (clickable) ─────────────── */}
           {route && (
-            <section className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
-              {/* Header */}
-              <div className="flex items-center justify-between p-4">
-                <button
-                  onClick={() => { setPacingOpen(o => !o); }}
-                  className="flex-1 flex items-center justify-between text-left hover:opacity-80 transition-opacity"
-                >
-                  <div>
-                    <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Pacing Strategy</h2>
-                    {estMin ? (
-                      <p className="text-sm text-gray-300 mt-0.5">
-                        {fmtTime(estMin)} est
-                        {avgWatts ? ` · ${avgWatts}W avg` : ''}
-                        {np       ? ` · ${np} NP`         : ''}
-                        {calories ? ` · ${calories.toLocaleString()} kcal` : ''}
-                      </p>
-                    ) : (
-                      <p className="text-sm text-gray-600 mt-0.5">No pacing data yet</p>
-                    )}
-                  </div>
-                  <svg className={`w-4 h-4 text-gray-500 flex-shrink-0 transition-transform ml-2 ${pacingOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
-                {pacingOpen && (
-                  <button onClick={() => setEditingPacing(e => !e)} className="ml-3 text-xs text-orange-400 hover:text-orange-300 transition-colors font-medium flex-shrink-0">
-                    {editingPacing ? 'Done' : 'Edit'}
-                  </button>
-                )}
+            <Link
+              href={`/events/${eventId}/pacing`}
+              className="block bg-gray-900 border border-gray-800 rounded-2xl p-4 hover:bg-gray-800/40 hover:border-gray-700 transition-colors group"
+            >
+              <div className="flex items-start justify-between gap-3 mb-3">
+                <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Pacing Strategy</h2>
+                <svg className="w-4 h-4 text-gray-600 group-hover:text-orange-400 flex-shrink-0 transition-colors mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                </svg>
               </div>
 
-              {/* Expanded pacing */}
-              {pacingOpen && (
-                <div className="border-t border-gray-800 p-4 space-y-4">
-                  {/* Overall stats */}
-                  {estMin && (
-                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                      {[
-                        { label: 'Duration',   value: fmtTime(estMin),                   color: 'text-white' },
-                        { label: 'Avg Watts',  value: avgWatts ? String(avgWatts) : '—', color: 'text-blue-400' },
-                        { label: 'NP',         value: np       ? String(np)       : '—', color: 'text-orange-400' },
-                        { label: 'Calories',   value: calories ? calories.toLocaleString() : '—', color: 'text-green-400' },
-                      ].map(({ label, value, color }) => (
-                        <div key={label} className="bg-gray-800/60 rounded-xl p-3 text-center">
-                          <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">{label}</p>
-                          <p className={`text-xl font-bold tabular-nums ${color}`}>{value}</p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Edit mode */}
-                  {editingPacing && (
-                    <div className="space-y-4">
-                      <div>
-                        <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-2">Flat / Rolling</p>
-                        <div className="grid grid-cols-2 gap-3">
-                          <div>
-                            <label className="text-[10px] text-gray-600 mb-1 block">Power (W)</label>
-                            <input type="number" value={flatWatts} onChange={e => setFlatWatts(Number(e.target.value))} className={inputCls} step={5} min={50} max={600} />
-                          </div>
-                          <div>
-                            <label className="text-[10px] text-gray-600 mb-1 block">Speed cap (km/h)</label>
-                            <input type="number" value={flatSpeedKmh ?? ''} onChange={e => setFlatSpeedKmh(e.target.value ? Number(e.target.value) : undefined)} className={inputCls} step={1} min={10} max={80} placeholder="None" />
-                          </div>
-                        </div>
+              {estMin ? (
+                <>
+                  <div className="grid grid-cols-3 gap-2 mb-3">
+                    {[
+                      { label: 'Est Time',  value: fmtTime(estMin),         color: 'text-white' },
+                      { label: 'Avg Power', value: `${avgWatts ?? '—'}W`,   color: 'text-orange-400' },
+                      { label: 'NP',        value: `${np ?? '—'}W`,         color: 'text-yellow-400' },
+                    ].map(({ label, value, color }) => (
+                      <div key={label} className="bg-gray-800/60 rounded-lg p-2 text-center">
+                        <p className="text-[9px] text-gray-500 uppercase tracking-wider mb-0.5">{label}</p>
+                        <p className={`text-sm font-bold tabular-nums ${color}`}>{value}</p>
                       </div>
-                      <div>
-                        <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-2">Downhill</p>
-                        <div className="grid grid-cols-2 gap-3">
-                          <div>
-                            <label className="text-[10px] text-gray-600 mb-1 block">Power (W)</label>
-                            <input type="number" value={descentWatts} onChange={e => setDescentWatts(Number(e.target.value))} className={inputCls} step={5} min={0} max={400} />
-                          </div>
-                          <div>
-                            <label className="text-[10px] text-gray-600 mb-1 block">Max speed (km/h)</label>
-                            <input type="number" value={descentSpeedKmh ?? ''} onChange={e => setDescentSpeedKmh(e.target.value ? Number(e.target.value) : undefined)} className={inputCls} step={1} min={10} max={100} placeholder="None" />
-                          </div>
-                        </div>
-                      </div>
-                      {climbs.length > 0 && (
-                        <div>
-                          <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-2">Climbs</p>
-                          <div className="space-y-2">
-                            {climbs.map((c, i) => (
-                              <div key={i} className="flex items-center gap-3 bg-gray-800/50 rounded-lg px-3 py-2">
-                                <span className="flex-1 text-sm text-gray-300 truncate">{c.name}</span>
-                                <span className="text-xs text-gray-500 flex-shrink-0">{c.distance_km} km · {c.avg_gradient}%</span>
-                                <div className="flex items-center gap-1 flex-shrink-0">
-                                  <input type="number" value={c.target_watts} onChange={e => updateClimbWatts(i, Number(e.target.value))}
-                                    className="w-16 bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-white text-right focus:outline-none focus:border-orange-500" step={5} min={50} max={600} />
-                                  <span className="text-xs text-gray-500">W</span>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      <p className="text-[10px] text-gray-600">Rider: {riderKg} kg · Bike: {bikeKg} kg · System: {riderKg + bikeKg} kg</p>
-                    </div>
-                  )}
-
-                  {/* Segment breakdown */}
-                  {segments.length > 0 && (
-                    <div>
-                      <p className="text-[10px] text-gray-600 uppercase tracking-wider mb-2">Segment Breakdown</p>
-                      <div className="space-y-1">
-                        {segments.map((seg, i) => (
-                          <div key={i} className={`flex items-center gap-2 py-2 px-3 rounded-lg text-xs ${
-                            seg.type === 'climb'   ? 'bg-orange-500/8 border border-orange-500/20' :
-                            seg.type === 'descent' ? 'bg-blue-500/5 border border-blue-500/15'     : 'border border-transparent'
-                          }`}>
-                            <span className={`flex-1 font-medium ${seg.type==='climb' ? 'text-orange-300' : seg.type==='descent' ? 'text-blue-300' : 'text-gray-300'}`}>
-                              {seg.label}
-                            </span>
-                            <span className="text-gray-500 w-14 text-right">{seg.distance_km} km</span>
-                            <span className={`w-16 text-right ${seg.elevation_gain >= 0 ? 'text-orange-400' : 'text-blue-400'}`}>
-                              {seg.elevation_gain >= 0 ? '+' : ''}{seg.elevation_gain} m
-                            </span>
-                            <span className="text-gray-400 w-10 text-right">{seg.target_watts}W</span>
-                            <span className="text-gray-500 w-16 text-right tabular-nums">{seg.avg_speed_kmh} km/h</span>
-                            <span className="text-white font-medium w-10 text-right tabular-nums">{fmtTime(seg.est_time_min)}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="flex justify-end">
-                    <button
-                      onClick={() => persistEvent(false)}
-                      disabled={saving}
-                      className="px-4 py-2 rounded-lg bg-orange-500/20 text-orange-400 hover:bg-orange-500/30 text-sm transition-colors"
-                    >
-                      {saving ? 'Saving…' : 'Save pacing'}
-                    </button>
+                    ))}
                   </div>
-                </div>
+
+                  {segments.length > 0 && (() => {
+                    const climbMin   = segments.filter(s => s.type === 'climb').reduce((t, s) => t + s.est_time_min, 0);
+                    const descentMin = segments.filter(s => s.type === 'descent').reduce((t, s) => t + s.est_time_min, 0);
+                    const flatMin    = segments.filter(s => s.type === 'flat').reduce((t, s) => t + s.est_time_min, 0);
+                    return (
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500 border-t border-gray-800/60 pt-2">
+                        {climbMin > 0   && <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-orange-500/60" />Climbing {fmtTime(climbMin)}</span>}
+                        {descentMin > 0 && <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500/60" />Descending {fmtTime(descentMin)}</span>}
+                        {flatMin > 0    && <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-gray-500/60" />Flat / Rolling {fmtTime(flatMin)}</span>}
+                      </div>
+                    );
+                  })()}
+                </>
+              ) : (
+                <p className="text-xs text-gray-600">Tap to set up your pacing strategy</p>
               )}
-            </section>
+            </Link>
           )}
 
           <div className="h-20" />
