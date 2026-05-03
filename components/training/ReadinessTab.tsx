@@ -194,7 +194,7 @@ export default function ReadinessTab() {
         <div className="grid grid-cols-3 gap-2 text-xs text-gray-500">
           <div><span className="text-gray-300 font-medium">HRV</span> — Heart Rate Variability (rMSSD, ms). Higher = more recovered.</div>
           <div><span className="text-green-400 font-medium">Band</span> — Your normal zone (baseline avg ± 1σ). Below = stress signal.</div>
-          <div><span className="text-blue-400 font-medium">Readiness</span> — intervals.icu composite score (0–100).</div>
+          <div><span className="text-blue-400 font-medium">Readiness</span> — composite score (0–100) from HRV, sleep & RHR.</div>
         </div>
       )}
     </div>

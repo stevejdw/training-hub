@@ -56,33 +56,69 @@ export async function GET(req: Request) {
     cutoff.setDate(cutoff.getDate() - displayDays);
     const cutoffStr = cutoff.toISOString().split('T')[0];
 
+    // Compute 60-day baseline zone for HRV from all fetched data
+    const hrvBaseline = allRows
+      .map(r => r.hrv_rmssd)
+      .filter((v): v is number => v !== null && isFinite(v));
+
+    let zone: ReadinessResponse['zone'] = null;
+    let hrvAvg = 0, hrvSd = 0;
+    if (hrvBaseline.length >= 7) {
+      hrvAvg = hrvBaseline.reduce((a, b) => a + b, 0) / hrvBaseline.length;
+      hrvSd  = Math.sqrt(hrvBaseline.reduce((a, b) => a + (b - hrvAvg) ** 2, 0) / hrvBaseline.length);
+      zone = {
+        avg:   Math.round(hrvAvg * 10) / 10,
+        sd:    Math.round(hrvSd  * 10) / 10,
+        upper: Math.round((hrvAvg + hrvSd) * 10) / 10,
+        lower: Math.round((hrvAvg - hrvSd) * 10) / 10,
+      };
+    }
+
+    // RHR baseline (lower is better)
+    const rhrBaseline = allRows
+      .map(r => r.resting_hr)
+      .filter((v): v is number => v !== null && isFinite(v));
+    let rhrAvg = 0, rhrSd = 0;
+    if (rhrBaseline.length >= 7) {
+      rhrAvg = rhrBaseline.reduce((a, b) => a + b, 0) / rhrBaseline.length;
+      rhrSd  = Math.sqrt(rhrBaseline.reduce((a, b) => a + (b - rhrAvg) ** 2, 0) / rhrBaseline.length);
+    }
+
+    const clamp = (v: number, lo = 0, hi = 100) => Math.max(lo, Math.min(hi, v));
+
+    /**
+     * Compute objective readiness score (0-100) from HRV, sleep, and RHR.
+     * Weights redistribute when components are missing. Requires HRV.
+     */
+    function computeReadiness(
+      hrv: number | null,
+      sleep: number | null,
+      rhr: number | null,
+    ): number | null {
+      if (hrv === null || hrvSd === 0) return null;
+      // HRV: z-score → 50 at baseline, +25 per +1σ, clamped 0-100
+      const hrvScore = clamp(50 + ((hrv - hrvAvg) / hrvSd) * 25);
+      const components: { score: number; weight: number }[] = [{ score: hrvScore, weight: 0.5 }];
+      if (sleep !== null) components.push({ score: clamp(sleep), weight: 0.3 });
+      if (rhr !== null && rhrSd > 0) {
+        // Lower RHR = better; invert sign on z-score
+        const rhrScore = clamp(50 + ((rhrAvg - rhr) / rhrSd) * 25);
+        components.push({ score: rhrScore, weight: 0.2 });
+      }
+      const totalW = components.reduce((s, c) => s + c.weight, 0);
+      const score  = components.reduce((s, c) => s + c.score * c.weight, 0) / totalW;
+      return Math.round(score);
+    }
+
     const points: ReadinessPoint[] = allRows
       .filter(r => r.date >= cutoffStr)
       .map(r => ({
         date:            r.date,
         hrv:             r.hrv_rmssd !== null ? Math.round(r.hrv_rmssd * 10) / 10 : null,
         sleep_score:     r.sleep_score,
-        readiness_score: r.readiness_score,
+        readiness_score: r.readiness_score ?? computeReadiness(r.hrv_rmssd, r.sleep_score, r.resting_hr),
         resting_hr:      r.resting_hr,
       }));
-
-    // Compute 60-day baseline zone from all fetched data (including the extra window)
-    const hrvBaseline = allRows
-      .map(r => r.hrv_rmssd)
-      .filter((v): v is number => v !== null && isFinite(v));
-
-    let zone: ReadinessResponse['zone'] = null;
-    if (hrvBaseline.length >= 7) {
-      const avg  = hrvBaseline.reduce((a, b) => a + b, 0) / hrvBaseline.length;
-      const variance = hrvBaseline.reduce((a, b) => a + (b - avg) ** 2, 0) / hrvBaseline.length;
-      const sd   = Math.sqrt(variance);
-      zone = {
-        avg:   Math.round(avg  * 10) / 10,
-        sd:    Math.round(sd   * 10) / 10,
-        upper: Math.round((avg + sd) * 10) / 10,
-        lower: Math.round((avg - sd) * 10) / 10,
-      };
-    }
 
     // 7-day recent average (from display window)
     const recent7 = points
