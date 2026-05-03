@@ -5,7 +5,7 @@ import Link from 'next/link';
 import type { EventGoal, EventClimb, CachedRoute, PacingStrategy } from '@/lib/profile';
 import {
   buildPacingSegments, calcNP, calcAvgWatts, calcCalories, estimateTime,
-  fmtTime, powerForSpeed, PacingSegment,
+  fmtTime, speedForPower, powerForSpeed, PacingSegment,
 } from '@/lib/pacing';
 import PageHeader from '@/components/PageHeader';
 import { iconFor } from '@/components/nav-items';
@@ -15,10 +15,24 @@ const DEFAULT_FLAT_WATTS    = 260;
 const DEFAULT_DESCENT_WATTS = 120;
 
 
-// Segment key used to track per-segment state
+// Unique key per segment
 function segKey(seg: PacingSegment): string {
   return seg.type === 'climb' ? `climb-${seg.climb_idx}` : `${seg.type}-${seg.start_km}`;
 }
+
+// Rolling = flat-type but noticeably undulating (|gradient| ≥ 1%)
+function isRolling(seg: PacingSegment) {
+  return seg.type === 'flat' && Math.abs(seg.avg_gradient) >= 1;
+}
+
+function segColors(seg: PacingSegment) {
+  if (seg.type === 'climb')   return { rowBg: 'bg-orange-500/8',  label: 'text-orange-300', dot: 'bg-orange-500/70',  name: 'Climbing'    };
+  if (seg.type === 'descent') return { rowBg: 'bg-blue-500/8',    label: 'text-blue-300',   dot: 'bg-blue-500/70',    name: 'Descending'  };
+  if (isRolling(seg))         return { rowBg: 'bg-yellow-500/5',  label: 'text-yellow-300', dot: 'bg-yellow-500/70',  name: 'Rolling'     };
+  return                             { rowBg: '',                  label: 'text-green-300',  dot: 'bg-green-500/70',   name: 'Flat'        };
+}
+
+const COLS = 'grid-cols-[1fr_48px_52px_68px_70px_52px]';
 
 interface Props { eventId: string }
 
@@ -66,27 +80,31 @@ export default function EventPacingPage({ eventId }: Props) {
 
 
   // ── Derived segments ──
-  // When editing pacing, merge per-segment watts overrides into climbs
-  const activeClimbs = useMemo(() => {
-    if (!editingPacing || Object.keys(segWattsEdit).length === 0) return climbs;
-    return climbs.map((c, i) => {
-      const key = `climb-${i}`;
-      return key in segWattsEdit ? { ...c, target_watts: segWattsEdit[key] } : c;
-    });
-  }, [climbs, segWattsEdit, editingPacing]);
-
-  const activeFlatWatts    = editingPacing && 'flat' in segWattsEdit    ? (segWattsEdit['flat'] ?? flatWatts)    : flatWatts;
-  const activeDescentWatts = editingPacing && 'descent' in segWattsEdit ? (segWattsEdit['descent'] ?? descentWatts) : descentWatts;
-
-  const segments = useMemo(() => {
-    if (!route || activeClimbs.length === 0) return [];
+  // Base segments use saved watts; per-segment overrides are applied on top.
+  const baseSegments = useMemo(() => {
+    if (!route || climbs.length === 0) return [];
     return buildPacingSegments(
       route.stream_distance_km, route.stream_altitude_m,
-      route.distance_m / 1000, activeClimbs,
-      activeFlatWatts, activeDescentWatts, riderKg, bikeKg,
+      route.distance_m / 1000, climbs,
+      flatWatts, descentWatts, riderKg, bikeKg,
       descentSpeedKmh, flatSpeedKmh,
     );
-  }, [route, activeClimbs, activeFlatWatts, activeDescentWatts, riderKg, bikeKg, descentSpeedKmh, flatSpeedKmh]);
+  }, [route, climbs, flatWatts, descentWatts, riderKg, bikeKg, descentSpeedKmh, flatSpeedKmh]);
+
+  // Apply per-segment watt overrides when editing
+  const segments = useMemo(() => {
+    if (!editingPacing || Object.keys(segWattsEdit).length === 0) return baseSegments;
+    return baseSegments.map(seg => {
+      const k = segKey(seg);
+      if (!(k in segWattsEdit)) return seg;
+      const watts   = segWattsEdit[k];
+      const speedMs = speedForPower(watts, seg.avg_gradient / 100, totalKg);
+      if (speedMs <= 0) return seg;
+      const speedKmh = Math.round(speedMs * 36) / 10;
+      const timeMin  = (seg.distance_km * 1000 / speedMs) / 60;
+      return { ...seg, target_watts: watts, avg_speed_kmh: speedKmh, est_time_min: timeMin };
+    });
+  }, [baseSegments, editingPacing, segWattsEdit, totalKg]);
 
   const estMin    = useMemo(() => segments.reduce((t, s) => t + s.est_time_min, 0), [segments]);
   const np        = useMemo(() => segments.length ? calcNP(segments)       : null, [segments]);
@@ -95,7 +113,8 @@ export default function EventPacingPage({ eventId }: Props) {
 
   const climbMin   = useMemo(() => segments.filter(s => s.type === 'climb').reduce((t, s) => t + s.est_time_min, 0), [segments]);
   const descentMin = useMemo(() => segments.filter(s => s.type === 'descent').reduce((t, s) => t + s.est_time_min, 0), [segments]);
-  const flatMin    = useMemo(() => segments.filter(s => s.type === 'flat').reduce((t, s) => t + s.est_time_min, 0), [segments]);
+  const rollingMin = useMemo(() => segments.filter(s => isRolling(s)).reduce((t, s) => t + s.est_time_min, 0), [segments]);
+  const flatMin    = useMemo(() => segments.filter(s => s.type === 'flat' && !isRolling(s)).reduce((t, s) => t + s.est_time_min, 0), [segments]);
 
   const totalKm      = route ? Math.round(route.distance_m / 100) / 10 : 0;
   const totalAscentM = segments.reduce((t, s) => t + s.ascent_m, 0);
@@ -110,41 +129,35 @@ export default function EventPacingPage({ eventId }: Props) {
     return seg.target_watts;
   }
 
-  function setSegWatts(seg: PacingSegment, w: number) {
-    // Map flat segments to a single 'flat' key, descents to 'descent'
-    let k = segKey(seg);
-    if (seg.type === 'flat') k = 'flat';
-    else if (seg.type === 'descent') k = 'descent';
-    setSegWattsEdit(prev => ({ ...prev, [k]: w }));
-    // Clear speed draft for this key since watts takes priority
-    setSpeedDrafts(prev => { const n = { ...prev }; delete n[k]; return n; });
-  }
-
   function handleWattsChange(seg: PacingSegment, w: number) {
-    setSegWatts(seg, w);
-  }
-
-  function handleSpeedBlur(seg: PacingSegment, draftValue: string) {
-    const s = parseFloat(draftValue);
-    if (!isNaN(s) && s > 0) {
-      const grad = seg.avg_gradient / 100;
-      const w    = powerForSpeed(s / 3.6, grad, totalKg);
-      if (w > 0) setSegWatts(seg, w);
-    }
-    // Clear draft
-    const k = seg.type === 'flat' ? 'flat' : seg.type === 'descent' ? 'descent' : segKey(seg);
+    const k = segKey(seg);
+    setSegWattsEdit(prev => ({ ...prev, [k]: w }));
     setSpeedDrafts(prev => { const n = { ...prev }; delete n[k]; return n; });
   }
 
   function getDisplaySpeed(seg: PacingSegment): string {
-    const k = seg.type === 'flat' ? 'flat' : seg.type === 'descent' ? 'descent' : segKey(seg);
+    const k = segKey(seg);
     if (k in speedDrafts) return speedDrafts[k];
+    // Show speed derived from current edit watts if overridden
+    if (editingPacing && k in segWattsEdit) {
+      const ms = speedForPower(segWattsEdit[k], seg.avg_gradient / 100, totalKg);
+      return String(Math.round(ms * 36) / 10);
+    }
     return String(seg.avg_speed_kmh);
   }
 
   function setSpeedDraft(seg: PacingSegment, val: string) {
-    const k = seg.type === 'flat' ? 'flat' : seg.type === 'descent' ? 'descent' : segKey(seg);
-    setSpeedDrafts(prev => ({ ...prev, [k]: val }));
+    setSpeedDrafts(prev => ({ ...prev, [segKey(seg)]: val }));
+  }
+
+  function handleSpeedBlur(seg: PacingSegment, draftValue: string) {
+    const k = segKey(seg);
+    const s = parseFloat(draftValue);
+    if (!isNaN(s) && s > 0) {
+      const w = powerForSpeed(s / 3.6, seg.avg_gradient / 100, totalKg);
+      if (w > 0) setSegWattsEdit(prev => ({ ...prev, [k]: w }));
+    }
+    setSpeedDrafts(prev => { const n = { ...prev }; delete n[k]; return n; });
   }
 
   function startPacingEdit() {
@@ -160,13 +173,16 @@ export default function EventPacingPage({ eventId }: Props) {
   }
 
   function savePacingEdit() {
-    // Merge segWattsEdit back into state
-    if ('flat' in segWattsEdit)    setFlatWatts(segWattsEdit['flat']);
-    if ('descent' in segWattsEdit) setDescentWatts(segWattsEdit['descent']);
+    // Persist climb-specific changes
     setClimbs(prev => prev.map((c, i) => {
       const k = `climb-${i}`;
       return k in segWattsEdit ? { ...c, target_watts: segWattsEdit[k] } : c;
     }));
+    // For flat/descent, average all edited segments of that type as new global default
+    const flatEdits    = baseSegments.filter(s => s.type === 'flat').map(s => segWattsEdit[segKey(s)]).filter((w): w is number => w !== undefined);
+    const descentEdits = baseSegments.filter(s => s.type === 'descent').map(s => segWattsEdit[segKey(s)]).filter((w): w is number => w !== undefined);
+    if (flatEdits.length)    setFlatWatts(Math.round(flatEdits.reduce((a, b) => a + b, 0) / flatEdits.length));
+    if (descentEdits.length) setDescentWatts(Math.round(descentEdits.reduce((a, b) => a + b, 0) / descentEdits.length));
     setSegWattsEdit({});
     setSpeedDrafts({});
     setEditingPacing(false);
@@ -246,28 +262,25 @@ export default function EventPacingPage({ eventId }: Props) {
                 </button>
               </div>
 
-              {/* Column headers */}
-              <div className={`border-t border-gray-800 px-3 py-1.5 grid gap-2 text-[9px] font-semibold text-gray-600 uppercase tracking-wider ${editingPacing ? 'grid-cols-[1fr_52px_52px_72px_72px_52px]' : 'grid-cols-[1fr_52px_52px_52px_56px_52px]'}`}>
+              {/* Column headers — single fixed layout for both view + edit */}
+              <div className={`border-t border-gray-800 px-3 py-1.5 grid ${COLS} gap-2 text-[9px] font-semibold text-gray-600 uppercase tracking-wider`}>
                 <span>Segment</span>
                 <span className="text-right">Dist</span>
                 <span className="text-right">Gain</span>
-                <span className="text-right">{editingPacing ? 'Power (W)' : 'Power'}</span>
-                <span className="text-right">{editingPacing ? 'Speed km/h' : 'Speed'}</span>
+                <span className="text-right">Power</span>
+                <span className="text-right">Speed</span>
                 <span className="text-right">Time</span>
               </div>
 
               {/* Segment rows */}
               <div className="divide-y divide-gray-800/40">
                 {segments.map((seg, i) => {
-                  const isClimb   = seg.type === 'climb';
-                  const isDescent = seg.type === 'descent';
-                  const labelColor = isClimb ? 'text-orange-300' : isDescent ? 'text-blue-300' : 'text-gray-300';
-                  const rowBg = isClimb ? 'bg-orange-500/5' : isDescent ? 'bg-blue-500/5' : '';
-                  const editWatts  = getEditWatts(seg);
-                  const dispSpeed  = getDisplaySpeed(seg);
+                  const { rowBg, label: labelColor } = segColors(seg);
+                  const editWatts = getEditWatts(seg);
+                  const dispSpeed = getDisplaySpeed(seg);
 
                   return (
-                    <div key={i} className={`px-3 py-2 ${rowBg} ${editingPacing ? 'grid grid-cols-[1fr_52px_52px_72px_72px_52px]' : 'grid grid-cols-[1fr_52px_52px_52px_56px_52px]'} items-center gap-2`}>
+                    <div key={i} className={`px-3 py-2 ${rowBg} grid ${COLS} items-center gap-2`}>
                       {/* Label */}
                       <div className="min-w-0">
                         <p className={`text-xs font-medium truncate ${labelColor}`}>{seg.label}</p>
@@ -282,15 +295,12 @@ export default function EventPacingPage({ eventId }: Props) {
                         {seg.elevation_gain >= 0 ? '+' : ''}{seg.elevation_gain}m
                       </span>
 
-                      {/* Watts — editable */}
+                      {/* Watts */}
                       {editingPacing ? (
                         <input
                           type="number"
                           value={editWatts}
-                          onChange={e => {
-                            const w = parseInt(e.target.value, 10);
-                            if (!isNaN(w) && w > 0) handleWattsChange(seg, w);
-                          }}
+                          onChange={e => { const w = parseInt(e.target.value, 10); if (!isNaN(w) && w > 0) handleWattsChange(seg, w); }}
                           className="w-full bg-gray-800 border border-gray-700 rounded px-1.5 py-1 text-xs text-white text-right focus:outline-none focus:border-orange-500 tabular-nums"
                           step={5} min={0} max={700}
                         />
@@ -298,7 +308,7 @@ export default function EventPacingPage({ eventId }: Props) {
                         <span className="text-xs text-gray-300 text-right tabular-nums">{seg.target_watts}W</span>
                       )}
 
-                      {/* Speed — editable with draft */}
+                      {/* Speed */}
                       {editingPacing ? (
                         <input
                           type="number"
@@ -320,7 +330,7 @@ export default function EventPacingPage({ eventId }: Props) {
               </div>
 
               {/* Totals row */}
-              <div className={`border-t-2 border-gray-700 px-3 py-2.5 ${editingPacing ? 'grid grid-cols-[1fr_52px_52px_72px_72px_52px]' : 'grid grid-cols-[1fr_52px_52px_52px_56px_52px]'} items-center gap-2`}>
+              <div className={`border-t-2 border-gray-700 px-3 py-2.5 grid ${COLS} items-center gap-2`}>
                 <span className="text-xs font-bold text-white uppercase tracking-wider">Total</span>
                 <span className="text-xs font-bold text-white text-right tabular-nums">{totalKm}</span>
                 <span className="text-xs font-bold text-orange-400 text-right tabular-nums">+{totalAscentM.toLocaleString()}m</span>
@@ -332,16 +342,17 @@ export default function EventPacingPage({ eventId }: Props) {
               {/* Save / terrain breakdown */}
               <div className="border-t border-gray-800 p-4 space-y-3">
                 {/* Terrain breakdown */}
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 gap-2">
                   {[
-                    { label: 'Climbing',        value: fmtTime(climbMin),   pct: estMin > 0 ? Math.round(climbMin / estMin * 100) : 0,   color: 'text-orange-400', dot: 'bg-orange-500/60' },
-                    { label: 'Descending',      value: fmtTime(descentMin), pct: estMin > 0 ? Math.round(descentMin / estMin * 100) : 0, color: 'text-blue-400',   dot: 'bg-blue-500/60' },
-                    { label: 'Flat / Rolling',  value: fmtTime(flatMin),    pct: estMin > 0 ? Math.round(flatMin / estMin * 100) : 0,    color: 'text-gray-400',   dot: 'bg-gray-500/60' },
+                    { label: 'Climbing',   value: fmtTime(climbMin),   pct: estMin > 0 ? Math.round(climbMin   / estMin * 100) : 0, color: 'text-orange-400', dot: 'bg-orange-500/70' },
+                    { label: 'Descending', value: fmtTime(descentMin), pct: estMin > 0 ? Math.round(descentMin / estMin * 100) : 0, color: 'text-blue-400',   dot: 'bg-blue-500/70'   },
+                    { label: 'Rolling',    value: fmtTime(rollingMin), pct: estMin > 0 ? Math.round(rollingMin / estMin * 100) : 0, color: 'text-yellow-400', dot: 'bg-yellow-500/70' },
+                    { label: 'Flat',       value: fmtTime(flatMin),    pct: estMin > 0 ? Math.round(flatMin    / estMin * 100) : 0, color: 'text-green-400',  dot: 'bg-green-500/70'  },
                   ].map(({ label, value, pct, color, dot }) => (
                     <div key={label} className="bg-gray-800/50 rounded-lg p-2.5 text-center">
                       <span className={`inline-block w-1.5 h-1.5 rounded-full ${dot} mb-1`} />
                       <p className="text-[10px] text-gray-500 uppercase tracking-wider leading-tight">{label}</p>
-                      <p className={`text-base font-bold tabular-nums ${color} mt-0.5`}>{value}</p>
+                      <p className={`text-sm font-bold tabular-nums ${color} mt-0.5`}>{value}</p>
                       <p className="text-[10px] text-gray-600">{pct}%</p>
                     </div>
                   ))}
