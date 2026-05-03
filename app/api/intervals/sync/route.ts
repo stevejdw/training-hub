@@ -102,6 +102,9 @@ export async function POST(req: Request) {
   try {
     await ensureTable(client);
 
+    // Log available fields from first row to help debug field name issues
+    const sampleFields = wellnessRows.length > 0 ? Object.keys(wellnessRows[0]) : [];
+
     let synced = 0;
     for (const row of wellnessRows) {
       const date = row.id as string; // intervals.icu uses 'id' for the date field (YYYY-MM-DD)
@@ -122,12 +125,13 @@ export async function POST(req: Request) {
           synced_at       = NOW()
       `, [
         date,
-        toFloatOrNull(row.hrvRMSSD ?? row.hrv_rmssd ?? row.hrv),
-        toFloatOrNull(row.hrvSDNN  ?? row.hrv_sdnn),
-        toIntOrNull(row.restingHR  ?? row.resting_hr),
-        toIntOrNull(row.sleepScore ?? row.sleep_score),
-        toIntOrNull(row.score      ?? row.readiness_score), // intervals uses 'score' for readiness
-        toIntOrNull(row.sleepSecs  ?? row.sleep_secs),
+        toFloatOrNull(row.hrv_rmssd  ?? row.hrvRMSSD  ?? row.hrv),
+        toFloatOrNull(row.hrv_sdnn   ?? row.hrvSDNN),
+        toIntOrNull(row.restingHR    ?? row.resting_hr),
+        toIntOrNull(row.sleepScore   ?? row.sleep_score),
+        // intervals.icu field is 'readiness', not 'score'
+        toIntOrNull(row.readiness    ?? row.readinessScore ?? row.score ?? row.readiness_score),
+        toIntOrNull(row.sleepSecs    ?? row.sleep_secs),
       ]);
       synced++;
     }
@@ -136,12 +140,12 @@ export async function POST(req: Request) {
     const updatedProfile = { ...profile, intervals_last_synced: fmt(newest) };
     await saveProfile(updatedProfile);
 
-    // Return summary
+    // Return summary + field names for debugging
     const summary = await client.query(`
       SELECT MIN(date) AS oldest, MAX(date) AS newest FROM daily_wellness
     `);
     const s = summary.rows[0] ?? {};
-    return Response.json({ synced, oldestDate: s.oldest ?? null, newestDate: s.newest ?? null });
+    return Response.json({ synced, oldestDate: s.oldest ?? null, newestDate: s.newest ?? null, sampleFields });
   } catch (err) {
     console.error('[intervals sync POST]', err);
     return Response.json({ error: String(err) }, { status: 500 });
