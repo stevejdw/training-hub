@@ -82,6 +82,17 @@ export interface AthleteProfile {
   intervals_athlete_id?: string;
   intervals_api_key?: string;
   intervals_last_synced?: string; // ISO date of most recent wellness record synced
+  // Weekly TSS targets configuration (for rolling 4-week chart)
+  tss_plan?: TssPlanConfig;
+}
+
+export interface TssPlanConfig {
+  mode:                'plan' | 'formula'; // 'plan' = sum training_days.tss_target; 'formula' = compute below
+  starting_tss:        number;             // base TSS for first build week of cycle
+  weekly_increase_pct: number;             // % compound increase per build week (e.g. 5)
+  block_weeks:         3 | 4;              // block size; final week of block is recovery
+  recovery_pct:        number;             // recovery week TSS as % of last build week (e.g. 65)
+  anchor_date:         string;             // YYYY-MM-DD Monday of week 1 of the periodization cycle
 }
 
 const DEFAULTS: AthleteProfile = {

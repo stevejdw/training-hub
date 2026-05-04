@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import SubTabBar from './SubTabBar';
-import FitnessTab, { TssWeekChart } from './training/FitnessTab';
+import FitnessTab from './training/FitnessTab';
+import TssRollingChart from './training/TssRollingChart';
 import AerobicEfficiencyTab from './training/AerobicEfficiencyTab';
 import ReadinessTab from './training/ReadinessTab';
 import KeyIntervalsTab from './training/KeyIntervalsTab';
@@ -47,10 +48,10 @@ export default function PerformancePage() {
                 <FitnessTab />
               </section>
 
-              {/* ── Weekly TSS ──────────────────────────────── */}
+              {/* ── Rolling Weekly TSS vs target ────────────── */}
               <section className="pt-2 border-t border-gray-800/60">
-                <SectionHeading title="Weekly TSS" subtitle="Training stress per week" />
-                <TssWeekChart />
+                <SectionHeading title="Weekly TSS" subtitle="Actual vs target per week" />
+                <TssRollingChart />
               </section>
 
               {/* ── Aerobic Efficiency ──────────────────────── */}
