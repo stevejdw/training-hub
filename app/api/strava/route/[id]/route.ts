@@ -4,7 +4,7 @@ import type { CachedRoute } from '@/lib/profile';
 export const runtime = 'nodejs';
 
 const STRAVA_API = 'https://www.strava.com/api/v3';
-const MAX_POINTS = 500;  // downsample to this many points for storage + display
+const MAX_POINTS = 2000;  // downsample to this many points for storage + display
 
 function downsample<T>(arr: T[], maxPts: number): T[] {
   if (arr.length <= maxPts) return arr;

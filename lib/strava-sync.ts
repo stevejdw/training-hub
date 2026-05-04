@@ -361,14 +361,16 @@ export async function syncActivity(activityId: number): Promise<void> {
       gearId,
     ]);
 
-    // Ensure hr column exists (idempotent)
+    // Ensure stream columns exist (idempotent)
     await client.query(`
-      ALTER TABLE activity_streams ADD COLUMN IF NOT EXISTS hr INT[]
+      ALTER TABLE activity_streams ADD COLUMN IF NOT EXISTS hr          INT[];
+      ALTER TABLE activity_streams ADD COLUMN IF NOT EXISTS altitude_m  FLOAT[];
+      ALTER TABLE activity_streams ADD COLUMN IF NOT EXISTS distance_km FLOAT[];
     `).catch(() => {});
 
-    // Fetch power+HR streams + laps in parallel
+    // Fetch power+HR+altitude+distance streams + laps in parallel
     const [streamRes, lapsRes] = await Promise.all([
-      fetch(`https://www.strava.com/api/v3/activities/${activityId}/streams?keys=watts,heartrate&key_by_type=true`, {
+      fetch(`https://www.strava.com/api/v3/activities/${activityId}/streams?keys=watts,heartrate,altitude,distance&key_by_type=true`, {
         headers: { Authorization: `Bearer ${token}` },
       }),
       fetch(`https://www.strava.com/api/v3/activities/${activityId}/laps`, {
@@ -379,16 +381,29 @@ export async function syncActivity(activityId: number): Promise<void> {
     const streamData  = streamRes.ok ? await streamRes.json() as Record<string, unknown> : null;
     const powerStream = (streamData?.watts     as { data: number[] } | null)?.data ?? null;
     const hrStream    = (streamData?.heartrate as { data: number[] } | null)?.data ?? null;
+    const altRaw      = (streamData?.altitude  as { data: number[] } | null)?.data ?? null;
+    const distRaw     = (streamData?.distance  as { data: number[] } | null)?.data ?? null;
+
+    // Downsample altitude + distance to 2000 points for storage efficiency
+    function downsampleArr<T>(arr: T[], maxPts: number): T[] {
+      if (arr.length <= maxPts) return arr;
+      const step = arr.length / maxPts;
+      return Array.from({ length: maxPts }, (_, i) => arr[Math.round(i * step)]);
+    }
+    const altStream  = altRaw  ? downsampleArr(altRaw,  2000).map(a => Math.round(a * 10) / 10) : null;
+    const distStream = distRaw ? downsampleArr(distRaw, 2000).map(d => Math.round(d / 10) / 100) : null; // m → km
 
     // Store streams
-    if (powerStream || hrStream) {
+    if (powerStream || hrStream || altStream || distStream) {
       await client.query(`
-        INSERT INTO activity_streams (activity_id, watts, hr)
-        VALUES ($1, $2, $3)
+        INSERT INTO activity_streams (activity_id, watts, hr, altitude_m, distance_km)
+        VALUES ($1, $2, $3, $4, $5)
         ON CONFLICT (activity_id) DO UPDATE
-          SET watts = COALESCE(EXCLUDED.watts, activity_streams.watts),
-              hr    = COALESCE(EXCLUDED.hr,    activity_streams.hr)
-      `, [activityId, powerStream, hrStream]);
+          SET watts       = COALESCE(EXCLUDED.watts,       activity_streams.watts),
+              hr          = COALESCE(EXCLUDED.hr,          activity_streams.hr),
+              altitude_m  = COALESCE(EXCLUDED.altitude_m,  activity_streams.altitude_m),
+              distance_km = COALESCE(EXCLUDED.distance_km, activity_streams.distance_km)
+      `, [activityId, powerStream, hrStream, altStream, distStream]);
     }
 
     // Store laps

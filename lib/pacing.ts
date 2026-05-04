@@ -2,50 +2,72 @@
  * Physics-based cycling speed / time estimation.
  *
  * Model:
- *   P_input = P_gravity + P_rolling + P_aero
+ *   P_wheel = P_input × ETA                   (drivetrain efficiency)
+ *   P_wheel = P_gravity + P_rolling + P_aero
  *   P_gravity = m·g·grad·v          (grad = rise/run, negative = descent)
  *   P_rolling = Crr·m·g·v
  *   P_aero    = ½·CdA·ρ·v³
  *
- * Solve for v using Newton-Raphson (converges in <20 iterations).
- *
- * Constants calibrated against real-world Peaks Challenge data:
- *   - Starting descent (~30 km / 3.67% avg): actual 38:00–38:12 → model 38.3 min ✓
- *   - Climb 1 at 302 W (82 kg rider + 8 kg bike): actual 27:54 → consistent ✓
- *   - Climb 1 at 275 W: actual 28:49 → consistent ✓
- *
- * Key lever for descent accuracy: CdA.  0.35 m² represents a sportive cyclist
- * on the hoods / sitting up during a long alpine event — not the aggressive aero
- * drops position used in short TTs (0.28–0.32 m²).
+ * Key accuracy levers:
+ *   - ETA:  drivetrain efficiency (0.975 typical for clean chain)
+ *   - CdA:  drag area — 0.35 sportive hoods, 0.32 drops, 0.25 TT tuck
+ *   - CRR:  rolling resistance — 0.0045 training tires, 0.003 race tires
+ *   - RHO:  air density — decreases with altitude (~11% lower at 1000 m)
  *
  * IMPORTANT: the climb time estimate is highly sensitive to rider weight.
- * Ensure Settings → Physical → Rider Weight is set correctly.
+ * Ensure Settings → Physical → Rider Weight is set correctly, and include
+ * accessories (water, food, clothing) in the pacing strategy weight.
  */
 
 const G     = 9.81;         // m/s²
-const RHO   = 1.225;        // kg/m³  air density at sea level
-const CDA   = 0.35;         // m²     sportive position (hoods / upright on climbs)
-const CRR   = 0.0045;       // rolling resistance — conservative for varied alpine roads
-const V_MAX = 65 / 3.6;    // m/s    hard cap (≈ 65 km/h); real limit is usually corners
+const V_MAX = 65 / 3.6;    // m/s  hard cap (≈ 65 km/h); real limit is corners
+
+// Defaults — overridable per-call via the physics params below
+const DEFAULT_RHO = 1.225;   // kg/m³  sea-level air density
+const DEFAULT_CDA = 0.35;    // m²     sportive position (hoods / upright on climbs)
+const DEFAULT_CRR = 0.0045;  // rolling resistance — conservative for alpine roads
+const DEFAULT_ETA = 0.975;   // drivetrain efficiency (clean chain ≈ 97.5%)
+
+export interface PhysicsParams {
+  cda?: number;   // drag area m²         (default 0.35)
+  crr?: number;   // rolling resistance    (default 0.0045)
+  rho?: number;   // air density kg/m³     (default 1.225)
+  eta?: number;   // drivetrain efficiency (default 0.975)
+}
+
+/** Derive air density from average route altitude using barometric formula. */
+export function rhoAtAltitude(avgAltM: number): number {
+  return DEFAULT_RHO * Math.exp(-avgAltM / 8500);
+}
 
 /**
  * Return the steady-state speed (m/s) for a given power and gradient.
- * @param watts  Mechanical power at the pedals
+ * @param watts  Mechanical power at the pedals (before drivetrain loss)
  * @param grad   Slope as a fraction (e.g. 0.06 = 6% climb, -0.05 = 5% descent)
- * @param totalKg  Rider + bike total mass in kg
+ * @param totalKg  Rider + bike + accessories mass in kg
+ * @param p      Optional physics overrides
  */
-export function speedForPower(watts: number, grad: number, totalKg: number): number {
-  const A = totalKg * G * (grad + CRR);   // linear term (gravity + rolling)
-  const B = 0.5 * CDA * RHO;              // cubic term (aero)
+export function speedForPower(
+  watts: number,
+  grad: number,
+  totalKg: number,
+  p: PhysicsParams = {},
+): number {
+  const cda = p.cda ?? DEFAULT_CDA;
+  const crr = p.crr ?? DEFAULT_CRR;
+  const rho = p.rho ?? DEFAULT_RHO;
+  const eta = p.eta ?? DEFAULT_ETA;
+
+  const effectiveW = watts * eta;
+  const A = totalKg * G * (grad + crr);   // linear term (gravity + rolling)
+  const B = 0.5 * cda * rho;              // cubic term (aero)
 
   // f(v)  = A·v + B·v³ - P = 0
   // f'(v) = A   + 3B·v²
-
-  // Initial guess: assume aero dominates on flats, gravity on climbs
   let v = grad > 0.03 ? 4.0 : grad < -0.03 ? V_MAX * 0.7 : 8.0;
 
   for (let i = 0; i < 60; i++) {
-    const f  = A * v + B * v * v * v - watts;
+    const f  = A * v + B * v * v * v - effectiveW;
     const df = A + 3 * B * v * v;
     if (Math.abs(df) < 1e-12) break;
     const dv = f / df;
@@ -57,24 +79,35 @@ export function speedForPower(watts: number, grad: number, totalKg: number): num
 }
 
 /**
- * Return the power (watts) required to sustain a given speed on a given gradient.
+ * Return the power (watts) at the pedals required to sustain a given speed.
  * Inverse of speedForPower — direct calculation, no iteration needed.
  * @param speedMs  Speed in m/s
- * @param grad     Slope as a fraction (e.g. 0.06 = 6% climb, -0.05 = 5% descent)
- * @param totalKg  Rider + bike total mass in kg
+ * @param grad     Slope as a fraction
+ * @param totalKg  Rider + bike + accessories mass in kg
+ * @param p        Optional physics overrides
  */
-export function powerForSpeed(speedMs: number, grad: number, totalKg: number): number {
-  const A = totalKg * G * (grad + CRR);
-  const B = 0.5 * CDA * RHO;
-  return Math.max(0, Math.round(A * speedMs + B * speedMs * speedMs * speedMs));
+export function powerForSpeed(
+  speedMs: number,
+  grad: number,
+  totalKg: number,
+  p: PhysicsParams = {},
+): number {
+  const cda = p.cda ?? DEFAULT_CDA;
+  const crr = p.crr ?? DEFAULT_CRR;
+  const rho = p.rho ?? DEFAULT_RHO;
+  const eta = p.eta ?? DEFAULT_ETA;
+
+  const A = totalKg * G * (grad + crr);
+  const B = 0.5 * cda * rho;
+  const wheelWatts = A * speedMs + B * speedMs * speedMs * speedMs;
+  return Math.max(0, Math.round(wheelWatts / eta));
 }
 
 /**
  * Find the constant-power watts required to ride a real elevation segment
  * at a target average speed. Inverts the time integration in `estimateTime`
  * via binary search — necessary because gradient varies within a segment,
- * so `powerForSpeed(speed, avg_grad)` gives the wrong answer on rolling/varying
- * terrain (the integrated speed at that constant power ≠ speed at avg gradient).
+ * so `powerForSpeed(speed, avg_grad)` gives the wrong answer on rolling terrain.
  */
 export function wattsForSegmentSpeed(
   streamDistKm:    number[],
@@ -84,6 +117,7 @@ export function wattsForSegmentSpeed(
   targetSpeedKmh:  number,
   riderKg:         number,
   bikeKg:          number,
+  p:               PhysicsParams = {},
 ): number {
   const sliceD: number[] = [];
   const sliceA: number[] = [];
@@ -98,8 +132,6 @@ export function wattsForSegmentSpeed(
   const distKm    = sliceD[sliceD.length - 1] - sliceD[0];
   const targetMin = (distKm / targetSpeedKmh) * 60;
 
-  // Binary search watts in [5, 2000] so estimateTime ≈ targetMin.
-  // estimateTime is monotonically decreasing in watts.
   let lo = 5, hi = 2000;
   for (let iter = 0; iter < 30; iter++) {
     const mid = (lo + hi) / 2;
@@ -111,8 +143,9 @@ export function wattsForSegmentSpeed(
       climbs:             [],
       rider_weight_kg:    riderKg,
       bike_weight_kg:     bikeKg,
+      physics:            p,
     });
-    if (t > targetMin) lo = mid;   // too slow — need more power
+    if (t > targetMin) lo = mid;
     else                hi = mid;
     if (hi - lo < 0.1)  break;
   }
@@ -129,12 +162,14 @@ export interface PacingInput {
   stream_distance_km:  number[];
   stream_altitude_m:   number[];
   flat_watts:          number;
-  flat_speed_kmh?:     number;   // optional speed cap for flat sections (km/h)
+  flat_speed_kmh?:     number;
   descent_watts:       number;
-  descent_speed_kmh?:  number;   // braking speed cap for descents (km/h)
+  descent_speed_kmh?:  number;
   climbs:              EventClimbInput[];
   rider_weight_kg:     number;
   bike_weight_kg:      number;
+  accessories_kg?:     number;
+  physics?:            PhysicsParams;
 }
 
 /** Compute total estimated riding time in minutes. */
@@ -143,21 +178,22 @@ export function estimateTime(input: PacingInput): number {
     stream_distance_km, stream_altitude_m,
     flat_watts, descent_watts, climbs,
     rider_weight_kg, bike_weight_kg,
+    accessories_kg = 0,
     descent_speed_kmh, flat_speed_kmh,
+    physics = {},
   } = input;
 
-  const totalKg = rider_weight_kg + bike_weight_kg;
+  const totalKg = rider_weight_kg + bike_weight_kg + accessories_kg;
   let totalSec = 0;
 
   for (let i = 1; i < stream_distance_km.length; i++) {
-    const dDist  = (stream_distance_km[i] - stream_distance_km[i - 1]) * 1000; // metres
-    const dAlt   = stream_altitude_m[i] - stream_altitude_m[i - 1];            // metres
+    const dDist  = (stream_distance_km[i] - stream_distance_km[i - 1]) * 1000;
+    const dAlt   = stream_altitude_m[i] - stream_altitude_m[i - 1];
     if (dDist <= 0) continue;
 
     const grad = dAlt / dDist;
     const km   = (stream_distance_km[i - 1] + stream_distance_km[i]) / 2;
 
-    // Find applicable watts: check if km is inside a defined climb
     const climbMatch = climbs.find(c => km >= c.start_km && km <= c.end_km);
     let watts: number;
     if (climbMatch) {
@@ -168,9 +204,8 @@ export function estimateTime(input: PacingInput): number {
       watts = flat_watts;
     }
 
-    let v = speedForPower(watts, grad, totalKg);
+    let v = speedForPower(watts, grad, totalKg, physics);
 
-    // Apply speed caps for non-climb sections
     if (!climbMatch) {
       if (grad < -0.01 && descent_speed_kmh) {
         v = Math.min(v, descent_speed_kmh / 3.6);
@@ -200,26 +235,16 @@ export interface DetectedClimb {
  *   33.6 km · 73.9 km · 83.9 km · 93.9 km · 146.7 km · 166.6 km · 200 km · 215 km
  *
  * Tiers ordered steepest-first; a segment qualifies by satisfying any one row.
- * Thresholds are intentionally conservative to avoid false positives —
- * use the "Add climb" button on the event page to add any missed climbs manually.
  */
 function qualifiesAsKeyClimb(distKm: number, gainM: number, gradPct: number): boolean {
-  if (gradPct >= 10 && distKm >= 0.4  && gainM >= 50)  return true; // short steep wall
+  if (gradPct >= 10 && distKm >= 0.4  && gainM >= 50)  return true;
   if (gradPct >= 7  && distKm >= 0.6  && gainM >= 70)  return true;
   if (gradPct >= 5  && distKm >= 0.7  && gainM >= 70)  return true;
   if (gradPct >= 3  && distKm >= 1.2  && gainM >= 100) return true;
-  if (gradPct >= 2  && distKm >= 5.0  && gainM >= 100) return true; // long gentle
+  if (gradPct >= 2  && distKm >= 5.0  && gainM >= 100) return true;
   return false;
 }
 
-/**
- * Auto-detect significant climbs from elevation profile using multi-tier thresholds.
- * A climb qualifies if any of these hold:
- *   >3% avg, >1.2 km, >100 m gain
- *   >5% avg, >0.7 km, >70 m gain
- *   >7% avg, >0.6 km, >70 m gain
- *   >10% avg, >0.4 km, >50 m gain
- */
 export function detectClimbs(
   distKm: number[],
   altM:   number[],
@@ -227,8 +252,6 @@ export function detectClimbs(
   const n = Math.min(distKm.length, altM.length);
   if (n < 2) return [];
 
-  // Smooth altitude with a 0.5km rolling window — keeps valley→climb transitions
-  // sharp so consecutive climbs separated by a short descent are detected separately.
   const SMOOTH_KM = 0.5;
   const smoothed  = altM.slice();
   for (let i = 0; i < n; i++) {
@@ -239,10 +262,6 @@ export function detectClimbs(
     smoothed[i] = cnt ? sum / cnt : altM[i];
   }
 
-  // Mark each segment as climbing if smoothed gradient >= 1.0%.
-  // Lower than the previous 1.5% so climbs with gentle approaches (common on
-  // alpine routes) are captured from their real start km.
-  // The qualifiesAsKeyClimb filter below suppresses short/minor false positives.
   const isClimbing = Array(n).fill(false);
   for (let i = 1; i < n; i++) {
     const dDist = (distKm[i] - distKm[i - 1]) * 1000;
@@ -250,7 +269,6 @@ export function detectClimbs(
     if (dDist > 0 && (dAlt / dDist) * 100 >= 1.0) isClimbing[i] = true;
   }
 
-  // Group consecutive climbing segments
   const rawClimbs: DetectedClimb[] = [];
   let startIdx: number | null = null;
 
@@ -276,9 +294,6 @@ export function detectClimbs(
     }
   }
 
-  // Merge climbs that are very close together (< 0.3 km gap — brief dip only).
-  // Keeping the gap small preserves consecutive distinct climbs (e.g. 10 km + 10 km
-  // separated by a short descent) that a larger window would incorrectly merge.
   const merged: DetectedClimb[] = [];
   for (const c of rawClimbs) {
     const prev = merged[merged.length - 1];
@@ -310,10 +325,10 @@ export interface PacingSegment {
   end_km:         number;
   distance_km:    number;
   elevation_gain: number;   // net m (negative = descent)
-  ascent_m:       number;   // total m gained (always ≥ 0)
+  ascent_m:       number;   // total m gained (always ≥ 0) — matches Strava's "total ascent"
   avg_gradient:   number;   // % (negative = downhill)
   target_watts:   number;
-  avg_speed_kmh:  number;   // estimated average speed for this segment
+  avg_speed_kmh:  number;
   est_time_min:   number;
 }
 
@@ -336,10 +351,18 @@ export function buildPacingSegments(
   bikeKg:          number,
   descentSpeedKmh?: number,
   flatSpeedKmh?:    number,
+  accessoriesKg:    number = 0,
+  physics:          PhysicsParams = {},
 ): PacingSegment[] {
+  // Compute altitude-corrected air density from full route stream if not overridden
+  const resolvedPhysics: PhysicsParams = { ...physics };
+  if (resolvedPhysics.rho === undefined && streamAltM.length > 0) {
+    const avgAltM = streamAltM.reduce((a, b) => a + b, 0) / streamAltM.length;
+    resolvedPhysics.rho = rhoAtAltitude(avgAltM);
+  }
+
   const sorted = [...climbs].sort((a, b) => a.start_km - b.start_km);
 
-  // Build interval list: [start, end, climbIdx | undefined]
   const intervals: { s: number; e: number; ci?: number }[] = [];
   let cursor = 0;
   for (let i = 0; i < sorted.length; i++) {
@@ -357,7 +380,6 @@ export function buildPacingSegments(
   for (const { s: startKm, e: endKm, ci } of intervals) {
     if (endKm <= startKm + 0.05) continue;
 
-    // Slice streams to this interval
     const sliceD: number[] = [];
     const sliceA: number[] = [];
     for (let i = 0; i < streamDistKm.length; i++) {
@@ -368,7 +390,6 @@ export function buildPacingSegments(
     }
     if (sliceD.length < 2) continue;
 
-    // Elevation stats
     const netGain = sliceA[sliceA.length - 1] - sliceA[0];
     let ascent = 0;
     for (let i = 1; i < sliceA.length; i++) {
@@ -378,7 +399,6 @@ export function buildPacingSegments(
     const distKm    = endKm - startKm;
     const avgGrad   = distKm > 0 ? (netGain / (distKm * 1000)) * 100 : 0;
 
-    // Determine type + watts
     const isClimb = ci !== undefined;
     let type:   PacingSegment['type'];
     let label:  string;
@@ -398,7 +418,6 @@ export function buildPacingSegments(
       watts = flatWatts;
     }
 
-    // Time estimate using physics model on actual gradient profile
     const estTime = estimateTime({
       stream_distance_km: sliceD,
       stream_altitude_m:  sliceA,
@@ -407,8 +426,10 @@ export function buildPacingSegments(
       climbs:             [],
       rider_weight_kg:    riderKg,
       bike_weight_kg:     bikeKg,
+      accessories_kg:     accessoriesKg,
       descent_speed_kmh:  isClimb ? undefined : descentSpeedKmh,
       flat_speed_kmh:     isClimb ? undefined : flatSpeedKmh,
+      physics:            resolvedPhysics,
     });
 
     const avgSpeedKmh = estTime > 0

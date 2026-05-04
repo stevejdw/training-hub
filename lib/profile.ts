@@ -27,19 +27,23 @@ export interface PacingStrategy {
   descent_watts:       number;
   descent_speed_kmh?:  number;   // braking speed cap for descents (km/h)
   bike_weight_kg:      number;
+  accessories_kg?:     number;   // water, food, clothing (default 2 kg)
+  cda?:                number;   // drag area m² (default 0.35)
+  crr?:                number;   // rolling resistance (default 0.0045)
   climbs:              EventClimb[];
   est_time_min:        number;
 }
 
 export interface EventGoal {
-  id?:               string;   // stable slug — set on creation
-  name:              string;
-  date:              string;   // YYYY-MM-DD
-  goal:              string;
-  location?:         string;
-  strava_route_id?:  string;
-  route?:            CachedRoute | null;
-  pacing_strategy?:  PacingStrategy | null;
+  id?:                   string;   // stable slug — set on creation
+  name:                  string;
+  date:                  string;   // YYYY-MM-DD
+  goal:                  string;
+  location?:             string;
+  strava_route_id?:      string;
+  route?:                CachedRoute | null;
+  pacing_strategy?:      PacingStrategy | null;
+  linked_activity_ids?:  number[];  // Strava activity IDs ridden on this route
 }
 
 export interface PowerTarget {
