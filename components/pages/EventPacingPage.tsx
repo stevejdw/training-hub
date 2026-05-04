@@ -5,7 +5,7 @@ import Link from 'next/link';
 import type { EventGoal, EventClimb, CachedRoute, PacingStrategy } from '@/lib/profile';
 import {
   buildPacingSegments, calcNP, calcAvgWatts, calcCalories,
-  fmtTime, speedForPower, powerForSpeed, PacingSegment,
+  fmtTime, wattsForSegmentSpeed, PacingSegment,
 } from '@/lib/pacing';
 import PageHeader from '@/components/PageHeader';
 import { iconFor } from '@/components/nav-items';
@@ -92,20 +92,33 @@ export default function EventPacingPage({ eventId }: Props) {
     );
   }, [route, climbs, flatWatts, descentWatts, riderKg, bikeKg, descentSpeedKmh, flatSpeedKmh]);
 
-  // Apply per-segment watt overrides when editing
+  // Apply per-segment watt overrides when editing.
+  // Re-runs the full time integration for the segment so displayed speed
+  // matches what `wattsForSegmentSpeed` solved for (varying gradients).
   const segments = useMemo(() => {
     if (!editingPacing || Object.keys(segWattsEdit).length === 0) return baseSegments;
+    if (!route) return baseSegments;
     return baseSegments.map(seg => {
       const k = segKey(seg);
       if (!(k in segWattsEdit)) return seg;
-      const watts   = segWattsEdit[k];
-      const speedMs = speedForPower(watts, seg.avg_gradient / 100, totalKg);
-      if (speedMs <= 0) return seg;
-      const speedKmh = Math.round(speedMs * 36) / 10;
-      const timeMin  = (seg.distance_km * 1000 / speedMs) / 60;
-      return { ...seg, target_watts: watts, avg_speed_kmh: speedKmh, est_time_min: timeMin };
+      const watts = segWattsEdit[k];
+      const overrideSegs = buildPacingSegments(
+        route.stream_distance_km, route.stream_altitude_m,
+        route.distance_m / 1000,
+        // Treat the segment as a single climb so its target_watts is honoured.
+        [{ name: seg.label, start_km: seg.start_km, end_km: seg.end_km, target_watts: watts }],
+        flatWatts, descentWatts, riderKg, bikeKg, descentSpeedKmh, flatSpeedKmh,
+      );
+      const inner = overrideSegs.find(s => s.start_km === seg.start_km && s.end_km === seg.end_km);
+      if (!inner || inner.est_time_min <= 0) return { ...seg, target_watts: watts };
+      return {
+        ...seg,
+        target_watts:  watts,
+        avg_speed_kmh: inner.avg_speed_kmh,
+        est_time_min:  inner.est_time_min,
+      };
     });
-  }, [baseSegments, editingPacing, segWattsEdit, totalKg]);
+  }, [baseSegments, editingPacing, segWattsEdit, route, flatWatts, descentWatts, riderKg, bikeKg, descentSpeedKmh, flatSpeedKmh]);
 
   const estMin    = useMemo(() => segments.reduce((t, s) => t + s.est_time_min, 0), [segments]);
   const np        = useMemo(() => segments.length ? calcNP(segments)       : null, [segments]);
@@ -150,8 +163,11 @@ export default function EventPacingPage({ eventId }: Props) {
   function handleSpeedBlur(seg: PacingSegment, draftValue: string) {
     const k = segKey(seg);
     const s = parseFloat(draftValue);
-    if (!isNaN(s) && s > 0) {
-      const w = powerForSpeed(s / 3.6, seg.avg_gradient / 100, totalKg);
+    if (!isNaN(s) && s > 0 && route) {
+      const w = wattsForSegmentSpeed(
+        route.stream_distance_km, route.stream_altitude_m,
+        seg.start_km, seg.end_km, s, riderKg, bikeKg,
+      );
       if (w > 0) setSegWattsEdit(prev => ({ ...prev, [k]: w }));
     }
     setSpeedDrafts(prev => { const n = { ...prev }; delete n[k]; return n; });
@@ -177,13 +193,18 @@ export default function EventPacingPage({ eventId }: Props) {
     // still focused — onBlur fires but its setSegWattsEdit hasn't been applied yet
     // because React batches state updates, so we must read speedDrafts directly here).
     const effectiveWatts = { ...segWattsEdit };
-    for (const seg of baseSegments) {
-      const k = segKey(seg);
-      if (k in speedDrafts) {
-        const s = parseFloat(speedDrafts[k]);
-        if (!isNaN(s) && s > 0) {
-          const w = powerForSpeed(s / 3.6, seg.avg_gradient / 100, totalKg);
-          if (w > 0) effectiveWatts[k] = w;
+    if (route) {
+      for (const seg of baseSegments) {
+        const k = segKey(seg);
+        if (k in speedDrafts) {
+          const s = parseFloat(speedDrafts[k]);
+          if (!isNaN(s) && s > 0) {
+            const w = wattsForSegmentSpeed(
+              route.stream_distance_km, route.stream_altitude_m,
+              seg.start_km, seg.end_km, s, riderKg, bikeKg,
+            );
+            if (w > 0) effectiveWatts[k] = w;
+          }
         }
       }
     }

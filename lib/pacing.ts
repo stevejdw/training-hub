@@ -69,6 +69,56 @@ export function powerForSpeed(speedMs: number, grad: number, totalKg: number): n
   return Math.max(0, Math.round(A * speedMs + B * speedMs * speedMs * speedMs));
 }
 
+/**
+ * Find the constant-power watts required to ride a real elevation segment
+ * at a target average speed. Inverts the time integration in `estimateTime`
+ * via binary search — necessary because gradient varies within a segment,
+ * so `powerForSpeed(speed, avg_grad)` gives the wrong answer on rolling/varying
+ * terrain (the integrated speed at that constant power ≠ speed at avg gradient).
+ */
+export function wattsForSegmentSpeed(
+  streamDistKm:    number[],
+  streamAltM:      number[],
+  startKm:         number,
+  endKm:           number,
+  targetSpeedKmh:  number,
+  riderKg:         number,
+  bikeKg:          number,
+): number {
+  const sliceD: number[] = [];
+  const sliceA: number[] = [];
+  for (let i = 0; i < streamDistKm.length; i++) {
+    if (streamDistKm[i] >= startKm && streamDistKm[i] <= endKm) {
+      sliceD.push(streamDistKm[i]);
+      sliceA.push(streamAltM[i]);
+    }
+  }
+  if (sliceD.length < 2 || targetSpeedKmh <= 0) return 0;
+
+  const distKm    = sliceD[sliceD.length - 1] - sliceD[0];
+  const targetMin = (distKm / targetSpeedKmh) * 60;
+
+  // Binary search watts in [5, 2000] so estimateTime ≈ targetMin.
+  // estimateTime is monotonically decreasing in watts.
+  let lo = 5, hi = 2000;
+  for (let iter = 0; iter < 30; iter++) {
+    const mid = (lo + hi) / 2;
+    const t = estimateTime({
+      stream_distance_km: sliceD,
+      stream_altitude_m:  sliceA,
+      flat_watts:         mid,
+      descent_watts:      mid,
+      climbs:             [],
+      rider_weight_kg:    riderKg,
+      bike_weight_kg:     bikeKg,
+    });
+    if (t > targetMin) lo = mid;   // too slow — need more power
+    else                hi = mid;
+    if (hi - lo < 1)    break;
+  }
+  return Math.round((lo + hi) / 2);
+}
+
 export interface EventClimbInput {
   start_km:    number;
   end_km:      number;
