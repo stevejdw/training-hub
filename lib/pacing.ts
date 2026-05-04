@@ -114,7 +114,7 @@ export function wattsForSegmentSpeed(
     });
     if (t > targetMin) lo = mid;   // too slow — need more power
     else                hi = mid;
-    if (hi - lo < 1)    break;
+    if (hi - lo < 0.1)  break;
   }
   return Math.round((lo + hi) / 2);
 }

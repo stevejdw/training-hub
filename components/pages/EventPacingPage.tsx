@@ -5,7 +5,7 @@ import Link from 'next/link';
 import type { EventGoal, EventClimb, CachedRoute, PacingStrategy } from '@/lib/profile';
 import {
   buildPacingSegments, calcNP, calcAvgWatts, calcCalories,
-  fmtTime, wattsForSegmentSpeed, PacingSegment,
+  fmtTime, speedForPower, wattsForSegmentSpeed, PacingSegment,
 } from '@/lib/pacing';
 import PageHeader from '@/components/PageHeader';
 import { iconFor } from '@/components/nav-items';
@@ -55,10 +55,12 @@ export default function EventPacingPage({ eventId }: Props) {
   const [editingPacing, setEditingPacing] = useState(false);
 
   // ── Inline segment edit state ──
-  // Per-segment watts overrides while in edit mode (before "Save")
-  const [segWattsEdit, setSegWattsEdit] = useState<Record<string, number>>({});
-  // Per-segment speed draft (string, only set while input is focused)
-  const [speedDrafts, setSpeedDrafts] = useState<Record<string, string>>({});
+  // Per-segment watts overrides (set by both watts and speed edits)
+  const [segWattsEdit,  setSegWattsEdit]  = useState<Record<string, number>>({});
+  // Per-segment confirmed speed overrides (set on speed blur, cleared when watts edited)
+  const [segSpeedEdit,  setSegSpeedEdit]  = useState<Record<string, number>>({});
+  // Per-segment speed draft (string, only while input is focused)
+  const [speedDrafts,   setSpeedDrafts]   = useState<Record<string, string>>({});
 
   const riderKg = profile?.weight_kg      ?? 75;
   const bikeKg  = profile?.bike_weight_kg ?? 8;
@@ -92,33 +94,32 @@ export default function EventPacingPage({ eventId }: Props) {
     );
   }, [route, climbs, flatWatts, descentWatts, riderKg, bikeKg, descentSpeedKmh, flatSpeedKmh]);
 
-  // Apply per-segment watt overrides when editing.
-  // Re-runs the full time integration for the segment so displayed speed
-  // matches what `wattsForSegmentSpeed` solved for (varying gradients).
+  // Apply per-segment overrides when editing.
+  // Speed overrides: time = distance / speed (exact). Displayed speed stays as entered.
+  // Watts-only overrides: approximate speed via constant-gradient formula (good enough for UI).
   const segments = useMemo(() => {
-    if (!editingPacing || Object.keys(segWattsEdit).length === 0) return baseSegments;
-    if (!route) return baseSegments;
+    if (!editingPacing) return baseSegments;
+    const hasAny = Object.keys(segWattsEdit).length > 0 || Object.keys(segSpeedEdit).length > 0;
+    if (!hasAny) return baseSegments;
     return baseSegments.map(seg => {
-      const k = segKey(seg);
-      if (!(k in segWattsEdit)) return seg;
-      const watts = segWattsEdit[k];
-      const overrideSegs = buildPacingSegments(
-        route.stream_distance_km, route.stream_altitude_m,
-        route.distance_m / 1000,
-        // Treat the segment as a single climb so its target_watts is honoured.
-        [{ name: seg.label, start_km: seg.start_km, end_km: seg.end_km, target_watts: watts }],
-        flatWatts, descentWatts, riderKg, bikeKg, descentSpeedKmh, flatSpeedKmh,
-      );
-      const inner = overrideSegs.find(s => s.start_km === seg.start_km && s.end_km === seg.end_km);
-      if (!inner || inner.est_time_min <= 0) return { ...seg, target_watts: watts };
-      return {
-        ...seg,
-        target_watts:  watts,
-        avg_speed_kmh: inner.avg_speed_kmh,
-        est_time_min:  inner.est_time_min,
-      };
+      const k         = segKey(seg);
+      const speedOver = segSpeedEdit[k];
+      const wattsOver = segWattsEdit[k];
+      if (speedOver === undefined && wattsOver === undefined) return seg;
+
+      if (speedOver !== undefined) {
+        // User set speed → derive time directly; use stored watts for watts column
+        const timeMin = (seg.distance_km / speedOver) * 60;
+        return { ...seg, target_watts: wattsOver ?? seg.target_watts, avg_speed_kmh: speedOver, est_time_min: timeMin };
+      }
+
+      // Watts-only override → approximate speed via avg gradient (fast, display-only)
+      const speedMs  = speedForPower(wattsOver!, seg.avg_gradient / 100, totalKg);
+      const speedKmh = Math.round(speedMs * 36) / 10;
+      const timeMin  = speedMs > 0 ? (seg.distance_km * 1000 / speedMs) / 60 : seg.est_time_min;
+      return { ...seg, target_watts: wattsOver!, avg_speed_kmh: speedKmh, est_time_min: timeMin };
     });
-  }, [baseSegments, editingPacing, segWattsEdit, route, flatWatts, descentWatts, riderKg, bikeKg, descentSpeedKmh, flatSpeedKmh]);
+  }, [baseSegments, editingPacing, segWattsEdit, segSpeedEdit, totalKg]);
 
   const estMin    = useMemo(() => segments.reduce((t, s) => t + s.est_time_min, 0), [segments]);
   const np        = useMemo(() => segments.length ? calcNP(segments)       : null, [segments]);
@@ -146,6 +147,8 @@ export default function EventPacingPage({ eventId }: Props) {
   function handleWattsChange(seg: PacingSegment, w: number) {
     const k = segKey(seg);
     setSegWattsEdit(prev => ({ ...prev, [k]: w }));
+    // Clear speed override so display uses watts-derived speed
+    setSegSpeedEdit(prev => { const n = { ...prev }; delete n[k]; return n; });
     setSpeedDrafts(prev => { const n = { ...prev }; delete n[k]; return n; });
   }
 
@@ -163,24 +166,31 @@ export default function EventPacingPage({ eventId }: Props) {
   function handleSpeedBlur(seg: PacingSegment, draftValue: string) {
     const k = segKey(seg);
     const s = parseFloat(draftValue);
-    if (!isNaN(s) && s > 0 && route) {
-      const w = wattsForSegmentSpeed(
-        route.stream_distance_km, route.stream_altitude_m,
-        seg.start_km, seg.end_km, s, riderKg, bikeKg,
-      );
-      if (w > 0) setSegWattsEdit(prev => ({ ...prev, [k]: w }));
+    if (!isNaN(s) && s > 0) {
+      // Store confirmed speed override — time will update immediately in useMemo
+      setSegSpeedEdit(prev => ({ ...prev, [k]: s }));
+      // Compute watts via full elevation integration for accurate persistence
+      if (route) {
+        const w = wattsForSegmentSpeed(
+          route.stream_distance_km, route.stream_altitude_m,
+          seg.start_km, seg.end_km, s, riderKg, bikeKg,
+        );
+        if (w > 0) setSegWattsEdit(prev => ({ ...prev, [k]: w }));
+      }
     }
     setSpeedDrafts(prev => { const n = { ...prev }; delete n[k]; return n; });
   }
 
   function startPacingEdit() {
     setSegWattsEdit({});
+    setSegSpeedEdit({});
     setSpeedDrafts({});
     setEditingPacing(true);
   }
 
   function cancelPacingEdit() {
     setSegWattsEdit({});
+    setSegSpeedEdit({});
     setSpeedDrafts({});
     setEditingPacing(false);
   }
@@ -192,19 +202,22 @@ export default function EventPacingPage({ eventId }: Props) {
     // Resolve any pending speed draft (user may click Save while the speed input is
     // still focused — onBlur fires but its setSegWattsEdit hasn't been applied yet
     // because React batches state updates, so we must read speedDrafts directly here).
+    // Resolve any edits whose setState may not have flushed yet (React batching when
+    // blur + click-save happen in the same tick). Priority: draft > segSpeedEdit > segWattsEdit.
     const effectiveWatts = { ...segWattsEdit };
     if (route) {
       for (const seg of baseSegments) {
         const k = segKey(seg);
-        if (k in speedDrafts) {
-          const s = parseFloat(speedDrafts[k]);
-          if (!isNaN(s) && s > 0) {
-            const w = wattsForSegmentSpeed(
-              route.stream_distance_km, route.stream_altitude_m,
-              seg.start_km, seg.end_km, s, riderKg, bikeKg,
-            );
-            if (w > 0) effectiveWatts[k] = w;
-          }
+        // Pending speed draft (input still focused when Save clicked)
+        const rawSpeed = k in speedDrafts ? parseFloat(speedDrafts[k])
+                       : k in segSpeedEdit ? segSpeedEdit[k]
+                       : NaN;
+        if (!isNaN(rawSpeed) && rawSpeed > 0 && !(k in effectiveWatts)) {
+          const w = wattsForSegmentSpeed(
+            route.stream_distance_km, route.stream_altitude_m,
+            seg.start_km, seg.end_km, rawSpeed, riderKg, bikeKg,
+          );
+          if (w > 0) effectiveWatts[k] = w;
         }
       }
     }
@@ -227,6 +240,7 @@ export default function EventPacingPage({ eventId }: Props) {
     setFlatWatts(newFlat);
     setDescentWatts(newDescent);
     setSegWattsEdit({});
+    setSegSpeedEdit({});
     setSpeedDrafts({});
     setEditingPacing(false);
 
