@@ -61,6 +61,9 @@ export default function EventPacingPage({ eventId }: Props) {
   const [segSpeedEdit,  setSegSpeedEdit]  = useState<Record<string, number>>({});
   // Per-segment speed draft (string, only while input is focused)
   const [speedDrafts,   setSpeedDrafts]   = useState<Record<string, string>>({});
+  // Committed target speeds — persists after Save so the display doesn't round-trip
+  // through watts→speed physics (which is never exact). Cleared on next Edit click.
+  const [savedSpeeds,   setSavedSpeeds]   = useState<Record<string, number>>({});
 
   const riderKg = profile?.weight_kg      ?? 75;
   const bikeKg  = profile?.bike_weight_kg ?? 8;
@@ -94,11 +97,22 @@ export default function EventPacingPage({ eventId }: Props) {
     );
   }, [route, climbs, flatWatts, descentWatts, riderKg, bikeKg, descentSpeedKmh, flatSpeedKmh]);
 
-  // Apply per-segment overrides when editing.
-  // Speed overrides: time = distance / speed (exact). Displayed speed stays as entered.
-  // Watts-only overrides: approximate speed via constant-gradient formula (good enough for UI).
+  // Apply per-segment overrides.
+  // • Editing: speed override → time = dist/speed; watts override → approx speed via avg gradient.
+  // • Post-save (not editing): savedSpeeds keeps the user's entered speed so it never
+  //   round-trips through watts→physics (which is lossy and causes visible drift).
   const segments = useMemo(() => {
-    if (!editingPacing) return baseSegments;
+    if (!editingPacing) {
+      // Post-save display: apply any committed target speeds
+      if (Object.keys(savedSpeeds).length === 0) return baseSegments;
+      return baseSegments.map(seg => {
+        const k = segKey(seg);
+        const saved = savedSpeeds[k];
+        if (saved === undefined) return seg;
+        const timeMin = (seg.distance_km / saved) * 60;
+        return { ...seg, avg_speed_kmh: saved, est_time_min: timeMin };
+      });
+    }
     const hasAny = Object.keys(segWattsEdit).length > 0 || Object.keys(segSpeedEdit).length > 0;
     if (!hasAny) return baseSegments;
     return baseSegments.map(seg => {
@@ -108,18 +122,17 @@ export default function EventPacingPage({ eventId }: Props) {
       if (speedOver === undefined && wattsOver === undefined) return seg;
 
       if (speedOver !== undefined) {
-        // User set speed → derive time directly; use stored watts for watts column
         const timeMin = (seg.distance_km / speedOver) * 60;
         return { ...seg, target_watts: wattsOver ?? seg.target_watts, avg_speed_kmh: speedOver, est_time_min: timeMin };
       }
 
-      // Watts-only override → approximate speed via avg gradient (fast, display-only)
+      // Watts-only override → approximate speed via avg gradient (display only)
       const speedMs  = speedForPower(wattsOver!, seg.avg_gradient / 100, totalKg);
       const speedKmh = Math.round(speedMs * 36) / 10;
       const timeMin  = speedMs > 0 ? (seg.distance_km * 1000 / speedMs) / 60 : seg.est_time_min;
       return { ...seg, target_watts: wattsOver!, avg_speed_kmh: speedKmh, est_time_min: timeMin };
     });
-  }, [baseSegments, editingPacing, segWattsEdit, segSpeedEdit, totalKg]);
+  }, [baseSegments, editingPacing, segWattsEdit, segSpeedEdit, savedSpeeds, totalKg]);
 
   const estMin    = useMemo(() => segments.reduce((t, s) => t + s.est_time_min, 0), [segments]);
   const np        = useMemo(() => segments.length ? calcNP(segments)       : null, [segments]);
@@ -185,6 +198,7 @@ export default function EventPacingPage({ eventId }: Props) {
     setSegWattsEdit({});
     setSegSpeedEdit({});
     setSpeedDrafts({});
+    setSavedSpeeds({});       // fresh edit — start from physics-computed speeds
     setEditingPacing(true);
   }
 
@@ -235,10 +249,21 @@ export default function EventPacingPage({ eventId }: Props) {
     const newFlat    = avg(baseSegments.filter(s => s.type === 'flat'))    ?? flatWatts;
     const newDescent = avg(baseSegments.filter(s => s.type === 'descent')) ?? descentWatts;
 
+    // Build committed target speeds so post-save display never round-trips through watts
+    const newSavedSpeeds = { ...savedSpeeds };
+    for (const seg of baseSegments) {
+      const k = segKey(seg);
+      const spd = k in speedDrafts ? parseFloat(speedDrafts[k])
+                : k in segSpeedEdit ? segSpeedEdit[k]
+                : NaN;
+      if (!isNaN(spd) && spd > 0) newSavedSpeeds[k] = spd;
+    }
+
     // Update local state
     setClimbs(newClimbs);
     setFlatWatts(newFlat);
     setDescentWatts(newDescent);
+    setSavedSpeeds(newSavedSpeeds);
     setSegWattsEdit({});
     setSegSpeedEdit({});
     setSpeedDrafts({});
