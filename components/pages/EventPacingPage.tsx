@@ -1,15 +1,15 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import type { EventGoal, EventClimb, CachedRoute, PacingStrategy } from '@/lib/profile';
 import {
-  buildPacingSegments, calcNP, calcAvgWatts, calcCalories, estimateTime,
+  buildPacingSegments, calcNP, calcAvgWatts, calcCalories,
   fmtTime, speedForPower, powerForSpeed, PacingSegment,
 } from '@/lib/pacing';
 import PageHeader from '@/components/PageHeader';
 import { iconFor } from '@/components/nav-items';
-import { useProfileEdit, inputCls } from '@/lib/use-profile-edit';
+import { useProfileEdit } from '@/lib/use-profile-edit';
 
 const DEFAULT_FLAT_WATTS    = 260;
 const DEFAULT_DESCENT_WATTS = 120;
@@ -32,7 +32,8 @@ function segColors(seg: PacingSegment) {
   return                             { rowBg: '',                  label: 'text-green-300',  dot: 'bg-green-500/70',   name: 'Flat'        };
 }
 
-const COLS = 'grid-cols-[1fr_48px_52px_68px_70px_52px]';
+// Fixed column widths — same for header and all rows, view and edit
+const COLS = 'grid-cols-[minmax(100px,1fr)_46px_50px_68px_68px_50px]';
 
 interface Props { eventId: string }
 
@@ -138,11 +139,7 @@ export default function EventPacingPage({ eventId }: Props) {
   function getDisplaySpeed(seg: PacingSegment): string {
     const k = segKey(seg);
     if (k in speedDrafts) return speedDrafts[k];
-    // Show speed derived from current edit watts if overridden
-    if (editingPacing && k in segWattsEdit) {
-      const ms = speedForPower(segWattsEdit[k], seg.avg_gradient / 100, totalKg);
-      return String(Math.round(ms * 36) / 10);
-    }
+    // seg.avg_speed_kmh is already override-computed in the segments useMemo
     return String(seg.avg_speed_kmh);
   }
 
@@ -172,40 +169,42 @@ export default function EventPacingPage({ eventId }: Props) {
     setEditingPacing(false);
   }
 
-  function savePacingEdit() {
-    // Persist climb-specific changes
-    setClimbs(prev => prev.map((c, i) => {
+  // ── Save: apply edits + persist in one step ──
+  function saveAndPersist() {
+    if (!profile) return;
+    // Merge climb overrides
+    const newClimbs = climbs.map((c, i) => {
       const k = `climb-${i}`;
       return k in segWattsEdit ? { ...c, target_watts: segWattsEdit[k] } : c;
-    }));
-    // For flat/descent, average all edited segments of that type as new global default
-    const flatEdits    = baseSegments.filter(s => s.type === 'flat').map(s => segWattsEdit[segKey(s)]).filter((w): w is number => w !== undefined);
-    const descentEdits = baseSegments.filter(s => s.type === 'descent').map(s => segWattsEdit[segKey(s)]).filter((w): w is number => w !== undefined);
-    if (flatEdits.length)    setFlatWatts(Math.round(flatEdits.reduce((a, b) => a + b, 0) / flatEdits.length));
-    if (descentEdits.length) setDescentWatts(Math.round(descentEdits.reduce((a, b) => a + b, 0) / descentEdits.length));
+    });
+    // Average edited flat/descent segments → new global defaults
+    const avg = (segs: PacingSegment[]) => {
+      const vals = segs.map(s => segWattsEdit[segKey(s)]).filter((w): w is number => w !== undefined);
+      return vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : null;
+    };
+    const newFlat    = avg(baseSegments.filter(s => s.type === 'flat'))    ?? flatWatts;
+    const newDescent = avg(baseSegments.filter(s => s.type === 'descent')) ?? descentWatts;
+
+    // Update local state
+    setClimbs(newClimbs);
+    setFlatWatts(newFlat);
+    setDescentWatts(newDescent);
     setSegWattsEdit({});
     setSpeedDrafts({});
     setEditingPacing(false);
-  }
 
-  // ── Persist ──
-  const buildUpdatedEvent = useCallback((): EventGoal => {
+    // Persist immediately with the new values (don't wait for React state flush)
     const strategy: PacingStrategy | null = route
-      ? { flat_watts: flatWatts, flat_speed_kmh: flatSpeedKmh, descent_watts: descentWatts,
-          descent_speed_kmh: descentSpeedKmh, bike_weight_kg: bikeKg, climbs, est_time_min: estMin }
+      ? { flat_watts: newFlat, flat_speed_kmh: flatSpeedKmh, descent_watts: newDescent,
+          descent_speed_kmh: descentSpeedKmh, bike_weight_kg: bikeKg, climbs: newClimbs, est_time_min: estMin }
       : event?.pacing_strategy ?? null;
-    return {
+    const updated = {
       id: eventId, name: event?.name ?? '', date: event?.date ?? '',
       location: event?.location, goal: event?.goal ?? '',
       strava_route_id: route?.id ?? event?.strava_route_id,
       route: route ?? event?.route ?? null, pacing_strategy: strategy,
     };
-  }, [eventId, event, route, flatWatts, descentWatts, bikeKg, climbs, estMin, flatSpeedKmh, descentSpeedKmh]);
-
-  function persistEvent() {
-    if (!profile) return;
-    const updated = buildUpdatedEvent();
-    const events  = profile.events.map(e => (e.id ?? '') === eventId ? updated : e);
+    const events = profile.events.map(e => (e.id ?? '') === eventId ? updated : e);
     setProfile({ ...profile, events });
     save({ ...profile, events });
   }
@@ -262,81 +261,69 @@ export default function EventPacingPage({ eventId }: Props) {
                 </button>
               </div>
 
-              {/* Column headers — single fixed layout for both view + edit */}
-              <div className={`border-t border-gray-800 px-3 py-1.5 grid ${COLS} gap-2 text-[9px] font-semibold text-gray-600 uppercase tracking-wider`}>
-                <span>Segment</span>
-                <span className="text-right">Dist</span>
-                <span className="text-right">Gain</span>
-                <span className="text-right">Power</span>
-                <span className="text-right">Speed</span>
-                <span className="text-right">Time</span>
-              </div>
+              {/* Scrollable table — ensures column alignment on all screen sizes */}
+              <div className="border-t border-gray-800 overflow-x-auto">
+                <div className="min-w-[420px]">
+                  {/* Column headers */}
+                  <div className={`px-3 py-1.5 grid ${COLS} gap-2 text-[9px] font-semibold text-gray-600 uppercase tracking-wider border-b border-gray-800/60`}>
+                    <span>Segment</span>
+                    <span className="text-right">Dist</span>
+                    <span className="text-right">Gain</span>
+                    <span className="text-right">Power</span>
+                    <span className="text-right">Speed</span>
+                    <span className="text-right">Time</span>
+                  </div>
 
-              {/* Segment rows */}
-              <div className="divide-y divide-gray-800/40">
-                {segments.map((seg, i) => {
-                  const { rowBg, label: labelColor } = segColors(seg);
-                  const editWatts = getEditWatts(seg);
-                  const dispSpeed = getDisplaySpeed(seg);
+                  {/* Segment rows */}
+                  <div className="divide-y divide-gray-800/40">
+                    {segments.map((seg, i) => {
+                      const { rowBg, label: labelColor } = segColors(seg);
+                      const editWatts = getEditWatts(seg);
+                      const dispSpeed = getDisplaySpeed(seg);
 
-                  return (
-                    <div key={i} className={`px-3 py-2 ${rowBg} grid ${COLS} items-center gap-2`}>
-                      {/* Label */}
-                      <div className="min-w-0">
-                        <p className={`text-xs font-medium truncate ${labelColor}`}>{seg.label}</p>
-                        <p className="text-[10px] text-gray-600">{seg.start_km}–{seg.end_km} km</p>
-                      </div>
+                      return (
+                        <div key={i} className={`px-3 py-2 ${rowBg} grid ${COLS} items-center gap-2`}>
+                          <div className="min-w-0">
+                            <p className={`text-xs font-medium truncate ${labelColor}`}>{seg.label}</p>
+                            <p className="text-[10px] text-gray-600">{seg.start_km}–{seg.end_km} km</p>
+                          </div>
+                          <span className="text-xs text-gray-500 text-right tabular-nums">{seg.distance_km}</span>
+                          <span className={`text-xs text-right tabular-nums ${seg.elevation_gain >= 0 ? 'text-orange-400' : 'text-blue-400'}`}>
+                            {seg.elevation_gain >= 0 ? '+' : ''}{seg.elevation_gain}m
+                          </span>
+                          {editingPacing ? (
+                            <input type="number" value={editWatts}
+                              onChange={e => { const w = parseInt(e.target.value, 10); if (!isNaN(w) && w > 0) handleWattsChange(seg, w); }}
+                              className="w-full bg-gray-800 border border-gray-700 rounded px-1.5 py-1 text-xs text-white text-right focus:outline-none focus:border-orange-500 tabular-nums"
+                              step={5} min={0} max={700} />
+                          ) : (
+                            <span className="text-xs text-gray-300 text-right tabular-nums">{seg.target_watts}W</span>
+                          )}
+                          {editingPacing ? (
+                            <input type="number" value={dispSpeed}
+                              onChange={e => setSpeedDraft(seg, e.target.value)}
+                              onBlur={e => handleSpeedBlur(seg, e.target.value)}
+                              className="w-full bg-gray-800 border border-gray-700 rounded px-1.5 py-1 text-xs text-white text-right focus:outline-none focus:border-blue-500 tabular-nums"
+                              step={0.5} min={1} max={120} />
+                          ) : (
+                            <span className="text-xs text-gray-400 text-right tabular-nums">{seg.avg_speed_kmh}</span>
+                          )}
+                          <span className="text-xs font-semibold text-white text-right tabular-nums">{fmtTime(seg.est_time_min)}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
 
-                      {/* Distance */}
-                      <span className="text-xs text-gray-500 text-right tabular-nums">{seg.distance_km}</span>
-
-                      {/* Elevation */}
-                      <span className={`text-xs text-right tabular-nums ${seg.elevation_gain >= 0 ? 'text-orange-400' : 'text-blue-400'}`}>
-                        {seg.elevation_gain >= 0 ? '+' : ''}{seg.elevation_gain}m
-                      </span>
-
-                      {/* Watts */}
-                      {editingPacing ? (
-                        <input
-                          type="number"
-                          value={editWatts}
-                          onChange={e => { const w = parseInt(e.target.value, 10); if (!isNaN(w) && w > 0) handleWattsChange(seg, w); }}
-                          className="w-full bg-gray-800 border border-gray-700 rounded px-1.5 py-1 text-xs text-white text-right focus:outline-none focus:border-orange-500 tabular-nums"
-                          step={5} min={0} max={700}
-                        />
-                      ) : (
-                        <span className="text-xs text-gray-300 text-right tabular-nums">{seg.target_watts}W</span>
-                      )}
-
-                      {/* Speed */}
-                      {editingPacing ? (
-                        <input
-                          type="number"
-                          value={dispSpeed}
-                          onChange={e => setSpeedDraft(seg, e.target.value)}
-                          onBlur={e => handleSpeedBlur(seg, e.target.value)}
-                          className="w-full bg-gray-800 border border-gray-700 rounded px-1.5 py-1 text-xs text-white text-right focus:outline-none focus:border-blue-500 tabular-nums"
-                          step={0.5} min={1} max={120}
-                        />
-                      ) : (
-                        <span className="text-xs text-gray-400 text-right tabular-nums">{seg.avg_speed_kmh}</span>
-                      )}
-
-                      {/* Time */}
-                      <span className="text-xs font-semibold text-white text-right tabular-nums">{fmtTime(seg.est_time_min)}</span>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Totals row */}
-              <div className={`border-t-2 border-gray-700 px-3 py-2.5 grid ${COLS} items-center gap-2`}>
-                <span className="text-xs font-bold text-white uppercase tracking-wider">Total</span>
-                <span className="text-xs font-bold text-white text-right tabular-nums">{totalKm}</span>
-                <span className="text-xs font-bold text-orange-400 text-right tabular-nums">+{totalAscentM.toLocaleString()}m</span>
-                <span className="text-xs font-bold text-white text-right tabular-nums">{avgWatts ?? '—'}W</span>
-                <span className="text-xs font-bold text-white text-right tabular-nums">{avgSpeedKmh ?? '—'}</span>
-                <span className="text-xs font-bold text-white text-right tabular-nums">{fmtTime(estMin)}</span>
+                  {/* Totals row */}
+                  <div className={`border-t-2 border-gray-700 px-3 py-2.5 grid ${COLS} items-center gap-2`}>
+                    <span className="text-xs font-bold text-white uppercase tracking-wider">Total</span>
+                    <span className="text-xs font-bold text-white text-right tabular-nums">{totalKm}</span>
+                    <span className="text-xs font-bold text-orange-400 text-right tabular-nums">+{totalAscentM.toLocaleString()}m</span>
+                    <span className="text-xs font-bold text-white text-right tabular-nums">{avgWatts ?? '—'}W</span>
+                    <span className="text-xs font-bold text-white text-right tabular-nums">{avgSpeedKmh ?? '—'}</span>
+                    <span className="text-xs font-bold text-white text-right tabular-nums">{fmtTime(estMin)}</span>
+                  </div>
+                </div>
               </div>
 
               {/* Save / terrain breakdown */}
@@ -375,16 +362,23 @@ export default function EventPacingPage({ eventId }: Props) {
                 <div className="flex items-center gap-3 justify-between">
                   <p className="text-[10px] text-gray-600">{riderKg} kg rider · {bikeKg} kg bike · {totalKg} kg system</p>
                   <div className="flex gap-2">
-                    {editingPacing && (
-                      <button onClick={savePacingEdit}
-                        className="px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-400 text-white text-sm font-medium transition-colors">
-                        Apply
+                    {editingPacing ? (
+                      <>
+                        <button onClick={cancelPacingEdit}
+                          className="px-4 py-2 rounded-lg bg-gray-800 text-gray-400 hover:text-gray-200 text-sm transition-colors">
+                          Cancel
+                        </button>
+                        <button onClick={saveAndPersist} disabled={saving}
+                          className="px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-400 text-white text-sm font-medium transition-colors disabled:opacity-50">
+                          {saving ? 'Saving…' : 'Save'}
+                        </button>
+                      </>
+                    ) : (
+                      <button onClick={saveAndPersist} disabled={saving}
+                        className="px-4 py-2 rounded-lg bg-orange-500/20 text-orange-400 hover:bg-orange-500/30 text-sm transition-colors disabled:opacity-50">
+                        {saving ? 'Saving…' : 'Save pacing'}
                       </button>
                     )}
-                    <button onClick={persistEvent} disabled={saving}
-                      className="px-4 py-2 rounded-lg bg-orange-500/20 text-orange-400 hover:bg-orange-500/30 text-sm transition-colors disabled:opacity-50">
-                      {saving ? 'Saving…' : 'Save pacing'}
-                    </button>
                   </div>
                 </div>
               </div>
