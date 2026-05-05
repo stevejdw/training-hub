@@ -68,10 +68,6 @@ export default function Nav() {
     <>
       {/* ── Desktop: top horizontal nav ── */}
       <header className="hidden md:flex h-16 border-b border-gray-800 bg-gray-950 items-center px-6 gap-6 flex-shrink-0">
-        <Link href="/home" className="flex items-center gap-2 flex-shrink-0">
-          <span className="text-xl">🚴</span>
-          <span className="font-semibold text-white tracking-tight">Training Hub</span>
-        </Link>
         <nav className="flex gap-1 flex-wrap">
           {desktopItems.map(({ key, href, label, icon, matchPrefixes }) => {
             const prefixes = key === 'more' ? desktopMorePrefixes : matchPrefixes;
