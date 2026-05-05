@@ -63,6 +63,7 @@ export async function GET(
     /* riderKg */ 75, strategy.bike_weight_kg,
     strategy.descent_speed_kmh, strategy.flat_speed_kmh,
     accessoriesKg, physics,
+    route.stream_latlng,
   );
 
   const client = await pool.connect();

@@ -280,6 +280,9 @@ export default function EventDetailPage({ eventId }: Props) {
       route.distance_m / 1000, climbs,
       flatWatts, descentWatts, riderKg, bikeKg,
       descentSpeedKmh, flatSpeedKmh,
+      0,
+      {},
+      route.stream_latlng,
     );
   }, [route, climbs, flatWatts, descentWatts, riderKg, bikeKg, descentSpeedKmh, flatSpeedKmh]);
 
@@ -288,6 +291,7 @@ export default function EventDetailPage({ eventId }: Props) {
     return estimateTime({
       stream_distance_km: route.stream_distance_km,
       stream_altitude_m:  route.stream_altitude_m,
+      stream_latlng:      route.stream_latlng,
       flat_watts: flatWatts, descent_watts: descentWatts,
       flat_speed_kmh: flatSpeedKmh, descent_speed_kmh: descentSpeedKmh,
       climbs, rider_weight_kg: riderKg, bike_weight_kg: bikeKg,

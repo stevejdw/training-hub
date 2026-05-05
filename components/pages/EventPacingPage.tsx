@@ -139,6 +139,7 @@ export default function EventPacingPage({ eventId }: Props) {
       flatWatts, descentWatts, riderKg, bikeKg,
       descentSpeedKmh, flatSpeedKmh,
       accessoriesKg, physicsParams,
+      route.stream_latlng,
     );
   }, [route, climbs, flatWatts, descentWatts, riderKg, bikeKg, descentSpeedKmh, flatSpeedKmh, accessoriesKg, physicsParams]);
 

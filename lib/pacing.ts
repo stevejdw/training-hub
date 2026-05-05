@@ -8,6 +8,12 @@
  *   P_rolling = Crr·m·g·v
  *   P_aero    = ½·CdA·ρ·v³
  *
+ * Route integration:
+ *   Streams are resampled to ~50 m steps so steep ramps are not averaged away.
+ *   CdA scales with gradient (upright climbing vs low aero flats).
+ *   Target watts vary slightly with grade (“climber’s rhythm”).
+ *   Descents use latlng curvature to cap corner speeds (hairpins).
+ *
  * Key accuracy levers:
  *   - ETA:  drivetrain efficiency (0.975 typical for clean chain)
  *   - CdA:  drag area — 0.35 sportive hoods, 0.32 drops, 0.25 TT tuck
@@ -22,11 +28,127 @@
 const G     = 9.81;         // m/s²
 const V_MAX = 65 / 3.6;    // m/s  hard cap (≈ 65 km/h); real limit is corners
 
+/** Mandatory spacing for time integration — preserves steep pitches vs stream spacing. */
+const ROUTE_SAMPLE_STEP_M = 50;
+
 // Defaults — overridable per-call via the physics params below
 const DEFAULT_RHO = 1.225;   // kg/m³  sea-level air density
 const DEFAULT_CDA = 0.35;    // m²     sportive position (hoods / upright on climbs)
 const DEFAULT_CRR = 0.0045;  // rolling resistance — conservative for alpine roads
 const DEFAULT_ETA = 0.975;   // drivetrain efficiency (clean chain ≈ 97.5%)
+
+function interpLinear(xs: number[], ys: number[], x: number): number {
+  const n = xs.length;
+  if (n === 0) return 0;
+  if (n === 1 || x <= xs[0]) return ys[0];
+  if (x >= xs[n - 1]) return ys[n - 1];
+  let lo = 0;
+  while (lo + 1 < n && xs[lo + 1] < x) lo++;
+  const hi = Math.min(lo + 1, n - 1);
+  const span = xs[hi] - xs[lo];
+  if (Math.abs(span) < 1e-12) return ys[lo];
+  const t = (x - xs[lo]) / span;
+  return ys[lo] + t * (ys[hi] - ys[lo]);
+}
+
+function interpLatLng(
+  distKm: number[],
+  latlng: [number, number][],
+  dKm: number,
+): [number, number] {
+  const lats = latlng.map(p => p[0]);
+  const lngs = latlng.map(p => p[1]);
+  return [interpLinear(distKm, lats, dKm), interpLinear(distKm, lngs, dKm)];
+}
+
+/**
+ * Resample distance / altitude (and optional latlng) to fixed spacing along-route.
+ */
+export function resampleRouteStreams(
+  streamDistKm: number[],
+  streamAltM: number[],
+  stepM: number,
+  streamLatLng?: [number, number][],
+): { distKm: number[]; altM: number[]; latlng?: [number, number][] } {
+  const n = Math.min(streamDistKm.length, streamAltM.length);
+  if (n < 2) {
+    return {
+      distKm: streamDistKm.slice(),
+      altM:   streamAltM.slice(),
+      latlng: streamLatLng?.slice(),
+    };
+  }
+
+  const d0 = streamDistKm[0];
+  const d1 = streamDistKm[n - 1];
+  const stepKm = stepM / 1000;
+  const distKm: number[] = [];
+  const altM: number[] = [];
+  const useLl =
+    !!(streamLatLng && streamLatLng.length === streamDistKm.length && streamLatLng.length === streamAltM.length);
+  const latlngOut: [number, number][] | undefined = useLl ? [] : undefined;
+
+  for (let d = d0; d < d1 - 1e-9; d += stepKm) {
+    distKm.push(d);
+    altM.push(interpLinear(streamDistKm, streamAltM, d));
+    if (latlngOut) latlngOut.push(interpLatLng(streamDistKm, streamLatLng!, d));
+  }
+  distKm.push(d1);
+  altM.push(streamAltM[n - 1]);
+  if (latlngOut && streamLatLng) latlngOut.push(streamLatLng[n - 1]);
+
+  return { distKm, altM, latlng: latlngOut };
+}
+
+/** Bearing from point a → b (degrees clockwise from north, 0–360). */
+function bearingDeg(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const φ1 = (lat1 * Math.PI) / 180;
+  const φ2 = (lat2 * Math.PI) / 180;
+  const Δλ = ((lng2 - lng1) * Math.PI) / 180;
+  const y = Math.sin(Δλ) * Math.cos(φ2);
+  const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+  return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
+}
+
+/** Smallest turn angle between two headings (degrees). */
+function headingTurnDeg(hIn: number, hOut: number): number {
+  const d = Math.abs(hIn - hOut) % 360;
+  return d > 180 ? 360 - d : d;
+}
+
+/**
+ * Technical-descent speed limit from curvature at sample points (~50 m spacing).
+ * Returns km/h cap or null when geometry does not tighten the allowable speed.
+ */
+function cornerSpeedCapKmh(
+  prev: [number, number],
+  curr: [number, number],
+  next: [number, number],
+): number | null {
+  const bearingIn  = bearingDeg(prev[0], prev[1], curr[0], curr[1]);
+  const bearingOut = bearingDeg(curr[0], curr[1], next[0], next[1]);
+  const turn       = headingTurnDeg(bearingIn, bearingOut);
+  if (turn >= 55) return 28;
+  if (turn >= 38) return 38;
+  if (turn >= 22) return 48;
+  if (turn >= 12) return 58;
+  return null;
+}
+
+/** CdA multiplier vs baseline from rider position / drafting by gradient (fraction). */
+function cdaGradeMultiplier(grad: number): number {
+  if (grad > 0.03) return 1.10;
+  if (grad >= -0.01 && grad <= 0.01) return 0.85;
+  return 1;
+}
+
+/** Climber rhythm + flat-road energy saving (applied after climb/descent/flat watt selection). */
+function wattGradeMultiplier(grad: number): number {
+  let m = 1;
+  if (grad > 0.06) m *= 1.10;
+  if (grad >= -0.01 && grad <= 0.01) m *= 0.95;
+  return m;
+}
 
 export interface PhysicsParams {
   cda?: number;   // drag area m²         (default 0.35)
@@ -161,6 +283,8 @@ export interface EventClimbInput {
 export interface PacingInput {
   stream_distance_km:  number[];
   stream_altitude_m:   number[];
+  /** Optional [lat,lng] per distance sample — enables descent corner caps when aligned with streams */
+  stream_latlng?:      [number, number][];
   flat_watts:          number;
   flat_speed_kmh?:     number;
   descent_watts:       number;
@@ -176,6 +300,7 @@ export interface PacingInput {
 export function estimateTime(input: PacingInput): number {
   const {
     stream_distance_km, stream_altitude_m,
+    stream_latlng,
     flat_watts, descent_watts, climbs,
     rider_weight_kg, bike_weight_kg,
     accessories_kg = 0,
@@ -184,15 +309,27 @@ export function estimateTime(input: PacingInput): number {
   } = input;
 
   const totalKg = rider_weight_kg + bike_weight_kg + accessories_kg;
+  const baseCda = physics.cda ?? DEFAULT_CDA;
+
+  const hi = resampleRouteStreams(
+    stream_distance_km,
+    stream_altitude_m,
+    ROUTE_SAMPLE_STEP_M,
+    stream_latlng,
+  );
+  const D = hi.distKm;
+  const A = hi.altM;
+  const L = hi.latlng;
+
   let totalSec = 0;
 
-  for (let i = 1; i < stream_distance_km.length; i++) {
-    const dDist  = (stream_distance_km[i] - stream_distance_km[i - 1]) * 1000;
-    const dAlt   = stream_altitude_m[i] - stream_altitude_m[i - 1];
+  for (let i = 1; i < D.length; i++) {
+    const dDist = (D[i] - D[i - 1]) * 1000;
+    const dAlt  = A[i] - A[i - 1];
     if (dDist <= 0) continue;
 
     const grad = dAlt / dDist;
-    const km   = (stream_distance_km[i - 1] + stream_distance_km[i]) / 2;
+    const km   = (D[i - 1] + D[i]) / 2;
 
     const climbMatch = climbs.find(c => km >= c.start_km && km <= c.end_km);
     let watts: number;
@@ -204,7 +341,12 @@ export function estimateTime(input: PacingInput): number {
       watts = flat_watts;
     }
 
-    let v = speedForPower(watts, grad, totalKg, physics);
+    watts *= wattGradeMultiplier(grad);
+
+    const cdaSeg = baseCda * cdaGradeMultiplier(grad);
+    const segmentPhysics: PhysicsParams = { ...physics, cda: cdaSeg };
+
+    let v = speedForPower(watts, grad, totalKg, segmentPhysics);
 
     if (!climbMatch) {
       if (grad < -0.01 && descent_speed_kmh) {
@@ -212,6 +354,11 @@ export function estimateTime(input: PacingInput): number {
       } else if (grad >= -0.01 && flat_speed_kmh) {
         v = Math.min(v, flat_speed_kmh / 3.6);
       }
+    }
+
+    if (grad < -0.01 && L && i >= 1 && i + 1 < L.length) {
+      const capKmh = cornerSpeedCapKmh(L[i - 1], L[i], L[i + 1]);
+      if (capKmh !== null) v = Math.min(v, capKmh / 3.6);
     }
 
     totalSec += dDist / v;
@@ -353,6 +500,7 @@ export function buildPacingSegments(
   flatSpeedKmh?:    number,
   accessoriesKg:    number = 0,
   physics:          PhysicsParams = {},
+  streamLatLng?:    [number, number][],
 ): PacingSegment[] {
   // Compute altitude-corrected air density from full route stream if not overridden
   const resolvedPhysics: PhysicsParams = { ...physics };
@@ -382,10 +530,13 @@ export function buildPacingSegments(
 
     const sliceD: number[] = [];
     const sliceA: number[] = [];
+    const sliceL: [number, number][] | undefined =
+      streamLatLng && streamLatLng.length === streamDistKm.length ? [] : undefined;
     for (let i = 0; i < streamDistKm.length; i++) {
       if (streamDistKm[i] >= startKm && streamDistKm[i] <= endKm) {
         sliceD.push(streamDistKm[i]);
         sliceA.push(streamAltM[i]);
+        if (sliceL) sliceL.push(streamLatLng![i]);
       }
     }
     if (sliceD.length < 2) continue;
@@ -421,6 +572,7 @@ export function buildPacingSegments(
     const estTime = estimateTime({
       stream_distance_km: sliceD,
       stream_altitude_m:  sliceA,
+      stream_latlng:      sliceL && sliceL.length === sliceD.length ? sliceL : undefined,
       flat_watts:         isClimb ? watts : flatWatts,
       descent_watts:      isClimb ? watts : descentWatts,
       climbs:             [],

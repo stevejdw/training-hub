@@ -54,6 +54,7 @@ export default function EventPacingModal({ event, riderWeightKg, onSave, onClose
     ? estimateTime({
         stream_distance_km: route.stream_distance_km,
         stream_altitude_m:  route.stream_altitude_m,
+        stream_latlng:      route.stream_latlng,
         flat_watts:         flatWatts,
         descent_watts:      descentWatts,
         climbs,
@@ -381,11 +382,20 @@ export default function EventPacingModal({ event, riderWeightKg, onSave, onClose
                   <p className="text-[10px] text-gray-600 uppercase tracking-wider mb-2">Climb estimates</p>
                   {climbs.map((c, i) => {
                     if (!route) return null;
+                    const dSlice: number[] = [];
+                    const aSlice: number[] = [];
+                    const lSlice: [number, number][] = [];
+                    for (let idx = 0; idx < route.stream_distance_km.length; idx++) {
+                      const d = route.stream_distance_km[idx];
+                      if (d < c.start_km || d > c.end_km) continue;
+                      dSlice.push(d);
+                      aSlice.push(route.stream_altitude_m[idx]);
+                      if (route.stream_latlng?.[idx]) lSlice.push(route.stream_latlng[idx]);
+                    }
                     const climbMin = estimateTime({
-                      stream_distance_km: route.stream_distance_km.filter(d => d >= c.start_km && d <= c.end_km),
-                      stream_altitude_m:  route.stream_altitude_m.filter((_, idx) =>
-                        route.stream_distance_km[idx] >= c.start_km && route.stream_distance_km[idx] <= c.end_km
-                      ),
+                      stream_distance_km: dSlice,
+                      stream_altitude_m:  aSlice,
+                      stream_latlng:      lSlice.length === dSlice.length ? lSlice : undefined,
                       flat_watts:      c.target_watts,
                       descent_watts:   c.target_watts,
                       climbs:          [],

@@ -77,9 +77,18 @@ export default function ClimbDetailPage({ eventId, climbIdx }: Props) {
     if (!route || !climb || chartData.length < 2) return null;
     const sliceD = chartData.map(p => p.km + climb.start_km);
     const sliceA = chartData.map(p => p.alt);
+    const tol = 0.15;
+    const sliceL: [number, number][] = [];
+    for (let i = 0; i < route.stream_distance_km.length; i++) {
+      const d = route.stream_distance_km[i];
+      if (d >= climb.start_km - tol && d <= climb.end_km + tol && route.stream_latlng?.[i]) {
+        sliceL.push(route.stream_latlng[i]);
+      }
+    }
     return estimateTime({
       stream_distance_km: sliceD,
       stream_altitude_m:  sliceA,
+      stream_latlng:      sliceL.length === sliceD.length ? sliceL : undefined,
       flat_watts:         targetWatts,
       descent_watts:      targetWatts,
       climbs:             [],
