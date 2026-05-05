@@ -50,6 +50,11 @@ function CustomTooltip({ active, payload, label }: any) {
       )}
       {p.target_source === 'plan' && <p className="text-[10px] text-gray-600">from training plan</p>}
       {p.target_source === 'formula' && <p className="text-[10px] text-gray-600">from formula</p>}
+      {p.high_duration_recovery_warning && (
+        <p className="text-amber-400 font-medium pt-1 border-t border-gray-700 mt-1">
+          High Duration Warning: May Delay Recovery.
+        </p>
+      )}
     </div>
   );
 }
@@ -170,6 +175,15 @@ export default function TssRollingChart() {
           </div>
         ))}
       </div>
+
+      {chartData.some(p => p.high_duration_recovery_warning) && (
+        <div
+          role="status"
+          className="rounded-lg border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-200/95 leading-snug"
+        >
+          High Duration Warning: May Delay Recovery.
+        </div>
+      )}
 
       {editing && (
         <TssGoalEditModal

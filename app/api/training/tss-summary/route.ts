@@ -5,6 +5,9 @@ export const runtime = 'nodejs';
 
 const CYCLING_TYPES = ['Ride', 'VirtualRide', 'GravelRide', 'EBikeRide', 'MountainBikeRide'];
 
+/** Moving time above this in a recovery week triggers a duration warning (2.5 h). */
+export const RECOVERY_WEEK_LONG_RIDE_SEC = Math.round(2.5 * 3600);
+
 export interface TssWeekPoint {
   week_start:    string;   // YYYY-MM-DD (Monday)
   week_end:      string;   // YYYY-MM-DD (Sunday)
@@ -12,6 +15,8 @@ export interface TssWeekPoint {
   target_tss:    number;
   is_recovery:   boolean;
   target_source: 'plan' | 'formula' | 'none';
+  /** True when this week is a formula recovery week but a single ride exceeded RECOVERY_WEEK_LONG_RIDE_SEC. */
+  high_duration_recovery_warning: boolean;
 }
 
 export interface TssSummaryResponse {
@@ -101,6 +106,27 @@ export async function GET(req: Request) {
     const tssByDate = new Map<string, number>();
     for (const r of actualRes.rows) tssByDate.set(r.d, Number(r.tss));
 
+    const ridesRes = await client.query<{ d: string; moving_time: number }>(`
+      SELECT (start_date AT TIME ZONE $1)::date::text AS d, moving_time
+      FROM activities
+      WHERE sport_type = ANY($4::text[])
+        AND moving_time IS NOT NULL
+        AND (start_date AT TIME ZONE $1)::date BETWEEN $2 AND $3
+    `, [profile.timezone || 'Australia/Sydney', startDateStr, endDateStr, CYCLING_TYPES]);
+
+    const maxMovingByWeekStart = new Map<string, number>();
+    for (const row of ridesRes.rows) {
+      for (const { start, end } of ranges) {
+        const ws = fmtDate(start);
+        const we = fmtDate(end);
+        if (row.d >= ws && row.d <= we) {
+          const prev = maxMovingByWeekStart.get(ws) ?? 0;
+          if (row.moving_time > prev) maxMovingByWeekStart.set(ws, row.moving_time);
+          break;
+        }
+      }
+    }
+
     // Plan targets — sum of training_days.tss_target per day, only when mode='plan' or no config
     let planByDate: Map<string, number> | null = null;
     if (!cfg || cfg.mode === 'plan') {
@@ -140,13 +166,19 @@ export async function GET(req: Request) {
         target_source = 'plan';
       }
 
+      const ws = fmtDate(start);
+      const maxMov = maxMovingByWeekStart.get(ws) ?? 0;
+      const high_duration_recovery_warning =
+        is_recovery && maxMov > RECOVERY_WEEK_LONG_RIDE_SEC;
+
       return {
-        week_start:    fmtDate(start),
+        week_start:    ws,
         week_end:      fmtDate(end),
         actual_tss:    Math.round(actual_tss),
         target_tss,
         is_recovery,
         target_source,
+        high_duration_recovery_warning,
       };
     });
 
