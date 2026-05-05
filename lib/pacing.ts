@@ -670,6 +670,7 @@ export interface ReferenceActivityStreamInput {
   distance_km:       number[];
   watts?:            (number | null)[] | null;
   latlng?:           [number, number][] | null;
+  time_s?:           number[] | null;
   moving_time_sec:   number;
 }
 
@@ -679,18 +680,25 @@ export function extractReferenceSegmentMetrics(
   actDistKm: number[],
   watts: (number | null)[] | null | undefined,
   movingTimeSec: number,
+  timeS?: number[] | null,
 ): Pick<PacingSegment, 'prev_avg_watts' | 'prev_avg_speed_kmh' | 'prev_time_min'> {
   if (startIdx >= endIdx || movingTimeSec <= 0) {
     return { prev_avg_watts: null, prev_avg_speed_kmh: null, prev_time_min: null };
   }
 
-  const nAct = actDistKm.length;
   const d0 = actDistKm[startIdx];
   const d1 = actDistKm[endIdx];
   const segKm = Math.max(0, d1 - d0);
-  const totalKm = Math.max(1e-9, actDistKm[nAct - 1] - actDistKm[0]);
-  const elapsedSec = (segKm / totalKm) * movingTimeSec;
-  const prev_time_min = elapsedSec / 60;
+
+  let elapsedSec: number;
+  if (timeS && timeS.length === actDistKm.length && startIdx < timeS.length && endIdx < timeS.length) {
+    elapsedSec = timeS[endIdx] - timeS[startIdx];
+  } else {
+    const nAct = actDistKm.length;
+    const totalKm = Math.max(1e-9, actDistKm[nAct - 1] - actDistKm[0]);
+    elapsedSec = (segKm / totalKm) * movingTimeSec;
+  }
+  const prev_time_min = Math.max(0, elapsedSec) / 60;
 
   let prev_avg_watts: number | null = null;
   if (watts) {
@@ -759,6 +767,7 @@ export function applyReferenceActivityToPacingSegments(
           ref.distance_km,
           ref.watts ?? null,
           ref.moving_time_sec,
+          ref.time_s ?? null,
         )
       : { prev_avg_watts: null, prev_avg_speed_kmh: null, prev_time_min: null };
     return { seg, metrics };

@@ -101,7 +101,8 @@ export async function GET(
       altitude_m:  number[] | null;
       distance_km: number[] | null;
       latlng:      unknown | null;
-    }>(`SELECT watts, hr, altitude_m, distance_km, latlng FROM activity_streams WHERE activity_id = $1`, [activityId]);
+      time_s:      number[] | null;
+    }>(`SELECT watts, hr, altitude_m, distance_km, latlng, time_s FROM activity_streams WHERE activity_id = $1`, [activityId]);
 
     const stream = streamRes.rows[0] ?? null;
     const hasStreams = !!(stream?.distance_km?.length);
@@ -117,6 +118,7 @@ export async function GET(
           distance_km:     stream.distance_km,
           watts:           stream.watts,
           latlng:          actLatlng,
+          time_s:          stream.time_s,
           moving_time_sec: act.moving_time,
         },
         flatWatts:        strategy.flat_watts,
@@ -131,21 +133,34 @@ export async function GET(
       });
     }
 
-    const segments: SegmentComparison[] = plannedSegs.map(seg => {
-      let actualNp: number | null = null;
-      let actualHr: number | null = null;
+    const segments: SegmentComparison[] = plannedSegsBase.map((baseSeg, i) => {
+      const refSeg = plannedSegs[i];
+      let actualNp:      number | null = null;
+      let actualHr:      number | null = null;
+      let actualTimeMin: number | null = refSeg?.prev_time_min ?? null;
+      let actualWatts:   number | null = refSeg?.prev_avg_watts ?? null;
 
-      if (hasStreams && stream?.distance_km && stream.watts) {
+      if (hasStreams && stream?.distance_km) {
         const win = matchPacingSegmentToActivityStream(
-          seg,
+          baseSeg,
           route.stream_distance_km,
           route.stream_latlng,
           stream.distance_km,
           actLatlng,
         );
         if (win && win.startIdx < win.endIdx) {
-          const wSlice = stream.watts.slice(win.startIdx, win.endIdx + 1).filter(w => w != null && w > 0) as number[];
-          if (wSlice.length > 0) actualNp = calcNp(wSlice);
+          // Accurate time from the time_s stream
+          if (stream.time_s && win.endIdx < stream.time_s.length) {
+            const elapsedSec = stream.time_s[win.endIdx] - stream.time_s[win.startIdx];
+            if (elapsedSec > 0) actualTimeMin = elapsedSec / 60;
+          }
+          if (stream.watts) {
+            const wSlice = stream.watts.slice(win.startIdx, win.endIdx + 1).filter(w => w != null && w > 0) as number[];
+            if (wSlice.length > 0) {
+              actualNp    = calcNp(wSlice);
+              actualWatts = Math.round(wSlice.reduce((a, b) => a + b, 0) / wSlice.length);
+            }
+          }
           if (stream.hr) {
             const hrSlice = stream.hr.slice(win.startIdx, win.endIdx + 1).filter(h => h != null && h > 0) as number[];
             if (hrSlice.length > 0) {
@@ -155,18 +170,22 @@ export async function GET(
         }
       }
 
+      const actualSpeedKmh = actualTimeMin != null && actualTimeMin > 0 && baseSeg.distance_km > 0
+        ? Math.round((baseSeg.distance_km / (actualTimeMin / 60)) * 10) / 10
+        : null;
+
       return {
-        label:             seg.label,
-        type:              seg.type,
-        start_km:          seg.start_km,
-        end_km:            seg.end_km,
-        planned_time_min:  seg.est_time_min,
-        actual_time_min:   seg.prev_time_min ?? null,
-        planned_watts:     seg.target_watts,
-        actual_watts:      seg.prev_avg_watts ?? null,
+        label:             baseSeg.label,
+        type:              baseSeg.type,
+        start_km:          baseSeg.start_km,
+        end_km:            baseSeg.end_km,
+        planned_time_min:  baseSeg.est_time_min,
+        actual_time_min:   actualTimeMin,
+        planned_watts:     baseSeg.target_watts,
+        actual_watts:      actualWatts,
         actual_np:         actualNp,
-        planned_speed_kmh: seg.avg_speed_kmh,
-        actual_speed_kmh:  seg.prev_avg_speed_kmh ?? null,
+        planned_speed_kmh: baseSeg.avg_speed_kmh,
+        actual_speed_kmh:  actualSpeedKmh,
         actual_avg_hr:     actualHr,
       };
     });
@@ -177,7 +196,7 @@ export async function GET(
 
     return Response.json({
       segments,
-      total_planned_min:  plannedSegs.reduce((t, s) => t + s.est_time_min, 0),
+      total_planned_min:  plannedSegsBase.reduce((t, s) => t + s.est_time_min, 0),
       total_actual_min:   totalActualMin,
       activity_name:      act.name,
       activity_date:      act.start_date,

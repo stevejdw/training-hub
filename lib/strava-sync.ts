@@ -367,13 +367,14 @@ export async function syncActivity(activityId: number): Promise<void> {
       ALTER TABLE activity_streams ADD COLUMN IF NOT EXISTS altitude_m  FLOAT[];
       ALTER TABLE activity_streams ADD COLUMN IF NOT EXISTS distance_km FLOAT[];
       ALTER TABLE activity_streams ADD COLUMN IF NOT EXISTS latlng      FLOAT[][];
+      ALTER TABLE activity_streams ADD COLUMN IF NOT EXISTS time_s      INT[];
     `).catch(() => {});
 
     const STREAM_MAX_POINTS = 5000;
 
-    // Fetch power+HR+altitude+distance+latlng streams + laps in parallel
+    // Fetch power+HR+altitude+distance+latlng+time streams + laps in parallel
     const [streamRes, lapsRes] = await Promise.all([
-      fetch(`https://www.strava.com/api/v3/activities/${activityId}/streams?keys=watts,heartrate,altitude,distance,latlng&key_by_type=true`, {
+      fetch(`https://www.strava.com/api/v3/activities/${activityId}/streams?keys=watts,heartrate,altitude,distance,latlng,time&key_by_type=true`, {
         headers: { Authorization: `Bearer ${token}` },
       }),
       fetch(`https://www.strava.com/api/v3/activities/${activityId}/laps`, {
@@ -387,8 +388,9 @@ export async function syncActivity(activityId: number): Promise<void> {
     const altRaw      = (streamData?.altitude  as { data: number[] } | null)?.data ?? null;
     const distRaw     = (streamData?.distance  as { data: number[] } | null)?.data ?? null;
     const latlngRaw   = (streamData?.latlng    as { data: number[][] } | null)?.data ?? null;
+    const timeRaw     = (streamData?.time      as { data: number[] } | null)?.data ?? null;
 
-    // Downsample altitude, distance, latlng for storage efficiency (keep enough points for corner/hairpin detail)
+    // Downsample altitude, distance, latlng, time for storage efficiency
     function downsampleArr<T>(arr: T[], maxPts: number): T[] {
       if (arr.length <= maxPts) return arr;
       const step = arr.length / maxPts;
@@ -396,6 +398,7 @@ export async function syncActivity(activityId: number): Promise<void> {
     }
     const altStream    = altRaw    ? downsampleArr(altRaw,    STREAM_MAX_POINTS).map(a => Math.round(a * 10) / 10) : null;
     const distStream   = distRaw   ? downsampleArr(distRaw,   STREAM_MAX_POINTS).map(d => Math.round(d / 10) / 100) : null; // m → km
+    const timeStream   = timeRaw   ? downsampleArr(timeRaw,   STREAM_MAX_POINTS).map(t => Math.round(t)) : null;
     const latlngStream = latlngRaw
       ? downsampleArr(latlngRaw, STREAM_MAX_POINTS).map(pair => [
           Math.round(Number(pair[0]) * 1e6) / 1e6,
@@ -404,17 +407,18 @@ export async function syncActivity(activityId: number): Promise<void> {
       : null;
 
     // Store streams
-    if (powerStream || hrStream || altStream || distStream || latlngStream) {
+    if (powerStream || hrStream || altStream || distStream || latlngStream || timeStream) {
       await client.query(`
-        INSERT INTO activity_streams (activity_id, watts, hr, altitude_m, distance_km, latlng)
-        VALUES ($1, $2, $3, $4, $5, $6)
+        INSERT INTO activity_streams (activity_id, watts, hr, altitude_m, distance_km, latlng, time_s)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
         ON CONFLICT (activity_id) DO UPDATE
           SET watts       = COALESCE(EXCLUDED.watts,       activity_streams.watts),
               hr          = COALESCE(EXCLUDED.hr,          activity_streams.hr),
               altitude_m  = COALESCE(EXCLUDED.altitude_m,  activity_streams.altitude_m),
               distance_km = COALESCE(EXCLUDED.distance_km, activity_streams.distance_km),
-              latlng      = COALESCE(EXCLUDED.latlng,      activity_streams.latlng)
-      `, [activityId, powerStream, hrStream, altStream, distStream, latlngStream]);
+              latlng      = COALESCE(EXCLUDED.latlng,      activity_streams.latlng),
+              time_s      = COALESCE(EXCLUDED.time_s,      activity_streams.time_s)
+      `, [activityId, powerStream, hrStream, altStream, distStream, latlngStream, timeStream]);
     }
 
     // Store laps
