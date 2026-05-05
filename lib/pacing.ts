@@ -336,15 +336,54 @@ export function estimateTime(input: PacingInput): number {
   const D = hi.distKm;
   const A = hi.altM;
   const L = hi.latlng;
+  const n = D.length;
+  if (n < 2) return 0;
+
+  // ── Slope smoothing ──────────────────────────────────────────────────────
+  // Pre-compute raw per-step grades, then apply a triangle-weighted moving
+  // average over ±GRADE_SMOOTH_STEPS (each step ≈ 50 m → ±150 m each side).
+  // This prevents single GPS altitude blips from producing 400W power spikes.
+  const rawGrades = new Array<number>(n - 1);
+  for (let i = 1; i < n; i++) {
+    const dd = (D[i] - D[i - 1]) * 1000;
+    rawGrades[i - 1] = dd > 0 ? (A[i] - A[i - 1]) / dd : 0;
+  }
+  const GRADE_SMOOTH_STEPS = 3;
+  const smoothGrades = rawGrades.map((_, i) => {
+    let sum = 0, wt = 0;
+    for (let j = Math.max(0, i - GRADE_SMOOTH_STEPS); j <= Math.min(rawGrades.length - 1, i + GRADE_SMOOTH_STEPS); j++) {
+      const w = GRADE_SMOOTH_STEPS + 1 - Math.abs(i - j);
+      sum += rawGrades[j] * w;
+      wt  += w;
+    }
+    return sum / wt;
+  });
+
+  // ── Momentum / kinetic energy ────────────────────────────────────────────
+  // Speed blends exponentially toward the steady-state target over
+  // MOMENTUM_M metres — short bumps or spikes no longer cause instant
+  // speed drops (a rider carrying 50 km/h into a short kicker keeps most of it).
+  // Hard caps (corners, user limits) are applied AFTER the blend so braking
+  // overrides momentum instantly.
+  const MOMENTUM_M = 200;
+
+  // Initialise vCurrent at the steady-state for the first step.
+  const grad0  = smoothGrades[0] ?? 0;
+  const watts0 = (grad0 < -0.01 ? descent_watts : flat_watts) * wattGradeMultiplier(grad0);
+  let vCurrent = speedForPower(
+    watts0,
+    grad0,
+    totalKg,
+    { ...physics, cda: baseCda * cdaGradeMultiplier(grad0) },
+  );
 
   let totalSec = 0;
 
-  for (let i = 1; i < D.length; i++) {
+  for (let i = 1; i < n; i++) {
     const dDist = (D[i] - D[i - 1]) * 1000;
-    const dAlt  = A[i] - A[i - 1];
     if (dDist <= 0) continue;
 
-    const grad = dAlt / dDist;
+    const grad = smoothGrades[i - 1];
     const km   = (D[i - 1] + D[i]) / 2;
 
     const climbMatch = climbs.find(c => km >= c.start_km && km <= c.end_km);
@@ -362,8 +401,14 @@ export function estimateTime(input: PacingInput): number {
     const cdaSeg = baseCda * cdaGradeMultiplier(grad);
     const segmentPhysics: PhysicsParams = { ...physics, cda: cdaSeg };
 
-    let v = speedForPower(watts, grad, totalKg, segmentPhysics);
+    const vSteady = speedForPower(watts, grad, totalKg, segmentPhysics);
 
+    // Blend toward steady-state — momentum smooths out short-duration spikes
+    const alpha = 1 - Math.exp(-dDist / MOMENTUM_M);
+    let v = vCurrent + alpha * (vSteady - vCurrent);
+    v = Math.min(Math.max(v, 0.3), V_MAX);
+
+    // Hard caps (braking) applied after momentum — these override it
     if (!climbMatch) {
       if (grad < -0.01 && descent_speed_kmh) {
         v = Math.min(v, descent_speed_kmh / 3.6);
@@ -385,6 +430,7 @@ export function estimateTime(input: PacingInput): number {
       }
     }
 
+    vCurrent  = v;
     totalSec += dDist / v;
   }
 
