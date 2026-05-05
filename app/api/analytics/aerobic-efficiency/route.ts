@@ -1,4 +1,5 @@
 import pool from '@/lib/db';
+import { getProfile } from '@/lib/profile';
 import { NextRequest } from 'next/server';
 
 export const runtime = 'nodejs';
@@ -32,8 +33,37 @@ export async function GET(req: NextRequest) {
     default:     interval = '3 months';
   }
 
-  const client = await pool.connect();
+  const [profile, client] = await Promise.all([getProfile(), pool.connect()]);
   try {
+    // Derive power zone boundaries (5-zone model: z1_max, z2_max, z3_max, z4_max)
+    let zoneBoundaries: number[] | null = profile.power_zone_boundaries ?? null;
+    if (!zoneBoundaries && profile.ftp) {
+      const ftp = profile.ftp;
+      zoneBoundaries = [
+        Math.round(ftp * 0.55),
+        Math.round(ftp * 0.75),
+        Math.round(ftp * 0.90),
+        Math.round(ftp * 1.05),
+      ];
+    }
+
+    // HRV baseline: 60-day rolling avg ± 1σ for low-HRV flagging
+    const wRes = await client.query<{ date: string; hrv_rmssd: number | null }>(`
+      SELECT TO_CHAR(date, 'YYYY-MM-DD') AS date, hrv_rmssd
+      FROM daily_wellness
+      WHERE date >= CURRENT_DATE - INTERVAL '60 days'
+        AND hrv_rmssd IS NOT NULL
+      ORDER BY date ASC
+    `);
+    const hrvValues = wRes.rows.map(r => r.hrv_rmssd!).filter(v => v > 0);
+    let hrvLowerBound: number | null = null;
+    if (hrvValues.length >= 7) {
+      const avg = hrvValues.reduce((a, b) => a + b, 0) / hrvValues.length;
+      const sd  = Math.sqrt(hrvValues.reduce((a, b) => a + (b - avg) ** 2, 0) / hrvValues.length);
+      hrvLowerBound = avg - sd;
+    }
+    const hrvByDate = new Map(wRes.rows.map(r => [r.date, r.hrv_rmssd]));
+
     const sql = `
       SELECT
         a.id,
@@ -89,6 +119,9 @@ export async function GET(req: NextRequest) {
       const ef2 = a2.hr > 0 ? a2.pw / a2.hr : 0;
       const decoupling = ef1 > 0 ? ((ef1 - ef2) / ef1) * 100 : 0;
 
+      const rideHrv = hrvByDate.get(r.date) ?? null;
+      const hrv_low = rideHrv !== null && hrvLowerBound !== null ? rideHrv < hrvLowerBound : null;
+
       return {
         id:           r.id,
         date:         r.date,
@@ -105,10 +138,11 @@ export async function GET(req: NextRequest) {
         hr_h1:        Math.round(a1.hr),
         hr_h2:        Math.round(a2.hr),
         decoupling:   Math.round(decoupling * 10) / 10,
+        hrv_low,
       };
     });
 
-    return Response.json({ rides, range });
+    return Response.json({ rides, range, zone_boundaries: zoneBoundaries });
   } catch (err) {
     console.error('[aerobic-efficiency]', err);
     return Response.json({ error: String(err) }, { status: 500 });

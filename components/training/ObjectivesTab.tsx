@@ -2,12 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { AthleteProfile, EventGoal, PowerTarget } from '@/lib/profile';
+import { calendarDaysFromToday } from '@/lib/calendar-days';
 
 function daysUntil(dateStr: string): number {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const d = new Date(dateStr + 'T00:00:00');
-  return Math.round((d.getTime() - today.getTime()) / 86400000);
+  return calendarDaysFromToday(dateStr);
 }
 
 function formatEventDate(dateStr: string): string {

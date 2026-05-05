@@ -1,10 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import {
   ComposedChart, Scatter, Line,
   XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer,
+  LineChart,
+  ReferenceLine,
+  ReferenceArea,
 } from 'recharts';
 import { useCachedFetch } from '@/lib/use-cached-fetch';
 import DurabilityCurveChart from './DurabilityCurveChart';
@@ -25,6 +28,12 @@ interface Ride {
   hr_h1:       number;
   hr_h2:       number;
   decoupling:  number;
+  hrv_low:     boolean | null;
+}
+
+interface ApiResponse {
+  rides:            Ride[];
+  zone_boundaries:  number[] | null;  // [z1_max, z2_max, z3_max, z4_max]
 }
 
 interface ScatterPoint extends Ride {
@@ -37,14 +46,35 @@ interface TrendPoint {
   trendY: number;
 }
 
+interface StreamData {
+  name:           string;
+  date:           string;
+  moving_time:    number;
+  avg_watts:      number;
+  avg_hr:         number;
+  np:             number;
+  n_samples:      number;
+  sec_per_sample: number;
+  watts:          (number | null)[];
+  hr:             (number | null)[];
+}
+
 const RANGES = [
   { key: '1m', label: '1 month'  },
   { key: '3m', label: '3 months' },
   { key: '6m', label: '6 months' },
 ];
 
+type ZoneFilter = 'all' | 'z2' | 'z3';
+
 function fmtDateShort(epochMs: number) {
   return new Date(epochMs).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
+}
+
+function fmtDuration(sec: number) {
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
 function linearRegression(pts: { x: number; y: number }[]) {
@@ -73,29 +103,262 @@ function EfTooltip({ active, payload }: any) {
       <p className="text-gray-300 truncate max-w-[200px] font-medium">{row.name}</p>
       <p className="text-orange-400 font-semibold pt-1">EF {ef}</p>
       <p className="text-[10px] text-gray-500">{row.np}W NP · {row.avg_hr} bpm</p>
+      {row.hrv_low === true && <p className="text-[10px] text-yellow-400">⚠ Low HRV day</p>}
+      <p className="text-[10px] text-gray-600 mt-0.5">Click for ride detail</p>
     </div>
   );
 }
 
+// Custom scatter shape: circle normally, triangle when HRV was low
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function EfDotShape(props: any) {
+  const { cx, cy, payload } = props;
+  if (payload?.hrv_low) {
+    // Downward triangle to indicate suppressed readiness
+    const size = 5;
+    const pts = `${cx},${cy + size} ${cx - size},${cy - size * 0.6} ${cx + size},${cy - size * 0.6}`;
+    return <polygon points={pts} fill="#fbbf24" opacity={0.85} />;
+  }
+  return <circle cx={cx} cy={cy} r={4} fill="#f97316" opacity={0.8} />;
+}
+
+/* ── Single Ride Modal ──────────────────────────────────────────────────── */
+
+function RideModal({ ride, onClose }: { ride: ScatterPoint; onClose: () => void }) {
+  const [stream, setStream] = useState<StreamData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState<string | null>(null);
+
+  // Fetch stream data on mount
+  useState(() => {
+    fetch(`/api/analytics/aerobic-efficiency/${ride.id}`)
+      .then(r => r.json())
+      .then((d: StreamData & { error?: string }) => {
+        if (d.error) { setErr(d.error); } else { setStream(d); }
+      })
+      .catch(e => setErr(String(e)))
+      .finally(() => setLoading(false));
+  });
+
+  const chartData = useMemo(() => {
+    if (!stream) return [];
+    const n = stream.watts.length;
+    const secPerSample = stream.sec_per_sample || 1;
+    return Array.from({ length: n }, (_, i) => ({
+      t:     Math.round((i * secPerSample) / 60),   // minutes
+      watts: stream.watts[i] ?? null,
+      hr:    stream.hr[i]    ?? null,
+    }));
+  }, [stream]);
+
+  const halfMin = stream ? Math.round((stream.moving_time / 2) / 60) : 0;
+  const ef = (ride.np / ride.avg_hr).toFixed(3);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      <div
+        className="relative bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-start justify-between p-4 border-b border-gray-800">
+          <div>
+            <p className="text-xs text-gray-500">{new Date(ride.date).toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}</p>
+            <p className="text-sm font-semibold text-white mt-0.5 leading-tight">{ride.name}</p>
+          </div>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-300 text-lg leading-none ml-4">✕</button>
+        </div>
+
+        {/* Stats row */}
+        <div className="grid grid-cols-4 gap-2 p-4 border-b border-gray-800">
+          {[
+            { label: 'Duration', value: fmtDuration(ride.moving_time) },
+            { label: 'NP', value: `${ride.np}W` },
+            { label: 'Avg HR', value: `${ride.avg_hr} bpm` },
+            { label: 'EF', value: ef },
+          ].map(s => (
+            <div key={s.label} className="text-center">
+              <p className="text-[10px] text-gray-500 uppercase tracking-wider">{s.label}</p>
+              <p className="text-base font-bold text-white mt-0.5">{s.value}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Half-split comparison */}
+        <div className="p-4 border-b border-gray-800">
+          <p className="text-[11px] text-gray-500 uppercase tracking-wider mb-3">Aerobic Decoupling — First vs Second Half</p>
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              { label: 'First half', watts: ride.pw_h1, hr: ride.hr_h1, ef: ride.ef_h1 },
+              { label: 'Second half', watts: ride.pw_h2, hr: ride.hr_h2, ef: ride.ef_h2 },
+            ].map(h => (
+              <div key={h.label} className="bg-gray-800/60 rounded-xl p-3">
+                <p className="text-[10px] text-gray-500 mb-2">{h.label}</p>
+                <div className="space-y-1">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-gray-500">Avg watts</span>
+                    <span className="text-orange-400 font-medium">{h.watts}W</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-gray-500">Avg HR</span>
+                    <span className="text-blue-400 font-medium">{h.hr} bpm</span>
+                  </div>
+                  <div className="flex justify-between text-xs pt-1 border-t border-gray-700/50">
+                    <span className="text-gray-500">EF</span>
+                    <span className="text-white font-semibold">{h.ef.toFixed(3)}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-3 flex items-center justify-between">
+            <p className="text-xs text-gray-500">Aerobic decoupling</p>
+            <p className={`text-sm font-bold ${ride.decoupling >= 5 ? 'text-red-400' : ride.decoupling >= 3 ? 'text-yellow-400' : 'text-green-400'}`}>
+              {ride.decoupling >= 0 ? '+' : ''}{ride.decoupling.toFixed(1)}%
+              <span className="text-[10px] font-normal text-gray-500 ml-1.5">
+                {ride.decoupling < 3 ? 'Excellent' : ride.decoupling < 5 ? 'Acceptable' : 'Drift detected'}
+              </span>
+            </p>
+          </div>
+        </div>
+
+        {/* Power / HR time series */}
+        <div className="p-4">
+          <p className="text-[11px] text-gray-500 uppercase tracking-wider mb-3">Power & HR Over Ride</p>
+          {loading ? (
+            <div className="h-48 animate-pulse bg-gray-800 rounded-lg" />
+          ) : err ? (
+            <div className="h-48 flex items-center justify-center text-red-400 text-sm">{err}</div>
+          ) : chartData.length === 0 ? (
+            <div className="h-48 flex items-center justify-center text-gray-500 text-sm">No stream data</div>
+          ) : (
+            <ResponsiveContainer width="100%" height={200}>
+              <LineChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
+                <XAxis
+                  dataKey="t"
+                  tick={{ fill: '#6b7280', fontSize: 10 }}
+                  axisLine={false}
+                  tickLine={false}
+                  tickFormatter={v => `${v}m`}
+                  tickCount={6}
+                />
+                {/* Watts Y-axis (left) */}
+                <YAxis
+                  yAxisId="w"
+                  domain={['auto', 'auto']}
+                  tick={{ fill: '#f97316', fontSize: 10 }}
+                  axisLine={false}
+                  tickLine={false}
+                  width={36}
+                  tickFormatter={v => `${v}W`}
+                />
+                {/* HR Y-axis (right) */}
+                <YAxis
+                  yAxisId="hr"
+                  orientation="right"
+                  domain={['auto', 'auto']}
+                  tick={{ fill: '#60a5fa', fontSize: 10 }}
+                  axisLine={false}
+                  tickLine={false}
+                  width={40}
+                  tickFormatter={v => `${v}`}
+                />
+                {/* Shade first vs second half */}
+                {halfMin > 0 && (
+                  <ReferenceArea
+                    yAxisId="w"
+                    x1={0}
+                    x2={halfMin}
+                    fill="#f97316"
+                    fillOpacity={0.04}
+                    stroke="none"
+                  />
+                )}
+                {halfMin > 0 && (
+                  <ReferenceLine
+                    yAxisId="w"
+                    x={halfMin}
+                    stroke="#374151"
+                    strokeDasharray="4 3"
+                    label={{ value: 'Half', fill: '#6b7280', fontSize: 9, position: 'insideTopRight' }}
+                  />
+                )}
+                <Line
+                  yAxisId="w"
+                  dataKey="watts"
+                  stroke="#f97316"
+                  strokeWidth={1.5}
+                  dot={false}
+                  isAnimationActive={false}
+                  connectNulls
+                />
+                <Line
+                  yAxisId="hr"
+                  dataKey="hr"
+                  stroke="#60a5fa"
+                  strokeWidth={1.5}
+                  dot={false}
+                  isAnimationActive={false}
+                  connectNulls
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          )}
+          <p className="text-[10px] text-gray-600 mt-2">
+            <span className="text-orange-400">—</span> Power (W) ·
+            <span className="text-blue-400 ml-1.5">—</span> Heart rate (bpm)
+          </p>
+        </div>
+        {ride.hrv_low === true && (
+          <div className="mx-4 mb-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg px-3 py-2 text-xs text-yellow-400">
+            ⚠ HRV was below your normal zone on this day — performance may reflect suppressed readiness.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ── Main tab ───────────────────────────────────────────────────────────── */
+
 export default function AerobicEfficiencyTab() {
   const [range, setRange] = useState('3m');
-  const { data, loading, error } = useCachedFetch<{ rides: Ride[] }>(
+  const [zoneFilter, setZoneFilter] = useState<ZoneFilter>('all');
+  const [selectedRide, setSelectedRide] = useState<ScatterPoint | null>(null);
+
+  const { data, loading, error } = useCachedFetch<ApiResponse>(
     `/api/analytics/aerobic-efficiency?range=${range}`,
     `cache-aerobic-${range}`,
   );
 
   const rides = data?.rides ?? [];
+  const zoneBounds = data?.zone_boundaries ?? null;   // [z1_max, z2_max, z3_max, z4_max]
 
-  const scatterData: ScatterPoint[] = rides.map(r => ({
+  // Full scatter set (all steady rides)
+  const allScatter: ScatterPoint[] = rides.map(r => ({
     ...r,
     x: new Date(r.date).getTime(),
     y: r.avg_hr > 0 ? Math.round((r.np / r.avg_hr) * 1000) / 1000 : 0,
   })).filter(p => p.y > 0);
 
+  // Zone-filtered scatter
+  const scatterData: ScatterPoint[] = useMemo(() => {
+    if (zoneFilter === 'all' || !zoneBounds) return allScatter;
+    const [z1Max, z2Max, z3Max] = zoneBounds;
+    return allScatter.filter(p => {
+      if (zoneFilter === 'z2') return p.np > z1Max && p.np <= z2Max;
+      if (zoneFilter === 'z3') return p.np > z2Max && p.np <= z3Max;
+      return true;
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allScatter, zoneFilter, zoneBounds]);
+
   const reg = linearRegression(scatterData);
   const trendLineData: TrendPoint[] = reg && scatterData.length >= 2 ? [
-    { x: scatterData[0].x,                    trendY: reg.slope * scatterData[0].x + reg.intercept },
-    { x: scatterData[scatterData.length - 1].x, trendY: reg.slope * scatterData[scatterData.length - 1].x + reg.intercept },
+    { x: scatterData[0].x,                      trendY: reg.slope * scatterData[0].x + reg.intercept },
+    { x: scatterData[scatterData.length - 1].x,  trendY: reg.slope * scatterData[scatterData.length - 1].x + reg.intercept },
   ] : [];
 
   const trendPct = trendLineData.length === 2 && trendLineData[0].trendY > 0
@@ -108,24 +371,68 @@ export default function AerobicEfficiencyTab() {
 
   const rangeLabel = RANGES.find(r => r.key === range)?.label ?? range;
 
+  const handleDotClick = useCallback((data: { payload?: ScatterPoint }) => {
+    if (data.payload) setSelectedRide(data.payload);
+  }, []);
+
+  const zoneLabel = useMemo(() => {
+    if (zoneFilter === 'all' || !zoneBounds) return null;
+    const [z1Max, z2Max, z3Max] = zoneBounds;
+    if (zoneFilter === 'z2') return `Zone 2 · ${z1Max + 1}–${z2Max}W`;
+    if (zoneFilter === 'z3') return `Zone 3 · ${z2Max + 1}–${z3Max}W`;
+    return null;
+  }, [zoneFilter, zoneBounds]);
+
+  const hvLowCount = allScatter.filter(p => p.hrv_low === true).length;
+
   return (
     <div className="space-y-3">
-      {/* Range selector */}
-      <div className="flex gap-1.5 flex-wrap">
-        {RANGES.map(r => (
-          <button
-            key={r.key}
-            onClick={() => setRange(r.key)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-              range === r.key
-                ? 'bg-orange-500/20 text-orange-400 border border-orange-500/50'
-                : 'bg-gray-800 text-gray-500 hover:text-gray-300'
-            }`}
-          >
-            {r.label}
-          </button>
-        ))}
+      {/* Range + Zone filter selectors */}
+      <div className="flex flex-wrap gap-2 items-center">
+        <div className="flex gap-1.5">
+          {RANGES.map(r => (
+            <button
+              key={r.key}
+              onClick={() => setRange(r.key)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                range === r.key
+                  ? 'bg-orange-500/20 text-orange-400 border border-orange-500/50'
+                  : 'bg-gray-800 text-gray-500 hover:text-gray-300'
+              }`}
+            >
+              {r.label}
+            </button>
+          ))}
+        </div>
+        <div className="w-px h-4 bg-gray-700" />
+        <div className="flex gap-1.5">
+          {([
+            { key: 'all', label: 'All zones' },
+            { key: 'z2', label: 'Zone 2' },
+            { key: 'z3', label: 'Zone 3' },
+          ] as { key: ZoneFilter; label: string }[]).map(z => (
+            <button
+              key={z.key}
+              onClick={() => setZoneFilter(z.key)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                zoneFilter === z.key
+                  ? 'bg-blue-500/20 text-blue-400 border border-blue-500/50'
+                  : 'bg-gray-800 text-gray-500 hover:text-gray-300'
+              }`}
+            >
+              {z.label}
+            </button>
+          ))}
+        </div>
       </div>
+
+      {/* Zone filter hint */}
+      {zoneFilter !== 'all' && zoneLabel && (
+        <p className="text-[11px] text-blue-400/70 -mt-1">
+          Filtering to {zoneLabel} rides · {scatterData.length} of {allScatter.length} rides shown
+          {zoneFilter === 'z2' && ' — steady Zone 2 EF trend reflects pure aerobic base.'}
+        </p>
+      )}
 
       {/* Summary cards */}
       <div className="grid grid-cols-3 gap-2">
@@ -160,7 +467,7 @@ export default function AerobicEfficiencyTab() {
       <div className="bg-gray-900 rounded-xl border border-gray-800 p-4">
         <div className="flex items-start justify-between gap-2 mb-1">
           <p className="text-[11px] text-gray-600">
-            Efficiency Factor (NP ÷ avg HR) per steady ride. Higher = better aerobic fitness.
+            Efficiency Factor (NP ÷ avg HR) per steady ride. Higher = better aerobic fitness. Click a dot for ride detail.
           </p>
           {trendPct !== null && (
             <p className={`text-[11px] font-medium flex-shrink-0 ${trendPct >= 0 ? 'text-green-400' : 'text-red-400'}`}>
@@ -204,9 +511,11 @@ export default function AerobicEfficiencyTab() {
               <Scatter
                 data={scatterData}
                 dataKey="y"
-                fill="#f97316"
-                opacity={0.8}
+                shape={<EfDotShape />}
                 isAnimationActive={false}
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                onClick={handleDotClick as any}
+                style={{ cursor: 'pointer' }}
               />
               {trendLineData.length === 2 && (
                 <Line
@@ -227,11 +536,19 @@ export default function AerobicEfficiencyTab() {
         <p className="text-[10px] text-gray-600 mt-2 leading-relaxed">
           <span className="text-orange-400">●</span> Each dot = one steady ride ·
           <span className="text-orange-300 ml-1.5">- - -</span> Linear trend
+          {hvLowCount > 0 && (
+            <span className="ml-1.5"><span className="text-yellow-400">▼</span> Low HRV day ({hvLowCount})</span>
+          )}
         </p>
       </div>
 
       {/* Durability Curve */}
       <DurabilityCurveChart />
+
+      {/* Single Ride Modal */}
+      {selectedRide && (
+        <RideModal ride={selectedRide} onClose={() => setSelectedRide(null)} />
+      )}
     </div>
   );
 }

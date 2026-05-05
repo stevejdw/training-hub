@@ -1,6 +1,7 @@
 import pool from '@/lib/db';
 import { getProfile } from '@/lib/profile';
 import { calculateFitness } from '@/lib/fitness';
+import { calendarDaysFromToday } from '@/lib/calendar-days';
 
 export const runtime = 'nodejs';
 
@@ -110,9 +111,7 @@ export async function GET() {
     const nextEvent = profile.events
       .filter(e => e.date >= today)
       .sort((a, b) => a.date.localeCompare(b.date))[0] ?? null;
-    const daysAway = nextEvent
-      ? Math.ceil((new Date(nextEvent.date).getTime() - Date.now()) / 86400000)
-      : null;
+    const daysAway = nextEvent ? calendarDaysFromToday(nextEvent.date) : null;
 
     // Find last cycling ride that has a watts stream
     const CYCLING = ['Ride','VirtualRide','GravelRide','MountainBikeRide','EBikeRide','EMountainBikeRide'];

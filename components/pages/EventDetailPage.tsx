@@ -15,6 +15,7 @@ import PageHeader from '@/components/PageHeader';
 import { iconFor } from '@/components/nav-items';
 import { useProfileEdit, inputCls } from '@/lib/use-profile-edit';
 import Link from 'next/link';
+import { calendarDaysFromToday } from '@/lib/calendar-days';
 
 const DEFAULT_FLAT_WATTS    = 260;
 const DEFAULT_DESCENT_WATTS = 120;
@@ -65,9 +66,7 @@ function climbFromBounds(
 }
 
 function daysToGo(dateStr: string): number {
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  const d     = new Date(dateStr + 'T00:00:00'); d.setHours(0, 0, 0, 0);
-  return Math.round((d.getTime() - today.getTime()) / 86400000);
+  return calendarDaysFromToday(dateStr);
 }
 
 function fmtDate(dateStr: string): string {

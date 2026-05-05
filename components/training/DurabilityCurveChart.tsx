@@ -3,7 +3,7 @@
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ReferenceLine, ResponsiveContainer,
-  Cell,
+  Cell, LabelList,
 } from 'recharts';
 import { useCachedFetch } from '@/lib/use-cached-fetch';
 
@@ -109,6 +109,25 @@ export default function DurabilityCurveChart() {
                     fill={entry.avg === null ? '#374151' : entry.avg > 5 ? '#f87171' : entry.avg > 3 ? '#facc15' : '#60a5fa'}
                   />
                 ))}
+                <LabelList
+                  dataKey="count"
+                  position="top"
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  content={({ x, y, width, value }: any) => {
+                    if (!value) return null;
+                    return (
+                      <text
+                        x={Number(x) + Number(width) / 2}
+                        y={Number(y) - 4}
+                        textAnchor="middle"
+                        fill="#6b7280"
+                        fontSize={10}
+                      >
+                        {`n=${value}`}
+                      </text>
+                    );
+                  }}
+                />
               </Bar>
             </BarChart>
           </ResponsiveContainer>

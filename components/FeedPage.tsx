@@ -5,6 +5,7 @@ import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { sportLabel, sportColor } from '@/lib/sport-types';
 import ReadinessResponseWidget from './ReadinessResponseWidget';
+import { calendarDaysFromToday } from '@/lib/calendar-days';
 
 const ActivityMap = dynamic(() => import('./ActivityMap'), { ssr: false });
 
@@ -223,12 +224,17 @@ export default function FeedPage() {
 
   // Format session date relative to today
   function sessionDateLabel(dateStr: string) {
-    const today = new Date(); today.setHours(0,0,0,0);
-    const d = new Date(dateStr + 'T00:00:00'); d.setHours(0,0,0,0);
-    const diff = Math.round((d.getTime() - today.getTime()) / 86400000);
+    const diff = calendarDaysFromToday(dateStr);
     if (diff === 0) return 'Today';
     if (diff === 1) return 'Tomorrow';
-    return d.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' });
+    const [y, m, d] = dateStr.split('-').map(Number);
+    if (!y || !m || !d) return dateStr;
+    return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-AU', {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+      timeZone: 'Australia/Sydney',
+    });
   }
 
   return (
