@@ -26,15 +26,15 @@
  */
 
 const G     = 9.81;         // m/s²
-const V_MAX = 65 / 3.6;    // m/s  hard cap (≈ 65 km/h); real limit is corners
+const V_MAX = 80 / 3.6;    // m/s  hard cap (≈ 80 km/h); real limit is corners
 
 /** Mandatory spacing for time integration — preserves steep pitches vs stream spacing. */
 const ROUTE_SAMPLE_STEP_M = 50;
 
 // Defaults — overridable per-call via the physics params below
 const DEFAULT_RHO = 1.225;   // kg/m³  sea-level air density
-const DEFAULT_CDA = 0.35;    // m²     sportive position (hoods / upright on climbs)
-const DEFAULT_CRR = 0.0045;  // rolling resistance — conservative for alpine roads
+const DEFAULT_CDA = 0.32;    // m²     drops position
+const DEFAULT_CRR = 0.005;   // rolling resistance — realistic for training tires
 const DEFAULT_ETA = 0.975;   // drivetrain efficiency (clean chain ≈ 97.5%)
 
 function interpLinear(xs: number[], ys: number[], x: number): number {
@@ -120,7 +120,7 @@ function headingTurnDeg(hIn: number, hOut: number): number {
  * Technical-descent speed limit from curvature at sample points (~50 m spacing).
  * Returns km/h cap or null when geometry does not tighten the allowable speed.
  */
-function cornerSpeedCapKmh(
+export function cornerSpeedCapKmh(
   prev: [number, number],
   curr: [number, number],
   next: [number, number],
@@ -180,14 +180,14 @@ export function speedForPower(
   const rho = p.rho ?? DEFAULT_RHO;
   const eta = p.eta ?? DEFAULT_ETA;
 
+  const sinGrade = Math.sin(Math.atan(grad));
+  const cosGrade = Math.cos(Math.atan(grad));
   const effectiveW = watts * eta;
-  const A = totalKg * G * (grad + crr);   // linear term (gravity + rolling)
-  const B = 0.5 * cda * rho;              // cubic term (aero)
+  // A·v + B·v³ = effectiveW   where A = gravity + rolling (linear), B = aero (cubic)
+  const A = totalKg * G * (sinGrade + cosGrade * crr);
+  const B = 0.5 * cda * rho;
 
-  // f(v)  = A·v + B·v³ - P = 0
-  // f'(v) = A   + 3B·v²
   let v = grad > 0.03 ? 4.0 : grad < -0.03 ? V_MAX * 0.7 : 8.0;
-
   for (let i = 0; i < 60; i++) {
     const f  = A * v + B * v * v * v - effectiveW;
     const df = A + 3 * B * v * v;
@@ -219,10 +219,16 @@ export function powerForSpeed(
   const rho = p.rho ?? DEFAULT_RHO;
   const eta = p.eta ?? DEFAULT_ETA;
 
-  const A = totalKg * G * (grad + crr);
-  const B = 0.5 * cda * rho;
-  const wheelWatts = A * speedMs + B * speedMs * speedMs * speedMs;
-  return Math.max(0, Math.round(wheelWatts / eta));
+  const sinGrade = Math.sin(Math.atan(grad));
+  const cosGrade = Math.cos(Math.atan(grad));
+
+  const gravityForce = totalKg * G * sinGrade;               // negative on downhill → reduces power needed
+  const rollingForce = totalKg * G * cosGrade * crr;         // always opposes motion
+  const dragForce    = 0.5 * cda * rho * speedMs * speedMs;  // always opposes motion
+
+  const propulsivePower = (gravityForce + rollingForce + dragForce) * speedMs;
+  if (propulsivePower <= 0) return 0;  // gravity does all the work — rider coasts
+  return Math.round(propulsivePower / eta);
 }
 
 /**
@@ -249,10 +255,11 @@ export function wattsForSegmentSpeed(
       sliceA.push(streamAltM[i]);
     }
   }
-  if (sliceD.length < 2 || targetSpeedKmh <= 0) return 0;
+  const cappedSpeedKmh = Math.min(targetSpeedKmh, V_MAX * 3.6);
+  if (sliceD.length < 2 || cappedSpeedKmh <= 0) return 0;
 
   const distKm    = sliceD[sliceD.length - 1] - sliceD[0];
-  const targetMin = (distKm / targetSpeedKmh) * 60;
+  const targetMin = (distKm / cappedSpeedKmh) * 60;
 
   let lo = 5, hi = 2000;
   for (let iter = 0; iter < 30; iter++) {
@@ -280,6 +287,13 @@ export interface EventClimbInput {
   target_watts: number;
 }
 
+/** Optional km windows (e.g. from a reference ride) that cap descent speed — mimics braking / terrain limits. */
+export interface SegmentSpeedCapZone {
+  start_km: number;
+  end_km:   number;
+  max_kmh:  number;
+}
+
 export interface PacingInput {
   stream_distance_km:  number[];
   stream_altitude_m:   number[];
@@ -294,6 +308,8 @@ export interface PacingInput {
   bike_weight_kg:      number;
   accessories_kg?:     number;
   physics?:            PhysicsParams;
+  /** Extra descent speed ceilings (applied after global caps and corner geometry caps). */
+  segment_speed_caps?: SegmentSpeedCapZone[];
 }
 
 /** Compute total estimated riding time in minutes. */
@@ -359,6 +375,14 @@ export function estimateTime(input: PacingInput): number {
     if (grad < -0.01 && L && i >= 1 && i + 1 < L.length) {
       const capKmh = cornerSpeedCapKmh(L[i - 1], L[i], L[i + 1]);
       if (capKmh !== null) v = Math.min(v, capKmh / 3.6);
+    }
+
+    if (grad < -0.01 && input.segment_speed_caps?.length) {
+      for (const z of input.segment_speed_caps) {
+        if (km >= z.start_km - 1e-6 && km <= z.end_km + 1e-6) {
+          v = Math.min(v, z.max_kmh / 3.6);
+        }
+      }
     }
 
     totalSec += dDist / v;
@@ -474,9 +498,14 @@ export interface PacingSegment {
   elevation_gain: number;   // net m (negative = descent)
   ascent_m:       number;   // total m gained (always ≥ 0) — matches Strava's "total ascent"
   avg_gradient:   number;   // % (negative = downhill)
-  target_watts:   number;
-  avg_speed_kmh:  number;
-  est_time_min:   number;
+  target_watts:      number;
+  avg_speed_kmh:     number;
+  est_time_min:      number;
+  isManualOverride?: boolean;
+  /** Reference activity (matched window) — optional */
+  prev_avg_watts?:     number | null;
+  prev_avg_speed_kmh?: number | null;
+  prev_time_min?:      number | null;
 }
 
 interface ClimbRef {
@@ -484,6 +513,299 @@ interface ClimbRef {
   start_km:     number;
   end_km:       number;
   target_watts: number;
+}
+
+/** Slice route streams to a [start_km, end_km] interval (inclusive). */
+export function sliceRouteStreams(
+  streamDistKm: number[],
+  streamAltM: number[],
+  streamLatLng: [number, number][] | undefined,
+  startKm: number,
+  endKm: number,
+): { sliceD: number[]; sliceA: number[]; sliceL?: [number, number][] } {
+  const sliceD: number[] = [];
+  const sliceA: number[] = [];
+  const sliceL: [number, number][] | undefined =
+    streamLatLng && streamLatLng.length === streamDistKm.length ? [] : undefined;
+  for (let i = 0; i < streamDistKm.length; i++) {
+    if (streamDistKm[i] >= startKm && streamDistKm[i] <= endKm) {
+      sliceD.push(streamDistKm[i]);
+      sliceA.push(streamAltM[i]);
+      if (sliceL) sliceL.push(streamLatLng![i]);
+    }
+  }
+  return { sliceD, sliceA, sliceL };
+}
+
+export function haversineDistanceMeters(a: [number, number], b: [number, number]): number {
+  const R = 6371000;
+  const [lat1, lon1] = a;
+  const [lat2, lon2] = b;
+  const toRad = (x: number) => (x * Math.PI) / 180;
+  const φ1 = toRad(lat1);
+  const φ2 = toRad(lat2);
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const aa =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(φ1) * Math.cos(φ2) * Math.sin(dLon / 2) ** 2;
+  const c = 2 * Math.atan2(Math.sqrt(Math.min(1, aa)), Math.sqrt(Math.max(0, 1 - aa)));
+  return R * c;
+}
+
+const MATCH_TOL_KM = 0.08;
+const LATLNG_REFINE_RADIUS = 40;
+
+export interface ActivityStreamIndexWindow {
+  startIdx: number;
+  endIdx:   number;
+}
+
+/**
+ * Map a pacing segment (route km + optional latlng) to activity stream indices
+ * using cumulative distance along the reference activity, refined with GPS when available.
+ */
+export function matchPacingSegmentToActivityStream(
+  seg: Pick<PacingSegment, 'start_km' | 'end_km'>,
+  routeDistKm: number[],
+  routeLatLng: [number, number][] | undefined,
+  actDistKm: number[],
+  actLatLng: [number, number][] | undefined,
+): ActivityStreamIndexWindow | null {
+  const n = actDistKm.length;
+  if (n < 2 || routeDistKm.length < 2) return null;
+
+  let startIdx = actDistKm.findIndex(d => d >= seg.start_km - MATCH_TOL_KM);
+  if (startIdx < 0) startIdx = 0;
+
+  let endIdx = n - 1;
+  for (let i = n - 1; i >= 0; i--) {
+    if (actDistKm[i] <= seg.end_km + MATCH_TOL_KM) {
+      endIdx = i;
+      break;
+    }
+  }
+
+  if (startIdx >= endIdx) return null;
+
+  const useRouteLl =
+    routeLatLng && routeLatLng.length === routeDistKm.length;
+  const useActLl = actLatLng && actLatLng.length === n;
+
+  if (useRouteLl && useActLl) {
+    const refStart = interpLatLng(routeDistKm, routeLatLng, seg.start_km);
+    const refEnd   = interpLatLng(routeDistKm, routeLatLng, seg.end_km);
+    const i0 = Math.max(0, startIdx - LATLNG_REFINE_RADIUS);
+    const i1 = Math.min(n - 1, startIdx + LATLNG_REFINE_RADIUS);
+    let bestI = startIdx;
+    let bestD = Infinity;
+    for (let i = i0; i <= i1; i++) {
+      const dd = haversineDistanceMeters(refStart, actLatLng[i]);
+      if (dd < bestD) { bestD = dd; bestI = i; }
+    }
+    startIdx = bestI;
+
+    const j0 = Math.max(0, endIdx - LATLNG_REFINE_RADIUS);
+    const j1 = Math.min(n - 1, endIdx + LATLNG_REFINE_RADIUS);
+    let bestJ = endIdx;
+    bestD = Infinity;
+    for (let j = j0; j <= j1; j++) {
+      const dd = haversineDistanceMeters(refEnd, actLatLng[j]);
+      if (dd < bestD) { bestD = dd; bestJ = j; }
+    }
+    endIdx = bestJ;
+  }
+
+  if (startIdx >= endIdx) return null;
+  return { startIdx, endIdx };
+}
+
+export interface ReferenceActivityStreamInput {
+  distance_km:       number[];
+  watts?:            (number | null)[] | null;
+  latlng?:           [number, number][] | null;
+  moving_time_sec:   number;
+}
+
+export function extractReferenceSegmentMetrics(
+  startIdx: number,
+  endIdx: number,
+  actDistKm: number[],
+  watts: (number | null)[] | null | undefined,
+  movingTimeSec: number,
+): Pick<PacingSegment, 'prev_avg_watts' | 'prev_avg_speed_kmh' | 'prev_time_min'> {
+  if (startIdx >= endIdx || movingTimeSec <= 0) {
+    return { prev_avg_watts: null, prev_avg_speed_kmh: null, prev_time_min: null };
+  }
+
+  const nAct = actDistKm.length;
+  const d0 = actDistKm[startIdx];
+  const d1 = actDistKm[endIdx];
+  const segKm = Math.max(0, d1 - d0);
+  const totalKm = Math.max(1e-9, actDistKm[nAct - 1] - actDistKm[0]);
+  const elapsedSec = (segKm / totalKm) * movingTimeSec;
+  const prev_time_min = elapsedSec / 60;
+
+  let prev_avg_watts: number | null = null;
+  if (watts) {
+    const wSlice = watts.slice(startIdx, endIdx + 1).filter((w): w is number => w != null && w > 0);
+    if (wSlice.length > 0) {
+      prev_avg_watts = Math.round(wSlice.reduce((a, b) => a + b, 0) / wSlice.length);
+    }
+  }
+
+  let prev_avg_speed_kmh: number | null = null;
+  if (segKm > 0 && prev_time_min > 1e-6) {
+    prev_avg_speed_kmh = Math.round((segKm / (prev_time_min / 60)) * 10) / 10;
+  }
+
+  return { prev_avg_watts, prev_avg_speed_kmh, prev_time_min };
+}
+
+export interface ApplyReferenceActivityParams {
+  streamDistKm:      number[];
+  streamAltM:        number[];
+  streamLatLng?:     [number, number][];
+  reference:         ReferenceActivityStreamInput;
+  flatWatts:         number;
+  descentWatts:      number;
+  descentSpeedKmh?:  number;
+  flatSpeedKmh?:     number;
+  riderKg:           number;
+  bikeKg:            number;
+  accessoriesKg:     number;
+  physics:           PhysicsParams;
+  sortedClimbs:      ClimbRef[];
+}
+
+/**
+ * Attach reference-ride metrics, apply reference descent speed caps, and calibrate segment times
+ * so replaying reference power matches observed duration (per segment).
+ */
+export function applyReferenceActivityToPacingSegments(
+  segments: PacingSegment[],
+  p: ApplyReferenceActivityParams,
+): PacingSegment[] {
+  const ref = p.reference;
+  if (!ref.distance_km?.length || ref.moving_time_sec <= 0) {
+    return segments.map(s => ({
+      ...s,
+      prev_avg_watts: null,
+      prev_avg_speed_kmh: null,
+      prev_time_min: null,
+    }));
+  }
+
+  const actLat = ref.latlng?.length === ref.distance_km.length ? ref.latlng : undefined;
+
+  const withPrev = segments.map(seg => {
+    const win = matchPacingSegmentToActivityStream(
+      seg,
+      p.streamDistKm,
+      p.streamLatLng,
+      ref.distance_km,
+      actLat,
+    );
+    const metrics = win
+      ? extractReferenceSegmentMetrics(
+          win.startIdx,
+          win.endIdx,
+          ref.distance_km,
+          ref.watts ?? null,
+          ref.moving_time_sec,
+        )
+      : { prev_avg_watts: null, prev_avg_speed_kmh: null, prev_time_min: null };
+    return { seg, metrics };
+  });
+
+  const refCaps: SegmentSpeedCapZone[] = withPrev
+    .filter(
+      x =>
+        x.seg.type === 'descent' &&
+        x.metrics.prev_avg_speed_kmh != null &&
+        x.metrics.prev_avg_speed_kmh > 0,
+    )
+    .map(x => ({
+      start_km: x.seg.start_km,
+      end_km:   x.seg.end_km,
+      max_kmh:  x.metrics.prev_avg_speed_kmh!,
+    }));
+
+  const resolvedPhysics: PhysicsParams = { ...p.physics };
+  if (resolvedPhysics.rho === undefined && p.streamAltM.length > 0) {
+    const avgAltM = p.streamAltM.reduce((a, b) => a + b, 0) / p.streamAltM.length;
+    resolvedPhysics.rho = rhoAtAltitude(avgAltM);
+  }
+
+  return withPrev.map(({ seg, metrics }) => {
+    const { sliceD, sliceA, sliceL } = sliceRouteStreams(
+      p.streamDistKm,
+      p.streamAltM,
+      p.streamLatLng,
+      seg.start_km,
+      seg.end_km,
+    );
+    if (sliceD.length < 2) {
+      return { ...seg, ...metrics };
+    }
+
+    const isClimb = seg.type === 'climb' && seg.climb_idx != null;
+    const climbSlice: EventClimbInput[] = isClimb
+      ? [{
+          start_km:     sliceD[0],
+          end_km:       sliceD[sliceD.length - 1],
+          target_watts: p.sortedClimbs[seg.climb_idx!].target_watts,
+        }]
+      : [];
+
+    const baseInput: PacingInput = {
+      stream_distance_km: sliceD,
+      stream_altitude_m:  sliceA,
+      stream_latlng:      sliceL && sliceL.length === sliceD.length ? sliceL : undefined,
+      flat_watts:         p.flatWatts,
+      descent_watts:      p.descentWatts,
+      flat_speed_kmh:     p.flatSpeedKmh,
+      descent_speed_kmh:  p.descentSpeedKmh,
+      climbs:             climbSlice,
+      rider_weight_kg:    p.riderKg,
+      bike_weight_kg:     p.bikeKg,
+      accessories_kg:     p.accessoriesKg,
+      physics:            resolvedPhysics,
+      segment_speed_caps: refCaps.length ? refCaps : undefined,
+    };
+
+    const strategyTime = estimateTime(baseInput);
+
+    let estMin = strategyTime;
+    const pw = metrics.prev_avg_watts;
+    const pt = metrics.prev_time_min;
+    if (pw != null && pw > 0 && pt != null && pt > 0) {
+      const refClimb: EventClimbInput[] = isClimb
+        ? [{ start_km: sliceD[0], end_km: sliceD[sliceD.length - 1], target_watts: pw }]
+        : [];
+      const refModelTime = estimateTime({
+        ...baseInput,
+        flat_watts:    pw,
+        descent_watts: pw,
+        climbs:        refClimb,
+      });
+      if (refModelTime > 1e-4) {
+        estMin = strategyTime * (pt / refModelTime);
+      }
+    }
+
+    const avgSpeedKmh =
+      seg.distance_km > 0 && estMin > 0
+        ? Math.round((seg.distance_km / (estMin / 60)) * 10) / 10
+        : 0;
+
+    return {
+      ...seg,
+      ...metrics,
+      est_time_min:  estMin,
+      avg_speed_kmh: avgSpeedKmh,
+    };
+  });
 }
 
 /** Build a list of pacing segments from the full route + climb list. */
@@ -528,17 +850,13 @@ export function buildPacingSegments(
   for (const { s: startKm, e: endKm, ci } of intervals) {
     if (endKm <= startKm + 0.05) continue;
 
-    const sliceD: number[] = [];
-    const sliceA: number[] = [];
-    const sliceL: [number, number][] | undefined =
-      streamLatLng && streamLatLng.length === streamDistKm.length ? [] : undefined;
-    for (let i = 0; i < streamDistKm.length; i++) {
-      if (streamDistKm[i] >= startKm && streamDistKm[i] <= endKm) {
-        sliceD.push(streamDistKm[i]);
-        sliceA.push(streamAltM[i]);
-        if (sliceL) sliceL.push(streamLatLng![i]);
-      }
-    }
+    const { sliceD, sliceA, sliceL } = sliceRouteStreams(
+      streamDistKm,
+      streamAltM,
+      streamLatLng,
+      startKm,
+      endKm,
+    );
     if (sliceD.length < 2) continue;
 
     const netGain = sliceA[sliceA.length - 1] - sliceA[0];

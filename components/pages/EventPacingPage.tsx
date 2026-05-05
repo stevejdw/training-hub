@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import type { EventGoal, EventClimb, CachedRoute, PacingStrategy } from '@/lib/profile';
 import type { CompareResponse } from '@/app/api/events/[id]/compare/[activityId]/route';
@@ -37,14 +37,7 @@ function fmtShortDate(iso: string): string {
 const DEFAULT_FLAT_WATTS    = 260;
 const DEFAULT_DESCENT_WATTS = 120;
 const DEFAULT_ACCESSORIES   = 2.0;
-const DEFAULT_CDA           = 0.35;
-
-const CDA_PRESETS = [
-  { label: 'TT tuck', value: 0.25 },
-  { label: 'Drops',   value: 0.32 },
-  { label: 'Hoods',   value: 0.35 },
-  { label: 'Upright', value: 0.42 },
-];
+const DEFAULT_CDA           = 0.32;
 
 function segKey(seg: PacingSegment): string {
   return seg.type === 'climb' ? `climb-${seg.climb_idx}` : `${seg.type}-${seg.start_km}`;
@@ -71,6 +64,11 @@ export default function EventPacingPage({ eventId }: Props) {
   const eventIdx = profile?.events.findIndex(e => (e.id ?? '') === eventId) ?? -1;
   const event    = eventIdx >= 0 ? profile!.events[eventIdx] : null;
 
+  const savedLinkedIdsKey = useMemo(
+    () => [...(event?.linked_activity_ids ?? [])].sort((a, b) => a - b).join(','),
+    [event?.linked_activity_ids],
+  );
+
   // ── Core pacing state ──
   const [route,           setRoute]           = useState<CachedRoute | null>(null);
   const [climbs,          setClimbs]          = useState<EventClimb[]>([]);
@@ -95,11 +93,14 @@ export default function EventPacingPage({ eventId }: Props) {
   const [compareData,        setCompareData]        = useState<CompareResponse | null>(null);
   const [loadingCompare,     setLoadingCompare]     = useState(false);
 
+  const matchingActivitiesLoadedRef = useRef(false);
+
   // ── Inline segment edit state ──
   const [segWattsEdit, setSegWattsEdit] = useState<Record<string, number>>({});
   const [segSpeedEdit, setSegSpeedEdit] = useState<Record<string, number>>({});
   const [speedDrafts,  setSpeedDrafts]  = useState<Record<string, string>>({});
   const [savedSpeeds,  setSavedSpeeds]  = useState<Record<string, number>>({});
+  const [savedWatts,   setSavedWatts]   = useState<Record<string, number>>({});
 
   const riderKg  = profile?.weight_kg      ?? 75;
   const bikeKg   = profile?.bike_weight_kg ?? 8;
@@ -118,6 +119,7 @@ export default function EventPacingPage({ eventId }: Props) {
   useEffect(() => {
     if (!event) return;
     if (event.route) setRoute(event.route);
+    setLinkedIds(event.linked_activity_ids ?? []);
     if (event.pacing_strategy) {
       setFlatWatts(event.pacing_strategy.flat_watts ?? DEFAULT_FLAT_WATTS);
       setDescentWatts(event.pacing_strategy.descent_watts ?? DEFAULT_DESCENT_WATTS);
@@ -129,6 +131,32 @@ export default function EventPacingPage({ eventId }: Props) {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventIdx >= 0]);
+
+  const loadMatchingActivities = useCallback(async (force = false) => {
+    if (!force && matchingActivitiesLoadedRef.current) return;
+    setLoadingRides(true);
+    try {
+      const res = await fetch(`/api/events/${eventId}/matching-activities`);
+      const data = await res.json() as { activities: MatchingActivity[]; linked_ids: number[] };
+      setMatchingActivities(data.activities);
+      setLinkedIds(data.linked_ids);
+    } finally {
+      setLoadingRides(false);
+      matchingActivitiesLoadedRef.current = true;
+    }
+  }, [eventId]);
+
+  useEffect(() => {
+    matchingActivitiesLoadedRef.current = false;
+    setMatchingActivities(null);
+  }, [eventId]);
+
+  // Open Past Rides automatically when this event already has linked activities (saved from last visit).
+  useEffect(() => {
+    if (!event?.route || !savedLinkedIdsKey) return;
+    setShowPastRides(true);
+    void loadMatchingActivities(true);
+  }, [event?.route, savedLinkedIdsKey, loadMatchingActivities]);
 
   // ── Derived segments ──
   const baseSegments = useMemo(() => {
@@ -146,34 +174,46 @@ export default function EventPacingPage({ eventId }: Props) {
   // Apply per-segment overrides.
   const segments = useMemo(() => {
     if (!editingPacing) {
-      if (Object.keys(savedSpeeds).length === 0) return baseSegments;
+      const hasOverrides = Object.keys(savedSpeeds).length > 0 || Object.keys(savedWatts).length > 0;
+      if (!hasOverrides) return baseSegments;
       return baseSegments.map(seg => {
-        const k = segKey(seg);
-        const saved = savedSpeeds[k];
-        if (saved === undefined) return seg;
-        const timeMin = (seg.distance_km / saved) * 60;
-        return { ...seg, avg_speed_kmh: saved, est_time_min: timeMin };
+        const k        = segKey(seg);
+        const savedW   = savedWatts[k];
+        const savedSpd = savedSpeeds[k];
+        let result = { ...seg };
+        if (savedW !== undefined) {
+          const speedMs  = speedForPower(savedW, seg.avg_gradient / 100, totalKg, physicsParams);
+          const speedKmh = Math.round(speedMs * 36) / 10;
+          const timeMin  = speedMs > 0 ? (seg.distance_km * 1000 / speedMs) / 60 : seg.est_time_min;
+          result = { ...result, target_watts: savedW, avg_speed_kmh: speedKmh, est_time_min: timeMin, isManualOverride: true };
+        }
+        if (savedSpd !== undefined) {
+          result = { ...result, avg_speed_kmh: savedSpd, est_time_min: (seg.distance_km / savedSpd) * 60 };
+        }
+        return result;
       });
     }
-    const hasAny = Object.keys(segWattsEdit).length > 0 || Object.keys(segSpeedEdit).length > 0;
+    const hasAny = Object.keys(segWattsEdit).length > 0 || Object.keys(segSpeedEdit).length > 0 || Object.keys(savedWatts).length > 0;
     if (!hasAny) return baseSegments;
     return baseSegments.map(seg => {
       const k         = segKey(seg);
       const speedOver = segSpeedEdit[k];
-      const wattsOver = segWattsEdit[k];
+      // Live edit takes priority; fall back to saved manual override
+      const wattsOver = segWattsEdit[k] ?? savedWatts[k];
+      const isManual  = wattsOver !== undefined;
       if (speedOver === undefined && wattsOver === undefined) return seg;
 
       if (speedOver !== undefined) {
         const timeMin = (seg.distance_km / speedOver) * 60;
-        return { ...seg, target_watts: wattsOver ?? seg.target_watts, avg_speed_kmh: speedOver, est_time_min: timeMin };
+        return { ...seg, target_watts: wattsOver ?? seg.target_watts, avg_speed_kmh: speedOver, est_time_min: timeMin, isManualOverride: isManual };
       }
 
       const speedMs  = speedForPower(wattsOver!, seg.avg_gradient / 100, totalKg, physicsParams);
       const speedKmh = Math.round(speedMs * 36) / 10;
       const timeMin  = speedMs > 0 ? (seg.distance_km * 1000 / speedMs) / 60 : seg.est_time_min;
-      return { ...seg, target_watts: wattsOver!, avg_speed_kmh: speedKmh, est_time_min: timeMin };
+      return { ...seg, target_watts: wattsOver!, avg_speed_kmh: speedKmh, est_time_min: timeMin, isManualOverride: true };
     });
-  }, [baseSegments, editingPacing, segWattsEdit, segSpeedEdit, savedSpeeds, totalKg, physicsParams]);
+  }, [baseSegments, editingPacing, segWattsEdit, segSpeedEdit, savedSpeeds, savedWatts, totalKg, physicsParams]);
 
   const estMin    = useMemo(() => segments.reduce((t, s) => t + s.est_time_min, 0), [segments]);
   const np        = useMemo(() => segments.length ? calcNP(segments)       : null, [segments]);
@@ -199,7 +239,8 @@ export default function EventPacingPage({ eventId }: Props) {
   // ── Segment edit helpers ──
   function getEditWatts(seg: PacingSegment): number {
     const k = segKey(seg);
-    if (editingPacing && k in segWattsEdit) return segWattsEdit[k];
+    if (k in segWattsEdit) return segWattsEdit[k];
+    if (k in savedWatts)   return savedWatts[k];   // load manual override, not physics default
     return seg.target_watts;
   }
 
@@ -237,19 +278,6 @@ export default function EventPacingPage({ eventId }: Props) {
   }
 
   // ── Past rides helpers ──
-  const loadMatchingActivities = useCallback(async () => {
-    if (matchingActivities !== null) return; // already loaded
-    setLoadingRides(true);
-    try {
-      const res = await fetch(`/api/events/${eventId}/matching-activities`);
-      const data = await res.json() as { activities: MatchingActivity[]; linked_ids: number[] };
-      setMatchingActivities(data.activities);
-      setLinkedIds(data.linked_ids);
-    } finally {
-      setLoadingRides(false);
-    }
-  }, [eventId, matchingActivities]);
-
   async function toggleLink(activityId: number) {
     const newIds = linkedIds.includes(activityId)
       ? linkedIds.filter(id => id !== activityId)
@@ -260,6 +288,12 @@ export default function EventPacingPage({ eventId }: Props) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ linked_activity_ids: newIds }),
     });
+    if (profile && eventIdx >= 0) {
+      const events = profile.events.map(e =>
+        (e.id ?? '') === eventId ? { ...e, linked_activity_ids: newIds } : e,
+      );
+      setProfile({ ...profile, events });
+    }
   }
 
   async function loadComparison(activityId: number) {
@@ -285,6 +319,7 @@ export default function EventPacingPage({ eventId }: Props) {
     setSegSpeedEdit({});
     setSpeedDrafts({});
     setSavedSpeeds({});
+    // savedWatts intentionally preserved — manual overrides load into the edit form
     setEditingPacing(true);
   }
 
@@ -336,10 +371,17 @@ export default function EventPacingPage({ eventId }: Props) {
       if (!isNaN(spd) && spd > 0) newSavedSpeeds[k] = spd;
     }
 
+    const newSavedWatts: Record<string, number> = { ...savedWatts }; // preserve existing overrides
+    for (const seg of baseSegments) {
+      const k = segKey(seg);
+      if (k in effectiveWatts) newSavedWatts[k] = effectiveWatts[k]; // apply new edits on top
+    }
+
     setClimbs(newClimbs);
     setFlatWatts(newFlat);
     setDescentWatts(newDescent);
     setSavedSpeeds(newSavedSpeeds);
+    setSavedWatts(newSavedWatts);
     setSegWattsEdit({});
     setSegSpeedEdit({});
     setSpeedDrafts({});
@@ -492,27 +534,6 @@ export default function EventPacingPage({ eventId }: Props) {
                   )}
                 </div>
 
-                {/* CdA selector */}
-                <div className="mt-2 flex items-center gap-2">
-                  <span className="text-xs text-gray-500 shrink-0">Position (CdA):</span>
-                  <div className="flex gap-1 flex-wrap">
-                    {CDA_PRESETS.map(p => (
-                      <button
-                        key={p.value}
-                        onClick={() => editingPacing && setCda(p.value)}
-                        className={`px-2 py-1 rounded text-[10px] font-medium transition-colors ${
-                          Math.abs(cda - p.value) < 0.005
-                            ? 'bg-orange-500/20 text-orange-400 border border-orange-500/50'
-                            : editingPacing
-                              ? 'bg-gray-800 text-gray-500 hover:text-gray-300 border border-transparent'
-                              : 'bg-gray-800/50 text-gray-600 border border-transparent'
-                        }`}
-                      >
-                        {p.label} <span className="opacity-60">({p.value})</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
               </div>
 
               {/* ── Scrollable segment table ── */}
@@ -640,15 +661,22 @@ export default function EventPacingPage({ eventId }: Props) {
                   This activity has no detailed streams stored. Re-sync to fetch altitude and distance data.
                 </div>
               )}
+              {compareData.has_streams && (
+                <div className="px-4 py-2 text-[10px] text-gray-600 border-b border-gray-800">
+                  Planned time and speed use reference-calibrated physics and observed descent speed caps when latlng/distance streams match the course.
+                </div>
+              )}
               <div className="overflow-x-auto">
-                <table className="w-full text-xs min-w-[480px]">
+                <table className="w-full text-xs min-w-[640px]">
                   <thead>
                     <tr className="text-[9px] text-gray-600 uppercase tracking-wider border-b border-gray-800">
                       <th className="px-3 py-1.5 text-left font-semibold">Segment</th>
                       <th className="px-2 py-1.5 text-right font-semibold">Plan W</th>
-                      <th className="px-2 py-1.5 text-right font-semibold">Act W</th>
+                      <th className="px-2 py-1.5 text-right font-semibold">Ref W</th>
+                      <th className="px-2 py-1.5 text-right font-semibold">Plan km/h</th>
+                      <th className="px-2 py-1.5 text-right font-semibold">Ref km/h</th>
                       <th className="px-2 py-1.5 text-right font-semibold">Plan Time</th>
-                      <th className="px-2 py-1.5 text-right font-semibold">Act Time</th>
+                      <th className="px-2 py-1.5 text-right font-semibold">Ref Time</th>
                       <th className="px-2 py-1.5 text-right font-semibold">Δ</th>
                     </tr>
                   </thead>
@@ -671,6 +699,10 @@ export default function EventPacingPage({ eventId }: Props) {
                           <td className="px-2 py-1.5 text-right tabular-nums text-gray-300">
                             {seg.actual_watts != null ? `${seg.actual_watts}W` : '—'}
                           </td>
+                          <td className="px-2 py-1.5 text-right tabular-nums text-gray-400">{seg.planned_speed_kmh}</td>
+                          <td className="px-2 py-1.5 text-right tabular-nums text-gray-300">
+                            {seg.actual_speed_kmh != null ? seg.actual_speed_kmh : '—'}
+                          </td>
                           <td className="px-2 py-1.5 text-right tabular-nums text-gray-400">{fmtTime(seg.planned_time_min)}</td>
                           <td className="px-2 py-1.5 text-right tabular-nums text-gray-300">
                             {seg.actual_time_min != null ? fmtTime(seg.actual_time_min) : '—'}
@@ -691,11 +723,20 @@ export default function EventPacingPage({ eventId }: Props) {
           {/* ── Past Rides panel ── */}
           {route && (
             <section className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
+              <div className="px-4 pt-3 pb-2 border-b border-gray-800/80 bg-gray-800/20">
+                <p className="text-[11px] text-gray-400 leading-relaxed">
+                  <span className="font-semibold text-gray-300">Strategy vs past ride:</span>{' '}
+                  Open <span className="text-gray-200">Past Rides on This Route</span> below, then tap{' '}
+                  <span className="text-orange-400 font-medium">Compare pacing</span> on any matching activity.
+                  Linked rides are highlighted — linking is optional and saves favourites on this event.
+                </p>
+              </div>
               <button
+                type="button"
                 onClick={() => {
                   const next = !showPastRides;
                   setShowPastRides(next);
-                  if (next) loadMatchingActivities();
+                  if (next) void loadMatchingActivities(false);
                 }}
                 className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-gray-800/40 transition-colors"
               >
@@ -733,19 +774,18 @@ export default function EventPacingPage({ eventId }: Props) {
                               </p>
                             </div>
                             <div className="flex items-center gap-2 shrink-0">
-                              {isLinked && (
-                                <button
-                                  onClick={() => loadComparison(act.id)}
-                                  disabled={loadingCompare && !isComparing}
-                                  className={`text-[10px] px-2 py-1 rounded border transition-colors ${
-                                    isComparing
-                                      ? 'bg-blue-500/20 text-blue-400 border-blue-500/50'
-                                      : 'border-gray-700 text-gray-500 hover:text-gray-300'
-                                  }`}
-                                >
-                                  {loadingCompare && isComparing ? 'Loading…' : isComparing ? 'Comparing' : 'Compare'}
-                                </button>
-                              )}
+                              <button
+                                type="button"
+                                onClick={() => loadComparison(act.id)}
+                                disabled={loadingCompare && !isComparing}
+                                className={`text-[10px] px-2 py-1 rounded border transition-colors ${
+                                  isComparing
+                                    ? 'bg-blue-500/20 text-blue-400 border-blue-500/50'
+                                    : 'border-gray-700 text-gray-400 hover:text-gray-200'
+                                }`}
+                              >
+                                {loadingCompare && isComparing ? 'Loading…' : isComparing ? 'Comparing' : 'Compare pacing'}
+                              </button>
                               <button
                                 onClick={() => toggleLink(act.id)}
                                 className={`text-[10px] px-2 py-1 rounded border transition-colors ${

@@ -1,6 +1,11 @@
 import pool from '@/lib/db';
 import { getProfile } from '@/lib/profile';
-import { buildPacingSegments, rhoAtAltitude } from '@/lib/pacing';
+import {
+  applyReferenceActivityToPacingSegments,
+  buildPacingSegments,
+  matchPacingSegmentToActivityStream,
+  rhoAtAltitude,
+} from '@/lib/pacing';
 
 export const runtime = 'nodejs';
 
@@ -34,6 +39,18 @@ function calcNp(watts: number[]): number | null {
   return Math.round(Math.pow(sum4 / watts.length, 0.25));
 }
 
+function pgLatLngToPairs(raw: unknown): [number, number][] | undefined {
+  if (raw == null || !Array.isArray(raw)) return undefined;
+  const out: [number, number][] = [];
+  for (const item of raw) {
+    if (!Array.isArray(item) || item.length < 2) continue;
+    const lat = Number(item[0]);
+    const lng = Number(item[1]);
+    if (Number.isFinite(lat) && Number.isFinite(lng)) out.push([lat, lng]);
+  }
+  return out.length ? out : undefined;
+}
+
 export async function GET(
   _req: Request,
   { params }: { params: Promise<{ id: string; activityId: string }> },
@@ -54,13 +71,15 @@ export async function GET(
     : undefined;
   const physics = { cda: strategy.cda, rho };
   const accessoriesKg = strategy.accessories_kg ?? 2.0;
+  const riderKg = profile.weight_kg ?? 75;
 
-  // Build planned segments
-  const plannedSegs = buildPacingSegments(
+  const sortedClimbs = [...strategy.climbs].sort((a, b) => a.start_km - b.start_km);
+
+  const plannedSegsBase = buildPacingSegments(
     route.stream_distance_km, route.stream_altitude_m,
-    route.distance_m / 1000, strategy.climbs,
+    route.distance_m / 1000, sortedClimbs,
     strategy.flat_watts, strategy.descent_watts,
-    /* riderKg */ 75, strategy.bike_weight_kg,
+    riderKg, strategy.bike_weight_kg,
     strategy.descent_speed_kmh, strategy.flat_speed_kmh,
     accessoriesKg, physics,
     route.stream_latlng,
@@ -68,72 +87,70 @@ export async function GET(
 
   const client = await pool.connect();
   try {
-    // Fetch activity info
     const actRes = await client.query<{
       name: string;
       start_date: string;
-    }>(`SELECT name, start_date FROM activities WHERE id = $1`, [activityId]);
+      moving_time: number;
+    }>(`SELECT name, start_date, moving_time FROM activities WHERE id = $1`, [activityId]);
     if (!actRes.rows.length) return Response.json({ error: 'Activity not found' }, { status: 404 });
     const act = actRes.rows[0];
 
-    // Fetch activity streams
     const streamRes = await client.query<{
       watts:       number[] | null;
       hr:          number[] | null;
       altitude_m:  number[] | null;
       distance_km: number[] | null;
-    }>(`SELECT watts, hr, altitude_m, distance_km FROM activity_streams WHERE activity_id = $1`, [activityId]);
+      latlng:      unknown | null;
+    }>(`SELECT watts, hr, altitude_m, distance_km, latlng FROM activity_streams WHERE activity_id = $1`, [activityId]);
 
     const stream = streamRes.rows[0] ?? null;
     const hasStreams = !!(stream?.distance_km?.length);
+    const actLatlng = stream?.latlng != null ? pgLatLngToPairs(stream.latlng) : undefined;
+
+    let plannedSegs = plannedSegsBase;
+    if (hasStreams && stream.distance_km && act.moving_time > 0) {
+      plannedSegs = applyReferenceActivityToPacingSegments(plannedSegsBase, {
+        streamDistKm:     route.stream_distance_km,
+        streamAltM:       route.stream_altitude_m,
+        streamLatLng:     route.stream_latlng,
+        reference: {
+          distance_km:     stream.distance_km,
+          watts:           stream.watts,
+          latlng:          actLatlng,
+          moving_time_sec: act.moving_time,
+        },
+        flatWatts:        strategy.flat_watts,
+        descentWatts:     strategy.descent_watts,
+        descentSpeedKmh:  strategy.descent_speed_kmh,
+        flatSpeedKmh:     strategy.flat_speed_kmh,
+        riderKg,
+        bikeKg:           strategy.bike_weight_kg,
+        accessoriesKg,
+        physics,
+        sortedClimbs,
+      });
+    }
 
     const segments: SegmentComparison[] = plannedSegs.map(seg => {
-      let actualTimMin: number | null  = null;
-      let actualWatts:  number | null  = null;
-      let actualNp:     number | null  = null;
-      let actualSpeed:  number | null  = null;
-      let actualHr:     number | null  = null;
+      let actualNp: number | null = null;
+      let actualHr: number | null = null;
 
-      if (hasStreams && stream.distance_km) {
-        // Find indices in the activity's distance stream that fall within this segment
-        const distKm = stream.distance_km;
-        const startI = distKm.findIndex(d => d >= seg.start_km);
-        let   endI   = distKm.length - 1;
-        for (let i = distKm.length - 1; i >= 0; i--) {
-          if (distKm[i] <= seg.end_km) { endI = i; break; }
-        }
-
-        if (startI >= 0 && endI > startI) {
-          const segDistKm = distKm[endI] - distKm[startI];
-          // Each array element = 1 second (Strava streams are 1 Hz before downsampling)
-          // After 2000-pt downsample, each element represents (original_length / 2000) seconds
-          // We approximate: use (endI - startI) elements as proportional time
-          // For a more accurate approach, use actual distance and speed from watts
-          const elapsedSamples = endI - startI;
-
-          if (segDistKm > 0) {
-            // Watts slice
-            if (stream.watts) {
-              const wSlice = stream.watts.slice(startI, endI + 1).filter(w => w > 0);
-              if (wSlice.length > 0) {
-                actualWatts = Math.round(wSlice.reduce((a, b) => a + b, 0) / wSlice.length);
-                actualNp    = calcNp(wSlice);
-              }
+      if (hasStreams && stream?.distance_km && stream.watts) {
+        const win = matchPacingSegmentToActivityStream(
+          seg,
+          route.stream_distance_km,
+          route.stream_latlng,
+          stream.distance_km,
+          actLatlng,
+        );
+        if (win && win.startIdx < win.endIdx) {
+          const wSlice = stream.watts.slice(win.startIdx, win.endIdx + 1).filter(w => w != null && w > 0) as number[];
+          if (wSlice.length > 0) actualNp = calcNp(wSlice);
+          if (stream.hr) {
+            const hrSlice = stream.hr.slice(win.startIdx, win.endIdx + 1).filter(h => h != null && h > 0) as number[];
+            if (hrSlice.length > 0) {
+              actualHr = Math.round(hrSlice.reduce((a, b) => a + b, 0) / hrSlice.length);
             }
-            // HR slice
-            if (stream.hr) {
-              const hrSlice = stream.hr.slice(startI, endI + 1).filter(h => h > 0);
-              if (hrSlice.length > 0) {
-                actualHr = Math.round(hrSlice.reduce((a, b) => a + b, 0) / hrSlice.length);
-              }
-            }
-            // Speed from distance/time (sample count as proxy for time at original 1Hz)
-            // We need original sample count — approximate from stream length ratio
-            const origSamplesPerDownsample = 1; // after downsampling, proportional
-            actualTimMin   = (elapsedSamples * origSamplesPerDownsample) / 60;
-            actualSpeed    = segDistKm > 0 && actualTimMin > 0
-              ? Math.round((segDistKm / (actualTimMin / 60)) * 10) / 10
-              : null;
           }
         }
       }
@@ -144,12 +161,12 @@ export async function GET(
         start_km:          seg.start_km,
         end_km:            seg.end_km,
         planned_time_min:  seg.est_time_min,
-        actual_time_min:   actualTimMin,
+        actual_time_min:   seg.prev_time_min ?? null,
         planned_watts:     seg.target_watts,
-        actual_watts:      actualWatts,
+        actual_watts:      seg.prev_avg_watts ?? null,
         actual_np:         actualNp,
         planned_speed_kmh: seg.avg_speed_kmh,
-        actual_speed_kmh:  actualSpeed,
+        actual_speed_kmh:  seg.prev_avg_speed_kmh ?? null,
         actual_avg_hr:     actualHr,
       };
     });

@@ -935,9 +935,12 @@ export default function EventDetailPage({ eventId }: Props) {
                       </div>
                     );
                   })()}
+                  <p className="text-[10px] text-gray-600 mt-2 pt-2 border-t border-gray-800/60">
+                    Open pacing → Past rides → <span className="text-gray-400">Compare pacing</span> vs strategy.
+                  </p>
                 </>
               ) : (
-                <p className="text-xs text-gray-600">Tap to set up your pacing strategy</p>
+                <p className="text-xs text-gray-600">Tap to set up pacing — compare strategy vs past rides on this course</p>
               )}
             </Link>
           )}
