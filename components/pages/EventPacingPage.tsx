@@ -92,6 +92,7 @@ export default function EventPacingPage({ eventId }: Props) {
   const [compareActivityId,  setCompareActivityId]  = useState<number | null>(null);
   const [compareData,        setCompareData]        = useState<CompareResponse | null>(null);
   const [loadingCompare,     setLoadingCompare]     = useState(false);
+  const [syncingIds,         setSyncingIds]         = useState<Set<number>>(new Set());
 
   const matchingActivitiesLoadedRef = useRef(false);
 
@@ -279,9 +280,10 @@ export default function EventPacingPage({ eventId }: Props) {
 
   // ── Past rides helpers ──
   async function toggleLink(activityId: number) {
-    const newIds = linkedIds.includes(activityId)
-      ? linkedIds.filter(id => id !== activityId)
-      : [...linkedIds, activityId];
+    const isLinking = !linkedIds.includes(activityId);
+    const newIds = isLinking
+      ? [...linkedIds, activityId]
+      : linkedIds.filter(id => id !== activityId);
     setLinkedIds(newIds);
     await fetch(`/api/events/${eventId}/matching-activities`, {
       method: 'PATCH',
@@ -293,6 +295,11 @@ export default function EventPacingPage({ eventId }: Props) {
         (e.id ?? '') === eventId ? { ...e, linked_activity_ids: newIds } : e,
       );
       setProfile({ ...profile, events });
+    }
+    if (isLinking) {
+      setSyncingIds(prev => new Set(prev).add(activityId));
+      fetch(`/api/activities/${activityId}/sync-streams`, { method: 'POST' })
+        .finally(() => setSyncingIds(prev => { const n = new Set(prev); n.delete(activityId); return n; }));
     }
   }
 
@@ -761,8 +768,9 @@ export default function EventPacingPage({ eventId }: Props) {
                   ) : (
                     <div className="divide-y divide-gray-800/40">
                       {matchingActivities?.map(act => {
-                        const isLinked   = linkedIds.includes(act.id);
+                        const isLinked    = linkedIds.includes(act.id);
                         const isComparing = compareActivityId === act.id;
+                        const isSyncing   = syncingIds.has(act.id);
                         return (
                           <div key={act.id} className={`px-4 py-3 flex items-center gap-3 ${isLinked ? 'bg-orange-500/5' : ''}`}>
                             <div className="flex-1 min-w-0">
@@ -771,16 +779,19 @@ export default function EventPacingPage({ eventId }: Props) {
                                 {fmtShortDate(act.start_date)} · {Math.round(act.distance_m / 100) / 10} km
                                 {' · '}{fmtMovingTime(act.moving_time)}
                                 {act.normalized_power && <> · {Math.round(act.normalized_power)}W NP</>}
+                                {isSyncing && <span className="ml-1 text-orange-400/70 animate-pulse">· syncing…</span>}
                               </p>
                             </div>
                             <div className="flex items-center gap-2 shrink-0">
                               <button
                                 type="button"
                                 onClick={() => loadComparison(act.id)}
-                                disabled={loadingCompare && !isComparing}
+                                disabled={(loadingCompare && !isComparing) || isSyncing}
                                 className={`text-[10px] px-2 py-1 rounded border transition-colors ${
                                   isComparing
                                     ? 'bg-blue-500/20 text-blue-400 border-blue-500/50'
+                                    : isSyncing
+                                    ? 'border-gray-800 text-gray-600 cursor-not-allowed'
                                     : 'border-gray-700 text-gray-400 hover:text-gray-200'
                                 }`}
                               >
