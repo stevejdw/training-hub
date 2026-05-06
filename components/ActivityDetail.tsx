@@ -6,6 +6,7 @@ import dynamic from 'next/dynamic';
 import { sportLabel, sportColor } from '@/lib/sport-types';
 import ZoneDistribution from './ZoneDistribution';
 import PowerCurveChart from './PowerCurveChart';
+import AerobicEfficiencyChart from './AerobicEfficiencyChart';
 
 const COMPARE_PERIODS = [
   { key: '30d', label: '30d' },
@@ -54,7 +55,7 @@ const INTERVALS: { label: string; seconds: number }[] = [
 
 const ActivityMap = dynamic(() => import('./ActivityMap'), { ssr: false });
 
-type Tab = 'stats' | 'laps' | 'power' | 'zones' | 'segments';
+type Tab = 'stats' | 'laps' | 'power-hr' | 'segments';
 
 interface SegmentEffort {
   id: number;
@@ -197,7 +198,7 @@ export default function ActivityDetail({ id }: { id: string }) {
   }, [id, activity?.id, bpSeconds]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (tab !== 'power' || !activity?.id) return;
+    if (tab !== 'power-hr' || !activity?.id) return;
     setCurveLoading(true);
     const controller = new AbortController();
     fetch(`/api/activities/${id}/power-curve?compare=${curvePeriod}`, { signal: controller.signal })
@@ -243,11 +244,10 @@ export default function ActivityDetail({ id }: { id: string }) {
   const speedKph = activity.average_speed ? (activity.average_speed * 3.6).toFixed(1) : null;
 
   const TABS: { key: Tab; label: string }[] = [
-    { key: 'stats',    label: 'Stats' },
-    { key: 'laps',     label: `Laps${laps.length ? ` (${laps.length})` : ''}` },
-    { key: 'power',    label: 'Power' },
-    { key: 'zones',    label: 'Time in Zones' },
-    { key: 'segments', label: `Segments${segments.length ? ` (${segments.length})` : ''}` },
+    { key: 'stats',     label: 'Stats' },
+    { key: 'laps',      label: `Laps${laps.length ? ` (${laps.length})` : ''}` },
+    { key: 'power-hr',  label: 'Power & HR' },
+    { key: 'segments',  label: `Segments${segments.length ? ` (${segments.length})` : ''}` },
   ];
 
   return (
@@ -504,139 +504,146 @@ export default function ActivityDetail({ id }: { id: string }) {
           );
         })()}
 
-        {/* Tab: Power */}
-        {tab === 'power' && (
-          activity.average_watts ? (
-            <div className="space-y-4">
+        {/* Tab: Power & HR */}
+        {tab === 'power-hr' && (
+          <div className="space-y-6">
+            {/* ── Power section ── */}
+            {activity.average_watts ? (
+              <div className="space-y-4">
 
-              {/* Power Curve */}
-              <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Power Curve</p>
-                  {curvePeriod !== 'none' && (
-                    <button
-                      onClick={() => setCurvePeriod('none')}
-                      className="text-xs text-gray-600 hover:text-gray-400 transition-colors"
-                    >
-                      Clear compare
-                    </button>
-                  )}
-                </div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-xs text-gray-600">Compare vs:</span>
-                  {COMPARE_PERIODS.map(p => (
-                    <button
-                      key={p.key}
-                      onClick={() => setCurvePeriod(prev => prev === p.key ? 'none' : p.key)}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors border ${
-                        curvePeriod === p.key
-                          ? 'bg-blue-500/20 text-blue-400 border-blue-500/50'
-                          : 'bg-gray-800 text-gray-500 hover:text-gray-300 border-transparent'
-                      }`}
-                    >
-                      {p.label}
-                    </button>
-                  ))}
-                </div>
-                {curveLoading ? (
-                  <div className="h-52 bg-gray-800/60 rounded-xl animate-pulse" />
-                ) : curveData && curveData.activity.length > 0 ? (
-                  <>
-                    <PowerCurveChart
-                      data={curveData.activity}
-                      compareData={curveData.comparison}
-                      compareLabel={curvePeriod !== 'none' ? COMPARE_LABELS[curvePeriod as ComparePeriod] : undefined}
-                      ftp={curveData.ftp}
-                    />
-                    {curveData.comparison && curvePeriod !== 'none' && (
-                      <p className="text-[10px] text-gray-600">
-                        <span className="text-orange-400">—</span> This ride &nbsp;
-                        <span className="text-gray-500">- -</span> {COMPARE_LABELS[curvePeriod as ComparePeriod]}
-                      </p>
+                {/* Power Curve */}
+                <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Power Curve</p>
+                    {curvePeriod !== 'none' && (
+                      <button
+                        onClick={() => setCurvePeriod('none')}
+                        className="text-xs text-gray-600 hover:text-gray-400 transition-colors"
+                      >
+                        Clear compare
+                      </button>
                     )}
-                  </>
-                ) : curveData ? (
-                  <div className="h-40 flex items-center justify-center text-gray-600 text-sm">
-                    No power stream data for this activity
                   </div>
-                ) : null}
-              </div>
-
-              {/* Best Efforts */}
-              <div className="flex items-center justify-between">
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Best Efforts</p>
-                <Link
-                  href={`/performance?tab=power&s=${bpSeconds}`}
-                  className="text-xs text-orange-400 hover:text-orange-300 transition-colors"
-                >
-                  All activities →
-                </Link>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <select
-                  value={bpSeconds}
-                  onChange={e => setBpSeconds(Number(e.target.value))}
-                  className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-orange-500"
-                >
-                  {INTERVALS.map(iv => (
-                    <option key={iv.seconds} value={iv.seconds}>{iv.label}</option>
-                  ))}
-                </select>
-                <span className="text-xs text-gray-500">Top 5 non-overlapping best efforts</span>
-              </div>
-
-              {bpLoading ? (
-                <div className="space-y-2">
-                  {[1,2,3,4,5].map(i => <div key={i} className="h-10 bg-gray-800 rounded-xl animate-pulse" />)}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs text-gray-600">Compare vs:</span>
+                    {COMPARE_PERIODS.map(p => (
+                      <button
+                        key={p.key}
+                        onClick={() => setCurvePeriod(prev => prev === p.key ? 'none' : p.key)}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors border ${
+                          curvePeriod === p.key
+                            ? 'bg-blue-500/20 text-blue-400 border-blue-500/50'
+                            : 'bg-gray-800 text-gray-500 hover:text-gray-300 border-transparent'
+                        }`}
+                      >
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+                  {curveLoading ? (
+                    <div className="h-52 bg-gray-800/60 rounded-xl animate-pulse" />
+                  ) : curveData && curveData.activity.length > 0 ? (
+                    <>
+                      <PowerCurveChart
+                        data={curveData.activity}
+                        compareData={curveData.comparison}
+                        compareLabel={curvePeriod !== 'none' ? COMPARE_LABELS[curvePeriod as ComparePeriod] : undefined}
+                        ftp={curveData.ftp}
+                      />
+                      {curveData.comparison && curvePeriod !== 'none' && (
+                        <p className="text-[10px] text-gray-600">
+                          <span className="text-orange-400">—</span> This ride &nbsp;
+                          <span className="text-gray-500">- -</span> {COMPARE_LABELS[curvePeriod as ComparePeriod]}
+                        </p>
+                      )}
+                    </>
+                  ) : curveData ? (
+                    <div className="h-40 flex items-center justify-center text-gray-600 text-sm">
+                      No power stream data for this activity
+                    </div>
+                  ) : null}
                 </div>
-              ) : bpResults && bpResults.length > 0 ? (
-                <div className="bg-gray-900 rounded-xl border border-gray-800 overflow-x-auto scroll-touch">
-                  <table className="text-sm w-full whitespace-nowrap">
-                    <thead>
-                      <tr className="border-b border-gray-800">
-                        <th className="text-left px-4 py-3 text-gray-500 font-medium">#</th>
-                        <th className="text-right px-4 py-3 text-gray-500 font-medium">Avg Power</th>
-                        <th className="text-right px-4 py-3 text-gray-500 font-medium">Max Power</th>
-                        <th className="text-right px-4 py-3 text-gray-500 font-medium">Avg HR</th>
-                        <th className="text-right px-4 py-3 text-gray-500 font-medium">Max HR</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {bpResults.map((r, i) => (
-                        <tr key={r.rank} className={`border-b border-gray-800/60 last:border-0 ${i === 0 ? 'bg-orange-500/5' : i % 2 !== 0 ? 'bg-gray-800/30' : ''}`}>
-                          <td className={`px-4 py-3 font-medium ${i === 0 ? 'text-orange-400' : 'text-gray-500'}`}>#{r.rank}</td>
-                          <td className={`px-4 py-3 text-right font-bold tabular-nums ${i === 0 ? 'text-white' : 'text-gray-200'}`}>
-                            {r.watts} <span className="text-xs font-normal text-gray-500">W</span>
-                          </td>
-                          <td className="px-4 py-3 text-right tabular-nums text-gray-300">
-                            {r.max_watts} <span className="text-xs text-gray-500">W</span>
-                          </td>
-                          <td className="px-4 py-3 text-right tabular-nums text-gray-300">
-                            {r.avg_hr ? <>{r.avg_hr} <span className="text-xs text-gray-500">bpm</span></> : '—'}
-                          </td>
-                          <td className="px-4 py-3 text-right tabular-nums text-gray-300">
-                            {r.max_hr ? <>{r.max_hr} <span className="text-xs text-gray-500">bpm</span></> : '—'}
-                          </td>
+
+                {/* Best Efforts */}
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Best Efforts</p>
+                  <Link
+                    href={`/performance?tab=power&s=${bpSeconds}`}
+                    className="text-xs text-orange-400 hover:text-orange-300 transition-colors"
+                  >
+                    All activities →
+                  </Link>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <select
+                    value={bpSeconds}
+                    onChange={e => setBpSeconds(Number(e.target.value))}
+                    className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-orange-500"
+                  >
+                    {INTERVALS.map(iv => (
+                      <option key={iv.seconds} value={iv.seconds}>{iv.label}</option>
+                    ))}
+                  </select>
+                  <span className="text-xs text-gray-500">Top 5 non-overlapping best efforts</span>
+                </div>
+
+                {bpLoading ? (
+                  <div className="space-y-2">
+                    {[1,2,3,4,5].map(i => <div key={i} className="h-10 bg-gray-800 rounded-xl animate-pulse" />)}
+                  </div>
+                ) : bpResults && bpResults.length > 0 ? (
+                  <div className="bg-gray-900 rounded-xl border border-gray-800 overflow-x-auto scroll-touch">
+                    <table className="text-sm w-full whitespace-nowrap">
+                      <thead>
+                        <tr className="border-b border-gray-800">
+                          <th className="text-left px-4 py-3 text-gray-500 font-medium">#</th>
+                          <th className="text-right px-4 py-3 text-gray-500 font-medium">Avg Power</th>
+                          <th className="text-right px-4 py-3 text-gray-500 font-medium">Max Power</th>
+                          <th className="text-right px-4 py-3 text-gray-500 font-medium">Avg HR</th>
+                          <th className="text-right px-4 py-3 text-gray-500 font-medium">Max HR</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <p className="text-sm text-gray-500 py-4">No power data</p>
-              )}
-            </div>
-          ) : (
-            <div className="bg-gray-800/50 border border-gray-700 border-dashed rounded-xl p-8 text-center">
-              <p className="text-gray-500 text-sm">No power data for this activity</p>
-            </div>
-          )
-        )}
+                      </thead>
+                      <tbody>
+                        {bpResults.map((r, i) => (
+                          <tr key={r.rank} className={`border-b border-gray-800/60 last:border-0 ${i === 0 ? 'bg-orange-500/5' : i % 2 !== 0 ? 'bg-gray-800/30' : ''}`}>
+                            <td className={`px-4 py-3 font-medium ${i === 0 ? 'text-orange-400' : 'text-gray-500'}`}>#{r.rank}</td>
+                            <td className={`px-4 py-3 text-right font-bold tabular-nums ${i === 0 ? 'text-white' : 'text-gray-200'}`}>
+                              {r.watts} <span className="text-xs font-normal text-gray-500">W</span>
+                            </td>
+                            <td className="px-4 py-3 text-right tabular-nums text-gray-300">
+                              {r.max_watts} <span className="text-xs text-gray-500">W</span>
+                            </td>
+                            <td className="px-4 py-3 text-right tabular-nums text-gray-300">
+                              {r.avg_hr ? <>{r.avg_hr} <span className="text-xs text-gray-500">bpm</span></> : '—'}
+                            </td>
+                            <td className="px-4 py-3 text-right tabular-nums text-gray-300">
+                              {r.max_hr ? <>{r.max_hr} <span className="text-xs text-gray-500">bpm</span></> : '—'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500 py-4">No power data</p>
+                )}
+              </div>
+            ) : (
+              <div className="bg-gray-800/50 border border-gray-700 border-dashed rounded-xl p-8 text-center">
+                <p className="text-gray-500 text-sm">No power data for this activity</p>
+              </div>
+            )}
 
-        {/* Tab: Time in Zones */}
-        {tab === 'zones' && (
-          <ZoneDistribution activityId={id} />
+            {/* ── Aerobic Efficiency section ── */}
+            <AerobicEfficiencyChart activityId={id} />
+
+            {/* ── Time in Zones section ── */}
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Time in Zones</p>
+              <ZoneDistribution activityId={id} />
+            </div>
+          </div>
         )}
 
         {/* Tab: Segments */}
