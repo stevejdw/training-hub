@@ -109,6 +109,12 @@ export async function GET(
     const hasStreams = !!(stream?.distance_km?.length);
     const actLatlng = stream?.latlng != null ? pgLatLngToPairs(stream.latlng) : undefined;
 
+    // Total moving time and total stream distance for fallback time estimation
+    const actMovingTimeSec = act.moving_time;
+    const actTotalDistKm = hasStreams && stream?.distance_km?.length
+      ? stream.distance_km[stream.distance_km.length - 1] - stream.distance_km[0]
+      : 0;
+
     const segments: SegmentComparison[] = plannedSegsBase.map((baseSeg) => {
       let actualNp:      number | null = null;
       let actualHr:      number | null = null;
@@ -128,6 +134,12 @@ export async function GET(
           if (stream.time_s && win.endIdx < stream.time_s.length) {
             const elapsedSec = stream.time_s[win.endIdx] - stream.time_s[win.startIdx];
             if (elapsedSec > 0) actualTimeMin = elapsedSec / 60;
+          }
+          // Fallback: estimate time from stream distance ratio × moving time
+          if (actualTimeMin == null && actMovingTimeSec > 0 && actTotalDistKm > 0) {
+            const segDistKm = stream.distance_km[win.endIdx] - stream.distance_km[win.startIdx];
+            const timeRatio = segDistKm / actTotalDistKm;
+            actualTimeMin = (actMovingTimeSec * timeRatio) / 60;
           }
           if (stream.watts) {
             const wSlice = stream.watts.slice(win.startIdx, win.endIdx + 1).filter(w => w != null && w > 0) as number[];
