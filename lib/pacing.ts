@@ -1298,11 +1298,14 @@ export function buildPacingSegments(
     const midKm   = (startKm + endKm) / 2;
 
     // Check which starred segment or climb this interval belongs to
+    // Use overlap detection instead of midpoint to avoid boundary precision issues
     let starredLabel: string | null = null;
     let climbIdx: number | null = null;
 
     for (const ss of sortedStarred) {
-      if (midKm >= ss.start_km && midKm <= ss.end_km) {
+      // Interval overlaps starred segment if they share more than 1 m
+      const overlap = Math.max(0, Math.min(endKm, ss.end_km) - Math.max(startKm, ss.start_km));
+      if (overlap > 0.001) {
         starredLabel = ss.name;
         break;
       }
