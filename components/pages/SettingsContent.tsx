@@ -34,6 +34,12 @@ export default function SettingsContent() {
   const [historyLog, setHistoryLog]         = useState<string[]>([]);
   const [historyDone, setHistoryDone]       = useState(false);
 
+  // Stream backfill state
+  const [streamBackfillRemaining, setStreamBackfillRemaining] = useState<number | null>(null);
+  const [streamBackfillBusy, setStreamBackfillBusy]           = useState(false);
+  const [streamBackfillLog, setStreamBackfillLog]             = useState<string[]>([]);
+  const [streamBackfillDone, setStreamBackfillDone]           = useState(false);
+
   // intervals.icu sync state
   const [wellnessStatus, setWellnessStatus]   = useState<WellnessStatus | null>(null);
   const [wellnessLoading, setWellnessLoading] = useState(false);
@@ -51,6 +57,10 @@ export default function SettingsContent() {
       .then((d: HistoryStatus) => setHistoryStatus(d))
       .catch(() => {})
       .finally(() => setHistoryLoading(false));
+    fetch('/api/activities/backfill/streams')
+      .then(r => r.json())
+      .then((d: { remaining: number }) => setStreamBackfillRemaining(d.remaining))
+      .catch(() => {});
   }, []);
 
   // Load wellness status + pre-fill credentials from profile on mount
@@ -136,6 +146,31 @@ export default function SettingsContent() {
       setHistoryLog(l => [...l, `Failed: ${String(err)}`]);
     } finally {
       setHistoryBusy(false);
+    }
+  }
+
+  async function runStreamBackfill() {
+    if (streamBackfillBusy) return;
+    setStreamBackfillBusy(true);
+    setStreamBackfillDone(false);
+    setStreamBackfillLog([]);
+    let totalProcessed = 0;
+    try {
+      for (let pass = 0; pass < 50; pass++) {
+        const res  = await fetch('/api/activities/backfill/streams', { method: 'POST' });
+        const data = await res.json() as { processed: number; remaining: number; rateLimited?: boolean; error?: string };
+        if (data.error) { setStreamBackfillLog(l => [...l, `Error: ${data.error}`]); break; }
+        totalProcessed += data.processed;
+        setStreamBackfillRemaining(data.remaining);
+        setStreamBackfillLog(l => [...l, `Updated ${totalProcessed} activities · ${data.remaining} remaining`]);
+        if (data.rateLimited) { setStreamBackfillLog(l => [...l, 'Rate limited — try again in a few minutes']); break; }
+        if (data.remaining === 0) { setStreamBackfillDone(true); break; }
+        if (data.processed === 0) { setStreamBackfillLog(l => [...l, 'No progress — stopping']); break; }
+      }
+    } catch (err) {
+      setStreamBackfillLog(l => [...l, `Failed: ${String(err)}`]);
+    } finally {
+      setStreamBackfillBusy(false);
     }
   }
 

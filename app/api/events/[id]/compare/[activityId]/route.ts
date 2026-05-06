@@ -6,6 +6,8 @@ import {
   rhoAtAltitude,
 } from '@/lib/pacing';
 
+const DEFAULT_CDA = 0.35;
+
 export const runtime = 'nodejs';
 
 export interface SegmentComparison {
@@ -51,36 +53,67 @@ function pgLatLngToPairs(raw: unknown): [number, number][] | undefined {
 }
 
 export async function GET(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ id: string; activityId: string }> },
 ) {
   const { id: eventId, activityId } = await params;
+  const url = new URL(req.url);
 
   const profile = await getProfile();
   const event   = profile.events.find(e => (e.id ?? '') === eventId);
-  if (!event || !event.route || !event.pacing_strategy) {
-    return Response.json({ error: 'Event or pacing strategy not found' }, { status: 404 });
+  if (!event || !event.route) {
+    return Response.json({ error: 'Event or route not found' }, { status: 404 });
   }
 
   const route    = event.route;
-  const strategy = event.pacing_strategy;
+  const dbStrategy = event.pacing_strategy;
+
+  // Allow caller to override the saved pacing strategy via query params.
+  // This ensures the comparison always reflects what the user sees on screen.
+  const flatWatts = url.searchParams.has('flat_watts')
+    ? Number(url.searchParams.get('flat_watts'))
+    : (dbStrategy?.flat_watts ?? 260);
+  const descentWatts = url.searchParams.has('descent_watts')
+    ? Number(url.searchParams.get('descent_watts'))
+    : (dbStrategy?.descent_watts ?? 120);
+  const descentSpeedKmh = url.searchParams.has('descent_speed_kmh')
+    ? Number(url.searchParams.get('descent_speed_kmh'))
+    : (dbStrategy?.descent_speed_kmh ?? undefined);
+  const flatSpeedKmh = url.searchParams.has('flat_speed_kmh')
+    ? Number(url.searchParams.get('flat_speed_kmh'))
+    : (dbStrategy?.flat_speed_kmh ?? undefined);
+  const accessoriesKg = url.searchParams.has('accessories_kg')
+    ? Number(url.searchParams.get('accessories_kg'))
+    : (dbStrategy?.accessories_kg ?? 2.0);
+  const cda = url.searchParams.has('cda')
+    ? Number(url.searchParams.get('cda'))
+    : (dbStrategy?.cda ?? DEFAULT_CDA);
+  const bikeKg = dbStrategy?.bike_weight_kg ?? 8;
+
+  // Build climbs from query params (climb_0_watts, climb_1_watts, …) or fall back to DB strategy climbs
+  let climbs = dbStrategy?.climbs ?? [];
+  if (url.searchParams.has('climb_0_watts')) {
+    climbs = climbs.map((c, i) => {
+      const kw = url.searchParams.get(`climb_${i}_watts`);
+      return kw != null ? { ...c, target_watts: Number(kw) } : c;
+    });
+  }
 
   const rho = route.stream_altitude_m.length > 0
     ? rhoAtAltitude(route.stream_altitude_m.reduce((a, b) => a + b, 0) / route.stream_altitude_m.length)
     : undefined;
-  const physics = { cda: strategy.cda, rho };
-  const accessoriesKg = strategy.accessories_kg ?? 2.0;
+  const physics = { cda, rho };
   const riderKg = profile.weight_kg ?? 75;
   const ftp = effectiveFtp(profile);
 
-  const sortedClimbs = [...strategy.climbs].sort((a, b) => a.start_km - b.start_km);
+  const sortedClimbs = [...climbs].sort((a, b) => a.start_km - b.start_km);
 
   const plannedSegsBase = buildPacingSegments(
     route.stream_distance_km, route.stream_altitude_m,
     route.distance_m / 1000, sortedClimbs,
-    strategy.flat_watts, strategy.descent_watts,
-    riderKg, strategy.bike_weight_kg,
-    strategy.descent_speed_kmh, strategy.flat_speed_kmh,
+    flatWatts, descentWatts,
+    riderKg, bikeKg,
+    descentSpeedKmh, flatSpeedKmh,
     accessoriesKg, physics,
     route.stream_latlng,
     ftp,

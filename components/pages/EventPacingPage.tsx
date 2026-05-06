@@ -316,7 +316,21 @@ export default function EventPacingPage({ eventId }: Props) {
     setCompareData(null);
     setLoadingCompare(true);
     try {
-      const res = await fetch(`/api/events/${eventId}/compare/${activityId}`);
+      // Pass current pacing strategy values as query params so the API
+      // uses what the user sees on screen, not what's (possibly stale) in the DB.
+      const params = new URLSearchParams();
+      params.set('flat_watts', String(flatWatts));
+      params.set('descent_watts', String(descentWatts));
+      if (descentSpeedKmh != null) params.set('descent_speed_kmh', String(descentSpeedKmh));
+      if (flatSpeedKmh != null) params.set('flat_speed_kmh', String(flatSpeedKmh));
+      params.set('accessories_kg', String(accessoriesKg));
+      params.set('cda', String(cda));
+      // Pass climb target watts
+      climbs.forEach((c, i) => {
+        params.set(`climb_${i}_watts`, String(c.target_watts));
+      });
+
+      const res = await fetch(`/api/events/${eventId}/compare/${activityId}?${params}`);
       const data = await res.json() as CompareResponse;
       setCompareData(data);
     } finally {
