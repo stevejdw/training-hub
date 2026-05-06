@@ -60,7 +60,7 @@ function CustomTooltip({ active, payload, label }: any) {
 }
 
 export default function TssRollingChart({ compact }: { compact?: boolean }) {
-  const [weeks,        setWeeks]        = useState(compact ? 1 : 4);
+  const [weeks,        setWeeks]        = useState(4);
   const [editing,      setEditing]      = useState(false);
   const [refreshKey,   setRefreshKey]   = useState(0);
 
@@ -77,7 +77,7 @@ export default function TssRollingChart({ compact }: { compact?: boolean }) {
     label: fmtWeekLabel(p.week_start),
   }));
 
-  // In compact mode, show only the current (last) week's data
+  // In compact mode, show current week's data in the summary boxes
   const currentWeek = compact && points.length > 0 ? points[points.length - 1] : null;
   const totalActual = currentWeek ? currentWeek.actual_tss : points.reduce((s, p) => s + p.actual_tss, 0);
   const totalTarget = currentWeek ? currentWeek.target_tss : points.reduce((s, p) => s + p.target_tss, 0);
