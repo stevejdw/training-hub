@@ -1,7 +1,6 @@
 import pool from '@/lib/db';
 import { getProfile, effectiveFtp } from '@/lib/profile';
 import {
-  applyReferenceActivityToPacingSegments,
   buildPacingSegments,
   matchPacingSegmentToActivityStream,
   rhoAtAltitude,
@@ -110,37 +109,11 @@ export async function GET(
     const hasStreams = !!(stream?.distance_km?.length);
     const actLatlng = stream?.latlng != null ? pgLatLngToPairs(stream.latlng) : undefined;
 
-    let plannedSegs = plannedSegsBase;
-    if (hasStreams && stream.distance_km && act.moving_time > 0) {
-      plannedSegs = applyReferenceActivityToPacingSegments(plannedSegsBase, {
-        streamDistKm:     route.stream_distance_km,
-        streamAltM:       route.stream_altitude_m,
-        streamLatLng:     route.stream_latlng,
-        reference: {
-          distance_km:     stream.distance_km,
-          watts:           stream.watts,
-          latlng:          actLatlng,
-          time_s:          stream.time_s,
-          moving_time_sec: act.moving_time,
-        },
-        flatWatts:        strategy.flat_watts,
-        descentWatts:     strategy.descent_watts,
-        descentSpeedKmh:  strategy.descent_speed_kmh,
-        flatSpeedKmh:     strategy.flat_speed_kmh,
-        riderKg,
-        bikeKg:           strategy.bike_weight_kg,
-        accessoriesKg,
-        physics,
-        sortedClimbs,
-      });
-    }
-
-    const segments: SegmentComparison[] = plannedSegsBase.map((baseSeg, i) => {
-      const refSeg = plannedSegs[i];
+    const segments: SegmentComparison[] = plannedSegsBase.map((baseSeg) => {
       let actualNp:      number | null = null;
       let actualHr:      number | null = null;
-      let actualTimeMin: number | null = refSeg?.prev_time_min ?? null;
-      let actualWatts:   number | null = refSeg?.prev_avg_watts ?? null;
+      let actualTimeMin: number | null = null;
+      let actualWatts:   number | null = null;
 
       if (hasStreams && stream?.distance_km) {
         const win = matchPacingSegmentToActivityStream(

@@ -410,7 +410,7 @@ export default function EventPacingPage({ eventId }: Props) {
       location: event?.location, goal: event?.goal ?? '',
       strava_route_id: route?.id ?? event?.strava_route_id,
       route: route ?? event?.route ?? null, pacing_strategy: strategy,
-      linked_activity_ids: event?.linked_activity_ids,
+      linked_activity_ids: linkedIds,
     };
     const events = profile.events.map(e => (e.id ?? '') === eventId ? updated : e);
     setProfile({ ...profile, events });
