@@ -1270,6 +1270,8 @@ export function buildPacingSegments(
     markerSet.add(c.end_km);
   }
   const markers = [...markerSet].sort((a, b) => a - b);
+  console.log("[buildPacingSegments] markers", markers, "sortedStarred count", sortedStarred.length, "climbs count", sortedClimbs.length);
+  if (sortedStarred.length) console.log("[buildPacingSegments] first starred", sortedStarred[0].name, sortedStarred[0].start_km, sortedStarred[0].end_km);
 
   // ── Step 2: build an interval for each consecutive pair of markers ──
   const segs: PacingSegment[] = [];

@@ -254,18 +254,22 @@ export default function EventDetailPage({ eventId }: Props) {
   // ── Always fetch starred segments when route is available ──
   useEffect(() => {
     if (!route) return;
+    let cancelled = false;
     (async () => {
       try {
         const res = await fetch(`/api/events/${eventId}/starred-segments`);
         const data = await res.json() as { starred: import('@/lib/pacing').RouteStarredSegment[] };
-        setStarredSegments(data.starred ?? []);
-      } catch {
-        // Silently fail — without starred segments the pacing strategy
-        // just uses gradient-based labels for gaps.
+        if (!cancelled) {
+          console.log('[starred] fetched', data.starred?.length, 'segments');
+          setStarredSegments(data.starred ?? []);
+        }
+      } catch (e) {
+        console.error('[starred] fetch failed', e);
       }
     })();
+    return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [route]);
+  }, [eventId, route]);
 
   // ── Auto-detect climbs (or seed known Peaks Challenge climbs, then merge with starred segments) ──
   useEffect(() => {
