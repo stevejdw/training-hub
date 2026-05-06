@@ -25,8 +25,13 @@
  * accessories (water, food, clothing) in the pacing strategy weight.
  */
 
-const G     = 9.81;         // m/s²
-const V_MAX = 80 / 3.6;    // m/s  hard cap (≈ 80 km/h); real limit is corners
+const G        = 9.81;     // m/s²
+const V_MAX    = 90 / 3.6; // m/s  safety cap (≈ 90 km/h) — real-world max descent speed
+
+/** Steeper than this downhill gradient → rider likely coasts (zero power). */
+const COAST_GRADIENT = -0.02;
+/** Speed above which rider coasts on steep descents (km/h). */
+const COAST_SPEED_KMH = 50;
 
 /** Mandatory spacing for time integration — preserves steep pitches vs stream spacing. */
 const ROUTE_SAMPLE_STEP_M = 50;
@@ -164,7 +169,16 @@ export function rhoAtAltitude(avgAltM: number): number {
 
 /**
  * Return the steady-state speed (m/s) for a given power and gradient.
- * @param watts  Mechanical power at the pedals (before drivetrain loss)
+ *
+ * Coasting logic:
+ *   When watts = 0 AND grad < 0, gravity + drag determine the equilibrium speed.
+ *   The rider freewheels and the equation becomes:
+ *     0 = P_gravity + P_rolling + P_aero
+ *     m·g·sin(θ)·v + Crr·m·g·cos(θ)·v + ½·CdA·ρ·v³ = 0
+ *     => ½·CdA·ρ·v² = -m·g·(sin(θ) + Crr·cos(θ))
+ *     => v = sqrt(-2·m·g·(sin(θ) + Crr·cos(θ)) / (CdA·ρ))
+ *
+ * @param watts  Mechanical power at the pedals (before drivetrain loss). 0 = coasting.
  * @param grad   Slope as a fraction (e.g. 0.06 = 6% climb, -0.05 = 5% descent)
  * @param totalKg  Rider + bike + accessories mass in kg
  * @param p      Optional physics overrides
@@ -182,6 +196,26 @@ export function speedForPower(
 
   const sinGrade = Math.sin(Math.atan(grad));
   const cosGrade = Math.cos(Math.atan(grad));
+
+  // ── Coasting (0W) on any downhill gradient ───────────────────────────────
+  if (watts <= 0 && sinGrade < 0) {
+    // Solve: gravity_propulsion = rolling_resistance + aero_drag
+    // -m·g·sin(θ) = Crr·m·g·cos(θ) + ½·CdA·ρ·v²
+    // v = sqrt( (-m·g·sin(θ) - Crr·m·g·cos(θ)) / (0.5·CdA·ρ) )
+    const aeroCoeff = 0.5 * cda * rho;
+    const gravityPropulsion = -totalKg * G * sinGrade; // positive downhill
+    const rollingResistance = totalKg * G * cosGrade * crr;
+    const netForce = gravityPropulsion - rollingResistance;
+
+    if (netForce <= 0) {
+      // Not steep enough to overcome rolling resistance — rider stops
+      return 0.3;
+    }
+    const v = Math.sqrt(netForce / aeroCoeff);
+    return Math.min(Math.max(v, 0.3), V_MAX);
+  }
+
+  // ── Pedalling (watts > 0) or on flat/uphill with 0W ─────────────────────
   const effectiveW = watts * eta;
   // A·v + B·v³ = effectiveW   where A = gravity + rolling (linear), B = aero (cubic)
   const A = totalKg * G * (sinGrade + cosGrade * crr);
@@ -246,6 +280,7 @@ export function wattsForSegmentSpeed(
   riderKg:         number,
   bikeKg:          number,
   p:               PhysicsParams = {},
+  ftp?:            number,
 ): number {
   const sliceD: number[] = [];
   const sliceA: number[] = [];
@@ -273,6 +308,7 @@ export function wattsForSegmentSpeed(
       rider_weight_kg:    riderKg,
       bike_weight_kg:     bikeKg,
       physics:            p,
+      ftp,
     });
     if (t > targetMin) lo = mid;
     else                hi = mid;
@@ -308,11 +344,98 @@ export interface PacingInput {
   bike_weight_kg:      number;
   accessories_kg?:     number;
   physics?:            PhysicsParams;
+  /** Rider's FTP (Functional Threshold Power) — used for climb power capping */
+  ftp?:                number;
   /** Extra descent speed ceilings (applied after global caps and corner geometry caps). */
   segment_speed_caps?: SegmentSpeedCapZone[];
 }
 
-/** Compute total estimated riding time in minutes. */
+/**
+ * Compute the terminal (coast) speed on a descent gradient given current momentum.
+ * Solves: gravity_force = rolling_resistance + aero_drag at equilibrium.
+ * On steep descents without pedalling, the rider accelerates until drag = gravity.
+ */
+function coastSpeedMs(
+  grad: number,
+  totalKg: number,
+  vCurrentMs: number,
+  dDistM: number,
+  p: PhysicsParams = {},
+): number {
+  const cda = p.cda ?? DEFAULT_CDA;
+  const crr = p.crr ?? DEFAULT_CRR;
+  const rho = p.rho ?? DEFAULT_RHO;
+
+  const sinGrade = Math.sin(Math.atan(grad));
+  const cosGrade = Math.cos(Math.atan(grad));
+
+  // Gravitational force pulling the rider down the hill (negative = downhill)
+  const gravityForce = totalKg * G * sinGrade; // negative on descents
+
+  if (gravityForce >= 0) return vCurrentMs; // not a descent
+
+  // A·v + B·v³ = |gravity| - rolling resistance (the net propulsive force available)
+  // The rider coasts so: drag + rolling = |gravity|
+  // Solve: 0.5·CdA·ρ·v² + Crr·m·g·cos(θ) = -m·g·sin(θ)
+  // => B·v² + A = 0 where:
+  //   B = 0.5·CdA·ρ (drag coefficient)
+  //   A = Crr·m·g·cos(θ) + m·g·sin(θ) (total resistance - gravity)
+  // At equilibrium: v = sqrt(-A / B) when A < 0
+  // But we also need momentum blending to prevent instant jumps.
+
+  const aeroCoeff = 0.5 * cda * rho;
+  const rollingForce = totalKg * G * cosGrade * crr;
+
+  // Total drag at current speed
+  const dragCurrent = aeroCoeff * vCurrentMs * vCurrentMs;
+
+  // Net force (positive = accelerating, negative = braking)
+  const netForce = -gravityForce - rollingForce - dragCurrent;
+
+  // If net force is positive, the rider is accelerating
+  // If net force is negative, the rider is braking
+
+  // Compute equilibrium speed where gravity = rolling + aero
+  // -gravityForce = rollingForce + aeroCoeff·v²
+  // v = sqrt((-gravityForce - rollingForce) / aeroCoeff)
+  const requiredPropulsion = -gravityForce - rollingForce; // must be overcome by drag
+
+  let vEquilibrium: number;
+  if (requiredPropulsion <= 0) {
+    // Even at zero speed, rolling + gravity is negative → rider accelerates from standstill
+    vEquilibrium = V_MAX;
+  } else {
+    vEquilibrium = Math.min(Math.sqrt(requiredPropulsion / aeroCoeff), V_MAX);
+  }
+  if (!isFinite(vEquilibrium) || vEquilibrium < 0.3) vEquilibrium = 0.3;
+
+  // Momentum blend: speed changes gradually toward equilibrium
+  // Characteristic distance ~ 100 m for typical aero drag
+  const MOMENTUM_COAST_M = 100;
+  const alpha = 1 - Math.exp(-dDistM / MOMENTUM_COAST_M);
+  const v = vCurrentMs + alpha * (vEquilibrium - vCurrentMs);
+
+  return Math.min(Math.max(v, 0.3), V_MAX);
+}
+
+/**
+ * Coasting check: rider stops pedalling when gradient is steeper than -2%
+ * AND speed exceeds 50 km/h. Below that threshold, the rider may still
+ * pedal lightly to maintain speed.
+ */
+function shouldCoast(grad: number, currentSpeedMs: number): boolean {
+  return grad < COAST_GRADIENT && (currentSpeedMs * 3.6) >= COAST_SPEED_KMH;
+}
+
+/**
+ * Compute the steady-state cycling speed accounting for coasting on descents.
+ *
+ * Key behaviours:
+ * 1. On descents steeper than -2% with speed > 50 km/h → rider coasts (0W).
+ * 2. On climbs, input watts are capped at 1.2×FTP for realistic pacing.
+ * 3. Momentum from the previous segment is carried forward naturally.
+ * 4. The speed blend ensures short bumps don't produce unrealistic speed drops.
+ */
 export function estimateTime(input: PacingInput): number {
   const {
     stream_distance_km, stream_altitude_m,
@@ -322,10 +445,13 @@ export function estimateTime(input: PacingInput): number {
     accessories_kg = 0,
     descent_speed_kmh, flat_speed_kmh,
     physics = {},
+    ftp = 300, // default FTP if not provided
   } = input;
 
   const totalKg = rider_weight_kg + bike_weight_kg + accessories_kg;
   const baseCda = physics.cda ?? DEFAULT_CDA;
+  const FTP_CLIMB_CAP = 1.2; // safety cap on climbs
+  const maxClimbWatts = ftp * FTP_CLIMB_CAP;
 
   const hi = resampleRouteStreams(
     stream_distance_km,
@@ -340,9 +466,8 @@ export function estimateTime(input: PacingInput): number {
   if (n < 2) return 0;
 
   // ── Slope smoothing ──────────────────────────────────────────────────────
-  // Pre-compute raw per-step grades, then apply a triangle-weighted moving
-  // average over ±GRADE_SMOOTH_STEPS (each step ≈ 50 m → ±150 m each side).
-  // This prevents single GPS altitude blips from producing 400W power spikes.
+  // Triangle-weighted moving average over ±3 steps (~150 m each side).
+  // Prevents single GPS altitude blips from producing erroneous power spikes.
   const rawGrades = new Array<number>(n - 1);
   for (let i = 1; i < n; i++) {
     const dd = (D[i] - D[i - 1]) * 1000;
@@ -359,26 +484,26 @@ export function estimateTime(input: PacingInput): number {
     return sum / wt;
   });
 
-  // ── Momentum / kinetic energy ────────────────────────────────────────────
-  // Speed blends exponentially toward the steady-state target over
-  // MOMENTUM_M metres — short bumps or spikes no longer cause instant
-  // speed drops (a rider carrying 50 km/h into a short kicker keeps most of it).
-  // Hard caps (corners, user limits) are applied AFTER the blend so braking
-  // overrides momentum instantly.
-  const MOMENTUM_M = 200;
-
-  // Initialise vCurrent at the steady-state for the first step.
+  // ── Initial speed ────────────────────────────────────────────────────────
+  // Start from steady-state on the first step's gradient.
   const grad0  = smoothGrades[0] ?? 0;
-  const watts0 = (grad0 < -0.01 ? descent_watts : flat_watts) * wattGradeMultiplier(grad0);
-  let vCurrent = speedForPower(
-    watts0,
-    grad0,
-    totalKg,
-    { ...physics, cda: baseCda * cdaGradeMultiplier(grad0) },
-  );
+  let vCurrent: number;
+  if (grad0 < COAST_GRADIENT) {
+    // Start coasting already if steep enough
+    vCurrent = coastSpeedMs(grad0, totalKg, 8.0, 50, { ...physics, cda: baseCda * cdaGradeMultiplier(grad0) });
+  } else {
+    const watts0 = (grad0 < -0.01 ? descent_watts : flat_watts) * wattGradeMultiplier(grad0);
+    vCurrent = speedForPower(
+      Math.min(watts0, grad0 > 0 ? maxClimbWatts : watts0),
+      grad0,
+      totalKg,
+      { ...physics, cda: baseCda * cdaGradeMultiplier(grad0) },
+    );
+  }
 
   let totalSec = 0;
 
+  // ── Route integration ────────────────────────────────────────────────────
   for (let i = 1; i < n; i++) {
     const dDist = (D[i] - D[i - 1]) * 1000;
     if (dDist <= 0) continue;
@@ -387,48 +512,77 @@ export function estimateTime(input: PacingInput): number {
     const km   = (D[i - 1] + D[i]) / 2;
 
     const climbMatch = climbs.find(c => km >= c.start_km && km <= c.end_km);
-    let watts: number;
-    if (climbMatch) {
-      watts = climbMatch.target_watts;
-    } else if (grad < -0.01) {
-      watts = descent_watts;
-    } else {
-      watts = flat_watts;
-    }
-
-    watts *= wattGradeMultiplier(grad);
-
     const cdaSeg = baseCda * cdaGradeMultiplier(grad);
     const segmentPhysics: PhysicsParams = { ...physics, cda: cdaSeg };
 
-    const vSteady = speedForPower(watts, grad, totalKg, segmentPhysics);
+    // ── Determine rider power for this 50m step ──
+    let v: number;
 
-    // Blend toward steady-state — momentum smooths out short-duration spikes
-    const alpha = 1 - Math.exp(-dDist / MOMENTUM_M);
-    let v = vCurrent + alpha * (vSteady - vCurrent);
-    v = Math.min(Math.max(v, 0.3), V_MAX);
+    if (climbMatch) {
+      // Climbing: use target watts, capped at 1.2×FTP for realism
+      const rawWatts = climbMatch.target_watts * wattGradeMultiplier(grad);
+      const watts = Math.min(rawWatts, maxClimbWatts);
+      const vSteady = speedForPower(watts, grad, totalKg, segmentPhysics);
+      // Momentum blend: short rises don't kill all speed
+      const MOMENTUM_CLIMB_M = 120;
+      const alpha = 1 - Math.exp(-dDist / MOMENTUM_CLIMB_M);
+      v = vCurrent + alpha * (vSteady - vCurrent);
+    } else if (grad < 0) {
+      // ── Descent (including slight downhill) ──
+      if (shouldCoast(grad, vCurrent)) {
+        // Steep + fast → rider coasts at 0W, gravity + drag determine speed
+        v = coastSpeedMs(grad, totalKg, vCurrent, dDist, segmentPhysics);
+      } else {
+        // Gentle descent or slow speed → rider pedals lightly
+        const watts = descent_watts * wattGradeMultiplier(grad);
+        const vSteady = speedForPower(watts, grad, totalKg, segmentPhysics);
 
-    // Hard caps (braking) applied after momentum — these override it
-    if (!climbMatch) {
-      if (grad < -0.01 && descent_speed_kmh) {
+        // On descents, use coast physics anyway (gravity assist likely makes
+        // the steady-state speed higher than pedalling alone)
+        const vCoast = coastSpeedMs(grad, totalKg, vCurrent, dDist, segmentPhysics);
+        const vPedal = vCurrent + (1 - Math.exp(-dDist / 200)) * (vSteady - vCurrent);
+
+        // The rider's actual speed is the *higher* of coasting and pedalling:
+        // if gravity alone pushes you faster than pedalling, you coast.
+        v = Math.max(vPedal, vCoast);
+      }
+
+      // Apply user-provided speed cap
+      if (descent_speed_kmh) {
         v = Math.min(v, descent_speed_kmh / 3.6);
-      } else if (grad >= -0.01 && flat_speed_kmh) {
+      }
+
+      // Corner speed caps (hairpins)
+      if (L && i >= 1 && i + 1 < L.length) {
+        const capKmh = cornerSpeedCapKmh(L[i - 1], L[i], L[i + 1]);
+        if (capKmh !== null) v = Math.min(v, capKmh / 3.6);
+      }
+
+      // Reference ride speed caps
+      if (input.segment_speed_caps?.length) {
+        for (const z of input.segment_speed_caps) {
+          if (km >= z.start_km - 1e-6 && km <= z.end_km + 1e-6) {
+            v = Math.min(v, z.max_kmh / 3.6);
+          }
+        }
+      }
+    } else {
+      // ── Flat / uphill (non-climb) ──
+      const watts = flat_watts * wattGradeMultiplier(grad);
+      const vSteady = speedForPower(watts, grad, totalKg, segmentPhysics);
+      // Momentum blend for rolling terrain
+      const MOMENTUM_FLAT_M = 150;
+      const alpha = 1 - Math.exp(-dDist / MOMENTUM_FLAT_M);
+      v = vCurrent + alpha * (vSteady - vCurrent);
+
+      // User speed cap
+      if (flat_speed_kmh) {
         v = Math.min(v, flat_speed_kmh / 3.6);
       }
     }
 
-    if (grad < -0.01 && L && i >= 1 && i + 1 < L.length) {
-      const capKmh = cornerSpeedCapKmh(L[i - 1], L[i], L[i + 1]);
-      if (capKmh !== null) v = Math.min(v, capKmh / 3.6);
-    }
-
-    if (grad < -0.01 && input.segment_speed_caps?.length) {
-      for (const z of input.segment_speed_caps) {
-        if (km >= z.start_km - 1e-6 && km <= z.end_km + 1e-6) {
-          v = Math.min(v, z.max_kmh / 3.6);
-        }
-      }
-    }
+    // Global safety cap
+    v = Math.min(Math.max(v, 0.3), V_MAX);
 
     vCurrent  = v;
     totalSec += dDist / v;
@@ -878,6 +1032,7 @@ export function buildPacingSegments(
   accessoriesKg:    number = 0,
   physics:          PhysicsParams = {},
   streamLatLng?:    [number, number][],
+  ftp?:             number,
 ): PacingSegment[] {
   // Compute altitude-corrected air density from full route stream if not overridden
   const resolvedPhysics: PhysicsParams = { ...physics };
@@ -955,6 +1110,7 @@ export function buildPacingSegments(
       descent_speed_kmh:  isClimb ? undefined : descentSpeedKmh,
       flat_speed_kmh:     isClimb ? undefined : flatSpeedKmh,
       physics:            resolvedPhysics,
+      ftp,
     });
 
     const avgSpeedKmh = estTime > 0

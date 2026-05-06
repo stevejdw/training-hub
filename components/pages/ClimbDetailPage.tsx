@@ -71,6 +71,7 @@ export default function ClimbDetailPage({ eventId, climbIdx }: Props) {
 
   const riderKg = profile?.weight_kg      ?? 75;
   const bikeKg  = profile?.bike_weight_kg ?? 8;
+  const ftp     = profile?.use_eftp && profile?.eftp ? profile.eftp : (profile?.ftp ?? 300);
   const totalKg = riderKg + bikeKg;
 
   const estMin = useMemo(() => {
@@ -94,8 +95,9 @@ export default function ClimbDetailPage({ eventId, climbIdx }: Props) {
       climbs:             [],
       rider_weight_kg:    riderKg,
       bike_weight_kg:     bikeKg,
+      ftp,
     });
-  }, [route, climb, chartData, targetWatts, riderKg, bikeKg]);
+  }, [route, climb, chartData, targetWatts, riderKg, bikeKg, ftp]);
 
   // Approx avg speed for this climb
   const avgSpeedKmh = useMemo(() => {

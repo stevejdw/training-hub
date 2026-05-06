@@ -218,10 +218,10 @@ export default function EventDetailPage({ eventId }: Props) {
 
   // ── Speed targets ──
   const [descentSpeedKmh, setDescentSpeedKmh] = useState<number | undefined>(undefined);
-  const [flatSpeedKmh,    setFlatSpeedKmh]    = useState<number | undefined>(undefined);
-
+    const [flatSpeedKmh,    setFlatSpeedKmh]    = useState<number | undefined>(undefined);
   const riderKg = profile?.weight_kg      ?? 75;
   const bikeKg  = profile?.bike_weight_kg ?? 8;
+  const ftp     = profile?.use_eftp && profile?.eftp ? profile.eftp : (profile?.ftp ?? 300);
 
   // Track whether we have unsaved edits in edit mode
   const savedEventRef  = useRef(event);
@@ -283,8 +283,9 @@ export default function EventDetailPage({ eventId }: Props) {
       0,
       {},
       route.stream_latlng,
+      ftp,
     );
-  }, [route, climbs, flatWatts, descentWatts, riderKg, bikeKg, descentSpeedKmh, flatSpeedKmh]);
+  }, [route, climbs, flatWatts, descentWatts, riderKg, bikeKg, descentSpeedKmh, flatSpeedKmh, ftp]);
 
   const estMin = useMemo(() => {
     if (!route) return null;
@@ -294,9 +295,9 @@ export default function EventDetailPage({ eventId }: Props) {
       stream_latlng:      route.stream_latlng,
       flat_watts: flatWatts, descent_watts: descentWatts,
       flat_speed_kmh: flatSpeedKmh, descent_speed_kmh: descentSpeedKmh,
-      climbs, rider_weight_kg: riderKg, bike_weight_kg: bikeKg,
+      climbs, rider_weight_kg: riderKg, bike_weight_kg: bikeKg, ftp,
     });
-  }, [route, flatWatts, descentWatts, climbs, riderKg, bikeKg, descentSpeedKmh, flatSpeedKmh]);
+  }, [route, flatWatts, descentWatts, climbs, riderKg, bikeKg, descentSpeedKmh, flatSpeedKmh, ftp]);
 
   const np       = useMemo(() => segments.length ? calcNP(segments)       : null, [segments]);
   const avgWatts = useMemo(() => segments.length ? calcAvgWatts(segments) : null, [segments]);

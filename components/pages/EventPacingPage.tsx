@@ -160,6 +160,7 @@ export default function EventPacingPage({ eventId }: Props) {
   }, [event?.route, savedLinkedIdsKey, loadMatchingActivities]);
 
   // ── Derived segments ──
+  const ftp = profile?.use_eftp && profile?.eftp ? profile.eftp : (profile?.ftp ?? 300);
   const baseSegments = useMemo(() => {
     if (!route || climbs.length === 0) return [];
     return buildPacingSegments(
@@ -169,8 +170,9 @@ export default function EventPacingPage({ eventId }: Props) {
       descentSpeedKmh, flatSpeedKmh,
       accessoriesKg, physicsParams,
       route.stream_latlng,
+      ftp,
     );
-  }, [route, climbs, flatWatts, descentWatts, riderKg, bikeKg, descentSpeedKmh, flatSpeedKmh, accessoriesKg, physicsParams]);
+  }, [route, climbs, flatWatts, descentWatts, riderKg, bikeKg, descentSpeedKmh, flatSpeedKmh, accessoriesKg, physicsParams, ftp]);
 
   // Apply per-segment overrides.
   const segments = useMemo(() => {
@@ -194,14 +196,14 @@ export default function EventPacingPage({ eventId }: Props) {
         return result;
       });
     }
-    const hasAny = Object.keys(segWattsEdit).length > 0 || Object.keys(segSpeedEdit).length > 0 || Object.keys(savedWatts).length > 0;
+    const hasAny = Object.keys(segWattsEdit).length > 0 || Object.keys(segSpeedEdit).length > 0 || Object.keys(savedWatts).length > 0 || Object.keys(savedSpeeds).length > 0;
     if (!hasAny) return baseSegments;
     return baseSegments.map(seg => {
       const k         = segKey(seg);
-      const speedOver = segSpeedEdit[k];
       // Live edit takes priority; fall back to saved manual override
+      const speedOver = segSpeedEdit[k] ?? savedSpeeds[k];
       const wattsOver = segWattsEdit[k] ?? savedWatts[k];
-      const isManual  = wattsOver !== undefined;
+      const isManual  = wattsOver !== undefined || speedOver !== undefined;
       if (speedOver === undefined && wattsOver === undefined) return seg;
 
       if (speedOver !== undefined) {
@@ -250,6 +252,7 @@ export default function EventPacingPage({ eventId }: Props) {
     setSegWattsEdit(prev => ({ ...prev, [k]: w }));
     setSegSpeedEdit(prev => { const n = { ...prev }; delete n[k]; return n; });
     setSpeedDrafts(prev => { const n = { ...prev }; delete n[k]; return n; });
+    setSavedSpeeds(prev => { const n = { ...prev }; delete n[k]; return n; });
   }
 
   function getDisplaySpeed(seg: PacingSegment): string {
@@ -270,7 +273,7 @@ export default function EventPacingPage({ eventId }: Props) {
       if (route) {
         const w = wattsForSegmentSpeed(
           route.stream_distance_km, route.stream_altitude_m,
-          seg.start_km, seg.end_km, s, riderKg, bikeKg, physicsParams,
+          seg.start_km, seg.end_km, s, riderKg, bikeKg, physicsParams, ftp,
         );
         if (w > 0) setSegWattsEdit(prev => ({ ...prev, [k]: w }));
       }
@@ -322,11 +325,11 @@ export default function EventPacingPage({ eventId }: Props) {
   }
 
   function startPacingEdit() {
-    setSegWattsEdit({});
-    setSegSpeedEdit({});
+    // Load saved overrides into the edit state so inputs show the
+    // same values the user saw before pressing Edit.
+    setSegWattsEdit({ ...savedWatts });
+    setSegSpeedEdit({ ...savedSpeeds });
     setSpeedDrafts({});
-    setSavedSpeeds({});
-    // savedWatts intentionally preserved — manual overrides load into the edit form
     setEditingPacing(true);
   }
 
@@ -351,7 +354,7 @@ export default function EventPacingPage({ eventId }: Props) {
         if (!isNaN(rawSpeed) && rawSpeed > 0 && !(k in effectiveWatts)) {
           const w = wattsForSegmentSpeed(
             route.stream_distance_km, route.stream_altitude_m,
-            seg.start_km, seg.end_km, rawSpeed, riderKg, bikeKg, physicsParams,
+            seg.start_km, seg.end_km, rawSpeed, riderKg, bikeKg, physicsParams, ftp,
           );
           if (w > 0) effectiveWatts[k] = w;
         }

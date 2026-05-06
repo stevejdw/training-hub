@@ -1,5 +1,5 @@
 import pool from '@/lib/db';
-import { getProfile } from '@/lib/profile';
+import { getProfile, effectiveFtp } from '@/lib/profile';
 import {
   applyReferenceActivityToPacingSegments,
   buildPacingSegments,
@@ -72,6 +72,7 @@ export async function GET(
   const physics = { cda: strategy.cda, rho };
   const accessoriesKg = strategy.accessories_kg ?? 2.0;
   const riderKg = profile.weight_kg ?? 75;
+  const ftp = effectiveFtp(profile);
 
   const sortedClimbs = [...strategy.climbs].sort((a, b) => a.start_km - b.start_km);
 
@@ -83,6 +84,7 @@ export async function GET(
     strategy.descent_speed_kmh, strategy.flat_speed_kmh,
     accessoriesKg, physics,
     route.stream_latlng,
+    ftp,
   );
 
   const client = await pool.connect();
