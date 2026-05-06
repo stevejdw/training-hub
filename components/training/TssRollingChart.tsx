@@ -60,7 +60,7 @@ function CustomTooltip({ active, payload, label }: any) {
 }
 
 export default function TssRollingChart({ compact }: { compact?: boolean }) {
-  const [weeks,        setWeeks]        = useState(compact ? 4 : 4);
+  const [weeks,        setWeeks]        = useState(compact ? 1 : 4);
   const [editing,      setEditing]      = useState(false);
   const [refreshKey,   setRefreshKey]   = useState(0);
 
@@ -77,8 +77,10 @@ export default function TssRollingChart({ compact }: { compact?: boolean }) {
     label: fmtWeekLabel(p.week_start),
   }));
 
-  const totalActual = points.reduce((s, p) => s + p.actual_tss, 0);
-  const totalTarget = points.reduce((s, p) => s + p.target_tss, 0);
+  // In compact mode, show only the current (last) week's data
+  const currentWeek = compact && points.length > 0 ? points[points.length - 1] : null;
+  const totalActual = currentWeek ? currentWeek.actual_tss : points.reduce((s, p) => s + p.actual_tss, 0);
+  const totalTarget = currentWeek ? currentWeek.target_tss : points.reduce((s, p) => s + p.target_tss, 0);
   const onTrack     = totalTarget > 0 ? Math.round((totalActual / totalTarget) * 100) : null;
 
   const modeLabel = config?.mode === 'formula' ? 'Custom formula' :
@@ -89,7 +91,7 @@ export default function TssRollingChart({ compact }: { compact?: boolean }) {
   if (compact) {
     return (
       <div className="bg-gray-900 rounded-xl border border-gray-800 p-3 space-y-2">
-        {/* Weekly summary */}
+        {/* Weekly summary — current week only */}
         <div className="grid grid-cols-3 gap-1.5">
           <div className="bg-gray-800/60 rounded-lg p-1.5 text-center">
             <p className="text-[8px] text-gray-500 uppercase tracking-wider">Actual</p>
@@ -110,7 +112,7 @@ export default function TssRollingChart({ compact }: { compact?: boolean }) {
           </div>
         </div>
 
-        {/* Mini chart */}
+        {/* Mini chart — current week only */}
         {loading && points.length === 0 ? (
           <div className="h-24 animate-pulse bg-gray-800 rounded-lg" />
         ) : (
