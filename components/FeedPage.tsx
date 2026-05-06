@@ -240,10 +240,93 @@ export default function FeedPage() {
     <div className="h-full overflow-y-auto scroll-touch">
       <div className="max-w-2xl md:max-w-5xl mx-auto px-4 py-4 md:px-8 md:py-8 space-y-3 pb-8">
 
-        {/* Row 1: 3 tiles — Next Session (left), Week to Date (middle), Event Days (right) */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        {/* ── MOBILE LAYOUT ── */}
+        <div className="block md:hidden space-y-3">
 
-          {/* Next Training Session */}
+          {/* Mobile: Next Session + Event side by side */}
+          <div className="flex gap-3 items-stretch">
+            <Link
+              href="/training?tab=plan"
+              className={`flex-1 min-w-0 rounded-2xl p-3 border transition-colors group ${
+                nextSession ? 'bg-gray-800/70 border-gray-700/60 hover:border-gray-600' : 'bg-gray-800/40 border-gray-800'
+              }`}
+            >
+              <p className="text-[9px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Next Session</p>
+              {nextSession ? (
+                <>
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <span
+                      className="px-1.5 py-0.5 rounded text-[9px] font-semibold flex-shrink-0 capitalize"
+                      style={{ background: sessionColor + '22', color: sessionColor }}
+                    >
+                      {nextSession.type}
+                    </span>
+                    <span className="text-[10px] text-gray-500">{sessionDateLabel(nextSession.date)}</span>
+                  </div>
+                  <p className="text-xs font-bold text-white group-hover:text-orange-300 transition-colors leading-snug line-clamp-2">
+                    {nextSession.title}
+                  </p>
+                  <div className="flex items-center gap-2 mt-1 text-[10px] text-gray-500">
+                    {nextSession.duration_min && <span>{nextSession.duration_min} min</span>}
+                    {nextSession.tss_target && <span>{nextSession.tss_target} TSS</span>}
+                  </div>
+                </>
+              ) : (
+                <p className="text-xs text-gray-600">No plan active</p>
+              )}
+            </Link>
+
+            {nextEvent ? (
+              <Link
+                href={`/events/${nextEvent.id}`}
+                className="flex-shrink-0 w-20 rounded-2xl p-2.5 bg-orange-500/10 border border-orange-500/25 hover:border-orange-500/60 hover:bg-orange-500/15 transition-colors flex flex-col items-center justify-center text-center gap-0.5"
+              >
+                <p className="text-[8px] font-semibold text-orange-400 uppercase tracking-wider">Event</p>
+                <p className="text-xl font-black text-orange-400 leading-none">{nextEvent.daysAway}</p>
+                <p className="text-[8px] text-orange-400/70">days</p>
+                <p className="text-[9px] text-gray-400 font-medium mt-0.5 leading-tight line-clamp-2">{nextEvent.name}</p>
+              </Link>
+            ) : (
+              <div className="flex-shrink-0 w-20 rounded-2xl p-2.5 bg-gray-800/40 border border-gray-800 flex flex-col items-center justify-center text-center">
+                <p className="text-[8px] font-semibold text-gray-500 uppercase tracking-wider">Event</p>
+                <p className="text-[10px] text-gray-600 mt-1">None</p>
+              </div>
+            )}
+          </div>
+
+          {/* Mobile: Week to Date */}
+          <Link
+            href="/training"
+            className="block bg-gray-800/60 rounded-2xl px-3 py-2.5 border border-transparent hover:border-gray-700 hover:bg-gray-800/80 transition-colors group"
+          >
+            <p className="text-[9px] font-semibold text-gray-400 uppercase tracking-wider group-hover:text-orange-400 transition-colors mb-1.5">
+              Week to Date →
+            </p>
+            {activeStat ? (
+              <div className="grid grid-cols-5 gap-1">
+                {[
+                  { label: 'Rides',  value: String(activeStat.rides)     },
+                  { label: 'km',     value: String(activeStat.km)        },
+                  { label: 'Hours',  value: String(activeStat.hours)     },
+                  { label: 'TSS',    value: String(activeStat.tss)       },
+                  { label: 'Elev m', value: String(activeStat.elevation) },
+                ].map(({ label, value }) => (
+                  <div key={label} className="text-center">
+                    <p className="text-xs font-bold text-white leading-tight">{value}</p>
+                    <p className="text-[9px] text-gray-500 mt-0.5">{label}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="h-6 bg-gray-700/40 rounded animate-pulse" />
+            )}
+          </Link>
+        </div>
+
+        {/* ── DESKTOP LAYOUT ── */}
+        <div className="hidden md:grid md:grid-cols-3 gap-3">
+
+          {/* Desktop: Next Training Session */}
           <Link
             href="/training?tab=plan"
             className={`rounded-2xl p-4 border transition-colors group ${
@@ -280,7 +363,7 @@ export default function FeedPage() {
             )}
           </Link>
 
-          {/* Week to Date stats */}
+          {/* Desktop: Week to Date stats */}
           <Link
             href="/training"
             className="rounded-2xl bg-gray-800/60 px-4 py-4 border border-transparent hover:border-gray-700 hover:bg-gray-800/80 transition-colors group"
@@ -308,7 +391,7 @@ export default function FeedPage() {
             )}
           </Link>
 
-          {/* Next Event — compact badge */}
+          {/* Desktop: Next Event */}
           {nextEvent ? (
             <Link
               href={`/events/${nextEvent.id}`}

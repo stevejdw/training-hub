@@ -8,8 +8,8 @@ export const runtime = 'nodejs';
 const PR_DURATIONS = [
   { label: '1 min',  seconds: 60 },
   { label: '5 min',  seconds: 300 },
+  { label: '10 min', seconds: 600 },
   { label: '20 min', seconds: 1200 },
-  { label: '60 min', seconds: 3600 },
 ];
 
 function rollingBest(arr: number[], w: number): number {
