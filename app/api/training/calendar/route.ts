@@ -1,14 +1,9 @@
 import pool from '@/lib/db';
 import { getProfile } from '@/lib/profile';
+import { CYCLING_TYPES } from '@/lib/sport-types';
 import { NextRequest } from 'next/server';
 
 export const runtime = 'nodejs';
-
-const ALL_SPORT_TYPES = [
-  'Ride', 'VirtualRide', 'GravelRide', 'MountainBikeRide',
-  'EBikeRide', 'EMountainBikeRide', 'Run', 'Walk', 'Swim',
-  'WeightTraining', 'Yoga', 'Hike',
-];
 
 /** Inclusive list of Mon–Sun day strings for the ISO week containing `dateStr`. */
 function weekDays(monDateStr: string): string[] {
@@ -80,7 +75,7 @@ export async function GET(req: NextRequest) {
           AND (start_date AT TIME ZONE $1)::date <= $3
           AND sport_type = ANY($4::text[])
         ORDER BY start_date
-      `, [tz, fromDate, toDate, ALL_SPORT_TYPES]);
+      `, [tz, fromDate, toDate, CYCLING_TYPES]);
 
       // Fetch training plan days in range (most recent plan)
       const planRes = await client.query<{
