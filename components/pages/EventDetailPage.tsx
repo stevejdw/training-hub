@@ -200,8 +200,9 @@ export default function EventDetailPage({ eventId }: Props) {
   const [routeError,   setRouteError]   = useState<string | null>(null);
   const [climbs,       setClimbs]       = useState<EventClimb[]>([]);
   const [autoDetected, setAutoDetected] = useState(false);
-  /** Raw starred segments (including non-climb) for naming pacing intervals. */
-  const [starredSegments, setStarredSegments] = useState<import('@/lib/pacing').RouteStarredSegment[]>([]);
+  /** Raw starred segments (including non-climb) for naming pacing intervals.
+   *  null = not yet loaded; [] = loaded but none found. */
+  const [starredSegments, setStarredSegments] = useState<import('@/lib/pacing').RouteStarredSegment[] | null>(null);
 
   // ── UI state ──
   const [editing,       setEditing]       = useState(false);
@@ -254,17 +255,19 @@ export default function EventDetailPage({ eventId }: Props) {
   // ── Always fetch starred segments when route is available ──
   useEffect(() => {
     if (!route) return;
+    // Mark as loading in case we need to re-fetch on route change
+    setStarredSegments(null);
     let cancelled = false;
     (async () => {
       try {
         const res = await fetch(`/api/events/${eventId}/starred-segments`);
         const data = await res.json() as { starred: import('@/lib/pacing').RouteStarredSegment[] };
         if (!cancelled) {
-          console.log('[starred] fetched', data.starred?.length, 'segments');
           setStarredSegments(data.starred ?? []);
         }
       } catch (e) {
         console.error('[starred] fetch failed', e);
+        if (!cancelled) setStarredSegments([]);
       }
     })();
     return () => { cancelled = true; };
@@ -318,13 +321,9 @@ export default function EventDetailPage({ eventId }: Props) {
   );
 
   const segments = useMemo(() => {
-    if (!route || climbs.length === 0) return [];
-    console.log('[debug] starredSegments', JSON.stringify(starredSegments.map(s => ({
-      name: s.name,
-      start_km: s.start_km,
-      end_km: s.end_km,
-    }))));
-    const result = buildPacingSegments(
+    // Wait for both climbs and starred segments to be available
+    if (!route || climbs.length === 0 || starredSegments === null) return [];
+    return buildPacingSegments(
       route.stream_distance_km, route.stream_altitude_m,
       route.distance_m / 1000, climbs,
       flatWatts, descentWatts, riderKg, bikeKg,
@@ -333,15 +332,8 @@ export default function EventDetailPage({ eventId }: Props) {
       {},
       route.stream_latlng,
       ftp,
-      starredSegments.length ? starredSegments : undefined,
+      starredSegments.length > 0 ? starredSegments : undefined,
     );
-    console.log('[debug] segments first 3', JSON.stringify(result.slice(0, 3).map(s => ({
-      label: s.label,
-      type: s.type,
-      start_km: s.start_km,
-      end_km: s.end_km,
-    }))));
-    return result;
   }, [route, climbs, flatWatts, descentWatts, riderKg, bikeKg, descentSpeedKmh, flatSpeedKmh, ftp, starredSegments]);
 
   const estMin = useMemo(() => {
@@ -442,7 +434,7 @@ export default function EventDetailPage({ eventId }: Props) {
         start_km: b.start_km, end_km: b.end_km, name: b.name, target_watts: defaultWatts,
       }));
       // Merge starred climbs with base Peaks Challenge climbs
-      if (starredSegments.length) {
+      if (starredSegments && starredSegments.length) {
         const merged = mergeStarredIntoSegments(baseClimbs, starredSegments, route.distance_m / 1000);
         const withStats = merged.map(c => climbFromBounds(route, c.name, c.start_km, c.end_km, defaultWatts));
         setClimbs(withStats);
