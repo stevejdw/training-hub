@@ -50,7 +50,7 @@ export async function GET() {
         FROM activities
         WHERE sport_type NOT ILIKE '%walk%'
         ORDER BY start_date DESC
-        LIMIT 8
+        LIMIT 50
       `),
       client.query(`
         SELECT TO_CHAR(start_date AT TIME ZONE 'Australia/Sydney','YYYY-MM-DD') AS date,

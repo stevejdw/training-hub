@@ -240,13 +240,13 @@ export default function FeedPage() {
     <div className="h-full overflow-y-auto scroll-touch">
       <div className="max-w-2xl md:max-w-5xl mx-auto px-4 py-4 md:px-8 md:py-8 space-y-3 pb-8">
 
-        {/* Row 1: Next Training Session (left) + Next Event badge (top-right) */}
-        <div className="flex gap-3 items-stretch">
+        {/* Row 1: 3 tiles — Next Session (left), Week to Date (middle), Event Days (right) */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
 
           {/* Next Training Session */}
           <Link
             href="/training?tab=plan"
-            className={`flex-1 min-w-0 rounded-2xl p-4 border transition-colors group ${
+            className={`rounded-2xl p-4 border transition-colors group ${
               nextSession ? 'bg-gray-800/70 border-gray-700/60 hover:border-gray-600' : 'bg-gray-800/40 border-gray-800'
             }`}
           >
@@ -280,88 +280,71 @@ export default function FeedPage() {
             )}
           </Link>
 
+          {/* Week to Date stats */}
+          <Link
+            href="/training"
+            className="rounded-2xl bg-gray-800/60 px-4 py-4 border border-transparent hover:border-gray-700 hover:bg-gray-800/80 transition-colors group"
+          >
+            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider group-hover:text-orange-400 transition-colors mb-2">
+              Week to Date →
+            </p>
+            {activeStat ? (
+              <div className="grid grid-cols-5 gap-1">
+                {[
+                  { label: 'Rides',  value: String(activeStat.rides)     },
+                  { label: 'km',     value: String(activeStat.km)        },
+                  { label: 'Hours',  value: String(activeStat.hours)     },
+                  { label: 'TSS',    value: String(activeStat.tss)       },
+                  { label: 'Elev m', value: String(activeStat.elevation) },
+                ].map(({ label, value }) => (
+                  <div key={label} className="text-center">
+                    <p className="text-sm font-bold text-white leading-tight">{value}</p>
+                    <p className="text-[10px] text-gray-500 mt-0.5">{label}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="h-8 bg-gray-700/40 rounded animate-pulse" />
+            )}
+          </Link>
+
           {/* Next Event — compact badge */}
-          {nextEvent && (
+          {nextEvent ? (
             <Link
               href={`/events/${nextEvent.id}`}
-              className="flex-shrink-0 w-24 rounded-2xl p-3 bg-orange-500/10 border border-orange-500/25 hover:border-orange-500/60 hover:bg-orange-500/15 transition-colors flex flex-col items-center justify-center text-center gap-0.5"
+              className="rounded-2xl p-4 bg-orange-500/10 border border-orange-500/25 hover:border-orange-500/60 hover:bg-orange-500/15 transition-colors flex flex-col items-center justify-center text-center gap-0.5"
             >
               <p className="text-[9px] font-semibold text-orange-400 uppercase tracking-wider">Event</p>
               <p className="text-2xl font-black text-orange-400 leading-none">{nextEvent.daysAway}</p>
               <p className="text-[9px] text-orange-400/70">days</p>
               <p className="text-[10px] text-gray-400 font-medium mt-1 leading-tight line-clamp-2">{nextEvent.name}</p>
             </Link>
+          ) : (
+            <div className="rounded-2xl p-4 bg-gray-800/40 border border-gray-800 flex flex-col items-center justify-center text-center">
+              <p className="text-[9px] font-semibold text-gray-500 uppercase tracking-wider">Event</p>
+              <p className="text-sm text-gray-600 mt-2">No upcoming events</p>
+            </div>
           )}
         </div>
 
-        {/* Period stats — swipeable WTD / MTD / YTD — whole tile links to /training */}
-        <Link
-          href="/training"
-          className="block bg-gray-800/60 rounded-2xl px-4 py-3 border border-transparent hover:border-gray-700 hover:bg-gray-800/80 transition-colors select-none touch-pan-y group"
-          onTouchStart={e => { swipeStartX.current = e.touches[0].clientX; }}
-          onTouchEnd={e => {
-            if (swipeStartX.current === null) return;
-            const dx = e.changedTouches[0].clientX - swipeStartX.current;
-            swipeStartX.current = null;
-            if (Math.abs(dx) > 40) {
-              e.preventDefault();
-              handleStatSwipe(dx < 0 ? 'left' : 'right');
-            }
-          }}
-        >
-          {/* Period label + dot indicators */}
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider group-hover:text-orange-400 transition-colors">
-              {STAT_PERIODS.find(p => p.key === statPeriod)?.label} →
-            </p>
-            <div className="flex items-center gap-1.5">
-              {STAT_PERIODS.map(p => (
-                <button
-                  key={p.key}
-                  onClick={e => { e.preventDefault(); e.stopPropagation(); setStatPeriod(p.key); }}
-                  className={`transition-all rounded-full ${
-                    statPeriod === p.key ? 'w-4 h-1.5 bg-orange-500' : 'w-1.5 h-1.5 bg-gray-600 hover:bg-gray-500'
-                  }`}
-                  aria-label={p.label}
-                />
-              ))}
-            </div>
-          </div>
-          <div className="grid grid-cols-5 gap-1">
-            {activeStat ? [
-              { label: 'Rides',  value: String(activeStat.rides)     },
-              { label: 'km',     value: String(activeStat.km)        },
-              { label: 'Hours',  value: String(activeStat.hours)     },
-              { label: 'TSS',    value: String(activeStat.tss)       },
-              { label: 'Elev m', value: String(activeStat.elevation) },
-            ].map(({ label, value }) => (
-              <div key={label} className="text-center">
-                <p className="text-sm font-bold text-white leading-tight">{value}</p>
-                <p className="text-[10px] text-gray-500 mt-0.5">{label}</p>
-              </div>
-            )) : (
-              <div className="col-span-5 h-8 bg-gray-700/40 rounded animate-pulse" />
-            )}
-          </div>
-        </Link>
-
-        {/* Readiness & Response */}
-        <ReadinessResponseWidget />
-
-        {/* Weekly TSS — compact version below readiness */}
-        <Link href="/performance" className="block group">
-          <div className="bg-gray-800/60 rounded-2xl border border-transparent hover:border-gray-700 hover:bg-gray-800/80 transition-colors overflow-hidden">
-            <div className="px-3 pt-2.5 pb-1">
-              <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider group-hover:text-orange-400 transition-colors">Weekly TSS →</p>
-            </div>
-            <div className="px-1 pb-1">
-              <TssRollingChart compact />
-            </div>
-          </div>
-        </Link>
-
         {/* Coaching Insight */}
         <CoachingTip />
+
+        {/* Row: Readiness & Response + Weekly TSS side by side */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <ReadinessResponseWidget />
+
+          <Link href="/performance" className="block group">
+            <div className="bg-gray-800/60 rounded-2xl border border-transparent hover:border-gray-700 hover:bg-gray-800/80 transition-colors overflow-hidden h-full">
+              <div className="px-3 pt-2.5 pb-1">
+                <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider group-hover:text-orange-400 transition-colors">Weekly TSS →</p>
+              </div>
+              <div className="px-1 pb-1">
+                <TssRollingChart compact />
+              </div>
+            </div>
+          </Link>
+        </div>
 
         {/* Power PRs */}
         {powerHighlights.length > 0 && (
