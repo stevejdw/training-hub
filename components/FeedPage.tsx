@@ -5,6 +5,7 @@ import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { sportLabel, sportColor } from '@/lib/sport-types';
 import ReadinessResponseWidget from './ReadinessResponseWidget';
+import TssRollingChart from './training/TssRollingChart';
 import { calendarDaysFromToday } from '@/lib/calendar-days';
 
 const ActivityMap = dynamic(() => import('./ActivityMap'), { ssr: false });
@@ -214,11 +215,9 @@ export default function FeedPage() {
     );
   }
 
-  const { recentRides = [], nextEvent, nextSession, fitness, powerHighlights = [], wtd, mtd, ytd } = data ?? {};
+  const { recentRides = [], nextEvent, nextSession, powerHighlights = [], wtd, mtd, ytd } = data ?? {};
   const activeStat = statPeriod === 'mtd' ? mtd : statPeriod === 'ytd' ? ytd : wtd;
   const newPRs   = powerHighlights.filter(p => p.isNew);
-  const tsbLabel = (fitness?.tsb ?? 0) >= 5 ? 'Fresh' : (fitness?.tsb ?? 0) <= -20 ? 'Fatigued' : 'Neutral';
-  const tsbColor = (fitness?.tsb ?? 0) >= 5 ? 'text-green-400' : (fitness?.tsb ?? 0) <= -20 ? 'text-red-400' : 'text-yellow-400';
 
   const sessionColor = nextSession ? (SESSION_TYPE_COLOR[nextSession.type] ?? '#9ca3af') : '#9ca3af';
 
@@ -346,28 +345,15 @@ export default function FeedPage() {
           </div>
         </Link>
 
-        {/* Fitness snapshot — whole tile links to /performance */}
-        {fitness && (
-          <Link href="/performance" className="block group">
-            <div className="bg-gray-800/60 rounded-2xl px-4 py-3 border border-transparent hover:border-gray-700 hover:bg-gray-800/80 transition-colors">
-              <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-2 group-hover:text-orange-400 transition-colors">Fitness →</p>
-              <div className="grid grid-cols-3 gap-2">
-                <div className="text-center">
-                  <p className="text-xl font-bold text-blue-400">{fitness.ctl}</p>
-                  <p className="text-[10px] text-gray-500 mt-0.5">Fitness (CTL)</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-xl font-bold text-purple-400">{fitness.atl}</p>
-                  <p className="text-[10px] text-gray-500 mt-0.5">Fatigue (ATL)</p>
-                </div>
-                <div className="text-center">
-                  <p className={`text-xl font-bold ${tsbColor}`}>{fitness.tsb > 0 ? '+' : ''}{fitness.tsb}</p>
-                  <p className={`text-[10px] mt-0.5 ${tsbColor}`}>{tsbLabel}</p>
-                </div>
-              </div>
+        {/* Rolling 4-week TSS chart — links to /performance */}
+        <Link href="/performance" className="block group">
+          <div className="bg-gray-800/60 rounded-2xl border border-transparent hover:border-gray-700 hover:bg-gray-800/80 transition-colors overflow-hidden">
+            <div className="px-4 pt-3 pb-1">
+              <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider group-hover:text-orange-400 transition-colors">Weekly TSS →</p>
             </div>
-          </Link>
-        )}
+            <TssRollingChart />
+          </div>
+        </Link>
 
         {/* Readiness & Response */}
         <ReadinessResponseWidget />
