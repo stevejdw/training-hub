@@ -754,7 +754,6 @@ export function haversineDistanceMeters(a: [number, number], b: [number, number]
 }
 
 const MATCH_TOL_KM = 0.08;
-const LATLNG_REFINE_RADIUS = 40;
 
 export interface ActivityStreamIndexWindow {
   startIdx: number;
@@ -762,8 +761,16 @@ export interface ActivityStreamIndexWindow {
 }
 
 /**
- * Map a pacing segment (route km + optional latlng) to activity stream indices
- * using cumulative distance along the reference activity, refined with GPS when available.
+ * Map a pacing segment (route km + optional latlng) to activity stream indices.
+ *
+ * Strategy:
+ *   1. Find a coarse distance-based window (± 5% of total route distance).
+ *   2. Within that window, refine using GPS when both have latlng data.
+ *   3. If GPS is unavailable or fails, use the distance-based window directly.
+ *
+ * The wide initial corridor prevents loop courses from matching to the wrong
+ * part (e.g. start/finish at the same GPS point).  GPS refinement within
+ * the corridor picks the exact match.
  */
 export function matchPacingSegmentToActivityStream(
   seg: Pick<PacingSegment, 'start_km' | 'end_km'>,
@@ -775,8 +782,80 @@ export function matchPacingSegmentToActivityStream(
   const n = actDistKm.length;
   if (n < 2 || routeDistKm.length < 2) return null;
 
+  const useRouteLl =
+    routeLatLng && routeLatLng.length === routeDistKm.length;
+  const useActLl = actLatLng && actLatLng.length === n;
+
+  // ── Stage 1: distance corridor ──────────────────────────────────────
+  // Map segment km to activity distance using the ratio of total distance.
+  const routeTotalKm = routeDistKm[routeDistKm.length - 1] - routeDistKm[0];
+  const actTotalKm   = actDistKm[n - 1] - actDistKm[0];
+  const actMaxKm     = actDistKm[n - 1];
+
+  // Corridor margin: ±5% of total distance, at least 2 km
+  const corridorKm = Math.max(routeTotalKm * 0.05, 2);
+
+  // Scale segment km boundary to activity distance space
+  const fracStart = routeTotalKm > 0
+    ? (seg.start_km - routeDistKm[0]) / routeTotalKm
+    : 0;
+  const fracEnd = routeTotalKm > 0
+    ? (seg.end_km - routeDistKm[0]) / routeTotalKm
+    : 0;
+
+  const expectedActStartKm = actDistKm[0] + fracStart * actTotalKm;
+  const expectedActEndKm   = actDistKm[0] + fracEnd * actTotalKm;
+
+  // Clamp search window
+  const searchStartKm = Math.max(actDistKm[0], expectedActStartKm - corridorKm);
+  const searchEndKm   = Math.min(actMaxKm, expectedActEndKm + corridorKm);
+
+  const i0 = actDistKm.findIndex(d => d >= searchStartKm);
+  // find last index ≤ searchEndKm
+  let i1 = actDistKm.length - 1;
+  for (let i = actDistKm.length - 1; i >= 0; i--) {
+    if (actDistKm[i] <= searchEndKm) {
+      i1 = i;
+      break;
+    }
+  }
+
+  if (i0 < 0 || i1 < 0 || i1 <= i0) {
+    // Fall back to pure distance if corridor is empty
+    return fallbackDistanceMatch(seg, actDistKm);
+  }
+
+  if (useRouteLl && useActLl) {
+    // ── Stage 2: GPS refinement within the distance corridor ──────────
+    const refStart = interpLatLng(routeDistKm, routeLatLng, seg.start_km);
+    const refEnd   = interpLatLng(routeDistKm, routeLatLng, seg.end_km);
+
+    // Scan entire corridor for best GPS match for segment start
+    let bestI = i0;
+    let bestStartD = Infinity;
+    for (let i = i0; i <= i1; i++) {
+      const dd = haversineDistanceMeters(refStart, actLatLng[i]);
+      if (dd < bestStartD) { bestStartD = dd; bestI = i; }
+    }
+
+    // Scan from start match forward for best GPS match for segment end
+    let bestJ = bestI;
+    let bestEndD = Infinity;
+    for (let j = bestI; j <= i1; j++) {
+      const dd = haversineDistanceMeters(refEnd, actLatLng[j]);
+      if (dd < bestEndD) { bestEndD = dd; bestJ = j; }
+    }
+
+    // Accept if both matches are within 500 m and start < end
+    if (bestI < bestJ && bestStartD < 500 && bestEndD < 500) {
+      return { startIdx: bestI, endIdx: bestJ };
+    }
+    // Otherwise fall through to distance-based match within corridor
+  }
+
+  // ── Stage 3: distance-based match within corridor ───────────────────
   let startIdx = actDistKm.findIndex(d => d >= seg.start_km - MATCH_TOL_KM);
-  if (startIdx < 0) startIdx = 0;
+  if (startIdx < 0 || startIdx < i0) startIdx = i0;
 
   let endIdx = n - 1;
   for (let i = n - 1; i >= 0; i--) {
@@ -785,35 +864,26 @@ export function matchPacingSegmentToActivityStream(
       break;
     }
   }
+  if (endIdx > i1) endIdx = i1;
 
   if (startIdx >= endIdx) return null;
+  return { startIdx, endIdx };
+}
 
-  const useRouteLl =
-    routeLatLng && routeLatLng.length === routeDistKm.length;
-  const useActLl = actLatLng && actLatLng.length === n;
+/** Pure distance-based fallback. */
+function fallbackDistanceMatch(
+  seg: Pick<PacingSegment, 'start_km' | 'end_km'>,
+  actDistKm: number[],
+): ActivityStreamIndexWindow | null {
+  let startIdx = actDistKm.findIndex(d => d >= seg.start_km - MATCH_TOL_KM);
+  if (startIdx < 0) startIdx = 0;
 
-  if (useRouteLl && useActLl) {
-    const refStart = interpLatLng(routeDistKm, routeLatLng, seg.start_km);
-    const refEnd   = interpLatLng(routeDistKm, routeLatLng, seg.end_km);
-    const i0 = Math.max(0, startIdx - LATLNG_REFINE_RADIUS);
-    const i1 = Math.min(n - 1, startIdx + LATLNG_REFINE_RADIUS);
-    let bestI = startIdx;
-    let bestD = Infinity;
-    for (let i = i0; i <= i1; i++) {
-      const dd = haversineDistanceMeters(refStart, actLatLng[i]);
-      if (dd < bestD) { bestD = dd; bestI = i; }
+  let endIdx = actDistKm.length - 1;
+  for (let i = actDistKm.length - 1; i >= 0; i--) {
+    if (actDistKm[i] <= seg.end_km + MATCH_TOL_KM) {
+      endIdx = i;
+      break;
     }
-    startIdx = bestI;
-
-    const j0 = Math.max(0, endIdx - LATLNG_REFINE_RADIUS);
-    const j1 = Math.min(n - 1, endIdx + LATLNG_REFINE_RADIUS);
-    let bestJ = endIdx;
-    bestD = Infinity;
-    for (let j = j0; j <= j1; j++) {
-      const dd = haversineDistanceMeters(refEnd, actLatLng[j]);
-      if (dd < bestD) { bestD = dd; bestJ = j; }
-    }
-    endIdx = bestJ;
   }
 
   if (startIdx >= endIdx) return null;
