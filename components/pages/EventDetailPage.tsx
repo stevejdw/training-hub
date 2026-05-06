@@ -315,7 +315,12 @@ export default function EventDetailPage({ eventId }: Props) {
 
   const segments = useMemo(() => {
     if (!route || climbs.length === 0) return [];
-    return buildPacingSegments(
+    console.log('[debug] starredSegments', JSON.stringify(starredSegments.map(s => ({
+      name: s.name,
+      start_km: s.start_km,
+      end_km: s.end_km,
+    }))));
+    const result = buildPacingSegments(
       route.stream_distance_km, route.stream_altitude_m,
       route.distance_m / 1000, climbs,
       flatWatts, descentWatts, riderKg, bikeKg,
@@ -326,6 +331,13 @@ export default function EventDetailPage({ eventId }: Props) {
       ftp,
       starredSegments.length ? starredSegments : undefined,
     );
+    console.log('[debug] segments first 3', JSON.stringify(result.slice(0, 3).map(s => ({
+      label: s.label,
+      type: s.type,
+      start_km: s.start_km,
+      end_km: s.end_km,
+    }))));
+    return result;
   }, [route, climbs, flatWatts, descentWatts, riderKg, bikeKg, descentSpeedKmh, flatSpeedKmh, ftp, starredSegments]);
 
   const estMin = useMemo(() => {
