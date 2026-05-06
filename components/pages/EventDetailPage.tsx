@@ -521,7 +521,7 @@ export default function EventDetailPage({ eventId }: Props) {
           <button onClick={cancelEdit} className="text-sm text-gray-500 hover:text-orange-400 transition-colors">← Back</button>
         </div>
         <div className="flex-1 overflow-y-auto scroll-touch">
-          <div className="max-w-2xl mx-auto px-4 py-4 md:px-8 md:py-6 space-y-5">
+          <div className="max-w-2xl md:max-w-5xl mx-auto px-4 py-4 md:px-8 md:py-6 space-y-5">
 
             <section className="bg-gray-900 border border-gray-800 rounded-2xl p-4 space-y-3">
               <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Event Details</h2>

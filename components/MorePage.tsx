@@ -66,7 +66,7 @@ export default function MorePage() {
     <div className="h-full flex flex-col">
       <PageHeader icon={iconFor('more')} title="More" />
       <div className="flex-1 overflow-y-auto scroll-touch">
-        <div className="max-w-2xl md:max-w-3xl mx-auto">
+        <div className="max-w-2xl md:max-w-5xl mx-auto">
 
         {overflow.length > 0 && (
           <div className="bg-gray-900 border-y border-gray-800 mb-2 divide-y divide-gray-800/60">

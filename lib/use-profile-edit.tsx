@@ -58,7 +58,7 @@ export function PageShell({ title, icon, children }: { title: string; icon: Reac
     <div className="h-full flex flex-col">
       <PageHeader icon={icon} title={title} />
       <div className="flex-1 overflow-y-auto scroll-touch">
-        <div className="max-w-2xl mx-auto px-4 py-5 md:px-8 md:py-8 space-y-5">
+        <div className="max-w-2xl md:max-w-5xl mx-auto px-4 py-5 md:px-8 md:py-8 space-y-5">
           {children}
           <div className="h-20" />
         </div>
