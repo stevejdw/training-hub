@@ -59,6 +59,9 @@ export default function AerobicEfficiencyChart({ activityId }: { activityId: str
       t:     Math.round((i * secPerSample) / 60),   // minutes
       watts: data.watts[i] ?? null,
       hr:    data.hr[i]    ?? null,
+      ef:    (data.watts[i] != null && data.hr[i] != null && data.hr[i]! > 0) 
+        ? data.watts[i]! / data.hr[i]! 
+        : null,
     }));
   }, [data]);
 
@@ -186,6 +189,13 @@ export default function AerobicEfficiencyChart({ activityId }: { activityId: str
                   width={40}
                   tickFormatter={v => `${v}`}
                 />
+                {/* EF Y-axis (hidden, shares right side) */}
+                <YAxis
+                  yAxisId="ef"
+                  orientation="right"
+                  domain={['auto', 'auto']}
+                  hide
+                />
                 {/* Shade first vs second half */}
                 {halfMin > 0 && (
                   <ReferenceArea
@@ -224,11 +234,22 @@ export default function AerobicEfficiencyChart({ activityId }: { activityId: str
                   isAnimationActive={false}
                   connectNulls
                 />
+                <Line
+                  yAxisId="ef"
+                  dataKey="ef"
+                  stroke="#ffffff"
+                  strokeWidth={1.5}
+                  dot={false}
+                  isAnimationActive={false}
+                  connectNulls
+                  opacity={0.7}
+                />
               </LineChart>
             </ResponsiveContainer>
             <p className="text-[10px] text-gray-600 mt-2">
               <span className="text-orange-400">—</span> Power (W) ·
-              <span className="text-blue-400 ml-1.5">—</span> Heart rate (bpm)
+              <span className="text-blue-400 ml-1.5">—</span> Heart rate (bpm) ·
+              <span className="text-white ml-1.5">—</span> EF
               <span className="ml-3 text-gray-600">· First half shaded</span>
             </p>
           </>

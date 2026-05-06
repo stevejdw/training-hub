@@ -59,8 +59,8 @@ function CustomTooltip({ active, payload, label }: any) {
   );
 }
 
-export default function TssRollingChart() {
-  const [weeks,        setWeeks]        = useState(4);
+export default function TssRollingChart({ compact }: { compact?: boolean }) {
+  const [weeks,        setWeeks]        = useState(compact ? 4 : 4);
   const [editing,      setEditing]      = useState(false);
   const [refreshKey,   setRefreshKey]   = useState(0);
 
@@ -85,6 +85,51 @@ export default function TssRollingChart() {
                     config?.mode === 'plan'    ? 'From training plan' :
                     points.some(p => p.target_source === 'plan') ? 'From training plan' :
                     'No plan configured';
+
+  if (compact) {
+    return (
+      <div className="bg-gray-900 rounded-xl border border-gray-800 p-3 space-y-2">
+        {/* Weekly summary */}
+        <div className="grid grid-cols-3 gap-1.5">
+          <div className="bg-gray-800/60 rounded-lg p-1.5 text-center">
+            <p className="text-[8px] text-gray-500 uppercase tracking-wider">Actual</p>
+            <p className="text-sm font-bold text-orange-400 tabular-nums">{totalActual}</p>
+          </div>
+          <div className="bg-gray-800/60 rounded-lg p-1.5 text-center">
+            <p className="text-[8px] text-gray-500 uppercase tracking-wider">Target</p>
+            <p className="text-sm font-bold text-blue-400 tabular-nums">{totalTarget || '—'}</p>
+          </div>
+          <div className="bg-gray-800/60 rounded-lg p-1.5 text-center">
+            <p className="text-[8px] text-gray-500 uppercase tracking-wider">On track</p>
+            <p className={`text-sm font-bold tabular-nums ${
+              onTrack == null ? 'text-gray-500' :
+              onTrack >= 90 && onTrack <= 110 ? 'text-green-400' :
+              onTrack > 110 ? 'text-amber-400' :
+              'text-red-400'
+            }`}>{onTrack != null ? `${onTrack}%` : '—'}</p>
+          </div>
+        </div>
+
+        {/* Mini chart */}
+        {loading && points.length === 0 ? (
+          <div className="h-24 animate-pulse bg-gray-800 rounded-lg" />
+        ) : (
+          <ResponsiveContainer width="100%" height={100}>
+            <ComposedChart data={chartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }} barCategoryGap="20%">
+              <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
+              <XAxis dataKey="label" tick={{ fill: '#6b7280', fontSize: 8 }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fill: '#6b7280', fontSize: 8 }} axisLine={false} tickLine={false} width={24} />
+              <Tooltip content={<CustomTooltip />} cursor={{ fill: '#374151', fillOpacity: 0.2 }} />
+              <Bar dataKey="actual_tss" fill="#f97316" name="actual_tss" radius={[2,2,0,0]} />
+              <Line dataKey="target_tss" stroke="#60a5fa" name="target_tss" strokeWidth={1.5}
+                    dot={{ r: 2, fill: '#60a5fa', strokeWidth: 0 }}
+                    isAnimationActive={false} />
+            </ComposedChart>
+          </ResponsiveContainer>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="bg-gray-900 rounded-xl border border-gray-800 p-4 space-y-3">

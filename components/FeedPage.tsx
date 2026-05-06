@@ -345,18 +345,20 @@ export default function FeedPage() {
           </div>
         </Link>
 
-        {/* Rolling 4-week TSS chart — links to /performance */}
-        <Link href="/performance" className="block group">
-          <div className="bg-gray-800/60 rounded-2xl border border-transparent hover:border-gray-700 hover:bg-gray-800/80 transition-colors overflow-hidden">
-            <div className="px-4 pt-3 pb-1">
-              <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider group-hover:text-orange-400 transition-colors">Weekly TSS →</p>
-            </div>
-            <TssRollingChart />
-          </div>
-        </Link>
-
         {/* Readiness & Response */}
         <ReadinessResponseWidget />
+
+        {/* Weekly TSS — compact version below readiness */}
+        <Link href="/performance" className="block group">
+          <div className="bg-gray-800/60 rounded-2xl border border-transparent hover:border-gray-700 hover:bg-gray-800/80 transition-colors overflow-hidden">
+            <div className="px-3 pt-2.5 pb-1">
+              <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider group-hover:text-orange-400 transition-colors">Weekly TSS →</p>
+            </div>
+            <div className="px-1 pb-1">
+              <TssRollingChart compact />
+            </div>
+          </div>
+        </Link>
 
         {/* Coaching Insight */}
         <CoachingTip />

@@ -148,6 +148,9 @@ function RideModal({ ride, onClose }: { ride: ScatterPoint; onClose: () => void 
       t:     Math.round((i * secPerSample) / 60),   // minutes
       watts: stream.watts[i] ?? null,
       hr:    stream.hr[i]    ?? null,
+      ef:    (stream.watts[i] != null && stream.hr[i] != null && stream.hr[i]! > 0) 
+        ? stream.watts[i]! / stream.hr[i]! 
+        : null,
     }));
   }, [stream]);
 
@@ -265,6 +268,13 @@ function RideModal({ ride, onClose }: { ride: ScatterPoint; onClose: () => void 
                   width={40}
                   tickFormatter={v => `${v}`}
                 />
+                {/* EF Y-axis (hidden) */}
+                <YAxis
+                  yAxisId="ef"
+                  orientation="right"
+                  domain={['auto', 'auto']}
+                  hide
+                />
                 {/* Shade first vs second half */}
                 {halfMin > 0 && (
                   <ReferenceArea
@@ -303,12 +313,23 @@ function RideModal({ ride, onClose }: { ride: ScatterPoint; onClose: () => void 
                   isAnimationActive={false}
                   connectNulls
                 />
+                <Line
+                  yAxisId="ef"
+                  dataKey="ef"
+                  stroke="#ffffff"
+                  strokeWidth={1.5}
+                  dot={false}
+                  isAnimationActive={false}
+                  connectNulls
+                  opacity={0.7}
+                />
               </LineChart>
             </ResponsiveContainer>
           )}
           <p className="text-[10px] text-gray-600 mt-2">
             <span className="text-orange-400">—</span> Power (W) ·
-            <span className="text-blue-400 ml-1.5">—</span> Heart rate (bpm)
+            <span className="text-blue-400 ml-1.5">—</span> Heart rate (bpm) ·
+            <span className="text-white ml-1.5">—</span> EF
           </p>
         </div>
         {ride.hrv_low === true && (
