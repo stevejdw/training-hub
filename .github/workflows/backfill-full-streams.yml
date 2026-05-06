@@ -1,0 +1,38 @@
+name: Backfill Full Streams
+
+on:
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: 'Max activities per run (1 Strava call each)'
+        required: false
+        default: '60'
+  schedule:
+    # Every 15 minutes. Each run uses up to 60 Strava calls (well within the
+    # 100/15-min window). The script self-stops at 950 daily calls so it
+    # doesn't crowd out the app or other workflows.
+    - cron: '*/15 * * * *'
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install requests psycopg2-binary
+
+      - name: Run full stream backfill
+        env:
+          STRAVA_CLIENT_ID:     ${{ secrets.STRAVA_CLIENT_ID }}
+          STRAVA_CLIENT_SECRET: ${{ secrets.STRAVA_CLIENT_SECRET }}
+          STRAVA_REFRESH_TOKEN: ${{ secrets.STRAVA_REFRESH_TOKEN }}
+          DATABASE_URL:         ${{ secrets.DATABASE_URL }}
+          BACKFILL_LIMIT:       ${{ github.event.inputs.limit || '60' }}
+        run: python .github/scripts/backfill_full_streams.py
