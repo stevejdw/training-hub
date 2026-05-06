@@ -1,8 +1,10 @@
 import pool from '@/lib/db';
+
 import { getProfile, effectiveFtp } from '@/lib/profile';
 import {
   buildPacingSegments,
   matchPacingSegmentToActivityStream,
+  findNearestRouteKmWithDist,
   rhoAtAltitude,
 } from '@/lib/pacing';
 
@@ -146,13 +148,90 @@ export async function GET(
     const actMovingTimeSec = act.moving_time;
     const actStreamPts = hasStreams && stream?.distance_km ? stream.distance_km.length : 0;
 
+    // ── Starred segments on this route ──────────────────────────────
+    interface StarredSegOnRoute {
+      id:        number;
+      name:      string;
+      start_km:  number;
+      end_km:    number;
+      distance_m: number;
+    }
+    const starredOnRoute: StarredSegOnRoute[] = [];
+    if (route.stream_latlng && route.stream_latlng.length >= 10) {
+      const ssRes = await client.query<{
+        id: number; name: string;
+        start_lat: number; start_lng: number;
+        end_lat: number; end_lng: number;
+        distance: number;
+      }>(`SELECT id, name, start_lat, start_lng, end_lat, end_lng, distance
+          FROM starred_segments WHERE start_lat IS NOT NULL AND end_lat IS NOT NULL`);
+      for (const ss of ssRes.rows) {
+        const startInfo = findNearestRouteKmWithDist(route.stream_latlng, route.stream_distance_km, [ss.start_lat, ss.start_lng]);
+        const endInfo   = findNearestRouteKmWithDist(route.stream_latlng, route.stream_distance_km, [ss.end_lat, ss.end_lng]);
+        if (startInfo && endInfo && endInfo.km > startInfo.km) {
+          starredOnRoute.push({ id: ss.id, name: ss.name, start_km: startInfo.km, end_km: endInfo.km, distance_m: ss.distance });
+        }
+      }
+    }
+
+    // Fetch segment efforts for this activity
+    const effortRes = await client.query<{
+      segment_id: number;
+      elapsed_time: number;
+      moving_time: number;
+      average_watts: number | null;
+      average_heartrate: number | null;
+      max_heartrate: number | null;
+      pr_rank: number | null;
+      kom_rank: number | null;
+    }>(`SELECT segment_id, elapsed_time, moving_time, average_watts, average_heartrate, max_heartrate, pr_rank, kom_rank
+        FROM segment_efforts WHERE activity_id = $1`, [activityId]);
+    const effortsBySegment: Map<number, typeof effortRes.rows[0]> = new Map();
+    for (const e of effortRes.rows) {
+      effortsBySegment.set(e.segment_id, e);
+    }
+
     const segments: SegmentComparison[] = plannedSegsBase.map((baseSeg) => {
+      // Check if a starred segment falls within this pacing segment
+      let starredMatch: StarredSegOnRoute | undefined;
+      for (const ss of starredOnRoute) {
+        if (ss.start_km >= baseSeg.start_km - 0.5 && ss.end_km <= baseSeg.end_km + 0.5) {
+          if (!starredMatch || (ss.end_km - ss.start_km) > (starredMatch.end_km - starredMatch.start_km)) {
+            starredMatch = ss;
+          }
+        }
+      }
       let actualNp:      number | null = null;
       let actualHr:      number | null = null;
       let actualTimeMin: number | null = null;
       let actualWatts:   number | null = null;
+      let label = baseSeg.label;
 
-      if (hasStreams && stream?.distance_km) {
+      // Does the starred segment closely match the pacing segment's boundaries?
+      // "Close" = the starred segment's GPS-mapped start/end are within
+      // 15% of the pacing segment's length or 500m absolute, whichever is larger.
+      let useStarredMetrics = false;
+      if (starredMatch) {
+        const segLen = baseSeg.end_km - baseSeg.start_km;
+        const matchOverlap = Math.min(segLen, starredMatch.end_km - starredMatch.start_km);
+        if (matchOverlap > 0 && starredMatch.end_km - starredMatch.start_km >= segLen * 0.85) {
+          useStarredMetrics = true;
+        }
+        label = `${baseSeg.label} (★ ${starredMatch.name})`;
+      }
+
+      // If a starred segment closely matches the pacing segment boundary and has
+      // Strava effort data, use the effort data as ground truth (GPS-precise).
+      if (useStarredMetrics && starredMatch && effortsBySegment.has(starredMatch.id)) {
+        const effort = effortsBySegment.get(starredMatch.id)!;
+        actualTimeMin = effort.moving_time > 0 ? effort.moving_time / 60 : null;
+        actualWatts  = effort.average_watts != null ? Math.round(effort.average_watts) : null;
+        actualHr     = effort.average_heartrate != null ? Math.round(effort.average_heartrate) : null;
+      }
+
+      // Stream-based matching (for time when starred effort doesn't exactly match, and for
+      // segments where no starred segment applies)
+      if (actualTimeMin == null && hasStreams && stream?.distance_km) {
         const win = matchPacingSegmentToActivityStream(
           baseSeg,
           route.stream_distance_km,
@@ -161,14 +240,10 @@ export async function GET(
           actLatlng,
         );
         if (win && win.startIdx < win.endIdx) {
-          // Accurate time from the time_s stream
           if (stream.time_s && win.endIdx < stream.time_s.length) {
             const elapsedSec = stream.time_s[win.endIdx] - stream.time_s[win.startIdx];
             if (elapsedSec > 0) actualTimeMin = elapsedSec / 60;
           }
-          // Fallback: estimate time from number of stream points within the matched
-          // window × average time per point.  This is more accurate than distance
-          // ratio because stream points are roughly evenly spaced in time.
           if (actualTimeMin == null && actMovingTimeSec > 0 && actStreamPts > 1) {
             const ptsInWindow = win.endIdx - win.startIdx + 1;
             const timePerPt = actMovingTimeSec / actStreamPts;
@@ -178,13 +253,13 @@ export async function GET(
             const wSlice = stream.watts.slice(win.startIdx, win.endIdx + 1).filter(w => w != null && w > 0) as number[];
             if (wSlice.length > 0) {
               actualNp    = calcNp(wSlice);
-              actualWatts = Math.round(wSlice.reduce((a, b) => a + b, 0) / wSlice.length);
+              actualWatts = actualWatts ?? Math.round(wSlice.reduce((a, b) => a + b, 0) / wSlice.length);
             }
           }
           if (stream.hr) {
             const hrSlice = stream.hr.slice(win.startIdx, win.endIdx + 1).filter(h => h != null && h > 0) as number[];
             if (hrSlice.length > 0) {
-              actualHr = Math.round(hrSlice.reduce((a, b) => a + b, 0) / hrSlice.length);
+              actualHr = actualHr ?? Math.round(hrSlice.reduce((a, b) => a + b, 0) / hrSlice.length);
             }
           }
         }
@@ -195,7 +270,7 @@ export async function GET(
         : null;
 
       return {
-        label:             baseSeg.label,
+        label:             label,
         type:              baseSeg.type,
         start_km:          baseSeg.start_km,
         end_km:            baseSeg.end_km,

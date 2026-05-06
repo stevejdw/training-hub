@@ -6,7 +6,7 @@ import {
   Tooltip, ResponsiveContainer, ReferenceArea,
 } from 'recharts';
 import type { EventGoal, EventClimb, CachedRoute, PacingStrategy } from '@/lib/profile';
-import { detectClimbs, estimateTime, fmtTime } from '@/lib/pacing';
+import { detectClimbs, estimateTime, fmtTime, mergeStarredIntoSegments } from '@/lib/pacing';
 
 interface Props {
   event:          EventGoal;
@@ -34,18 +34,64 @@ export default function EventPacingModal({ event, riderWeightKg, onSave, onClose
   const [autoDetected,  setAutoDetected]  = useState(false);
 
   // Run climb auto-detection when route first loads (and no existing climbs)
+  // Merge with starred segments from the route for better segment naming
   useEffect(() => {
     if (!route || autoDetected) return;
     if (climbs.length > 0) { setAutoDetected(true); return; }
+
     const detected = detectClimbs(route.stream_distance_km, route.stream_altitude_m);
-    if (detected.length > 0) {
-      setClimbs(detected.map((c, i) => ({
-        ...c,
-        name:         `Climb ${i + 1}`,
-        target_watts: Math.round(flatWatts * 0.9),
-      })));
-    }
-    setAutoDetected(true);
+    const baseClimbs = detected.map((c, i) => ({
+      start_km: c.start_km, end_km: c.end_km, name: `Climb ${i + 1}`, target_watts: defaultWatts,
+    }));
+
+    // Merge with starred segments
+    const defaultWatts = Math.round(flatWatts * 0.9);
+    (async () => {
+      try {
+        const res = await fetch(`/api/events/${event.id}/starred-segments`);
+        const data = await res.json() as { starred: Array<{ id: number; name: string; start_km: number; end_km: number; start_dist_m: number; end_dist_m: number; distance_m: number; avg_grade: number }> };
+        if (data.starred?.length) {
+          const merged = mergeStarredIntoSegments(baseClimbs, data.starred, route.distance_m / 1000);
+          // Compute elevation stats for each climb
+          const withStats = merged.map(c => {
+            const dSlice: number[] = [];
+            const aSlice: number[] = [];
+            for (let idx = 0; idx < route.stream_distance_km.length; idx++) {
+              const d = route.stream_distance_km[idx];
+              if (d < c.start_km || d > c.end_km) continue;
+              dSlice.push(d);
+              aSlice.push(route.stream_altitude_m[idx]);
+            }
+            const dist    = c.end_km - c.start_km;
+            const netGain = aSlice.length > 1 ? aSlice[aSlice.length - 1] - aSlice[0] : 0;
+            const avgGrad = dist > 0 ? Math.round((netGain / (dist * 1000)) * 1000) / 10 : 0;
+            return {
+              name: c.name,
+              start_km: Math.round(c.start_km * 10) / 10,
+              end_km: Math.round(c.end_km * 10) / 10,
+              distance_km: Math.round(dist * 10) / 10,
+              elevation_gain: Math.round(netGain),
+              avg_gradient: avgGrad,
+              target_watts: defaultWatts,
+            } satisfies EventClimb;
+          });
+          setClimbs(withStats);
+        } else {
+          setClimbs(baseClimbs.map((c, i) => ({
+            ...detected[i],
+            name: c.name,
+            target_watts: defaultWatts,
+          })));
+        }
+      } catch {
+        setClimbs(baseClimbs.map((c, i) => ({
+          ...detected[i],
+          name: c.name,
+          target_watts: defaultWatts,
+        })));
+      }
+      setAutoDetected(true);
+    })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [route]);
 

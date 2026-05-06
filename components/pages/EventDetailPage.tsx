@@ -10,6 +10,7 @@ import type { EventGoal, EventClimb, CachedRoute, PacingStrategy } from '@/lib/p
 import {
   detectClimbs, estimateTime, buildPacingSegments,
   calcNP, calcAvgWatts, calcCalories, fmtTime,
+  mergeStarredIntoSegments,
 } from '@/lib/pacing';
 import PageHeader from '@/components/PageHeader';
 import { iconFor } from '@/components/nav-items';
@@ -248,22 +249,43 @@ export default function EventDetailPage({ eventId }: Props) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventIdx >= 0]);
 
-  // ── Auto-detect climbs (or seed known Peaks Challenge climbs) ──
+  // ── Auto-detect climbs (or seed known Peaks Challenge climbs, then merge with starred segments) ──
   useEffect(() => {
     if (!route || autoDetected) return;
     if (climbs.length > 0) { setAutoDetected(true); return; }
     const defaultWatts = Math.round(flatWatts * 0.88);
+
+    let baseClimbs: Array<{ start_km: number; end_km: number; name: string; target_watts: number }>;
     if (name.toLowerCase().includes('peaks challenge')) {
-      setClimbs(PEAKS_CHALLENGE_BOUNDS.map(b =>
-        climbFromBounds(route, b.name, b.start_km, b.end_km, defaultWatts)
-      ));
+      baseClimbs = PEAKS_CHALLENGE_BOUNDS.map(b => ({
+        start_km: b.start_km, end_km: b.end_km, name: b.name, target_watts: defaultWatts,
+      }));
     } else {
       const detected = detectClimbs(route.stream_distance_km, route.stream_altitude_m);
-      setClimbs(detected.map((c, i) => ({
-        ...c, name: `Climb ${i + 1}`, target_watts: defaultWatts,
-      })));
+      baseClimbs = detected.map((c, i) => ({
+        start_km: c.start_km, end_km: c.end_km, name: `Climb ${i + 1}`, target_watts: defaultWatts,
+      }));
     }
-    setAutoDetected(true);
+
+    // Merge with starred segments from the route
+    (async () => {
+      try {
+        const res = await fetch(`/api/events/${eventId}/starred-segments`);
+        const data = await res.json() as { starred: Array<{ id: number; name: string; start_km: number; end_km: number; start_dist_m: number; end_dist_m: number; distance_m: number; avg_grade: number }> };
+        if (data.starred?.length) {
+          const merged = mergeStarredIntoSegments(baseClimbs, data.starred, route.distance_m / 1000);
+          // Convert to EventClimb[] with elevation stats
+          const withStats = merged.map(c => climbFromBounds(route, c.name, c.start_km, c.end_km, defaultWatts));
+          setClimbs(withStats);
+        } else {
+          setClimbs(baseClimbs.map(c => climbFromBounds(route, c.name, c.start_km, c.end_km, defaultWatts)));
+        }
+      } catch {
+        // Fall back to base climbs if starred segment fetch fails
+        setClimbs(baseClimbs.map(c => climbFromBounds(route, c.name, c.start_km, c.end_km, defaultWatts)));
+      }
+      setAutoDetected(true);
+    })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [route]);
 

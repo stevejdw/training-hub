@@ -271,6 +271,8 @@ export async function ensureSegmentTables(): Promise<void> {
     // Add columns idempotently (no-op if already present)
     await client.query(`ALTER TABLE starred_segments ADD COLUMN IF NOT EXISTS start_lat            FLOAT`);
     await client.query(`ALTER TABLE starred_segments ADD COLUMN IF NOT EXISTS start_lng            FLOAT`);
+    await client.query(`ALTER TABLE starred_segments ADD COLUMN IF NOT EXISTS end_lat              FLOAT`);
+    await client.query(`ALTER TABLE starred_segments ADD COLUMN IF NOT EXISTS end_lng              FLOAT`);
     await client.query(`ALTER TABLE starred_segments ADD COLUMN IF NOT EXISTS elevation_high       FLOAT`);
     await client.query(`ALTER TABLE starred_segments ADD COLUMN IF NOT EXISTS elevation_low        FLOAT`);
     await client.query(`ALTER TABLE starred_segments ADD COLUMN IF NOT EXISTS total_elevation_gain FLOAT`);

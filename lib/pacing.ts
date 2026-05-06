@@ -753,6 +753,53 @@ export function haversineDistanceMeters(a: [number, number], b: [number, number]
   return R * c;
 }
 
+/**
+ * Find the route km index closest to a given GPS point.
+ * Scans the full route latlng array and returns the km value at the
+ * closest matching index.  Returns null for distance > 200 m.
+ */
+export function findRouteKmForLatLng(
+  latlng: [number, number][],
+  distKm: number[],
+  target: [number, number],
+): number | null {
+  let bestIdx = -1;
+  let bestDist = Infinity;
+  const n = Math.min(latlng.length, distKm.length);
+  for (let i = 0; i < n; i++) {
+    const d = haversineDistanceMeters(target, latlng[i]);
+    if (d < bestDist) {
+      bestDist = d;
+      bestIdx = i;
+    }
+  }
+  if (bestIdx < 0 || bestDist > 200) return null;
+  return distKm[bestIdx];
+}
+
+/**
+ * Find the nearest route km index for a GPS point, with plottable distance.
+ * Like findRouteKmForLatLng but also returns the match distance.
+ */
+export function findNearestRouteKmWithDist(
+  latlng: [number, number][],
+  distKm: number[],
+  target: [number, number],
+): { km: number; distM: number } | null {
+  let bestIdx = -1;
+  let bestDist = Infinity;
+  const n = Math.min(latlng.length, distKm.length);
+  for (let i = 0; i < n; i++) {
+    const d = haversineDistanceMeters(target, latlng[i]);
+    if (d < bestDist) {
+      bestDist = d;
+      bestIdx = i;
+    }
+  }
+  if (bestIdx < 0 || bestDist > 500) return null;
+  return { km: distKm[bestIdx], distM: Math.round(bestDist) };
+}
+
 const MATCH_TOL_KM = 0.08;
 
 export interface ActivityStreamIndexWindow {
@@ -846,11 +893,13 @@ export function matchPacingSegmentToActivityStream(
       if (dd < bestEndD) { bestEndD = dd; bestJ = j; }
     }
 
-    // Accept if both matches are within 500 m and start < end
-    if (bestI < bestJ && bestStartD < 500 && bestEndD < 500) {
+    // Accept GPS match — even if GPS distance is larger than 500m, GPS
+    // is more reliable than distance-based matching on loop courses
+    if (bestI < bestJ) {
       return { startIdx: bestI, endIdx: bestJ };
     }
-    // Otherwise fall through to distance-based match within corridor
+    // If GPS end is before start (shouldn't happen on a proper course),
+    // fall through to distance-based match
   }
 
   // ── Stage 3: distance-based match within corridor ───────────────────
@@ -888,6 +937,103 @@ function fallbackDistanceMatch(
 
   if (startIdx >= endIdx) return null;
   return { startIdx, endIdx };
+}
+
+export interface RouteStarredSegment {
+  id:           number;
+  name:         string;
+  start_km:     number;
+  end_km:       number;
+  start_dist_m: number;
+  end_dist_m:   number;
+  distance_m:   number;
+  avg_grade:    number;
+}
+
+/**
+ * Merge starred segments into the climb list used for building pacing segments.
+ *
+ * Strategy:
+ * 1. For each starred segment, check if it overlaps with an existing climb.
+ *    - If overlap ratio > 60 %, replace the climb's name + boundaries with the
+ *      starred segment's data (Strava's official boundaries are more accurate).
+ *    - If the starred segment overlaps multiple climbs, replace whichever
+ *      climb has the greatest overlap.
+ * 2. Any remaining starred segment (not overlapping any climb) is added as a
+ *    new climb.
+ * 3. Return the merged climb list sorted by start_km.
+ *
+ * This creates Strava-starred "anchor points" that the user recognises from
+ * their rides, while still filling the gaps with auto-detected climbs.
+ */
+export function mergeStarredIntoSegments(
+  climbs: ClimbRef[],
+  starred: RouteStarredSegment[],
+  totalDistKm: number,
+): ClimbRef[] {
+  if (!starred.length) return climbs;
+
+  const result: ClimbRef[] = [...climbs];
+  const used = new Set<number>();
+
+  for (const ss of starred) {
+    const segLen = ss.end_km - ss.start_km;
+    if (segLen < 0.3) continue; // skip tiny segments
+
+    // Find best overlap with existing climbs
+    let bestOverlap = 0;
+    let bestIdx = -1;
+    for (let i = 0; i < result.length; i++) {
+      const c = result[i];
+      const overlapStart = Math.max(c.start_km, ss.start_km);
+      const overlapEnd   = Math.min(c.end_km, ss.end_km);
+      const overlap = Math.max(0, overlapEnd - overlapStart);
+      const ratio = segLen > 0 ? overlap / segLen : 0;
+      if (ratio > bestOverlap && ratio > 0.5) {
+        bestOverlap = ratio;
+        bestIdx = i;
+      }
+    }
+
+    if (bestIdx >= 0) {
+      // Replace existing climb with starred segment data
+      result[bestIdx] = {
+        name: ss.name,
+        start_km: ss.start_km,
+        end_km: ss.end_km,
+        target_watts: result[bestIdx].target_watts, // preserve the user's watt target
+      };
+      used.add(bestIdx);
+    } else {
+      // New starred segment not overlapping any climb → add as a climb
+      result.push({
+        name: ss.name,
+        start_km: ss.start_km,
+        end_km: ss.end_km,
+        target_watts: 230, // default climb watts (user can adjust)
+      });
+    }
+  }
+
+  // Sort by start_km
+  result.sort((a, b) => a.start_km - b.start_km);
+
+  // Remove tiny gaps (< 200 m) between adjacent segments by merging
+  const merged: ClimbRef[] = [];
+  for (const c of result) {
+    const prev = merged[merged.length - 1];
+    if (prev && c.start_km - prev.end_km < 0.2) {
+      // Extend the previous segment to cover the gap
+      merged[merged.length - 1] = {
+        ...prev,
+        end_km: c.end_km,
+      };
+    } else {
+      merged.push(c);
+    }
+  }
+
+  return merged;
 }
 
 export interface ReferenceActivityStreamInput {
