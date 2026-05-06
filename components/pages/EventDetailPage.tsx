@@ -200,6 +200,8 @@ export default function EventDetailPage({ eventId }: Props) {
   const [routeError,   setRouteError]   = useState<string | null>(null);
   const [climbs,       setClimbs]       = useState<EventClimb[]>([]);
   const [autoDetected, setAutoDetected] = useState(false);
+  /** Raw starred segments (including non-climb) for naming pacing intervals. */
+  const [starredSegments, setStarredSegments] = useState<import('@/lib/pacing').RouteStarredSegment[]>([]);
 
   // ── UI state ──
   const [editing,       setEditing]       = useState(false);
@@ -249,6 +251,22 @@ export default function EventDetailPage({ eventId }: Props) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventIdx >= 0]);
 
+  // ── Always fetch starred segments when route is available ──
+  useEffect(() => {
+    if (!route) return;
+    (async () => {
+      try {
+        const res = await fetch(`/api/events/${eventId}/starred-segments`);
+        const data = await res.json() as { starred: import('@/lib/pacing').RouteStarredSegment[] };
+        setStarredSegments(data.starred ?? []);
+      } catch {
+        // Silently fail — without starred segments the pacing strategy
+        // just uses gradient-based labels for gaps.
+      }
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [route]);
+
   // ── Auto-detect climbs (or seed known Peaks Challenge climbs, then merge with starred segments) ──
   useEffect(() => {
     if (!route || autoDetected) return;
@@ -271,7 +289,7 @@ export default function EventDetailPage({ eventId }: Props) {
     (async () => {
       try {
         const res = await fetch(`/api/events/${eventId}/starred-segments`);
-        const data = await res.json() as { starred: Array<{ id: number; name: string; start_km: number; end_km: number; start_dist_m: number; end_dist_m: number; distance_m: number; avg_grade: number }> };
+        const data = await res.json() as { starred: import('@/lib/pacing').RouteStarredSegment[] };
         if (data.starred?.length) {
           const merged = mergeStarredIntoSegments(baseClimbs, data.starred, route.distance_m / 1000);
           // Convert to EventClimb[] with elevation stats
@@ -306,8 +324,9 @@ export default function EventDetailPage({ eventId }: Props) {
       {},
       route.stream_latlng,
       ftp,
+      starredSegments.length ? starredSegments : undefined,
     );
-  }, [route, climbs, flatWatts, descentWatts, riderKg, bikeKg, descentSpeedKmh, flatSpeedKmh, ftp]);
+  }, [route, climbs, flatWatts, descentWatts, riderKg, bikeKg, descentSpeedKmh, flatSpeedKmh, ftp, starredSegments]);
 
   const estMin = useMemo(() => {
     if (!route) return null;
@@ -403,9 +422,17 @@ export default function EventDetailPage({ eventId }: Props) {
     if (!route) return;
     const defaultWatts = Math.round(flatWatts * 0.88);
     if (name.toLowerCase().includes('peaks challenge')) {
-      setClimbs(PEAKS_CHALLENGE_BOUNDS.map(b =>
-        climbFromBounds(route, b.name, b.start_km, b.end_km, defaultWatts)
-      ));
+      const baseClimbs = PEAKS_CHALLENGE_BOUNDS.map(b => ({
+        start_km: b.start_km, end_km: b.end_km, name: b.name, target_watts: defaultWatts,
+      }));
+      // Merge starred climbs with base Peaks Challenge climbs
+      if (starredSegments.length) {
+        const merged = mergeStarredIntoSegments(baseClimbs, starredSegments, route.distance_m / 1000);
+        const withStats = merged.map(c => climbFromBounds(route, c.name, c.start_km, c.end_km, defaultWatts));
+        setClimbs(withStats);
+      } else {
+        setClimbs(baseClimbs.map(c => climbFromBounds(route, c.name, c.start_km, c.end_km, defaultWatts)));
+      }
     } else {
       const detected = detectClimbs(route.stream_distance_km, route.stream_altitude_m);
       setClimbs(detected.map((c, i) => ({
