@@ -61,12 +61,13 @@ function CustomTooltip({ active, payload, label }: any) {
 
 export default function TssRollingChart({ compact }: { compact?: boolean }) {
   const [weeks,        setWeeks]        = useState(4);
+  const [offset,       setOffset]       = useState(0);   // weeks to scroll back
   const [editing,      setEditing]      = useState(false);
   const [refreshKey,   setRefreshKey]   = useState(0);
 
   const { data, loading } = useCachedFetch<TssSummaryResponse>(
-    `/api/training/tss-summary?weeks=${weeks}&_=${refreshKey}`,
-    `cache-tss-summary-${weeks}-${refreshKey}`,
+    `/api/training/tss-summary?weeks=${weeks}&offset=${offset}&_=${refreshKey}`,
+    `cache-tss-summary-${weeks}-${offset}-${refreshKey}`,
   );
 
   const points = data?.weeks ?? [];
@@ -77,10 +78,10 @@ export default function TssRollingChart({ compact }: { compact?: boolean }) {
     label: fmtWeekLabel(p.week_start),
   }));
 
-  // In compact mode, show current week's data in the summary boxes
-  const currentWeek = compact && points.length > 0 ? points[points.length - 1] : null;
-  const totalActual = currentWeek ? currentWeek.actual_tss : points.reduce((s, p) => s + p.actual_tss, 0);
-  const totalTarget = currentWeek ? currentWeek.target_tss : points.reduce((s, p) => s + p.target_tss, 0);
+  // Show the last (most recent) week's data in the summary boxes
+  const lastWeek = points.length > 0 ? points[points.length - 1] : null;
+  const totalActual = lastWeek ? lastWeek.actual_tss : points.reduce((s, p) => s + p.actual_tss, 0);
+  const totalTarget = lastWeek ? lastWeek.target_tss : points.reduce((s, p) => s + p.target_tss, 0);
   const onTrack     = totalTarget > 0 ? Math.round((totalActual / totalTarget) * 100) : null;
 
   const modeLabel = config?.mode === 'formula' ? 'Custom formula' :
@@ -142,12 +143,31 @@ export default function TssRollingChart({ compact }: { compact?: boolean }) {
           <p className="text-[10px] text-gray-600 mt-0.5">{modeLabel}</p>
         </div>
         <div className="flex items-center gap-2">
+          {/* Scroll back/forward */}
+          <div className="flex gap-0.5">
+            <button
+              onClick={() => setOffset(o => Math.max(0, o - weeks))}
+              disabled={offset <= 0}
+              className="px-1.5 py-1 rounded text-[10px] font-medium bg-gray-800 text-gray-500 hover:text-gray-300 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              title="Forward"
+            >
+              ◀
+            </button>
+            <button
+              onClick={() => setOffset(o => o + weeks)}
+              className="px-1.5 py-1 rounded text-[10px] font-medium bg-gray-800 text-gray-500 hover:text-gray-300 transition-colors"
+              title="Back"
+            >
+              ▶
+            </button>
+          </div>
+          <div className="w-px h-4 bg-gray-700" />
           {/* Range selector */}
           <div className="flex gap-1">
             {RANGE_OPTIONS.map(n => (
               <button
                 key={n}
-                onClick={() => setWeeks(n)}
+                onClick={() => { setWeeks(n); setOffset(0); }}
                 className={`px-2 py-1 rounded text-[10px] font-medium transition-colors ${
                   weeks === n
                     ? 'bg-orange-500/20 text-orange-400 border border-orange-500/50'

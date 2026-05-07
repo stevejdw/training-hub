@@ -70,14 +70,17 @@ function formulaTarget(weekStart: Date, cfg: TssPlanConfig): { target: number; i
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const weeks = Math.max(1, Math.min(26, Number(searchParams.get('weeks') ?? '4')));
+  const offset = Math.max(0, Number(searchParams.get('offset') ?? '0'));
 
   const profile = await getProfile();
   const cfg = profile.tss_plan ?? null;
 
-  // Build list of week ranges ending on the current week (Monday-based)
+  // Build list of week ranges ending on the current week (Monday-based), shifted by offset
   const today      = new Date();
   today.setUTCHours(0, 0, 0, 0);
   const thisMon    = mondayOf(today);
+  // Shift back by offset weeks
+  thisMon.setUTCDate(thisMon.getUTCDate() - offset * 7);
   const ranges: { start: Date; end: Date }[] = [];
   for (let i = weeks - 1; i >= 0; i--) {
     const s = new Date(thisMon);

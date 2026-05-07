@@ -5,7 +5,7 @@ import {
   LineChart, Line,
   XAxis, YAxis, CartesianGrid,
   ReferenceLine, ReferenceArea,
-  ResponsiveContainer,
+  ResponsiveContainer, Tooltip,
 } from 'recharts';
 
 interface AerobicData {
@@ -28,16 +28,64 @@ interface AerobicData {
   decoupling: number;
 }
 
+const COMPARE_PERIODS = [
+  { key: '30d', label: '30d' },
+  { key: '90d', label: '90d' },
+  { key: '6m',  label: '6m'  },
+  { key: '1y',  label: '1yr' },
+  { key: 'all', label: 'All' },
+] as const;
+
+type ComparePeriod = typeof COMPARE_PERIODS[number]['key'];
+
+const COMPARE_LABELS: Record<ComparePeriod, string> = {
+  '30d': 'Last 30 days',
+  '90d': 'Last 90 days',
+  '6m':  'Last 6 months',
+  '1y':  'Last year',
+  'all': 'All time',
+};
+
 function fmtDuration(sec: number) {
   const h = Math.floor(sec / 3600);
   const m = Math.floor((sec % 3600) / 60);
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function CustomTooltip({ active, payload, label }: any) {
+  if (!active || !payload?.length) return null;
+  const p = payload[0]?.payload;
+  if (!p) return null;
+  return (
+    <div className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-xs shadow-lg space-y-1">
+      <p className="text-gray-400 font-medium">{label}</p>
+      {p.watts != null && (
+        <p className="text-orange-400">
+          Power: <span className="font-bold">{p.watts} W</span>
+        </p>
+      )}
+      {p.hr != null && (
+        <p className="text-blue-400">
+          HR: <span className="font-bold">{p.hr} bpm</span>
+        </p>
+      )}
+      {p.ef != null && (
+        <p className="text-white">
+          EF: <span className="font-bold">{p.ef.toFixed(3)}</span>
+        </p>
+      )}
+    </div>
+  );
+}
+
 export default function AerobicEfficiencyChart({ activityId }: { activityId: string }) {
   const [data, setData] = useState<AerobicData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [comparePeriod, setComparePeriod] = useState<ComparePeriod | null>(null);
+  const [compareData, setCompareData] = useState<AerobicData | null>(null);
+  const [compareLoading, setCompareLoading] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -50,6 +98,20 @@ export default function AerobicEfficiencyChart({ activityId }: { activityId: str
       .catch(e => setError(String(e)))
       .finally(() => setLoading(false));
   }, [activityId]);
+
+  // Fetch comparison data when period changes
+  useEffect(() => {
+    if (!comparePeriod || !data) { setCompareData(null); return; }
+    setCompareLoading(true);
+    fetch(`/api/activities/${activityId}/aerobic-efficiency?compare=${comparePeriod}`)
+      .then(r => r.json())
+      .then((d: AerobicData & { error?: string }) => {
+        if (!d.error) setCompareData(d);
+        else setCompareData(null);
+      })
+      .catch(() => setCompareData(null))
+      .finally(() => setCompareLoading(false));
+  }, [activityId, comparePeriod, data]);
 
   const chartData = useMemo(() => {
     if (!data) return [];
@@ -64,6 +126,20 @@ export default function AerobicEfficiencyChart({ activityId }: { activityId: str
         : null,
     }));
   }, [data]);
+
+  const compareChartData = useMemo(() => {
+    if (!compareData) return [];
+    const n = compareData.watts.length;
+    const secPerSample = compareData.sec_per_sample || 1;
+    return Array.from({ length: n }, (_, i) => ({
+      t:     Math.round((i * secPerSample) / 60),
+      watts: compareData.watts[i] ?? null,
+      hr:    compareData.hr[i]    ?? null,
+      ef:    (compareData.watts[i] != null && compareData.hr[i] != null && compareData.hr[i]! > 0)
+        ? compareData.watts[i]! / compareData.hr[i]!
+        : null,
+    }));
+  }, [compareData]);
 
   const halfMin = data ? Math.round((data.moving_time / 2) / 60) : 0;
 
@@ -85,12 +161,22 @@ export default function AerobicEfficiencyChart({ activityId }: { activityId: str
 
   const ef = data.np > 0 && data.avg_hr > 0 ? (data.np / data.avg_hr).toFixed(3) : '—';
 
+  // Compute EF domain for Y-axis
+  const allEf = chartData.filter(d => d.ef != null).map(d => d.ef as number);
+  const efMin = allEf.length > 0 ? Math.floor(Math.min(...allEf) * 1000) / 1000 : 0;
+  const efMax = allEf.length > 0 ? Math.ceil(Math.max(...allEf) * 1000) / 1000 : 1;
+  const efPadding = Math.max((efMax - efMin) * 0.15, 0.05);
+  const efDomain: [number, number] = [
+    Math.max(0, efMin - efPadding),
+    efMax + efPadding,
+  ];
+
   return (
     <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4 space-y-4">
       {/* Header */}
       <div>
         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-          Aerobic Efficiency
+          Efficiency Graph
         </p>
         <p className="text-[11px] text-gray-600 mt-1">
           First half vs second half comparison — measures aerobic decoupling (cardiac drift)
@@ -150,14 +236,33 @@ export default function AerobicEfficiencyChart({ activityId }: { activityId: str
         </div>
       </div>
 
-      {/* Power / HR time series chart */}
+      {/* Efficiency Graph */}
       <div>
-        <p className="text-[11px] text-gray-500 uppercase tracking-wider mb-3">Power & HR Over Ride</p>
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-[11px] text-gray-500 uppercase tracking-wider">Efficiency Graph</p>
+          {/* Compare period selector */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] text-gray-600">Compare vs:</span>
+            {COMPARE_PERIODS.map(p => (
+              <button
+                key={p.key}
+                onClick={() => setComparePeriod(prev => prev === p.key ? null : p.key)}
+                className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors border ${
+                  comparePeriod === p.key
+                    ? 'bg-blue-500/20 text-blue-400 border-blue-500/50'
+                    : 'bg-gray-800 text-gray-500 hover:text-gray-300 border-transparent'
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+        </div>
         {chartData.length === 0 ? (
           <div className="h-48 flex items-center justify-center text-gray-500 text-sm">No stream data</div>
         ) : (
           <>
-            <ResponsiveContainer width="100%" height={200}>
+            <ResponsiveContainer width="100%" height={220}>
               <LineChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
                 <XAxis
@@ -186,15 +291,19 @@ export default function AerobicEfficiencyChart({ activityId }: { activityId: str
                   tick={{ fill: '#60a5fa', fontSize: 10 }}
                   axisLine={false}
                   tickLine={false}
-                  width={40}
+                  width={36}
                   tickFormatter={v => `${v}`}
                 />
-                {/* EF Y-axis (hidden, shares right side) */}
+                {/* EF Y-axis (far right) */}
                 <YAxis
                   yAxisId="ef"
                   orientation="right"
-                  domain={['auto', 'auto']}
-                  hide
+                  domain={efDomain}
+                  tick={{ fill: '#ffffff', fontSize: 10 }}
+                  axisLine={false}
+                  tickLine={false}
+                  width={40}
+                  tickFormatter={v => v.toFixed(2)}
                 />
                 {/* Shade first vs second half */}
                 {halfMin > 0 && (
@@ -216,6 +325,7 @@ export default function AerobicEfficiencyChart({ activityId }: { activityId: str
                     label={{ value: 'Half', fill: '#6b7280', fontSize: 9, position: 'insideTopRight' }}
                   />
                 )}
+                <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#374151', strokeWidth: 1 }} />
                 <Line
                   yAxisId="w"
                   dataKey="watts"
@@ -244,12 +354,56 @@ export default function AerobicEfficiencyChart({ activityId }: { activityId: str
                   connectNulls
                   opacity={0.7}
                 />
+                {/* Comparison overlay lines */}
+                {compareChartData.length > 0 && (
+                  <>
+                    <Line
+                      yAxisId="w"
+                      data={compareChartData}
+                      dataKey="watts"
+                      stroke="#f97316"
+                      strokeWidth={1}
+                      dot={false}
+                      isAnimationActive={false}
+                      connectNulls
+                      strokeDasharray="4 3"
+                      opacity={0.5}
+                    />
+                    <Line
+                      yAxisId="hr"
+                      data={compareChartData}
+                      dataKey="hr"
+                      stroke="#60a5fa"
+                      strokeWidth={1}
+                      dot={false}
+                      isAnimationActive={false}
+                      connectNulls
+                      strokeDasharray="4 3"
+                      opacity={0.5}
+                    />
+                    <Line
+                      yAxisId="ef"
+                      data={compareChartData}
+                      dataKey="ef"
+                      stroke="#ffffff"
+                      strokeWidth={1}
+                      dot={false}
+                      isAnimationActive={false}
+                      connectNulls
+                      strokeDasharray="4 3"
+                      opacity={0.35}
+                    />
+                  </>
+                )}
               </LineChart>
             </ResponsiveContainer>
             <p className="text-[10px] text-gray-600 mt-2">
               <span className="text-orange-400">—</span> Power (W) ·
               <span className="text-blue-400 ml-1.5">—</span> Heart rate (bpm) ·
               <span className="text-white ml-1.5">—</span> EF
+              {comparePeriod && compareChartData.length > 0 && (
+                <span className="text-gray-500 ml-1.5">· <span className="opacity-50">- -</span> {COMPARE_LABELS[comparePeriod]}</span>
+              )}
               <span className="ml-3 text-gray-600">· First half shaded</span>
             </p>
           </>

@@ -11,7 +11,7 @@ function downsample<T>(arr: T[], maxPts: number): T[] {
 }
 
 export async function GET(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
@@ -20,8 +20,35 @@ export async function GET(
     return Response.json({ error: 'Invalid activity id' }, { status: 400 });
   }
 
+  const { searchParams } = new URL(req.url);
+  const compare = searchParams.get('compare'); // optional: 30d, 90d, 6m, 1y, all
+
   const client = await pool.connect();
   try {
+    // If compare is set, find the best matching activity in that time range
+    let compareActId: number | null = null;
+    if (compare) {
+      const rangeDays: Record<string, number> = {
+        '30d': 30, '90d': 90, '6m': 180, '1y': 365, 'all': 99999,
+      };
+      const days = rangeDays[compare] ?? 30;
+      const compareRes = await client.query<{ id: number }>(`
+        SELECT a.id
+        FROM activities a
+        JOIN activity_streams s ON s.activity_id = a.id
+        WHERE a.id != $1
+          AND a.start_date >= NOW() - ($2 || ' days')::interval
+          AND s.watts IS NOT NULL
+          AND s.hr IS NOT NULL
+          AND a.sport_type = ANY($3::text[])
+        ORDER BY a.start_date DESC
+        LIMIT 1
+      `, [actId, String(days), ['Ride','VirtualRide','GravelRide','MountainBikeRide','EBikeRide','EMountainBikeRide']]);
+      if (compareRes.rows.length > 0) {
+        compareActId = compareRes.rows[0].id;
+      }
+    }
+
     const res = await client.query<{
       name: string;
       start_date: string;

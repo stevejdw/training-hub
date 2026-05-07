@@ -1,8 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  ResponsiveContainer, Tooltip,
+} from 'recharts';
 import { sportLabel, sportColor } from '@/lib/sport-types';
 import ZoneDistribution from './ZoneDistribution';
 import PowerCurveChart from './PowerCurveChart';
@@ -462,44 +466,93 @@ export default function ActivityDetail({ id }: { id: string }) {
             );
           }
 
+          // Lap chart data
+          const lapChartData = useMemo(() => {
+            return sortedLaps.map(lap => ({
+              lap: `L${lap.lap_index}`,
+              watts: lap.average_watts ? Math.round(lap.average_watts) : 0,
+              hr: lap.average_heartrate ? Math.round(lap.average_heartrate) : 0,
+            }));
+          }, [sortedLaps]);
+
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          function LapTooltip({ active, payload, label }: any) {
+            if (!active || !payload?.length) return null;
+            return (
+              <div className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-xs shadow-lg space-y-1">
+                <p className="text-gray-400 font-medium">{label}</p>
+                {payload.map((p: { dataKey: string; value: number; color: string }) => (
+                  <p key={p.dataKey} style={{ color: p.color }}>
+                    {p.dataKey === 'watts' ? 'Avg Power' : 'Avg HR'}: <span className="font-bold">{p.value}{p.dataKey === 'watts' ? ' W' : ' bpm'}</span>
+                  </p>
+                ))}
+              </div>
+            );
+          }
+
           return (
-            <div className="bg-gray-900 rounded-xl overflow-x-auto scroll-touch border border-gray-800">
-              <table className="text-sm whitespace-nowrap w-full">
-                <thead>
-                  <tr className="border-b border-gray-800">
-                    <SortTh col="index"             label="#"        align="left" />
-                    <SortTh col="distance"          label="Distance" />
-                    <SortTh col="moving_time"       label="Time" />
-                    <SortTh col="average_watts"     label="Avg W" />
-                    <SortTh col="normalized_power"  label="NP" />
-                    <SortTh col="average_heartrate" label="Avg HR" />
-                    <SortTh col="max_heartrate"     label="Max HR" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {sortedLaps.map((lap, i) => (
-                    <tr key={lap.id} className={`border-b border-gray-800/60 ${i % 2 === 0 ? '' : 'bg-gray-800/30'}`}>
-                      <td className="px-4 py-2.5 text-gray-400">{lap.lap_index}</td>
-                      <td className="px-4 py-2.5 text-right text-gray-300">
-                        {lap.distance > 0 ? `${(lap.distance / 1000).toFixed(2)} km` : '—'}
-                      </td>
-                      <td className="px-4 py-2.5 text-right text-gray-300">{fmt(lap.moving_time)}</td>
-                      <td className="px-4 py-2.5 text-right text-white font-medium">
-                        {lap.average_watts ? Math.round(lap.average_watts) : '—'}
-                      </td>
-                      <td className="px-4 py-2.5 text-right text-gray-300">
-                        {lap.normalized_power ? Math.round(lap.normalized_power) : '—'}
-                      </td>
-                      <td className="px-4 py-2.5 text-right text-gray-300">
-                        {lap.average_heartrate ? Math.round(lap.average_heartrate) : '—'}
-                      </td>
-                      <td className="px-4 py-2.5 text-right text-gray-300">
-                        {lap.max_heartrate ? Math.round(lap.max_heartrate) : '—'}
-                      </td>
+            <div className="space-y-4">
+              {/* Lap performance bar chart */}
+              {lapChartData.length > 0 && (
+                <div className="bg-gray-900 rounded-xl border border-gray-800 p-4">
+                  <p className="text-[11px] text-gray-500 uppercase tracking-wider mb-3">Lap Performance</p>
+                  <ResponsiveContainer width="100%" height={160}>
+                    <BarChart data={lapChartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }} barCategoryGap="15%">
+                      <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
+                      <XAxis dataKey="lap" tick={{ fill: '#6b7280', fontSize: 9 }} axisLine={false} tickLine={false} />
+                      <YAxis yAxisId="w" domain={[0, 'auto']} tick={{ fill: '#f97316', fontSize: 9 }} axisLine={false} tickLine={false} width={28} tickFormatter={v => `${v}W`} />
+                      <YAxis yAxisId="hr" orientation="right" domain={[0, 'auto']} tick={{ fill: '#60a5fa', fontSize: 9 }} axisLine={false} tickLine={false} width={28} tickFormatter={v => `${v}`} />
+                      <Tooltip content={<LapTooltip />} cursor={{ fill: '#374151', fillOpacity: 0.2 }} />
+                      <Bar yAxisId="w" dataKey="watts" fill="#f97316" radius={[2,2,0,0]} opacity={0.8} />
+                      <Bar yAxisId="hr" dataKey="hr" fill="#60a5fa" radius={[2,2,0,0]} opacity={0.6} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                  <p className="text-[10px] text-gray-600 mt-2">
+                    <span className="text-orange-400">■</span> Avg Power (W) ·
+                    <span className="text-blue-400 ml-1.5">■</span> Avg HR (bpm)
+                  </p>
+                </div>
+              )}
+
+              {/* Lap table */}
+              <div className="bg-gray-900 rounded-xl overflow-x-auto scroll-touch border border-gray-800">
+                <table className="text-sm whitespace-nowrap w-full">
+                  <thead>
+                    <tr className="border-b border-gray-800">
+                      <SortTh col="index"             label="#"        align="left" />
+                      <SortTh col="distance"          label="Distance" />
+                      <SortTh col="moving_time"       label="Time" />
+                      <SortTh col="average_watts"     label="Avg W" />
+                      <SortTh col="normalized_power"  label="NP" />
+                      <SortTh col="average_heartrate" label="Avg HR" />
+                      <SortTh col="max_heartrate"     label="Max HR" />
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {sortedLaps.map((lap, i) => (
+                      <tr key={lap.id} className={`border-b border-gray-800/60 ${i % 2 === 0 ? '' : 'bg-gray-800/30'}`}>
+                        <td className="px-4 py-2.5 text-gray-400">{lap.lap_index}</td>
+                        <td className="px-4 py-2.5 text-right text-gray-300">
+                          {lap.distance > 0 ? `${(lap.distance / 1000).toFixed(2)} km` : '—'}
+                        </td>
+                        <td className="px-4 py-2.5 text-right text-gray-300">{fmt(lap.moving_time)}</td>
+                        <td className="px-4 py-2.5 text-right text-white font-medium">
+                          {lap.average_watts ? Math.round(lap.average_watts) : '—'}
+                        </td>
+                        <td className="px-4 py-2.5 text-right text-gray-300">
+                          {lap.normalized_power ? Math.round(lap.normalized_power) : '—'}
+                        </td>
+                        <td className="px-4 py-2.5 text-right text-gray-300">
+                          {lap.average_heartrate ? Math.round(lap.average_heartrate) : '—'}
+                        </td>
+                        <td className="px-4 py-2.5 text-right text-gray-300">
+                          {lap.max_heartrate ? Math.round(lap.max_heartrate) : '—'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           );
         })()}
