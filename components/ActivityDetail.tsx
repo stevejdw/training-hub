@@ -466,14 +466,12 @@ export default function ActivityDetail({ id }: { id: string }) {
             );
           }
 
-          // Lap chart data
-          const lapChartData = useMemo(() => {
-            return sortedLaps.map(lap => ({
-              lap: `L${lap.lap_index}`,
-              watts: lap.average_watts ? Math.round(lap.average_watts) : 0,
-              hr: lap.average_heartrate ? Math.round(lap.average_heartrate) : 0,
-            }));
-          }, [sortedLaps]);
+          // Lap chart data (computed inline, no hooks inside IIFE)
+          const lapChartData = sortedLaps.map(lap => ({
+            lap: `L${lap.lap_index}`,
+            watts: lap.average_watts ? Math.round(lap.average_watts) : 0,
+            hr: lap.average_heartrate ? Math.round(lap.average_heartrate) : 0,
+          }));
 
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           function LapTooltip({ active, payload, label }: any) {
