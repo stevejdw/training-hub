@@ -469,21 +469,22 @@ export default function ActivityDetail({ id }: { id: string }) {
           // Lap chart data (computed inline, no hooks inside IIFE)
           const lapChartData = sortedLaps.map(lap => ({
             lap: `L${lap.lap_index}`,
+            time: fmt(lap.moving_time),
             watts: lap.average_watts ? Math.round(lap.average_watts) : 0,
-            hr: lap.average_heartrate ? Math.round(lap.average_heartrate) : 0,
           }));
 
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           function LapTooltip({ active, payload, label }: any) {
             if (!active || !payload?.length) return null;
+            const p = payload[0]?.payload;
+            if (!p) return null;
             return (
               <div className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-xs shadow-lg space-y-1">
                 <p className="text-gray-400 font-medium">{label}</p>
-                {payload.map((p: { dataKey: string; value: number; color: string }) => (
-                  <p key={p.dataKey} style={{ color: p.color }}>
-                    {p.dataKey === 'watts' ? 'Avg Power' : 'Avg HR'}: <span className="font-bold">{p.value}{p.dataKey === 'watts' ? ' W' : ' bpm'}</span>
-                  </p>
-                ))}
+                <p className="text-gray-500">{p.time}</p>
+                <p className="text-orange-400">
+                  Avg Power: <span className="font-bold">{p.watts} W</span>
+                </p>
               </div>
             );
           }
@@ -498,16 +499,13 @@ export default function ActivityDetail({ id }: { id: string }) {
                     <BarChart data={lapChartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }} barCategoryGap="15%">
                       <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
                       <XAxis dataKey="lap" tick={{ fill: '#6b7280', fontSize: 9 }} axisLine={false} tickLine={false} />
-                      <YAxis yAxisId="w" domain={[0, 'auto']} tick={{ fill: '#f97316', fontSize: 9 }} axisLine={false} tickLine={false} width={28} tickFormatter={v => `${v}W`} />
-                      <YAxis yAxisId="hr" orientation="right" domain={[0, 'auto']} tick={{ fill: '#60a5fa', fontSize: 9 }} axisLine={false} tickLine={false} width={28} tickFormatter={v => `${v}`} />
+                      <YAxis domain={[0, 'auto']} tick={{ fill: '#f97316', fontSize: 9 }} axisLine={false} tickLine={false} width={28} tickFormatter={v => `${v}W`} />
                       <Tooltip content={<LapTooltip />} cursor={{ fill: '#374151', fillOpacity: 0.2 }} />
-                      <Bar yAxisId="w" dataKey="watts" fill="#f97316" radius={[2,2,0,0]} opacity={0.8} />
-                      <Bar yAxisId="hr" dataKey="hr" fill="#60a5fa" radius={[2,2,0,0]} opacity={0.6} />
+                      <Bar dataKey="watts" fill="#f97316" radius={[2,2,0,0]} opacity={0.8} />
                     </BarChart>
                   </ResponsiveContainer>
                   <p className="text-[10px] text-gray-600 mt-2">
-                    <span className="text-orange-400">■</span> Avg Power (W) ·
-                    <span className="text-blue-400 ml-1.5">■</span> Avg HR (bpm)
+                    <span className="text-orange-400">■</span> Avg Power (W) per lap
                   </p>
                 </div>
               )}
