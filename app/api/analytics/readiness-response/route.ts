@@ -114,10 +114,10 @@ export async function GET(_req: NextRequest) {
       client.query(`
         SELECT
           start_date::date::text AS date,
-          COALESCE(SUM(tss), 0)::float AS tss
+          COALESCE(SUM(COALESCE(tss, hrss, 0)), 0)::float AS tss
         FROM activities
         WHERE sport_type = ANY($1::text[])
-          AND tss IS NOT NULL
+          AND (tss IS NOT NULL OR hrss IS NOT NULL)
           AND start_date >= CURRENT_DATE - INTERVAL '60 days'
         GROUP BY start_date::date
         ORDER BY date ASC

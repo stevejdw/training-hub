@@ -69,7 +69,7 @@ export async function GET(req: NextRequest) {
           (start_date AT TIME ZONE $1)::date::text AS act_date,
           moving_time,
           ROUND((distance / 1000.0)::numeric, 1)::float AS distance,
-          COALESCE(tss, 0)::int AS tss
+          COALESCE(tss, hrss, 0))::int AS tss
         FROM activities
         WHERE (start_date AT TIME ZONE $1)::date >= $2
           AND (start_date AT TIME ZONE $1)::date <= $3

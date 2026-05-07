@@ -96,12 +96,12 @@ export async function GET(req: Request) {
   const client = await pool.connect();
   try {
     // Actual TSS per day (we'll bucket into weeks client-side)
+    // Uses COALESCE(tss, hrss, 0) to include HR-based TSS for non-power activities.
     const actualRes = await client.query<{ d: string; tss: string }>(`
       SELECT (start_date AT TIME ZONE $1)::date::text AS d,
-             COALESCE(SUM(tss), 0)::float AS tss
+             SUM(COALESCE(tss, hrss, 0))::float AS tss
       FROM activities
       WHERE sport_type = ANY($4::text[])
-        AND tss IS NOT NULL
         AND (start_date AT TIME ZONE $1)::date BETWEEN $2 AND $3
       GROUP BY 1
     `, [profile.timezone || 'Australia/Sydney', startDateStr, endDateStr, CYCLING_TYPES]);

@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
         SELECT COUNT(*) AS activities,
           ROUND(SUM(distance)::numeric / 1000.0, 1) AS km,
           ROUND(SUM(moving_time)::numeric / 3600.0, 1) AS hours,
-          ROUND(SUM(COALESCE(tss,0))::numeric, 0) AS tss
+          ROUND(SUM(COALESCE(tss, hrss, 0))::numeric, 0) AS tss
         FROM activities
         WHERE date_trunc('week', start_date AT TIME ZONE 'Australia/Sydney')
             = date_trunc('week', NOW() AT TIME ZONE 'Australia/Sydney')
@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
         SELECT COUNT(*) AS activities,
           ROUND(SUM(distance)::numeric / 1000.0, 1) AS km,
           ROUND(SUM(moving_time)::numeric / 3600.0, 1) AS hours,
-          ROUND(SUM(COALESCE(tss,0))::numeric, 0) AS tss
+          ROUND(SUM(COALESCE(tss, hrss, 0))::numeric, 0) AS tss
         FROM activities
         WHERE date_trunc('month', start_date AT TIME ZONE 'Australia/Sydney')
             = date_trunc('month', NOW() AT TIME ZONE 'Australia/Sydney')
@@ -42,7 +42,7 @@ export async function GET(req: NextRequest) {
         SELECT COUNT(*) AS activities,
           ROUND(SUM(distance)::numeric / 1000.0, 1) AS km,
           ROUND(SUM(moving_time)::numeric / 3600.0, 1) AS hours,
-          ROUND(SUM(COALESCE(tss,0))::numeric, 0) AS tss,
+          ROUND(SUM(COALESCE(tss, hrss, 0))::numeric, 0) AS tss,
           ROUND(SUM(total_elevation_gain)::numeric, 0) AS elevation
         FROM activities
         WHERE EXTRACT(YEAR FROM start_date AT TIME ZONE 'Australia/Sydney')
@@ -54,7 +54,7 @@ export async function GET(req: NextRequest) {
         SELECT COUNT(*) AS activities,
           ROUND(SUM(distance)::numeric / 1000.0, 1) AS km,
           ROUND(SUM(moving_time)::numeric / 3600.0, 1) AS hours,
-          ROUND(SUM(COALESCE(tss,0))::numeric, 0) AS tss
+          ROUND(SUM(COALESCE(tss, hrss, 0))::numeric, 0) AS tss
         FROM activities
         WHERE date_trunc('week', start_date AT TIME ZONE 'Australia/Sydney')
             = date_trunc('week', NOW() AT TIME ZONE 'Australia/Sydney')
@@ -64,7 +64,7 @@ export async function GET(req: NextRequest) {
         SELECT COUNT(*) AS activities,
           ROUND(SUM(distance)::numeric / 1000.0, 1) AS km,
           ROUND(SUM(moving_time)::numeric / 3600.0, 1) AS hours,
-          ROUND(SUM(COALESCE(tss,0))::numeric, 0) AS tss
+          ROUND(SUM(COALESCE(tss, hrss, 0))::numeric, 0) AS tss
         FROM activities
         WHERE date_trunc('month', start_date AT TIME ZONE 'Australia/Sydney')
             = date_trunc('month', NOW() AT TIME ZONE 'Australia/Sydney')
@@ -74,7 +74,7 @@ export async function GET(req: NextRequest) {
         SELECT COUNT(*) AS activities,
           ROUND(SUM(distance)::numeric / 1000.0, 1) AS km,
           ROUND(SUM(moving_time)::numeric / 3600.0, 1) AS hours,
-          ROUND(SUM(COALESCE(tss,0))::numeric, 0) AS tss,
+          ROUND(SUM(COALESCE(tss, hrss, 0))::numeric, 0) AS tss,
           ROUND(SUM(total_elevation_gain)::numeric, 0) AS elevation
         FROM activities
         WHERE EXTRACT(YEAR FROM start_date AT TIME ZONE 'Australia/Sydney')

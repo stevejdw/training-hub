@@ -69,6 +69,7 @@ export interface AthleteProfile {
   timezone: string; // IANA timezone, e.g. 'Australia/Sydney'
   // HR zones
   max_hr: number | null;
+  lthr: number | null;
   hr_zones_auto: boolean;
   hr_zone_boundaries: number[] | null; // [z1_max, z2_max, z3_max, z4_max]
   // Power zones
@@ -108,6 +109,7 @@ const DEFAULTS: AthleteProfile = {
   training_notes: '',
   timezone: 'Australia/Sydney',
   max_hr: null,
+  lthr: null,
   hr_zones_auto: true,
   hr_zone_boundaries: null,
   power_zones_auto: true,
@@ -154,4 +156,11 @@ export async function saveProfile(profile: AthleteProfile): Promise<void> {
 export function effectiveFtp(profile: AthleteProfile): number {
   if (profile.use_eftp && profile.eftp) return profile.eftp;
   return profile.ftp;
+}
+
+/** Get the athlete's Lactate Threshold HR, falling back to 90% of max_hr. */
+export function effectiveLthr(profile: AthleteProfile): number | null {
+  if (profile.lthr) return profile.lthr;
+  if (profile.max_hr) return Math.round(profile.max_hr * 0.9);
+  return null;
 }

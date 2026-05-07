@@ -107,7 +107,7 @@ export async function POST(req: NextRequest) {
         SELECT COUNT(*)::int AS total,
           ROUND(AVG(moving_time)::numeric / 3600.0, 1) AS avg_hours,
           ROUND(SUM(distance)::numeric / 1000.0, 0)::int AS total_km,
-          ROUND(AVG(COALESCE(tss, 0))::numeric, 0)::int AS avg_tss
+          ROUND(AVG(COALESCE(tss, hrss, 0)))::numeric, 0)::int AS avg_tss
         FROM activities
         WHERE start_date >= NOW() - INTERVAL '28 days'
           AND sport_type = ANY(ARRAY['Ride','VirtualRide','GravelRide','MountainBikeRide','EBikeRide','EMountainBikeRide'])

@@ -14,16 +14,15 @@ export async function GET(req: Request) {
 
   const client = await pool.connect();
   try {
-    // Use intervals.icu's TSS (icu_tss) from daily_wellness when available,
-    // falling back to Strava-calculated TSS from activities.
-    // This ensures CTL/ATL/TSB matches what intervals.icu shows.
+    // Use TSS when available, falling back to HRSS for activities without
+    // power data (walks, eBike rides, etc.). This gives a complete daily
+    // TSS timeline for CTL/ATL/TSB.
     const res = await client.query<{ date: string; tss: number }>(`
       WITH strava_tss AS (
         SELECT
           TO_CHAR(start_date AT TIME ZONE 'Australia/Sydney', 'YYYY-MM-DD') AS date,
-          ROUND(SUM(COALESCE(tss, 0)))::int AS tss
+          ROUND(SUM(COALESCE(tss, hrss, 0)))::int AS tss
         FROM activities
-        WHERE tss IS NOT NULL
         GROUP BY 1
       ),
       intervals_tss AS (

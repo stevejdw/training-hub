@@ -54,7 +54,7 @@ export async function GET() {
       `),
       client.query(`
         SELECT TO_CHAR(start_date AT TIME ZONE 'Australia/Sydney','YYYY-MM-DD') AS date,
-               SUM(COALESCE(tss,0)) AS tss
+                SUM(COALESCE(tss, hrss, 0)) AS tss
         FROM activities
         GROUP BY 1 ORDER BY 1
       `),
@@ -91,7 +91,7 @@ export async function GET() {
         COUNT(*)                                   AS rides,
         ROUND(COALESCE(SUM(distance)/1000, 0)::numeric, 1) AS km,
         ROUND(COALESCE(SUM(moving_time)/3600.0, 0)::numeric, 1) AS hours,
-        COALESCE(SUM(tss), 0)::int                AS tss,
+        COALESCE(SUM(COALESCE(tss, hrss, 0)), 0)::int AS tss,
         ROUND(COALESCE(SUM(total_elevation_gain), 0)::numeric) AS elevation
       FROM activities
       WHERE sport_type NOT ILIKE '%walk%'

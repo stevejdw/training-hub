@@ -89,6 +89,17 @@ function calculateTss(movingTime: number, np: number, ftp: number): number | nul
 }
 
 /**
+ * Compute heart-rate-based TSS (HRSS) for non-power activities.
+ * Formula: hours × 100 × (avg_hr / LTHR)²
+ * Uses a default LTHR of 173 when not configured.
+ */
+function calculateHrss(movingTime: number, avgHr: number, lthr: number = 173): number | null {
+  if (!movingTime || !avgHr || avgHr <= 0) return null;
+  return Math.round((movingTime / 3600.0) * 100.0 * (avgHr / lthr) * (avgHr / lthr));
+}
+
+
+/**
  * Fetch a page of historical activities from Strava (before the oldest stored
  * activity, or before a supplied epoch) and bulk-insert the summary data.
  *
@@ -150,7 +161,9 @@ export async function syncHistoricalBatch(beforeEpoch?: number): Promise<{
     for (const a of list) {
       const np      = (a.weighted_average_watts as number | null) ?? null;
       const movingT = a.moving_time as number;
-      const tss     = np ? calculateTss(movingT, np, ftp) : null;
+      const avgHr   = (a.average_heartrate as number | null) ?? null;
+      const hrss    = (!np && avgHr) ? calculateHrss(movingT, avgHr) : null;
+      const tss     = np ? calculateTss(movingT, np, ftp) : hrss;
       const ifVal   = np ? Math.round((np / ftp) * 1000) / 1000 : null;
       const polyline = (a.map as Record<string, string> | null)?.summary_polyline ?? null;
       const gearId   = (a.gear_id as string | null) ?? null;
@@ -162,10 +175,10 @@ export async function syncHistoricalBatch(beforeEpoch?: number): Promise<{
           average_watts, weighted_average_watts, max_watts,
           kilojoules, average_heartrate, max_heartrate,
           suffer_score, trainer, average_speed,
-          tss, intensity_factor, normalized_power, summary_polyline,
+          tss, hrss, intensity_factor, normalized_power, summary_polyline,
           gear_id
         ) VALUES (
-          $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22
+          $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23
         )
         ON CONFLICT (id) DO NOTHING
       `, [
@@ -177,7 +190,7 @@ export async function syncHistoricalBatch(beforeEpoch?: number): Promise<{
         a.average_watts, np, a.max_watts,
         a.kilojoules, a.average_heartrate, a.max_heartrate,
         a.suffer_score, a.trainer ?? false, a.average_speed,
-        tss, ifVal, np, polyline,
+        tss, hrss, ifVal, np, polyline,
         gearId,
       ]);
     }
@@ -287,6 +300,8 @@ export async function ensureSegmentTables(): Promise<void> {
     await client.query(`ALTER TABLE segment_efforts  ADD COLUMN IF NOT EXISTS wind_direction             INTEGER`);
     await client.query(`ALTER TABLE starred_segments ADD COLUMN IF NOT EXISTS all_efforts_synced_at      TIMESTAMPTZ`);
     await client.query(`ALTER TABLE activities       ADD COLUMN IF NOT EXISTS segments_synced_at         TIMESTAMPTZ`);
+    // hrss column for HR-based TSS
+    await client.query(`ALTER TABLE activities       ADD COLUMN IF NOT EXISTS hrss                        FLOAT`);
   } finally {
     client.release();
   }
@@ -304,10 +319,12 @@ export async function syncActivity(activityId: number): Promise<void> {
   if (!aRes.ok) throw new Error(`Strava activity fetch failed: ${aRes.status}`);
   const a = await aRes.json() as Record<string, unknown>;
 
-  const np       = (a.weighted_average_watts as number | null) ?? null;
+  const np         = (a.weighted_average_watts as number | null) ?? null;
   const movingTime = a.moving_time as number;
-  const tss      = np ? calculateTss(movingTime, np, ftp) : null;
-  const ifVal    = np ? Math.round((np / ftp) * 1000) / 1000 : null;
+  const avgHr      = (a.average_heartrate as number | null) ?? null;
+  const hrss       = (!np && avgHr) ? calculateHrss(movingTime, avgHr) : null;
+  const tss        = np ? calculateTss(movingTime, np, ftp) : hrss;
+  const ifVal      = np ? Math.round((np / ftp) * 1000) / 1000 : null;
   const polyline = (a.map as Record<string, string> | null)?.summary_polyline ?? null;
 
   // Gear (bike) — Strava activity detail includes nested `gear` { id, name, nickname, retired }
@@ -337,14 +354,15 @@ export async function syncActivity(activityId: number): Promise<void> {
         average_watts, weighted_average_watts, max_watts,
         kilojoules, average_heartrate, max_heartrate,
         suffer_score, trainer, average_speed,
-        tss, intensity_factor, normalized_power, summary_polyline,
+        tss, hrss, intensity_factor, normalized_power, summary_polyline,
         gear_id
       ) VALUES (
-        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22
+        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23
       )
       ON CONFLICT (id) DO UPDATE SET
         name             = EXCLUDED.name,
         tss              = EXCLUDED.tss,
+        hrss             = EXCLUDED.hrss,
         intensity_factor = EXCLUDED.intensity_factor,
         normalized_power = EXCLUDED.normalized_power,
         summary_polyline = EXCLUDED.summary_polyline,
@@ -359,7 +377,7 @@ export async function syncActivity(activityId: number): Promise<void> {
       a.average_watts, np, a.max_watts,
       a.kilojoules, a.average_heartrate, a.max_heartrate,
       a.suffer_score, a.trainer ?? false, a.average_speed,
-      tss, ifVal, np, polyline,
+      tss, hrss, ifVal, np, polyline,
       gearId,
     ]);
 

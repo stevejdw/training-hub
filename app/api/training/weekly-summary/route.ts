@@ -36,7 +36,7 @@ export async function GET() {
             (start_date AT TIME ZONE $1)::date AS act_date,
             moving_time,
             distance,
-            COALESCE(tss, 0)::int AS tss
+            COALESCE(tss, hrss, 0)::int AS tss
           FROM activities
           WHERE sport_type = ANY($2::text[])
             AND (start_date AT TIME ZONE $1)::date >= (SELECT MIN(week_start) FROM weeks)

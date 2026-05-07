@@ -83,6 +83,39 @@ function buildFullTimeline(sorted: DailyTSS[]): DailyTSS[] {
 }
 
 /**
+ * Estimate HR-based TSS (HRSS) using a squared-intensity model calibrated
+ * to match TSS semantics:
+ *
+ *   HRSS = duration_hours × 100 × (avg_hr / LTHR)²
+ *
+ * This is analogous to rTSS (running TSS) which uses (pace / threshold_pace)².
+ * It gives ~100 for 1 hour at LTHR, scaling appropriately for lower/higher
+ * intensities. Used for activities without power data but with HR data.
+ *
+ * @param avgHr    Average heart rate for the activity (bpm)
+ * @param durationMin Duration in minutes
+ * @param lthr     Lactate Threshold Heart Rate (bpm)
+ * @param maxHr    Maximum Heart Rate (bpm – used for bounding only)
+ */
+export function estimateHrTss(
+  avgHr: number,
+  durationMin: number,
+  lthr: number,
+  maxHr: number,
+): number {
+  // Guard: LTHR should be less than max HR and greater than resting
+  if (maxHr <= lthr || lthr <= 0 || avgHr <= 0) return 0;
+
+  // Use a squared-intensity model analogous to rTSS:
+  //   HRSS = duration_hours × 100 × (avg_hr / LTHR)²
+  // This gives ~100 for 1 hour at LTHR, matching TSS semantics.
+  const hours = durationMin / 60;
+  const ratio = avgHr / lthr;
+  const hrss = hours * 100 * ratio * ratio;
+  return Math.round(hrss);
+}
+
+/**
  * Calculate current CTL/ATL/TSB from an array of daily TSS values.
  */
 export function calculateFitness(dailyTss: DailyTSS[]): FitnessMetrics {

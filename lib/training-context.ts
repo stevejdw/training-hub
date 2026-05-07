@@ -54,7 +54,7 @@ export async function buildTrainingContext(): Promise<string> {
         date_trunc('week', start_date)::date AS week_start,
         COUNT(*) AS activity_count,
         ROUND(SUM(moving_time) / 3600.0, 1) AS hours,
-        ROUND(SUM(COALESCE(tss, 0))::numeric, 0) AS total_tss,
+        ROUND(SUM(COALESCE(tss, hrss, 0))::numeric, 0) AS total_tss,
         ROUND(SUM(distance / 1000.0)::numeric, 0) AS total_km,
         ROUND(SUM(total_elevation_gain)::numeric, 0) AS total_elevation,
         STRING_AGG(DISTINCT sport_type, ', ') AS sports
@@ -67,12 +67,12 @@ export async function buildTrainingContext(): Promise<string> {
     const weeklySummaries = weeklySummaryResult.rows;
 
     // 3. All-time daily TSS for CTL/ATL/TSB — prefer intervals.icu's icu_tss
-    //    from daily_wellness, falling back to Strava TSS when unavailable.
+    //    from daily_wellness, falling back to COALESCE(tss, hrss, 0).
     const dailyTssResult = await client.query(`
       WITH strava_tss AS (
         SELECT
           TO_CHAR(start_date AT TIME ZONE 'Australia/Sydney', 'YYYY-MM-DD') AS date,
-          SUM(COALESCE(tss, 0)) AS tss
+          SUM(COALESCE(tss, hrss, 0)) AS tss
         FROM activities
         GROUP BY 1
       ),

@@ -172,7 +172,7 @@ export async function GET(req: NextRequest) {
           COUNT(*)::int                                              AS activities,
           ROUND(SUM(distance)::numeric         / 1000.0, 1)         AS km,
           ROUND(SUM(moving_time)::numeric      / 3600.0, 1)         AS hours,
-          ROUND(SUM(COALESCE(tss, 0))::numeric, 0)::int             AS tss,
+          ROUND(SUM(COALESCE(tss, hrss, 0))::numeric, 0)::int       AS tss,
           ROUND(SUM(total_elevation_gain)::numeric, 0)::int         AS elevation
         FROM activities
         WHERE (start_date AT TIME ZONE 'Australia/Sydney')::date >= $1

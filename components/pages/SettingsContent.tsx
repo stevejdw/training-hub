@@ -281,6 +281,41 @@ export default function SettingsContent() {
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
+            <label className="block text-[10px] text-gray-500 uppercase tracking-wider mb-1">Max Heart Rate</label>
+            <input
+              type="number"
+              value={profile.max_hr ?? ''}
+              onChange={e => update('max_hr', e.target.value ? Number(e.target.value) : null)}
+              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-orange-500"
+              placeholder="193"
+              step={1}
+              min={100}
+              max={250}
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] text-gray-500 uppercase tracking-wider mb-1">Lactate Threshold HR</label>
+            <input
+              type="number"
+              value={profile.lthr ?? ''}
+              onChange={e => update('lthr', e.target.value ? Number(e.target.value) : null)}
+              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-orange-500"
+              placeholder={profile.max_hr ? String(Math.round(profile.max_hr * 0.9)) : '173'}
+              step={1}
+              min={80}
+              max={220}
+            />
+            <p className="text-[10px] text-gray-500 mt-0.5">
+              {profile.lthr
+                ? `Used for HR-based TSS (HRSS) on non-power activities`
+                : profile.max_hr
+                  ? `Defaults to 90% of max HR (${Math.round(profile.max_hr * 0.9)})`
+                  : 'Set Max HR first, or enter directly'}
+            </p>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
             <label className="block text-[10px] text-gray-500 uppercase tracking-wider mb-1">Rider Weight (kg)</label>
             <input
               type="number"
