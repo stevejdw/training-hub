@@ -134,6 +134,11 @@ export default function TssRollingChart({ compact }: { compact?: boolean }) {
     );
   }
 
+  // Date range label from chart data
+  const firstLabel = points.length > 0 ? fmtWeekLabel(points[0].week_start) : '';
+  const lastLabel  = points.length > 0 ? fmtWeekLabel(points[points.length - 1].week_start) : '';
+  const rangeLabel = firstLabel && lastLabel ? `${firstLabel} – ${lastLabel}` : '';
+
   return (
     <div className="bg-gray-900 rounded-xl border border-gray-800 p-4 space-y-3">
       {/* Header */}
@@ -143,25 +148,6 @@ export default function TssRollingChart({ compact }: { compact?: boolean }) {
           <p className="text-[10px] text-gray-600 mt-0.5">{modeLabel}</p>
         </div>
         <div className="flex items-center gap-2">
-          {/* Scroll back/forward */}
-          <div className="flex gap-0.5">
-            <button
-              onClick={() => setOffset(o => Math.max(0, o - weeks))}
-              disabled={offset <= 0}
-              className="px-1.5 py-1 rounded text-[10px] font-medium bg-gray-800 text-gray-500 hover:text-gray-300 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-              title="Forward"
-            >
-              ◀
-            </button>
-            <button
-              onClick={() => setOffset(o => o + weeks)}
-              className="px-1.5 py-1 rounded text-[10px] font-medium bg-gray-800 text-gray-500 hover:text-gray-300 transition-colors"
-              title="Back"
-            >
-              ▶
-            </button>
-          </div>
-          <div className="w-px h-4 bg-gray-700" />
           {/* Range selector */}
           <div className="flex gap-1">
             {RANGE_OPTIONS.map(n => (
@@ -234,7 +220,34 @@ export default function TssRollingChart({ compact }: { compact?: boolean }) {
         </ResponsiveContainer>
       )}
 
+      {/* Week navigation — below the chart, arrows on sides with date range between */}
+      <div className="flex items-center justify-center gap-4 select-none">
+        <button
+          onClick={() => setOffset(o => o + weeks)}
+          className="p-1.5 rounded text-gray-500 hover:text-white hover:bg-gray-800 transition-colors"
+          aria-label="Previous weeks"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
+        <span className="text-xs text-gray-300 font-medium tabular-nums text-center min-w-[10rem]">{rangeLabel}</span>
+        <button
+          onClick={() => setOffset(o => Math.max(0, o - weeks))}
+          disabled={offset <= 0}
+          className={`p-1.5 rounded transition-colors ${
+            offset <= 0 ? 'text-gray-700 cursor-not-allowed' : 'text-gray-500 hover:text-white hover:bg-gray-800'
+          }`}
+          aria-label="Next weeks"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+      </div>
+
       {/* Per-week breakdown row */}
+
       <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${chartData.length}, 1fr)` }}>
         {chartData.map(p => (
           <div key={p.week_start} className="text-center">
