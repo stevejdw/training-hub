@@ -5,9 +5,10 @@ import { useSearchParams } from 'next/navigation';
 import FitnessTab from './training/FitnessTab';
 import PowerProgressChart from './training/PowerProgressChart';
 import HRPerformanceTab from './training/HRPerformanceTab';
+import ReadinessTab from './training/ReadinessTab';
 import MobileTabBar from './MobileTabBar';
 
-type Tab = 'summary' | 'performance' | 'hr';
+type Tab = 'summary' | 'performance' | 'hr' | 'readiness';
 
 const TABS: { key: Tab; label: string; icon: React.ReactNode }[] = [
   {
@@ -34,12 +35,20 @@ const TABS: { key: Tab; label: string; icon: React.ReactNode }[] = [
       </svg>
     ),
   },
+  {
+    key: 'readiness', label: 'Readiness',
+    icon: (
+      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    ),
+  },
 ];
 
 export default function FitnessPage() {
   const searchParams = useSearchParams();
   const rawTab = searchParams.get('tab');
-  const initialTab: Tab = rawTab === 'performance' ? 'performance' : rawTab === 'hr' ? 'hr' : 'summary';
+  const initialTab: Tab = rawTab === 'performance' ? 'performance' : rawTab === 'hr' ? 'hr' : rawTab === 'readiness' ? 'readiness' : 'summary';
   const [tab, setTab] = useState<Tab>(initialTab);
 
   return (
@@ -75,6 +84,7 @@ export default function FitnessPage() {
           {tab === 'summary'     && <FitnessTab />}
           {tab === 'performance' && <PowerProgressChart />}
           {tab === 'hr'          && <HRPerformanceTab />}
+          {tab === 'readiness'   && <ReadinessTab />}
         </div>
       </div>
 

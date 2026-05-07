@@ -7,7 +7,101 @@ export const maxDuration = 30;
 
 const CYCLING = ['Ride', 'VirtualRide', 'GravelRide', 'MountainBikeRide'];
 
+function toFloatOrNull(v: unknown): number | null {
+  if (v === null || v === undefined || v === '') return null;
+  const n = Number(v);
+  return isFinite(n) ? n : null;
+}
+
+function toIntOrNull(v: unknown): number | null {
+  const n = toFloatOrNull(v);
+  return n !== null ? Math.round(n) : null;
+}
+
+/**
+ * If the newest daily_wellness row is older than 1 day, fetch the last 7 days
+ * from intervals.icu and upsert them. This keeps wellness data fresh without
+ * requiring the user to manually sync every day.
+ */
+async function autoSyncWellness(): Promise<void> {
+  const profile = await getProfile();
+  const athleteId = profile.intervals_athlete_id?.trim();
+  const apiKey    = profile.intervals_api_key?.trim();
+  if (!athleteId || !apiKey) return; // no creds configured
+
+  const client = await pool.connect();
+  try {
+    const res = await client.query(`SELECT MAX(date) AS newest FROM daily_wellness`);
+    const newest: string | null = res.rows[0]?.newest ?? null;
+
+    // If newest data is less than 1 day old, no sync needed
+    if (newest) {
+      const newestDate = new Date(newest + 'T00:00:00Z');
+      const now = new Date();
+      const diffMs = now.getTime() - newestDate.getTime();
+      if (diffMs < 24 * 60 * 60 * 1000) return; // less than 1 day old
+    }
+
+    // Fetch last 7 days from intervals.icu
+    const newestDate = new Date();
+    const oldestDate = new Date(newestDate);
+    oldestDate.setDate(oldestDate.getDate() - 7);
+
+    const fmt = (d: Date) => d.toISOString().split('T')[0];
+    const url = `https://intervals.icu/api/v1/athlete/${athleteId}/wellness?oldest=${fmt(oldestDate)}&newest=${fmt(newestDate)}`;
+
+    const auth = Buffer.from(`API_KEY:${apiKey}`).toString('base64');
+
+    const resFetch = await fetch(url, {
+      headers: { Authorization: `Basic ${auth}` },
+    });
+
+    if (!resFetch.ok) {
+      console.warn('[autoSync] intervals.icu fetch failed', resFetch.status);
+      return;
+    }
+
+    const wellnessRows = await resFetch.json() as Record<string, unknown>[];
+    if (!Array.isArray(wellnessRows) || wellnessRows.length === 0) return;
+
+    for (const row of wellnessRows) {
+      const date = row.id as string; // intervals.icu uses 'id' for the date field
+      if (!date) continue;
+
+      await client.query(`
+        INSERT INTO daily_wellness
+          (date, hrv_rmssd, hrv_sdnn, resting_hr, sleep_score, readiness_score, sleep_secs, source, synced_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, 'intervals', NOW())
+        ON CONFLICT (date) DO UPDATE SET
+          hrv_rmssd       = EXCLUDED.hrv_rmssd,
+          hrv_sdnn        = EXCLUDED.hrv_sdnn,
+          resting_hr      = EXCLUDED.resting_hr,
+          sleep_score     = EXCLUDED.sleep_score,
+          readiness_score = EXCLUDED.readiness_score,
+          sleep_secs      = EXCLUDED.sleep_secs,
+          source          = EXCLUDED.source,
+          synced_at       = NOW()
+      `, [
+        date,
+        toFloatOrNull(row.hrv_rmssd  ?? row.hrvRMSSD  ?? row.hrv),
+        toFloatOrNull(row.hrv_sdnn   ?? row.hrvSDNN),
+        toIntOrNull(row.restingHR    ?? row.resting_hr),
+        toIntOrNull(row.sleepScore   ?? row.sleep_score),
+        toIntOrNull(row.readiness    ?? row.readinessScore ?? row.score ?? row.readiness_score),
+        toIntOrNull(row.sleepSecs    ?? row.sleep_secs),
+      ]);
+    }
+  } catch (err) {
+    console.warn('[autoSync] error', err);
+  } finally {
+    client.release();
+  }
+}
+
 export async function GET(_req: NextRequest) {
+  // Auto-sync wellness data if stale (non-blocking — fire and forget)
+  autoSyncWellness().catch(() => {});
+
   const profile = await getProfile();
   const intervalsConfigured = !!(profile.intervals_athlete_id?.trim());
 
