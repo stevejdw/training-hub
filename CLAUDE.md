@@ -1,15 +1,22 @@
 # Deployment
 
-This project is deployed on Vercel. The Vercel CLI is available via npx.
+This project is **auto-deployed** via a GitHub Actions workflow (`.github/workflows/deploy.yml`). Every push to `main` triggers a production deployment to Vercel. No manual steps needed.
 
-**After every commit/push**, deploy the latest code to production:
-```
-npx vercel --prod --yes
-```
+However, the first time you need to set up a few **GitHub Secrets** for the workflow to work:
 
-> **Note:** Vercel GitHub integration is NOT configured for auto-deploy. The `.vercel/project.json` exists from a manual `vercel link`, but there is no GitHub Actions workflow or Vercel Git integration to trigger deploys automatically on push. You must run the deploy command manually after pushing changes.
+## One-time setup: Add GitHub Secrets
 
-Inspect deployment at: https://vercel.com/stevejdws-projects/training-hub/2GcBxiGbF5D8pgVKDpdy2bLsxyKm
+Go to **https://github.com/stevejdw/training-hub/settings/secrets/actions** and add these 3 secrets:
+
+| Secret | Value | How to get it |
+|--------|-------|---------------|
+| `VERCEL_TOKEN` | Your Vercel API token | [https://vercel.com/account/tokens](https://vercel.com/account/tokens) — Create a token with "Full" scope |
+| `VERCEL_ORG_ID` | `team_eNq0vXRaOOyK0GIPOgwg3kgR` | From `.vercel/project.json` → `orgId` |
+| `VERCEL_PROJECT_ID` | `prj_3eFx1hpxM0WKg0On2tJY1PLkaRe6` | From `.vercel/project.json` → `projectId` |
+
+After that, every `git push origin main` will automatically deploy.
+
+Inspect deployment at: https://vercel.com/stevejdws-projects/training-hub
 Project dashboard: https://vercel.com/stevejdws-projects/training-hub
 
 ---
