@@ -15,9 +15,17 @@ async function ensureTable(client: PoolClient) {
       sleep_score     INT,
       readiness_score INT,
       sleep_secs      INT,
+      icu_tss         DOUBLE PRECISION,
       source          TEXT DEFAULT 'intervals',
       synced_at       TIMESTAMPTZ DEFAULT NOW()
     )
+  `);
+  // Migrate existing tables: add icu_tss column if missing
+  await client.query(`
+    DO $$ BEGIN
+      ALTER TABLE daily_wellness ADD COLUMN IF NOT EXISTS icu_tss DOUBLE PRECISION;
+    EXCEPTION WHEN duplicate_column THEN NULL;
+    END $$;
   `);
 }
 
@@ -112,8 +120,8 @@ export async function POST(req: Request) {
 
       await client.query(`
         INSERT INTO daily_wellness
-          (date, hrv_rmssd, hrv_sdnn, resting_hr, sleep_score, readiness_score, sleep_secs, source, synced_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, 'intervals', NOW())
+          (date, hrv_rmssd, hrv_sdnn, resting_hr, sleep_score, readiness_score, sleep_secs, icu_tss, source, synced_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'intervals', NOW())
         ON CONFLICT (date) DO UPDATE SET
           hrv_rmssd       = EXCLUDED.hrv_rmssd,
           hrv_sdnn        = EXCLUDED.hrv_sdnn,
@@ -121,6 +129,7 @@ export async function POST(req: Request) {
           sleep_score     = EXCLUDED.sleep_score,
           readiness_score = EXCLUDED.readiness_score,
           sleep_secs      = EXCLUDED.sleep_secs,
+          icu_tss         = EXCLUDED.icu_tss,
           source          = EXCLUDED.source,
           synced_at       = NOW()
       `, [
@@ -132,6 +141,7 @@ export async function POST(req: Request) {
         // intervals.icu field is 'readiness', not 'score'
         toIntOrNull(row.readiness    ?? row.readinessScore ?? row.score ?? row.readiness_score),
         toIntOrNull(row.sleepSecs    ?? row.sleep_secs),
+        toFloatOrNull(row.icu_tss    ?? row.icuTSS),  // intervals.icu's own TSS calculation
       ]);
       synced++;
     }

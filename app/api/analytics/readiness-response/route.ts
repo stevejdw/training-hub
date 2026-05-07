@@ -70,8 +70,8 @@ async function autoSyncWellness(): Promise<void> {
 
       await client.query(`
         INSERT INTO daily_wellness
-          (date, hrv_rmssd, hrv_sdnn, resting_hr, sleep_score, readiness_score, sleep_secs, source, synced_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, 'intervals', NOW())
+          (date, hrv_rmssd, hrv_sdnn, resting_hr, sleep_score, readiness_score, sleep_secs, icu_tss, source, synced_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'intervals', NOW())
         ON CONFLICT (date) DO UPDATE SET
           hrv_rmssd       = EXCLUDED.hrv_rmssd,
           hrv_sdnn        = EXCLUDED.hrv_sdnn,
@@ -79,6 +79,7 @@ async function autoSyncWellness(): Promise<void> {
           sleep_score     = EXCLUDED.sleep_score,
           readiness_score = EXCLUDED.readiness_score,
           sleep_secs      = EXCLUDED.sleep_secs,
+          icu_tss         = EXCLUDED.icu_tss,
           source          = EXCLUDED.source,
           synced_at       = NOW()
       `, [
@@ -89,6 +90,7 @@ async function autoSyncWellness(): Promise<void> {
         toIntOrNull(row.sleepScore   ?? row.sleep_score),
         toIntOrNull(row.readiness    ?? row.readinessScore ?? row.score ?? row.readiness_score),
         toIntOrNull(row.sleepSecs    ?? row.sleep_secs),
+        toFloatOrNull(row.icu_tss    ?? row.icuTSS),
       ]);
     }
   } catch (err) {
