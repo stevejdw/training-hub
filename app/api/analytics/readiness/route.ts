@@ -108,8 +108,9 @@ async function autoSyncWellness(): Promise<void> {
  * user selects a short display window.
  */
 export async function GET(req: Request) {
-  // Auto-sync wellness data if stale (non-blocking)
-  autoSyncWellness().catch(() => {});
+  // Auto-sync wellness data if stale before querying — so the current request
+  // sees freshly synced data rather than stale cached rows.
+  await autoSyncWellness();
 
   const { searchParams } = new URL(req.url);
   const displayDays = Math.min(365, Math.max(7, Number(searchParams.get('days') ?? '30')));

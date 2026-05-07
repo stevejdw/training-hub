@@ -99,8 +99,9 @@ async function autoSyncWellness(): Promise<void> {
 }
 
 export async function GET(_req: NextRequest) {
-  // Auto-sync wellness data if stale (non-blocking — fire and forget)
-  autoSyncWellness().catch(() => {});
+  // Auto-sync wellness data if stale before querying — so the current request
+  // sees freshly synced data rather than stale cached rows.
+  await autoSyncWellness();
 
   const profile = await getProfile();
   const intervalsConfigured = !!(profile.intervals_athlete_id?.trim());
