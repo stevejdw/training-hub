@@ -466,21 +466,12 @@ export default function ActivityDetail({ id }: { id: string }) {
             );
           }
 
-          // Lap chart data — compute cumulative time for histogram positioning
-          let cumTime = 0;
-          const lapChartData = sortedLaps.map(lap => {
-            const start = cumTime;
-            cumTime += lap.moving_time;
-            return {
-              lap: `L${lap.lap_index}`,
-              time: fmt(lap.moving_time),
-              timeSec: lap.moving_time,
-              startSec: start,
-              endSec: cumTime,
-              watts: lap.average_watts ? Math.round(lap.average_watts) : 0,
-            };
-          });
-          const maxTime = cumTime;
+          // Lap chart data
+          const lapChartData = sortedLaps.map(lap => ({
+            lap: `L${lap.lap_index}`,
+            time: fmt(lap.moving_time),
+            watts: lap.average_watts ? Math.round(lap.average_watts) : 0,
+          }));
 
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           function LapTooltip({ active, payload, label }: any) {
@@ -498,17 +489,6 @@ export default function ActivityDetail({ id }: { id: string }) {
             );
           }
 
-          // Custom bar shape that draws width proportional to lap duration
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          function DurationBar({ x, y, width, height, payload, fill }: any) {
-            if (!payload) return null;
-            const barWidth = Math.max(4, (payload.timeSec / maxTime) * width * lapChartData.length * 0.85);
-            const centerX = x + width / 2 - barWidth / 2;
-            return (
-              <rect x={centerX} y={y} width={barWidth} height={height} fill={fill} rx={2} ry={2} opacity={0.8} />
-            );
-          }
-
           return (
             <div className="space-y-4">
               {/* Lap performance bar chart */}
@@ -516,14 +496,13 @@ export default function ActivityDetail({ id }: { id: string }) {
                 <div className="bg-gray-900 rounded-xl border border-gray-800 p-4">
                   <p className="text-[11px] text-gray-500 uppercase tracking-wider mb-3">Lap Performance</p>
                   <ResponsiveContainer width="100%" height={160}>
-                    <BarChart data={lapChartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }} barCategoryGap="10%">
+                    <BarChart data={lapChartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }} barCategoryGap="5%" barGap={0}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
                       <XAxis
                         dataKey="lap"
                         tick={{ fill: '#6b7280', fontSize: 9 }}
                         axisLine={false}
                         tickLine={false}
-                        label={{ value: 'Lap (duration)', position: 'insideBottomRight', offset: -4, fill: '#6b7280', fontSize: 9 }}
                       />
                       <YAxis
                         domain={[0, dataMax => Math.ceil(dataMax * 1.15)]}
@@ -534,11 +513,11 @@ export default function ActivityDetail({ id }: { id: string }) {
                         tickFormatter={v => `${v}W`}
                       />
                       <Tooltip content={<LapTooltip />} cursor={{ fill: '#374151', fillOpacity: 0.2 }} />
-                      <Bar dataKey="watts" fill="#f97316" shape={<DurationBar />} />
+                      <Bar dataKey="watts" fill="#f97316" radius={[2,2,0,0]} opacity={0.85} />
                     </BarChart>
                   </ResponsiveContainer>
                   <p className="text-[10px] text-gray-600 mt-2">
-                    <span className="text-orange-400">■</span> Avg Power (W) — bar width reflects lap duration
+                    <span className="text-orange-400">■</span> Avg Power (W) per lap
                   </p>
                 </div>
               )}
