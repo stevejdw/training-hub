@@ -143,7 +143,9 @@ export async function GET() {
           const best = rollingBest(wattsArr, dur.seconds);
           if (!best) continue;
           const prev = storedPRs.get(dur.seconds) ?? null;
-          const isNew = prev === null || best > prev;
+          // Only flag as "new PR" if we have a previous best AND this ride beats it.
+          // If prev is null (first time tracking this duration), just show the watts without PR badge.
+          const isNew = prev !== null && best > prev;
 
           powerHighlights.push({
             label: dur.label,
@@ -153,7 +155,8 @@ export async function GET() {
             isNew,
           });
 
-          if (isNew) {
+          // Always persist the best known value for this duration
+          if (prev === null || best > prev) {
             toUpsert.push({ seconds: dur.seconds, watts: best, actId: lastCyclingRide.id });
           }
         }
