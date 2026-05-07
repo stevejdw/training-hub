@@ -10,6 +10,18 @@ export interface FitnessMetrics {
 }
 
 /**
+ * Compute an initial seed for the EMA by averaging TSS over the first N
+ * *calendar* days (including zeros). This matches intervals.icu's approach:
+ * it uses the first 42 days to seed CTL and the first 7 days to seed ATL,
+ * which eliminates the cold-start ramp-up that starting from 0 would cause.
+ */
+function computeSeed(dailyTss: DailyTSS[], days: number): number {
+  const slice = dailyTss.slice(0, Math.min(days, dailyTss.length));
+  if (slice.length === 0) return 0;
+  return slice.reduce((s, d) => s + d.tss, 0) / slice.length;
+}
+
+/**
  * Calculate CTL/ATL/TSB from an array of daily TSS values.
  * Returns the current (most recent day) values.
  */
@@ -26,8 +38,10 @@ export function calculateFitness(dailyTss: DailyTSS[]): FitnessMetrics {
   const ctlDecay = 2 / (42 + 1);
   const atlDecay = 2 / (7 + 1);
 
-  let ctl = 0;
-  let atl = 0;
+  // Seed CTL/ATL with the average TSS over the respective windows so the
+  // EMA doesn't start from an unrealistic 0 during the cold-start phase.
+  let ctl = computeSeed(filled, 42);
+  let atl = computeSeed(filled, 7);
 
   for (const { tss } of filled) {
     ctl = tss * ctlDecay + ctl * (1 - ctlDecay);
@@ -55,8 +69,9 @@ export function calculateFitnessHistory(
   const ctlDecay = 2 / (42 + 1);
   const atlDecay = 2 / (7 + 1);
 
-  let ctl = 0;
-  let atl = 0;
+  // Seed CTL/ATL with the average TSS over the respective windows
+  let ctl = computeSeed(filled, 42);
+  let atl = computeSeed(filled, 7);
 
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - daysBack);
