@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import {
   ComposedChart, Line, ReferenceArea, ReferenceLine,
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
 import { useCachedFetch } from '@/lib/use-cached-fetch';
 import type { ReadinessResponse, ReadinessPoint } from '@/app/api/analytics/readiness/route';
@@ -144,18 +144,39 @@ export default function ReadinessTab() {
                 interval="preserveStartEnd"
                 tickFormatter={fmtDate}
               />
+              {/* Left axis — HRV (ms) */}
               <YAxis
+                yAxisId="hrv"
                 tick={{ fill: '#6b7280', fontSize: 10 }}
                 axisLine={false}
                 tickLine={false}
                 width={32}
                 domain={['auto', 'auto']}
               />
+              {/* Right axis — Readiness (0–100) */}
+              <YAxis
+                yAxisId="readiness"
+                orientation="right"
+                tick={{ fill: '#3b82f6', fontSize: 10 }}
+                axisLine={false}
+                tickLine={false}
+                width={32}
+                domain={[0, 100]}
+              />
               <Tooltip content={<ReadinessTooltip />} cursor={{ stroke: '#374151', strokeWidth: 1 }} />
+              <Legend
+                iconSize={8}
+                formatter={value => (
+                  <span style={{ color: '#9ca3af', fontSize: 10 }}>
+                    {value === 'hrv' ? 'HRV (rMSSD)' : 'Readiness'}
+                  </span>
+                )}
+              />
 
               {/* Normal zone band */}
               {zone && (
                 <ReferenceArea
+                  yAxisId="hrv"
                   y1={zone.lower}
                   y2={zone.upper}
                   fill="#34d399"
@@ -166,6 +187,7 @@ export default function ReadinessTab() {
               {/* Baseline average line */}
               {zone && (
                 <ReferenceLine
+                  yAxisId="hrv"
                   y={zone.avg}
                   stroke="#34d399"
                   strokeOpacity={0.4}
@@ -175,12 +197,28 @@ export default function ReadinessTab() {
 
               {/* Daily HRV dots + line */}
               <Line
+                yAxisId="hrv"
                 type="monotone"
                 dataKey="hrv"
+                name="hrv"
                 stroke="#9ca3af"
                 strokeWidth={1.5}
                 dot={{ fill: '#9ca3af', r: 3, strokeWidth: 0 }}
                 activeDot={{ r: 5, fill: '#34d399' }}
+                connectNulls={false}
+                isAnimationActive={false}
+              />
+
+              {/* Daily Readiness score line */}
+              <Line
+                yAxisId="readiness"
+                type="monotone"
+                dataKey="readiness_score"
+                name="readiness"
+                stroke="#3b82f6"
+                strokeWidth={1.5}
+                dot={{ fill: '#3b82f6', r: 3, strokeWidth: 0 }}
+                activeDot={{ r: 5, fill: '#60a5fa' }}
                 connectNulls={false}
                 isAnimationActive={false}
               />
