@@ -10,6 +10,16 @@ export interface FitnessMetrics {
 }
 
 /**
+ * Decay factor for an N-day time-constant exponential moving average.
+ * intervals.icu uses α = 1 - e^(-1/N), which is the correct continuous-time
+ * formulation for an EWMA with a time constant of N days. The common
+ * "2/(N+1)" approximation would respond ~2× faster and give different results.
+ */
+function emaDecay(N: number): number {
+  return 1 - Math.exp(-1 / N);
+}
+
+/**
  * Compute an initial seed for the EMA by averaging TSS over the first N
  * *calendar* days (including zeros). This matches intervals.icu's approach:
  * it uses the first 42 days to seed CTL and the first 7 days to seed ATL,
@@ -22,6 +32,36 @@ function computeSeed(dailyTss: DailyTSS[], days: number): number {
 }
 
 /**
+ * Run the EWMA for CTL and ATL over a filled daily TSS array.
+ * Shared core used by both calculateFitness and calculateFitnessHistory.
+ */
+function runEma(
+  filled: DailyTSS[],
+  ctlSeed: number,
+  atlSeed: number,
+): { dates: string[]; ctls: number[]; atls: number[] } {
+  const ctlDecay = emaDecay(42);
+  const atlDecay = emaDecay(7);
+
+  let ctl = ctlSeed;
+  let atl = atlSeed;
+
+  const dates: string[] = [];
+  const ctls: number[]  = [];
+  const atls: number[]  = [];
+
+  for (const { date, tss } of filled) {
+    ctl = tss * ctlDecay + ctl * (1 - ctlDecay);
+    atl = tss * atlDecay + atl * (1 - atlDecay);
+    dates.push(date);
+    ctls.push(Math.round(ctl * 10) / 10);
+    atls.push(Math.round(atl * 10) / 10);
+  }
+
+  return { dates, ctls, atls };
+}
+
+/**
  * Calculate CTL/ATL/TSB from an array of daily TSS values.
  * Returns the current (most recent day) values.
  */
@@ -31,22 +71,18 @@ export function calculateFitness(dailyTss: DailyTSS[]): FitnessMetrics {
   // Sort ascending by date
   const sorted = [...dailyTss].sort((a, b) => a.date.localeCompare(b.date));
 
-  // Fill date gaps with 0 TSS
+  // Fill date gaps with 0 TSS so the EMA decays properly on rest days
   const filled = fillGaps(sorted);
-
-  // EMA decay factors
-  const ctlDecay = 2 / (42 + 1);
-  const atlDecay = 2 / (7 + 1);
 
   // Seed CTL/ATL with the average TSS over the respective windows so the
   // EMA doesn't start from an unrealistic 0 during the cold-start phase.
-  let ctl = computeSeed(filled, 42);
-  let atl = computeSeed(filled, 7);
+  const ctlSeed = computeSeed(filled, 42);
+  const atlSeed = computeSeed(filled, 7);
 
-  for (const { tss } of filled) {
-    ctl = tss * ctlDecay + ctl * (1 - ctlDecay);
-    atl = tss * atlDecay + atl * (1 - atlDecay);
-  }
+  const { ctls, atls } = runEma(filled, ctlSeed, atlSeed);
+
+  const ctl = ctls[ctls.length - 1] ?? 0;
+  const atl = atls[atls.length - 1] ?? 0;
 
   return {
     ctl: Math.round(ctl * 10) / 10,
@@ -66,12 +102,11 @@ export function calculateFitnessHistory(
   const sorted = [...dailyTss].sort((a, b) => a.date.localeCompare(b.date));
   const filled = fillGaps(sorted);
 
-  const ctlDecay = 2 / (42 + 1);
-  const atlDecay = 2 / (7 + 1);
-
   // Seed CTL/ATL with the average TSS over the respective windows
-  let ctl = computeSeed(filled, 42);
-  let atl = computeSeed(filled, 7);
+  const ctlSeed = computeSeed(filled, 42);
+  const atlSeed = computeSeed(filled, 7);
+
+  const { dates, ctls, atls } = runEma(filled, ctlSeed, atlSeed);
 
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - daysBack);
@@ -79,15 +114,13 @@ export function calculateFitnessHistory(
 
   const result: Array<{ date: string; ctl: number; atl: number; tsb: number }> = [];
 
-  for (const { date, tss } of filled) {
-    ctl = tss * ctlDecay + ctl * (1 - ctlDecay);
-    atl = tss * atlDecay + atl * (1 - atlDecay);
-    if (date >= cutoffStr) {
+  for (let i = 0; i < dates.length; i++) {
+    if (dates[i] >= cutoffStr) {
       result.push({
-        date,
-        ctl: Math.round(ctl * 10) / 10,
-        atl: Math.round(atl * 10) / 10,
-        tsb: Math.round((ctl - atl) * 10) / 10,
+        date: dates[i],
+        ctl:  ctls[i],
+        atl:  atls[i],
+        tsb:  Math.round((ctls[i] - atls[i]) * 10) / 10,
       });
     }
   }
