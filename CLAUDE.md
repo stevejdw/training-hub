@@ -1,3 +1,19 @@
+# Deployment
+
+This project is deployed on Vercel. The Vercel CLI is available via npx.
+
+**After every commit/push**, deploy the latest code to production:
+```
+npx vercel --prod --yes
+```
+
+> **Note:** Vercel GitHub integration is NOT configured for auto-deploy. The `.vercel/project.json` exists from a manual `vercel link`, but there is no GitHub Actions workflow or Vercel Git integration to trigger deploys automatically on push. You must run the deploy command manually after pushing changes.
+
+Inspect deployment at: https://vercel.com/stevejdws-projects/training-hub/2GcBxiGbF5D8pgVKDpdy2bLsxyKm
+Project dashboard: https://vercel.com/stevejdws-projects/training-hub
+
+---
+
 # Task: Fix CTL/ATL/TSB formula and clean up intervals.icu UI
 
 ## Changes Made
