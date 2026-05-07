@@ -718,7 +718,7 @@ export default function ActivityDetail({ id }: { id: string }) {
             )}
 
             {/* ── Aerobic Efficiency section ── */}
-            <AerobicEfficiencyChart activityId={id} />
+            <AerobicEfficiencyChart activityId={id} showCompare={false} />
 
             {/* ── Time in Zones section ── */}
             <div>

@@ -79,7 +79,7 @@ function CustomTooltip({ active, payload, label }: any) {
   );
 }
 
-export default function AerobicEfficiencyChart({ activityId }: { activityId: string }) {
+export default function AerobicEfficiencyChart({ activityId, showCompare }: { activityId: string; showCompare?: boolean }) {
   const [data, setData] = useState<AerobicData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -240,23 +240,25 @@ export default function AerobicEfficiencyChart({ activityId }: { activityId: str
       <div>
         <div className="flex items-center justify-between mb-3">
           <p className="text-[11px] text-gray-500 uppercase tracking-wider">Efficiency Graph</p>
-          {/* Compare period selector */}
-          <div className="flex items-center gap-1.5">
-            <span className="text-[10px] text-gray-600">Compare vs:</span>
-            {COMPARE_PERIODS.map(p => (
-              <button
-                key={p.key}
-                onClick={() => setComparePeriod(prev => prev === p.key ? null : p.key)}
-                className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors border ${
-                  comparePeriod === p.key
-                    ? 'bg-blue-500/20 text-blue-400 border-blue-500/50'
-                    : 'bg-gray-800 text-gray-500 hover:text-gray-300 border-transparent'
-                }`}
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
+          {/* Compare period selector — only shown in fitness screen */}
+          {showCompare && (
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-gray-600">Compare vs:</span>
+              {COMPARE_PERIODS.map(p => (
+                <button
+                  key={p.key}
+                  onClick={() => setComparePeriod(prev => prev === p.key ? null : p.key)}
+                  className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors border ${
+                    comparePeriod === p.key
+                      ? 'bg-blue-500/20 text-blue-400 border-blue-500/50'
+                      : 'bg-gray-800 text-gray-500 hover:text-gray-300 border-transparent'
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
         {chartData.length === 0 ? (
           <div className="h-48 flex items-center justify-center text-gray-500 text-sm">No stream data</div>
