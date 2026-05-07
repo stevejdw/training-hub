@@ -10,49 +10,30 @@ export interface FitnessMetrics {
 }
 
 /**
- * Decay factor for an N-day time-constant exponential moving average.
- * intervals.icu uses α = 1 - e^(-1/N), which is the correct continuous-time
- * formulation for an EWMA with a time constant of N days. The common
- * "2/(N+1)" approximation would respond ~2× faster and give different results.
+ * Run the CTL/ATL EWMA over a daily TSS array using Coggan's formula:
+ *
+ *   CTL_t = CTL_{t-1} + α_ctl × (TSS_t − CTL_{t-1})
+ *   ATL_t = ATL_{t-1} + α_atl × (TSS_t − ATL_{t-1})
+ *
+ * where α = 2 / (N + 1).  This matches intervals.icu, TrainingPeaks, etc.
  */
-function emaDecay(N: number): number {
-  return 1 - Math.exp(-1 / N);
-}
-
-/**
- * Compute an initial seed for the EMA by averaging TSS over the first N
- * *calendar* days (including zeros). This matches intervals.icu's approach:
- * it uses the first 42 days to seed CTL and the first 7 days to seed ATL,
- * which eliminates the cold-start ramp-up that starting from 0 would cause.
- */
-function computeSeed(dailyTss: DailyTSS[], days: number): number {
-  const slice = dailyTss.slice(0, Math.min(days, dailyTss.length));
-  if (slice.length === 0) return 0;
-  return slice.reduce((s, d) => s + d.tss, 0) / slice.length;
-}
-
-/**
- * Run the EWMA for CTL and ATL over a filled daily TSS array.
- * Shared core used by both calculateFitness and calculateFitnessHistory.
- */
-function runEma(
-  filled: DailyTSS[],
-  ctlSeed: number,
-  atlSeed: number,
+function computeEma(
+  dailyTss: DailyTSS[],
 ): { dates: string[]; ctls: number[]; atls: number[] } {
-  const ctlDecay = emaDecay(42);
-  const atlDecay = emaDecay(7);
+  const ctlDecay = 2 / (42 + 1);   // ≈ 0.0465
+  const atlDecay = 2 / (7 + 1);    // ≈ 0.25
 
-  let ctl = ctlSeed;
-  let atl = atlSeed;
+  // Matches intervals.icu: both start at 0
+  let ctl = 0;
+  let atl = 0;
 
   const dates: string[] = [];
   const ctls: number[]  = [];
   const atls: number[]  = [];
 
-  for (const { date, tss } of filled) {
-    ctl = tss * ctlDecay + ctl * (1 - ctlDecay);
-    atl = tss * atlDecay + atl * (1 - atlDecay);
+  for (const { date, tss } of dailyTss) {
+    ctl += ctlDecay * (tss - ctl);
+    atl += atlDecay * (tss - atl);
     dates.push(date);
     ctls.push(Math.round(ctl * 10) / 10);
     atls.push(Math.round(atl * 10) / 10);
@@ -62,24 +43,39 @@ function runEma(
 }
 
 /**
- * Calculate CTL/ATL/TSB from an array of daily TSS values.
- * Returns the current (most recent day) values.
+ * Build a complete daily TSS timeline from the earliest data point to today.
+ * Any missing days get TSS = 0, which means the EMA naturally decays on rest
+ * days — exactly how intervals.icu works.
+ */
+function buildFullTimeline(sorted: DailyTSS[]): DailyTSS[] {
+  if (sorted.length === 0) return [];
+  const result: DailyTSS[] = [];
+  const cursor = new Date(sorted[0].date);
+  const end    = new Date();
+  let i = 0;
+
+  while (cursor <= end) {
+    const key = cursor.toISOString().slice(0, 10);
+    if (i < sorted.length && sorted[i].date === key) {
+      result.push(sorted[i]);
+      i++;
+    } else {
+      result.push({ date: key, tss: 0 });
+    }
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return result;
+}
+
+/**
+ * Calculate current CTL/ATL/TSB from an array of daily TSS values.
  */
 export function calculateFitness(dailyTss: DailyTSS[]): FitnessMetrics {
   if (dailyTss.length === 0) return { ctl: 0, atl: 0, tsb: 0 };
 
-  // Sort ascending by date
   const sorted = [...dailyTss].sort((a, b) => a.date.localeCompare(b.date));
-
-  // Fill date gaps with 0 TSS so the EMA decays properly on rest days
-  const filled = fillGaps(sorted);
-
-  // Seed CTL/ATL with the average TSS over the respective windows so the
-  // EMA doesn't start from an unrealistic 0 during the cold-start phase.
-  const ctlSeed = computeSeed(filled, 42);
-  const atlSeed = computeSeed(filled, 7);
-
-  const { ctls, atls } = runEma(filled, ctlSeed, atlSeed);
+  const timeline = buildFullTimeline(sorted);
+  const { ctls, atls } = computeEma(timeline);
 
   const ctl = ctls[ctls.length - 1] ?? 0;
   const atl = atls[atls.length - 1] ?? 0;
@@ -92,28 +88,22 @@ export function calculateFitness(dailyTss: DailyTSS[]): FitnessMetrics {
 }
 
 /**
- * Calculate full CTL/ATL/TSB history for charting.
- * Returns one entry per day from startDate to today.
+ * Calculate CTL/ATL/TSB history for charting.
+ * Returns one entry per day from daysBack days ago to today.
  */
 export function calculateFitnessHistory(
   dailyTss: DailyTSS[],
-  daysBack = 180
+  daysBack = 180,
 ): Array<{ date: string; ctl: number; atl: number; tsb: number }> {
   const sorted = [...dailyTss].sort((a, b) => a.date.localeCompare(b.date));
-  const filled = fillGaps(sorted);
-
-  // Seed CTL/ATL with the average TSS over the respective windows
-  const ctlSeed = computeSeed(filled, 42);
-  const atlSeed = computeSeed(filled, 7);
-
-  const { dates, ctls, atls } = runEma(filled, ctlSeed, atlSeed);
+  const timeline = buildFullTimeline(sorted);
+  const { dates, ctls, atls } = computeEma(timeline);
 
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - daysBack);
   const cutoffStr = cutoff.toISOString().slice(0, 10);
 
   const result: Array<{ date: string; ctl: number; atl: number; tsb: number }> = [];
-
   for (let i = 0; i < dates.length; i++) {
     if (dates[i] >= cutoffStr) {
       result.push({
@@ -123,27 +113,6 @@ export function calculateFitnessHistory(
         tsb:  Math.round((ctls[i] - atls[i]) * 10) / 10,
       });
     }
-  }
-
-  return result;
-}
-
-function fillGaps(sorted: DailyTSS[]): DailyTSS[] {
-  if (sorted.length === 0) return [];
-  const result: DailyTSS[] = [];
-  const current = new Date(sorted[0].date);
-  const end = new Date(); // today
-
-  let i = 0;
-  while (current <= end) {
-    const dateStr = current.toISOString().slice(0, 10);
-    if (i < sorted.length && sorted[i].date === dateStr) {
-      result.push(sorted[i]);
-      i++;
-    } else {
-      result.push({ date: dateStr, tss: 0 });
-    }
-    current.setDate(current.getDate() + 1);
   }
   return result;
 }
