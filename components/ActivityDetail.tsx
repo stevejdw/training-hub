@@ -3,10 +3,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  ResponsiveContainer, Tooltip,
-} from 'recharts';
 import { sportLabel, sportColor } from '@/lib/sport-types';
 import ZoneDistribution from './ZoneDistribution';
 import PowerCurveChart from './PowerCurveChart';
@@ -466,58 +462,106 @@ export default function ActivityDetail({ id }: { id: string }) {
             );
           }
 
-          // Lap chart data
-          const lapChartData = sortedLaps.map(lap => ({
-            lap: `L${lap.lap_index}`,
-            time: fmt(lap.moving_time),
-            watts: lap.average_watts ? Math.round(lap.average_watts) : 0,
-          }));
+          // Lap histogram data — compute cumulative time for true time-based histogram
+          let cumSec = 0;
+          const maxWatts = Math.max(...sortedLaps.map(l => l.average_watts ?? 0), 1);
+          const totalSec = sortedLaps.reduce((s, l) => s + l.moving_time, 0) || 1;
+          const barData = sortedLaps.map(lap => {
+            const start = cumSec;
+            const duration = lap.moving_time;
+            cumSec += duration;
+            return {
+              label: `L${lap.lap_index}`,
+              timeStr: fmt(duration),
+              durationSec: duration,
+              startSec: start,
+              endSec: cumSec,
+              watts: lap.average_watts ? Math.round(lap.average_watts) : 0,
+            };
+          });
 
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          function LapTooltip({ active, payload, label }: any) {
-            if (!active || !payload?.length) return null;
-            const p = payload[0]?.payload;
-            if (!p) return null;
-            return (
-              <div className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-xs shadow-lg space-y-1">
-                <p className="text-gray-400 font-medium">{label}</p>
-                <p className="text-gray-500">{p.time}</p>
-                <p className="text-orange-400">
-                  Avg Power: <span className="font-bold">{p.watts} W</span>
-                </p>
-              </div>
-            );
+          // SVG histogram dimensions
+          const svgW = 800, svgH = 170;
+          const pad = { top: 8, right: 8, bottom: 22, left: 36 };
+          const chartW = svgW - pad.left - pad.right;
+          const chartH = svgH - pad.top - pad.bottom;
+          const yMax = Math.ceil(maxWatts * 1.15) || 1;
+
+          // Y-axis ticks (5 evenly spaced)
+          const yTicks = [0, 1, 2, 3, 4].map(i => Math.round((i * yMax) / 4));
+
+          // X-axis time labels — show elapsed time at regular intervals
+          const xTickCount = 8;
+          const xTicks = Array.from({ length: xTickCount }, (_, i) =>
+            Math.round((i * totalSec) / (xTickCount - 1))
+          );
+
+          function fmtShort(sec: number) {
+            const m = Math.floor(sec / 60);
+            const s = sec % 60;
+            return s === 0 ? `${m}m` : `${m}m ${s}s`;
           }
 
           return (
             <div className="space-y-4">
-              {/* Lap performance bar chart */}
-              {lapChartData.length > 0 && (
+              {/* Lap performance histogram */}
+              {barData.length > 0 && (
                 <div className="bg-gray-900 rounded-xl border border-gray-800 p-4">
                   <p className="text-[11px] text-gray-500 uppercase tracking-wider mb-3">Lap Performance</p>
-                  <ResponsiveContainer width="100%" height={160}>
-                    <BarChart data={lapChartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }} barCategoryGap="5%" barGap={0}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
-                      <XAxis
-                        dataKey="lap"
-                        tick={{ fill: '#6b7280', fontSize: 9 }}
-                        axisLine={false}
-                        tickLine={false}
-                      />
-                      <YAxis
-                        domain={[0, dataMax => Math.ceil(dataMax * 1.15)]}
-                        tick={{ fill: '#f97316', fontSize: 9 }}
-                        axisLine={false}
-                        tickLine={false}
-                        width={32}
-                        tickFormatter={v => `${v}W`}
-                      />
-                      <Tooltip content={<LapTooltip />} cursor={{ fill: '#374151', fillOpacity: 0.2 }} />
-                      <Bar dataKey="watts" fill="#f97316" radius={[2,2,0,0]} opacity={0.85} />
-                    </BarChart>
-                  </ResponsiveContainer>
+                  <div className="relative" style={{ aspectRatio: String(svgW) + '/' + String(svgH) }}>
+                    <svg viewBox={`0 0 ${svgW} ${svgH}`} className="w-full h-full overflow-visible">
+                      {/* Horizontal grid lines */}
+                      {yTicks.map(v => {
+                        const y = pad.top + chartH - (v / yMax) * chartH;
+                        return (
+                          <g key={v}>
+                            <line x1={pad.left} y1={y} x2={pad.left + chartW} y2={y} stroke="#1f2937" strokeWidth={1} />
+                            <text x={pad.left - 4} y={y + 3} textAnchor="end" fill="#f97316" fontSize={10}>
+                              {v}W
+                            </text>
+                          </g>
+                        );
+                      })}
+
+                      {/* X-axis time labels */}
+                      {xTicks.map(t => {
+                        const x = pad.left + (t / totalSec) * chartW;
+                        return (
+                          <text key={t} x={x} y={svgH - 4} textAnchor="middle" fill="#6b7280" fontSize={9}>
+                            {fmtShort(t)}
+                          </text>
+                        );
+                      })}
+
+                      {/* Bars — width exactly proportional to lap duration, no gaps */}
+                      {barData.map((b, i) => {
+                        const x = pad.left + (b.startSec / totalSec) * chartW;
+                        const barW = Math.max(2, (b.durationSec / totalSec) * chartW);
+                        const barH = (b.watts / yMax) * chartH;
+                        const y = pad.top + chartH - barH;
+                        return (
+                          <g key={i}>
+                            <rect
+                              x={x}
+                              y={y}
+                              width={barW}
+                              height={barH}
+                              fill="#f97316"
+                              opacity={0.85}
+                              rx={1}
+                            >
+                              <title>{b.label} · {b.timeStr} · Avg Power: {b.watts} W</title>
+                            </rect>
+                          </g>
+                        );
+                      })}
+
+                      {/* Bottom axis line */}
+                      <line x1={pad.left} y1={pad.top + chartH} x2={pad.left + chartW} y2={pad.top + chartH} stroke="#374151" strokeWidth={1} />
+                    </svg>
+                  </div>
                   <p className="text-[10px] text-gray-600 mt-2">
-                    <span className="text-orange-400">■</span> Avg Power (W) per lap
+                    <span className="text-orange-400">■</span> Avg Power (W) — bar width = lap duration, no gaps
                   </p>
                 </div>
               )}
