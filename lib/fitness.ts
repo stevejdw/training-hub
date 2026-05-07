@@ -17,8 +17,8 @@ export interface FitnessMetrics {
  *
  * Both CTL and ATL start at 0 and are updated sequentially.
  *
- * TSB is displayed as-of this morning (yesterday's CTL − yesterday's ATL),
- * which matches what intervals.icu shows on its dashboard.
+ * TSB is the current day's CTL − current day's ATL (matching intervals.icu
+ * dashboard behaviour).
  */
 function computeEma(
   dailyTss: DailyTSS[],
@@ -26,36 +26,36 @@ function computeEma(
   let ctl = 0;
   let atl = 0;
 
-  // Track previous day's values for TSB (yesterday's CTL − yesterday's ATL)
-  let prevCtl = 0;
-  let prevAtl = 0;
-
   const dates: string[] = [];
   const ctls: number[]  = [];
   const atls: number[]  = [];
   const tsbs: number[]  = [];
 
   for (const { date, tss } of dailyTss) {
-    // TSB for today is yesterday's CTL minus yesterday's ATL
-    // (matches intervals.icu dashboard — values as of this morning)
-    const tsb = Math.round((prevCtl - prevAtl) * 10) / 10;
-
     // Update CTL/ATL with today's TSS (intervals.icu formula)
     ctl = ctl * Math.exp(-1 / 42) + tss * (1 - Math.exp(-1 / 42));
     atl = atl * Math.exp(-1 / 7)  + tss * (1 - Math.exp(-1 / 7));
+
+    // TSB = current CTL − current ATL (matches intervals.icu dashboard)
+    const tsb = Math.round((ctl - atl) * 10) / 10;
 
     dates.push(date);
     ctls.push(Math.round(ctl * 10) / 10);
     atls.push(Math.round(atl * 10) / 10);
     tsbs.push(tsb);
-
-    prevCtl = ctl;
-    prevAtl = atl;
   }
 
   return { dates, ctls, atls, tsbs };
 }
 
+/**
+ * Get today's date as YYYY-MM-DD in Australia/Sydney timezone.
+ * All activity dates in the DB are converted to AEST, so the timeline end
+ * must use the same timezone to stay aligned.
+ */
+function todayAest(): string {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'Australia/Sydney' });
+}
 
 /**
  * Build a complete daily TSS timeline from the earliest data point to today.
@@ -66,7 +66,7 @@ function buildFullTimeline(sorted: DailyTSS[]): DailyTSS[] {
   if (sorted.length === 0) return [];
   const result: DailyTSS[] = [];
   const cursor = new Date(sorted[0].date);
-  const end    = new Date();
+  const end    = new Date(todayAest() + 'T00:00:00');
   let i = 0;
 
   while (cursor <= end) {
@@ -115,9 +115,11 @@ export function calculateFitnessHistory(
   const timeline = buildFullTimeline(sorted);
   const { dates, ctls, atls, tsbs } = computeEma(timeline);
 
-  const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - daysBack);
-  const cutoffStr = cutoff.toISOString().slice(0, 10);
+  // Use AEST date for cutoff to stay aligned with timeline dates
+  const cutoffAest = new Date(todayAest() + 'T00:00:00');
+  cutoffAest.setDate(cutoffAest.getDate() - daysBack);
+  const cutoffStr = cutoffAest.toISOString().slice(0, 10);
+
 
   const result: Array<{ date: string; ctl: number; atl: number; tsb: number }> = [];
   for (let i = 0; i < dates.length; i++) {

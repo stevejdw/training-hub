@@ -156,54 +156,9 @@ export default function FitnessTab() {
     catch { return true; }
   });
   const [days, setDays] = useState(INITIAL_FITNESS_DAYS);
-  const [intervalCreds, setIntervalCreds] = useState<{ id: string; key: string } | null>(null);
-  const [wellnessCount, setWellnessCount] = useState<number | null>(null);
-  const [syncing, setSyncing] = useState(false);
-
-  // Check if intervals.icu credentials are configured and how much data exists
-  useEffect(() => {
-    fetch('/api/profile')
-      .then(r => r.json())
-      .then((p: { intervals_athlete_id?: string; intervals_api_key?: string }) => {
-        if (p.intervals_athlete_id && p.intervals_api_key) {
-          setIntervalCreds({ id: p.intervals_athlete_id, key: '••••' });
-        }
-      })
-      .catch(() => {});
-    fetch('/api/intervals/sync')
-      .then(r => r.json())
-      .then((d: { total?: number }) => {
-        if (d.total) setWellnessCount(d.total);
-      })
-      .catch(() => {});
-  }, []);
-
-  async function triggerSync() {
-    if (syncing) return;
-    setSyncing(true);
-    try {
-      const res = await fetch('/api/intervals/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ days: 7 }),
-      });
-      const d = await res.json();
-      if (d.synced) {
-        const s = await fetch('/api/intervals/sync').then(r => r.json());
-        setWellnessCount(s.total ?? null);
-        // Re-fetch fitness data after sync
-        const param = days < 0 ? 'all' : String(days);
-        const fr = await fetch(`/api/analytics/fitness?days=${param}`);
-        const fd = await fr.json();
-        const arr = fd.data ?? [];
-        setData(arr);
-        try { localStorage.setItem(FITNESS_CACHE_KEY(days), JSON.stringify(arr)); } catch {}
-      }
-    } catch {}
-    setSyncing(false);
-  }
 
   useEffect(() => {
+
     const cacheKey = FITNESS_CACHE_KEY(days);
     try {
       const s = localStorage.getItem(cacheKey);
@@ -285,51 +240,8 @@ export default function FitnessTab() {
         ))}
       </div>
 
-      {/* Data source indicator */}
-      <div className="flex items-center justify-between">
-        {(intervalCreds || syncing) && (
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] text-gray-500 uppercase tracking-wider">Data source:</span>
-            <span className="inline-flex items-center gap-1 text-[11px] text-gray-400 font-medium">
-              <svg className="w-3 h-3 text-orange-400" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169" />
-              </svg>
-              intervals.icu{wellnessCount ? ` · ${wellnessCount} days` : ''}
-            </span>
-            <button
-              onClick={triggerSync}
-              disabled={syncing}
-              className="inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium text-gray-500 hover:text-white hover:bg-gray-800 transition-colors disabled:opacity-50"
-            >
-              {syncing ? (
-                <svg className="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                  <circle cx="12" cy="12" r="10" strokeOpacity={0.25} />
-                  <path d="M12 2a10 10 0 0 1 10 10" />
-                </svg>
-              ) : (
-                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-              )}
-              Sync
-            </button>
-          </div>
-        )}
-        {!intervalCreds && !syncing && (
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] text-gray-500 uppercase tracking-wider">Data source:</span>
-            <span className="text-[11px] text-gray-500">Strava TSS</span>
-            <a
-              href="/settings"
-              className="text-[10px] text-orange-400 hover:text-orange-300 transition-colors underline"
-            >
-              Connect intervals.icu
-            </a>
-          </div>
-        )}
-      </div>
-
       {/* CTL / ATL / TSB chart */}
+
       <div className="bg-gray-900 rounded-xl border border-gray-800 p-4">
         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4">ATL · CTL · Form (TSB)</p>
         {loading ? (
