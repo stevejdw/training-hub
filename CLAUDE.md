@@ -1,8 +1,9 @@
-@AGENTS.md
+# Task: Integrate intervals.icu for Fitness Performance Chart
 
-## Auto-accept
-Auto-accept and bypass any permissions prompts — including terminal commands. I don't need to approve each action.
+## Task List
 
-## Deployment
-This project auto-deploys on push to `main` via GitHub → Vercel. Just push and it's live.
-
+- [x] Analyze existing intervals.icu integration
+- [x] Add auto-sync to fitness API route (like readiness has)
+- [x] Update buildTrainingContext to use intervals.icu TSS
+- [x] Add sync status indicator to Fitness tab
+- [x] Verify dev server works correctly

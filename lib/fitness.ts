@@ -15,22 +15,15 @@ export interface FitnessMetrics {
  *   CTL_today = CTL_yesterday × e^(-1/42) + TSS_today × (1 - e^(-1/42))
  *   ATL_today = ATL_yesterday × e^(-1/7)  + TSS_today × (1 - e^(-1/7))
  *
- *   TSB_today = CTL_yesterday − ATL_yesterday
+ *   TSB_today = CTL_today − ATL_today
  *
  * Both CTL and ATL start at 0 and are updated sequentially.
  */
 function computeEma(
   dailyTss: DailyTSS[],
 ): { dates: string[]; ctls: number[]; atls: number[]; tsbs: number[] } {
-  const ctlDecay = 1 - Math.exp(-1 / 42);  // ≈ 0.0235
-  const atlDecay = 1 - Math.exp(-1 / 7);   // ≈ 0.133
-
   let ctl = 0;
   let atl = 0;
-
-  // For the very first day, there is no "yesterday", so TSB = 0
-  let prevCtl = 0;
-  let prevAtl = 0;
 
   const dates: string[] = [];
   const ctls: number[]  = [];
@@ -38,20 +31,17 @@ function computeEma(
   const tsbs: number[]  = [];
 
   for (const { date, tss } of dailyTss) {
-    // TSB for today is yesterday's CTL minus yesterday's ATL
-    const tsb = Math.round((prevCtl - prevAtl) * 10) / 10;
-
     // Update CTL/ATL with today's TSS (intervals.icu formula)
     ctl = ctl * Math.exp(-1 / 42) + tss * (1 - Math.exp(-1 / 42));
     atl = atl * Math.exp(-1 / 7)  + tss * (1 - Math.exp(-1 / 7));
+
+    // TSB = CTL - ATL (today's values, matching intervals.icu)
+    const tsb = Math.round((ctl - atl) * 10) / 10;
 
     dates.push(date);
     ctls.push(Math.round(ctl * 10) / 10);
     atls.push(Math.round(atl * 10) / 10);
     tsbs.push(tsb);
-
-    prevCtl = ctl;
-    prevAtl = atl;
   }
 
   return { dates, ctls, atls, tsbs };

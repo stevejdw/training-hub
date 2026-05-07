@@ -1213,16 +1213,7 @@ export function applyReferenceActivityToPacingSegments(
   });
 }
 
-/** Build a list of pacing segments from the full route + climb list.
- *
- * Strategy:
- * 1. All starred segments become named pacing intervals (type based on gradient).
- * 2. Gaps between starred segments get their own segments labelled by gradient
- *    (descent / flat / rolling / climb) — no gap is skipped, regardless of size.
- * 3. Climb entries from the climbs list that are not covered by a starred segment
- *    also become named climb intervals.
- * 4. The full ride is covered with no gaps — every km boundary is accounted for.
- */
+/** Build a list of pacing segments from the full route + climb list. */
 export function buildPacingSegments(
   streamDistKm:    number[],
   streamAltM:      number[],
@@ -1238,8 +1229,7 @@ export function buildPacingSegments(
   physics:          PhysicsParams = {},
   streamLatLng?:    [number, number][],
   ftp?:             number,
-  /** All starred segments — each becomes a named pacing interval. Gaps between them
-   *  get segments labelled by gradient (descent / flat / rolling / climb). */
+  /** Starred segments for labelling non-climb pacing intervals (e.g. descents). */
   starredSegments?: RouteStarredSegment[],
 ): PacingSegment[] {
   // Compute altitude-corrected air density from full route stream if not overridden
@@ -1249,33 +1239,65 @@ export function buildPacingSegments(
     resolvedPhysics.rho = rhoAtAltitude(avgAltM);
   }
 
-  // Sort starred segments and climbs
+  const sorted = [...climbs].sort((a, b) => a.start_km - b.start_km);
+
+  // Sort starred segments for interval matching (non-climb gaps)
   const sortedStarred = starredSegments
     ? [...starredSegments]
         .filter(ss => (ss.end_km - ss.start_km) >= 0.3)
         .sort((a, b) => a.start_km - b.start_km)
     : [];
-  const sortedClimbs = [...climbs].sort((a, b) => a.start_km - b.start_km);
 
-  // ── Step 1: gather all km boundaries ────────────────────────────────
-  // Every starred segment boundary, every climb boundary, plus 0 and totalDistKm.
-  // This ensures every metre of the route is covered.
-  const markerSet = new Set<number>([0, totalDistKm]);
-  for (const ss of sortedStarred) {
-    markerSet.add(ss.start_km);
-    markerSet.add(ss.end_km);
+  const intervals: { s: number; e: number; ci?: number; starredName?: string }[] = [];
+  let cursor = 0;
+  for (let i = 0; i < sorted.length; i++) {
+    if (sorted[i].start_km > cursor + 0.1) {
+      intervals.push({ s: cursor, e: sorted[i].start_km });
+    }
+    intervals.push({ s: sorted[i].start_km, e: sorted[i].end_km, ci: i });
+    cursor = sorted[i].end_km;
   }
-  for (const c of sortedClimbs) {
-    markerSet.add(c.start_km);
-    markerSet.add(c.end_km);
+  if (cursor < totalDistKm - 0.1) {
+    intervals.push({ s: cursor, e: totalDistKm });
   }
-  const markers = [...markerSet].sort((a, b) => a - b);
 
-  // ── Step 2: build an interval for each consecutive pair of markers ──
+  // Tag non-climb intervals with their starred segment name.
+  // Strategy:
+  //   1. Check if the interval midpoint falls within a starred segment.
+  //   2. If not, and the interval is a small gap (< 5 km) between two starred
+  //      segments, absorb it into the preceding one (extends the labelled zone
+  //      across short gaps, avoiding tiny unnamed segments).
+  for (const iv of intervals) {
+    if (iv.ci !== undefined) continue; // skip climbs
+    const midKm = (iv.s + iv.e) / 2;
+    for (const ss of sortedStarred) {
+      if (midKm >= ss.start_km && midKm <= ss.end_km) {
+        iv.starredName = ss.name;
+        break;
+      }
+    }
+    // Not found by midpoint — check for a small gap between starred segments
+    if (!iv.starredName) {
+      const gapKm = iv.e - iv.s;
+      if (gapKm > 0.1 && gapKm < 5) {
+        for (const ss of sortedStarred) {
+          // Gap right after a starred segment ends
+          if (Math.abs(ss.end_km - iv.s) < 0.5) {
+            iv.starredName = ss.name;
+            break;
+          }
+          // Gap right before a starred segment starts
+          if (Math.abs(ss.start_km - iv.e) < 0.5) {
+            iv.starredName = ss.name;
+            break;
+          }
+        }
+      }
+    }
+  }
+
   const segs: PacingSegment[] = [];
-  for (let i = 0; i < markers.length - 1; i++) {
-    const startKm = markers[i];
-    const endKm   = markers[i + 1];
+  for (const { s: startKm, e: endKm, ci, starredName } of intervals) {
     if (endKm <= startKm + 0.05) continue;
 
     const { sliceD, sliceA, sliceL } = sliceRouteStreams(
@@ -1287,104 +1309,51 @@ export function buildPacingSegments(
     );
     if (sliceD.length < 2) continue;
 
-    const distKm    = endKm - startKm;
-    const netGain   = sliceA[sliceA.length - 1] - sliceA[0];
+    const netGain = sliceA[sliceA.length - 1] - sliceA[0];
     let ascent = 0;
-    for (let j = 1; j < sliceA.length; j++) {
-      const diff = sliceA[j] - sliceA[j - 1];
+    for (let i = 1; i < sliceA.length; i++) {
+      const diff = sliceA[i] - sliceA[i - 1];
       if (diff > 0) ascent += diff;
     }
-    const avgGrad = distKm > 0 ? (netGain / (distKm * 1000)) * 100 : 0;
-    const midKm   = (startKm + endKm) / 2;
+    const distKm    = endKm - startKm;
+    const avgGrad   = distKm > 0 ? (netGain / (distKm * 1000)) * 100 : 0;
 
-    // Check which starred segment or climb this interval belongs to
-    // Use overlap detection instead of midpoint to avoid boundary precision issues
-    let starredLabel: string | null = null;
-    let climbIdx: number | null = null;
+    const isClimb = ci !== undefined;
+    let type:   PacingSegment['type'];
+    let label:  string;
+    let watts:  number;
 
-    for (const ss of sortedStarred) {
-      // Interval overlaps starred segment if they share more than 1 m
-      const overlap = Math.max(0, Math.min(endKm, ss.end_km) - Math.max(startKm, ss.start_km));
-      if (overlap > 0.001) {
-        starredLabel = ss.name;
-        break;
-      }
-    }
-    if (!starredLabel) {
-      for (let ci = 0; ci < sortedClimbs.length; ci++) {
-        const c = sortedClimbs[ci];
-        if (midKm >= c.start_km && midKm <= c.end_km) {
-          climbIdx = ci;
-          break;
-        }
-      }
-    }
-
-    // Determine type, label and watts
-    let type: PacingSegment['type'];
-    let label: string;
-    let watts: number;
-
-    if (starredLabel) {
-      // Named from starred segment — type based on gradient
-      if (avgGrad >= 2) {
-        type = 'climb';
-        label = starredLabel;
-        watts = 230;
-      } else if (avgGrad < -1.5) {
-        type = 'descent';
-        label = starredLabel;
-        watts = descentWatts;
-      } else if (avgGrad > 1) {
-        type = 'climb';
-        label = starredLabel;
-        watts = flatWatts;
-      } else {
-        type = avgGrad >= -0.5 ? 'flat' : 'descent';
-        label = starredLabel;
-        watts = type === 'descent' ? descentWatts : flatWatts;
-      }
-    } else if (climbIdx !== null) {
-      type = 'climb';
-      label = sortedClimbs[climbIdx]!.name;
-      watts = sortedClimbs[climbIdx]!.target_watts;
+    if (isClimb) {
+      type  = 'climb';
+      label = sorted[ci!].name;
+      watts = sorted[ci!].target_watts;
+    } else if (starredName) {
+      // This gap falls within a starred segment — use its name
+      type  = avgGrad < -1.5 ? 'descent' : 'flat';
+      label = starredName;
+      watts = type === 'descent' ? descentWatts : flatWatts;
+    } else if (avgGrad < -1.5) {
+      type  = 'descent';
+      label = 'Descent';
+      watts = descentWatts;
     } else {
-      // Gap segment — label by gradient
-      if (avgGrad >= 2) {
-        type = 'climb';
-        label = `Climb — ${distKm.toFixed(1)} km`;
-        watts = 230;
-      } else if (avgGrad < -1.5) {
-        type = 'descent';
-        label = `Descent — ${distKm.toFixed(1)} km`;
-        watts = descentWatts;
-      } else if (avgGrad > 1) {
-        type = 'climb';
-        label = `Rolling climb — ${distKm.toFixed(1)} km`;
-        watts = flatWatts;
-      } else if (avgGrad >= -0.5) {
-        type = 'flat';
-        label = `Flat — ${distKm.toFixed(1)} km`;
-        watts = flatWatts;
-      } else {
-        type = 'descent';
-        label = `Gentle descent — ${distKm.toFixed(1)} km`;
-        watts = descentWatts;
-      }
+      type  = 'flat';
+      label = 'Flat / Rolling';
+      watts = flatWatts;
     }
 
     const estTime = estimateTime({
       stream_distance_km: sliceD,
       stream_altitude_m:  sliceA,
       stream_latlng:      sliceL && sliceL.length === sliceD.length ? sliceL : undefined,
-      flat_watts:         type === 'climb' ? watts : flatWatts,
-      descent_watts:      type === 'climb' ? watts : descentWatts,
+      flat_watts:         isClimb ? watts : flatWatts,
+      descent_watts:      isClimb ? watts : descentWatts,
       climbs:             [],
       rider_weight_kg:    riderKg,
       bike_weight_kg:     bikeKg,
       accessories_kg:     accessoriesKg,
-      descent_speed_kmh:  type === 'climb' ? undefined : descentSpeedKmh,
-      flat_speed_kmh:     type === 'climb' ? undefined : flatSpeedKmh,
+      descent_speed_kmh:  isClimb ? undefined : descentSpeedKmh,
+      flat_speed_kmh:     isClimb ? undefined : flatSpeedKmh,
       physics:            resolvedPhysics,
       ftp,
     });
@@ -1396,7 +1365,7 @@ export function buildPacingSegments(
     segs.push({
       label,
       type,
-      climb_idx:      climbIdx ?? undefined,
+      climb_idx:      ci,
       start_km:       Math.round(startKm * 10) / 10,
       end_km:         Math.round(endKm    * 10) / 10,
       distance_km:    Math.round(distKm   * 10) / 10,

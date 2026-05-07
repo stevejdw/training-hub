@@ -66,13 +66,28 @@ export async function buildTrainingContext(): Promise<string> {
     `);
     const weeklySummaries = weeklySummaryResult.rows;
 
-    // 3. All-time daily TSS for CTL/ATL/TSB
+    // 3. All-time daily TSS for CTL/ATL/TSB — prefer intervals.icu's icu_tss
+    //    from daily_wellness, falling back to Strava TSS when unavailable.
     const dailyTssResult = await client.query(`
+      WITH strava_tss AS (
+        SELECT
+          TO_CHAR(start_date AT TIME ZONE 'Australia/Sydney', 'YYYY-MM-DD') AS date,
+          SUM(COALESCE(tss, 0)) AS tss
+        FROM activities
+        GROUP BY 1
+      ),
+      intervals_tss AS (
+        SELECT
+          TO_CHAR(date, 'YYYY-MM-DD') AS date,
+          icu_tss AS tss
+        FROM daily_wellness
+        WHERE icu_tss IS NOT NULL
+      )
       SELECT
-        TO_CHAR(start_date AT TIME ZONE 'Australia/Sydney', 'YYYY-MM-DD') AS date,
-        SUM(COALESCE(tss, 0)) AS tss
-      FROM activities
-      GROUP BY 1
+        COALESCE(i.date, s.date) AS date,
+        COALESCE(i.tss, s.tss, 0) AS tss
+      FROM intervals_tss i
+      FULL OUTER JOIN strava_tss s ON i.date = s.date
       ORDER BY 1
     `);
     const dailyTss = dailyTssResult.rows.map((r) => ({
