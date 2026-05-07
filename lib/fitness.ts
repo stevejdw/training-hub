@@ -10,36 +10,51 @@ export interface FitnessMetrics {
 }
 
 /**
- * Run the CTL/ATL EWMA over a daily TSS array using Coggan's formula:
+ * Run the CTL/ATL EWMA over a daily TSS array using intervals.icu's formulas:
  *
- *   CTL_t = CTL_{t-1} + α_ctl × (TSS_t − CTL_{t-1})
- *   ATL_t = ATL_{t-1} + α_atl × (TSS_t − ATL_{t-1})
+ *   CTL_today = CTL_yesterday × e^(-1/42) + TSS_today × (1 - e^(-1/42))
+ *   ATL_today = ATL_yesterday × e^(-1/7)  + TSS_today × (1 - e^(-1/7))
  *
- * where α = 2 / (N + 1).  This matches intervals.icu, TrainingPeaks, etc.
+ *   TSB_today = CTL_yesterday − ATL_yesterday
+ *
+ * Both CTL and ATL start at 0 and are updated sequentially.
  */
 function computeEma(
   dailyTss: DailyTSS[],
-): { dates: string[]; ctls: number[]; atls: number[] } {
-  const ctlDecay = 2 / (42 + 1);   // ≈ 0.0465
-  const atlDecay = 2 / (7 + 1);    // ≈ 0.25
+): { dates: string[]; ctls: number[]; atls: number[]; tsbs: number[] } {
+  const ctlDecay = 1 - Math.exp(-1 / 42);  // ≈ 0.0235
+  const atlDecay = 1 - Math.exp(-1 / 7);   // ≈ 0.133
 
-  // Matches intervals.icu: both start at 0
   let ctl = 0;
   let atl = 0;
+
+  // For the very first day, there is no "yesterday", so TSB = 0
+  let prevCtl = 0;
+  let prevAtl = 0;
 
   const dates: string[] = [];
   const ctls: number[]  = [];
   const atls: number[]  = [];
+  const tsbs: number[]  = [];
 
   for (const { date, tss } of dailyTss) {
-    ctl += ctlDecay * (tss - ctl);
-    atl += atlDecay * (tss - atl);
+    // TSB for today is yesterday's CTL minus yesterday's ATL
+    const tsb = Math.round((prevCtl - prevAtl) * 10) / 10;
+
+    // Update CTL/ATL with today's TSS (intervals.icu formula)
+    ctl = ctl * Math.exp(-1 / 42) + tss * (1 - Math.exp(-1 / 42));
+    atl = atl * Math.exp(-1 / 7)  + tss * (1 - Math.exp(-1 / 7));
+
     dates.push(date);
     ctls.push(Math.round(ctl * 10) / 10);
     atls.push(Math.round(atl * 10) / 10);
+    tsbs.push(tsb);
+
+    prevCtl = ctl;
+    prevAtl = atl;
   }
 
-  return { dates, ctls, atls };
+  return { dates, ctls, atls, tsbs };
 }
 
 /**
@@ -75,15 +90,16 @@ export function calculateFitness(dailyTss: DailyTSS[]): FitnessMetrics {
 
   const sorted = [...dailyTss].sort((a, b) => a.date.localeCompare(b.date));
   const timeline = buildFullTimeline(sorted);
-  const { ctls, atls } = computeEma(timeline);
+  const { ctls, atls, tsbs } = computeEma(timeline);
 
   const ctl = ctls[ctls.length - 1] ?? 0;
   const atl = atls[atls.length - 1] ?? 0;
+  const tsb = tsbs[tsbs.length - 1] ?? 0;
 
   return {
     ctl: Math.round(ctl * 10) / 10,
     atl: Math.round(atl * 10) / 10,
-    tsb: Math.round((ctl - atl) * 10) / 10,
+    tsb: Math.round(tsb * 10) / 10,
   };
 }
 
@@ -97,7 +113,7 @@ export function calculateFitnessHistory(
 ): Array<{ date: string; ctl: number; atl: number; tsb: number }> {
   const sorted = [...dailyTss].sort((a, b) => a.date.localeCompare(b.date));
   const timeline = buildFullTimeline(sorted);
-  const { dates, ctls, atls } = computeEma(timeline);
+  const { dates, ctls, atls, tsbs } = computeEma(timeline);
 
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - daysBack);
@@ -110,7 +126,7 @@ export function calculateFitnessHistory(
         date: dates[i],
         ctl:  ctls[i],
         atl:  atls[i],
-        tsb:  Math.round((ctls[i] - atls[i]) * 10) / 10,
+        tsb:  tsbs[i],
       });
     }
   }
