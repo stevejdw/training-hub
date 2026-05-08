@@ -192,9 +192,10 @@ function RideModal({ ride, onClose }: { ride: ScatterPoint; onClose: () => void 
         )}
 
         {/* Stats row */}
-        <div className="grid grid-cols-4 gap-2 p-4 border-b border-gray-800">
+        <div className="grid grid-cols-5 gap-2 p-4 border-b border-gray-800">
           {[
             { label: 'Duration', value: fmtDuration(ride.moving_time) },
+            { label: 'Avg Power', value: `${ride.avg_watts}W` },
             { label: 'NP', value: `${ride.np}W` },
             { label: 'Avg HR', value: `${ride.avg_hr} bpm` },
             { label: 'EF', value: ef },
@@ -259,6 +260,8 @@ function RideModal({ ride, onClose }: { ride: ScatterPoint; onClose: () => void 
                 <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
                 <XAxis
                   dataKey="t"
+                  type="number"
+                  domain={[0, 'dataMax']}
                   tick={{ fill: '#6b7280', fontSize: 10 }}
                   axisLine={false}
                   tickLine={false}

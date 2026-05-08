@@ -191,9 +191,10 @@ export default function AerobicEfficiencyChart({ activityId, showCompare }: { ac
       </div>
 
       {/* Summary stats */}
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-5 gap-2">
         {[
           { label: 'Duration', value: fmtDuration(data.moving_time) },
+          { label: 'Avg Power', value: `${data.avg_watts}W` },
           { label: 'NP', value: `${data.np}W` },
           { label: 'Avg HR', value: `${data.avg_hr} bpm` },
           { label: 'EF', value: ef },
@@ -309,6 +310,8 @@ export default function AerobicEfficiencyChart({ activityId, showCompare }: { ac
                 <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
                 <XAxis
                   dataKey="t"
+                  type="number"
+                  domain={[0, 'dataMax']}
                   tick={{ fill: '#6b7280', fontSize: 10 }}
                   axisLine={false}
                   tickLine={false}
