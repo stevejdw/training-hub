@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback, useRef } from 'react';
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import {
   ComposedChart, Scatter, Line,
   XAxis, YAxis, CartesianGrid, Tooltip,
@@ -141,6 +141,54 @@ function RideModal({ ride, onClose }: { ride: ScatterPoint; onClose: () => void 
   const isBrushingRef = useRef(false);
   const brushStartRef = useRef<number | null>(null);
   const brushEndRef = useRef<number | null>(null);
+  const chartDataRef = useRef<{ t: number }[]>([]);
+
+  // Window-level mouse event listeners for brush drag
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isBrushingRef.current) return;
+      const el = chartContainerRef.current;
+      if (!el) return;
+      const svg = el.querySelector('svg');
+      if (!svg) return;
+      const rect = svg.getBoundingClientRect();
+      const chartLeft = rect.left + 0;
+      const chartRight = rect.right - 8;
+      const chartWidth = chartRight - chartLeft;
+      if (chartWidth <= 0) return;
+      const cd = chartDataRef.current;
+      if (cd.length === 0) return;
+      const maxT = cd[cd.length - 1].t;
+      if (maxT <= 0) return;
+      const mouseX = e.clientX;
+      const pct = Math.max(0, Math.min(1, (mouseX - chartLeft) / chartWidth));
+      const t = Math.round(pct * maxT);
+      brushEndRef.current = t;
+      setBrushEnd(t);
+    };
+    const handleMouseUp = () => {
+      if (!isBrushingRef.current) return;
+      isBrushingRef.current = false;
+      const s = brushStartRef.current;
+      const e = brushEndRef.current;
+      if (s != null && e != null) {
+        const lo = Math.min(s, e);
+        const hi = Math.max(s, e);
+        if (hi - lo < 1) {
+          brushStartRef.current = null;
+          brushEndRef.current = null;
+          setBrushStart(null);
+          setBrushEnd(null);
+        }
+      }
+    };
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, []);
 
   // Fetch stream data on mount
   useState(() => {
@@ -157,7 +205,7 @@ function RideModal({ ride, onClose }: { ride: ScatterPoint; onClose: () => void 
     if (!stream) return [];
     const n = stream.watts.length;
     const secPerSample = stream.sec_per_sample || 1;
-    return Array.from({ length: n }, (_, i) => ({
+    const result = Array.from({ length: n }, (_, i) => ({
       t:     Math.round((i * secPerSample) / 60),   // minutes
       watts: stream.watts[i] ?? null,
       hr:    stream.hr[i]    ?? null,
@@ -165,6 +213,8 @@ function RideModal({ ride, onClose }: { ride: ScatterPoint; onClose: () => void 
         ? stream.watts[i]! / stream.hr[i]! 
         : null,
     }));
+    chartDataRef.current = result;
+    return result;
   }, [stream]);
 
   // Half-way point based on actual chart data midpoint, not moving_time
