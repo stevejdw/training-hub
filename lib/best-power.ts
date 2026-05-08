@@ -106,6 +106,21 @@ export async function ensureBestPowerTable(): Promise<void> {
     await client.query(`ALTER TABLE best_power_efforts ADD COLUMN IF NOT EXISTS sport_type TEXT`);
     // Index for the queries we actually run: filter by seconds + date, order by best_watts
     await client.query(`CREATE INDEX IF NOT EXISTS idx_bpe_lookup ON best_power_efforts(seconds, start_date DESC, best_watts DESC)`);
+
+    // Backfill a small batch of rows with NULL sport_type so data becomes
+    // visible gradually without blocking the request.
+    await client.query(`
+      UPDATE best_power_efforts bpe
+      SET start_date = a.start_date, sport_type = a.sport_type
+      FROM activities a
+      WHERE a.id = bpe.activity_id
+        AND bpe.sport_type IS NULL
+        AND bpe.activity_id IN (
+          SELECT activity_id FROM best_power_efforts
+          WHERE sport_type IS NULL
+          LIMIT 1000
+        )
+    `);
   } finally {
     client.release();
   }
