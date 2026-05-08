@@ -1,3 +1,6 @@
+import pool from './db';
+import { CYCLING_TYPES } from './sport-types';
+
 /**
  * Shared best-power interval definitions and compute logic.
  *
@@ -83,3 +86,77 @@ export function computeBestPower(watts: (number | null)[]): BestPowerResult[] {
     return { seconds, best_watts: Math.round(max / seconds) };
   });
 }
+
+/**
+ * Lazy-compute best power for any cycling activities that have power streams
+ * but are missing from `best_power_efforts`.  This is called by read endpoints
+ * so they self-heal without needing a separate backfill.
+ *
+ * Only processes `limit` activities at a time to stay within Vercel timeout.
+ * Returns the number of activities processed.
+ */
+export async function warmMissingActivities(
+  limit: number = 500,
+): Promise<{ processed: number; done: boolean }> {
+  const client = await pool.connect();
+  try {
+    // Find activities with power streams that are missing from best_power_efforts
+    const missingRes = await client.query(`
+      SELECT a.id
+      FROM activities a
+      JOIN activity_streams s ON s.activity_id = a.id
+      WHERE a.sport_type = ANY($1::text[])
+        AND array_length(s.watts, 1) > 0
+        AND NOT EXISTS (
+          SELECT 1 FROM best_power_efforts bpe
+          WHERE bpe.activity_id = a.id
+        )
+      ORDER BY a.start_date DESC
+      LIMIT $2
+    `, [CYCLING_TYPES, limit]);
+
+    const ids = missingRes.rows.map(r => r.id as number);
+    if (ids.length === 0) return { processed: 0, done: true };
+
+    // Fetch all streams for these activities in one query
+    const streamsRes = await client.query(`
+      SELECT activity_id, watts FROM activity_streams
+      WHERE activity_id = ANY($1::bigint[])
+    `, [ids]);
+
+    const streamMap = new Map<number, (number | null)[]>();
+    for (const row of streamsRes.rows) {
+      streamMap.set(row.activity_id as number, row.watts as (number | null)[]);
+    }
+
+    let processed = 0;
+    for (const id of ids) {
+      const watts = streamMap.get(id);
+      if (!watts || watts.length === 0) continue;
+
+      const results = computeBestPower(watts);
+
+      const valueClauses: string[] = [];
+      const valueParams: unknown[] = [];
+      for (const r of results) {
+        if (r.best_watts != null) {
+          valueClauses.push(`($${valueParams.length + 1}, $${valueParams.length + 2}, $${valueParams.length + 3})`);
+          valueParams.push(id, r.seconds, r.best_watts);
+        }
+      }
+      if (valueClauses.length > 0) {
+        await client.query(`
+          INSERT INTO best_power_efforts (activity_id, seconds, best_watts)
+          VALUES ${valueClauses.join(', ')}
+          ON CONFLICT (activity_id, seconds) DO UPDATE SET best_watts = EXCLUDED.best_watts
+        `, valueParams);
+      }
+      processed++;
+    }
+
+    return { processed, done: ids.length < limit };
+  } finally {
+    client.release();
+  }
+}
+

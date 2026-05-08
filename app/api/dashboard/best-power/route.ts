@@ -2,6 +2,7 @@ import pool from '@/lib/db';
 import { CYCLING_TYPES } from '@/lib/sport-types';
 import { NextRequest } from 'next/server';
 import { ensureBestPowerTable } from '@/lib/strava-sync';
+import { warmMissingActivities } from '@/lib/best-power';
 
 export const runtime = 'nodejs';
 export const maxDuration = 30;
@@ -12,6 +13,7 @@ export async function GET(req: NextRequest) {
   const days    = Math.max(0, parseInt(sp.get('days')    ?? '90',  10));
 
   await ensureBestPowerTable();
+  await warmMissingActivities(200);
 
   const client = await pool.connect();
   try {
@@ -22,7 +24,7 @@ export async function GET(req: NextRequest) {
       dateClause = `AND a.start_date >= NOW() - ($${params.length}::int * INTERVAL '1 day')`;
     }
 
-    // Pre-computed intervals (up to 2h) — read from best_power_efforts
+    // Pre-computed intervals (≤ 2h) — read from best_power_efforts
     if (seconds <= 7200) {
       const res = await client.query(`
         SELECT
@@ -43,7 +45,7 @@ export async function GET(req: NextRequest) {
       return Response.json({ results: res.rows, seconds });
     }
 
-    // Longer intervals (2h+) — fall back to average/NP across long rides
+    // Longer intervals (2h+) — fall back to NP/AP across rides with moving_time >= seconds
     const fallbackRes = await client.query(`
       SELECT
         a.id,

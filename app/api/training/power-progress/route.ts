@@ -2,6 +2,7 @@ import pool from '@/lib/db';
 import { NextRequest } from 'next/server';
 import { getProfile, effectiveFtp } from '@/lib/profile';
 import { ensureBestPowerTable } from '@/lib/strava-sync';
+import { warmMissingActivities } from '@/lib/best-power';
 
 export const runtime = 'nodejs';
 export const maxDuration = 45;
@@ -45,6 +46,8 @@ const COLORS = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#60a5fa', '#a78bfa'
 export async function GET(req: NextRequest) {
   try {
     await ensureBestPowerTable();
+    // Warm the table so subsequent loads are fast
+    await warmMissingActivities(200);
 
     const sp = req.nextUrl.searchParams;
     const days  = Math.min(99999, Math.max(1, parseInt(sp.get('days')  ?? '90', 10) || 90));

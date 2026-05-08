@@ -3,11 +3,12 @@ import { getProfile, effectiveFtp } from '@/lib/profile';
 import { NextRequest } from 'next/server';
 import { CYCLING_TYPES } from '@/lib/sport-types';
 import { ensureBestPowerTable } from '@/lib/strava-sync';
+import { warmMissingActivities, BEST_POWER_INTERVALS } from '@/lib/best-power';
 
 export type PeriodKey = string;
 
 function periodToClause(period: PeriodKey): string {
-  if (period === 'all') return ''; // no date filter
+  if (period === 'all') return '';
   if (period.startsWith('y:')) {
     const year = parseInt(period.slice(2), 10);
     return `AND a.start_date >= '${year}-01-01'::date AND a.start_date < '${year + 1}-01-01'::date`;
@@ -28,7 +29,7 @@ function periodToClause(period: PeriodKey): string {
   return '';
 }
 
-// Durations for the power curve, matching the chart's expected label ordering
+// All durations for the power curve, including long ones up to 15h
 const CURVE_DURATIONS = [
   { label: '1s',  seconds: 1    },
   { label: '5s',  seconds: 5    },
@@ -45,14 +46,23 @@ const CURVE_DURATIONS = [
   { label: '75m', seconds: 4500 },
   { label: '90m', seconds: 5400 },
   { label: '2h',  seconds: 7200 },
+  { label: '3h',  seconds: 10800 },
+  { label: '4h',  seconds: 14400 },
+  { label: '5h',  seconds: 18000 },
+  { label: '6h',  seconds: 21600 },
+  { label: '8h',  seconds: 28800 },
+  { label: '10h', seconds: 36000 },
+  { label: '12h', seconds: 43200 },
+  { label: '15h', seconds: 54000 },
 ];
 
 async function fetchCurve(period: PeriodKey) {
   const clause = periodToClause(period);
+  const secondsList = CURVE_DURATIONS.map(d => d.seconds);
 
   const client = await pool.connect();
   try {
-    // Read best power from the pre-computed table
+    // Step 1: read pre-computed best power from the table (up to 2h)
     const res = await client.query(`
       SELECT
         be.seconds,
@@ -65,7 +75,7 @@ async function fetchCurve(period: PeriodKey) {
         ${clause}
       GROUP BY be.seconds
       ORDER BY be.seconds
-    `, [CYCLING_TYPES, CURVE_DURATIONS.map(d => d.seconds)]);
+    `, [CYCLING_TYPES, secondsList]);
 
     const rowMap = new Map<number, number>();
     for (const row of res.rows) {
@@ -73,40 +83,28 @@ async function fetchCurve(period: PeriodKey) {
     }
 
     const points: { label: string; power: number }[] = [];
+
+    // Step 2: for each duration, try best_power_efforts first, then NP/AP fallback
     for (const d of CURVE_DURATIONS) {
       const val = rowMap.get(d.seconds);
       if (val != null && Number.isFinite(val) && val > 0) {
         points.push({ label: d.label, power: val });
+        continue;
       }
-    }
 
-    // For durations longer than any single ride (2h+), fall back to NP/AP across rides
-    // that span the full duration (e.g., a 2+ hour ride's NP is a good proxy for 2h best power)
-    if (!points.some(p => p.label === '2h')) {
-      const longRes = await client.query(`
+      // Fallback for long intervals that exceed any single ride's stream:
+      // use NP (or AP) across rides that are at least this long
+      const fallbackRes = await client.query(`
         SELECT
-          ROUND(MAX(COALESCE(normalized_power, weighted_average_watts, average_watts))::numeric) AS best_7200
+          ROUND(MAX(COALESCE(normalized_power, weighted_average_watts, average_watts))::numeric) AS best
         FROM activities a
         WHERE a.average_watts IS NOT NULL
           AND a.sport_type = ANY($1::text[])
-          AND a.moving_time >= 7200
+          AND a.moving_time >= $2
           ${clause}
-      `, [CYCLING_TYPES]);
-      if (longRes.rows[0]?.best_7200 != null) {
-        points.push({ label: '2h', power: Number(longRes.rows[0].best_7200) });
-      }
-
-      const longRes3h = await client.query(`
-        SELECT
-          ROUND(MAX(COALESCE(normalized_power, weighted_average_watts, average_watts))::numeric) AS best_10800
-        FROM activities a
-        WHERE a.average_watts IS NOT NULL
-          AND a.sport_type = ANY($1::text[])
-          AND a.moving_time >= 10800
-          ${clause}
-      `, [CYCLING_TYPES]);
-      if (longRes3h.rows[0]?.best_10800 != null) {
-        points.push({ label: '3h+', power: Number(longRes3h.rows[0].best_10800) });
+      `, [CYCLING_TYPES, d.seconds]);
+      if (fallbackRes.rows[0]?.best != null) {
+        points.push({ label: d.label, power: Number(fallbackRes.rows[0].best) });
       }
     }
 
@@ -122,6 +120,8 @@ export async function GET(req: NextRequest) {
 
   try {
     await ensureBestPowerTable();
+    // Warm the table so first request is fast for subsequent calls
+    await warmMissingActivities(200);
     const [curve1, profile] = await Promise.all([
       fetchCurve(p1),
       getProfile(),

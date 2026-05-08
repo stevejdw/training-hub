@@ -1,4 +1,5 @@
 import { syncRecentActivities, ensureBestPowerTable } from '@/lib/strava-sync';
+import { warmMissingActivities } from '@/lib/best-power';
 import pool from '@/lib/db';
 
 export const runtime = 'nodejs';
@@ -8,6 +9,8 @@ export async function POST() {
   try {
     // Ensure the best_power_efforts table exists before syncing
     await ensureBestPowerTable();
+    // Warm up any activities that haven't been processed yet
+    await warmMissingActivities(500);
     const result = await syncRecentActivities();
     return Response.json(result);
   } catch (err) {
