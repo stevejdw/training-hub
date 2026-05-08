@@ -162,7 +162,7 @@ export default function DashboardBestPower() {
           </div>
         ) : results.length === 0 ? (
           <p className="text-gray-500 text-sm text-center py-8">
-            No power data for this period — run the backfill workflow first
+            No power data for this period
           </p>
         ) : (
           <div className="divide-y divide-gray-700/50">
