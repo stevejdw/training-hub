@@ -11,11 +11,14 @@ import {
 } from 'recharts';
 import { useCachedFetch } from '@/lib/use-cached-fetch';
 import DurabilityCurveChart from './DurabilityCurveChart';
+import ActivityMap from '@/components/ActivityMap';
+import Link from 'next/link';
 
 interface Ride {
   id:          number;
   date:        string;
   name:        string;
+  summary_polyline: string | null;
   np:          number;
   avg_watts:   number;
   avg_hr:      number;
@@ -173,6 +176,13 @@ function RideModal({ ride, onClose }: { ride: ScatterPoint; onClose: () => void 
           <button onClick={onClose} className="text-gray-500 hover:text-gray-300 text-lg leading-none ml-4">✕</button>
         </div>
 
+        {/* Route map */}
+        {ride.summary_polyline && (
+          <div className="border-b border-gray-800">
+            <ActivityMap polyline={ride.summary_polyline} className="w-full h-44 rounded-none overflow-hidden bg-gray-800" thumbnail />
+          </div>
+        )}
+
         {/* Stats row */}
         <div className="grid grid-cols-4 gap-2 p-4 border-b border-gray-800">
           {[
@@ -291,10 +301,23 @@ function RideModal({ ride, onClose }: { ride: ScatterPoint; onClose: () => void 
           )}
         </div>
         {ride.hrv_low === true && (
-          <div className="mx-4 mb-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg px-3 py-2 text-xs text-yellow-400">
+          <div className="mx-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg px-3 py-2 text-xs text-yellow-400">
             ⚠ HRV was below your normal zone on this day — performance may reflect suppressed readiness.
           </div>
         )}
+
+        {/* View full activity */}
+        <div className="p-4 border-t border-gray-800">
+          <Link
+            href={`/activities/${ride.id}`}
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-orange-400 hover:text-orange-300 transition-colors"
+          >
+            View full activity
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+          </Link>
+        </div>
       </div>
     </div>
   );

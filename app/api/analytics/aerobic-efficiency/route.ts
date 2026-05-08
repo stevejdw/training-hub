@@ -73,6 +73,7 @@ export async function GET(req: NextRequest) {
         a.normalized_power,
         a.average_heartrate,
         a.moving_time,
+        a.summary_polyline,
         s.watts,
         s.hr
       FROM activities a
@@ -126,6 +127,7 @@ export async function GET(req: NextRequest) {
         id:           r.id,
         date:         r.date,
         name:         r.name,
+        summary_polyline: r.summary_polyline ?? null,
         np:           Math.round(Number(r.normalized_power)),
         avg_watts:    Math.round(Number(r.average_watts)),
         avg_hr:       Math.round(Number(r.average_heartrate)),
