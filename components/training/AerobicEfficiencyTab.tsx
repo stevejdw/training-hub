@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useRef } from 'react';
 import {
   ComposedChart, Scatter, Line,
   XAxis, YAxis, CartesianGrid, Tooltip,
@@ -138,6 +138,8 @@ function RideModal({ ride, onClose }: { ride: ScatterPoint; onClose: () => void 
   const [brushStart, setBrushStart] = useState<number | null>(null);
   const [brushEnd, setBrushEnd] = useState<number | null>(null);
   const [isBrushing, setIsBrushing] = useState(false);
+  const chartContainerRef = useRef<HTMLDivElement>(null);
+  const chartDataMax = useRef(0);
 
   // Fetch stream data on mount
   useState(() => {
@@ -280,33 +282,63 @@ function RideModal({ ride, onClose }: { ride: ScatterPoint; onClose: () => void 
           ) : chartData.length === 0 ? (
             <div className="h-48 flex items-center justify-center text-gray-500 text-sm">No stream data</div>
           ) : (
-            <ResponsiveContainer width="100%" height={200}>
-              <LineChart
-                data={chartData}
-                margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
-                onMouseDown={(e) => {
-                  const label = e?.activeLabel;
-                  if (label != null) {
-                    const t = typeof label === 'number' ? label : Number(label);
-                    if (!isNaN(t)) {
-                      setBrushStart(t);
-                      setBrushEnd(t);
-                      setIsBrushing(true);
-                    }
+            <div
+              ref={chartContainerRef}
+              className="relative select-none"
+              style={{ cursor: isBrushing ? 'ew-resize' : 'crosshair' }}
+              onMouseDown={(e) => {
+                // Get the chart area bounds from the SVG rendered inside
+                const el = chartContainerRef.current;
+                if (!el) return;
+                const svg = el.querySelector('svg');
+                if (!svg) return;
+                const rect = svg.getBoundingClientRect();
+                // Chart margins: top:4, right:8, left:0, bottom:0
+                const chartLeft = rect.left + 0;   // left margin
+                const chartRight = rect.right - 8; // right margin
+                const chartWidth = chartRight - chartLeft;
+                if (chartWidth <= 0) return;
+                const maxT = chartData.length > 0 ? chartData[chartData.length - 1].t : 0;
+                if (maxT <= 0) return;
+                const mouseX = e.clientX;
+                const pct = Math.max(0, Math.min(1, (mouseX - chartLeft) / chartWidth));
+                const t = Math.round(pct * maxT);
+                setBrushStart(t);
+                setBrushEnd(t);
+                setIsBrushing(true);
+              }}
+              onMouseMove={(e) => {
+                if (!isBrushing) return;
+                const el = chartContainerRef.current;
+                if (!el) return;
+                const svg = el.querySelector('svg');
+                if (!svg) return;
+                const rect = svg.getBoundingClientRect();
+                const chartLeft = rect.left + 0;
+                const chartRight = rect.right - 8;
+                const chartWidth = chartRight - chartLeft;
+                if (chartWidth <= 0) return;
+                const maxT = chartData.length > 0 ? chartData[chartData.length - 1].t : 0;
+                if (maxT <= 0) return;
+                const mouseX = e.clientX;
+                const pct = Math.max(0, Math.min(1, (mouseX - chartLeft) / chartWidth));
+                const t = Math.round(pct * maxT);
+                setBrushEnd(t);
+              }}
+              onMouseUp={() => {
+                setIsBrushing(false);
+                if (brushStart != null && brushEnd != null) {
+                  const lo = Math.min(brushStart, brushEnd);
+                  const hi = Math.max(brushStart, brushEnd);
+                  if (hi - lo < 1) {
+                    setBrushStart(null);
+                    setBrushEnd(null);
                   }
-                }}
-                onMouseMove={(e) => {
-                  if (isBrushing) {
-                    const label = e?.activeLabel;
-                    if (label != null) {
-                      const t = typeof label === 'number' ? label : Number(label);
-                      if (!isNaN(t)) setBrushEnd(t);
-                    }
-                  }
-                }}
-                onMouseUp={() => {
+                }
+              }}
+              onMouseLeave={() => {
+                if (isBrushing) {
                   setIsBrushing(false);
-                  // If the selection is too small (single point), clear it
                   if (brushStart != null && brushEnd != null) {
                     const lo = Math.min(brushStart, brushEnd);
                     const hi = Math.max(brushStart, brushEnd);
@@ -315,7 +347,13 @@ function RideModal({ ride, onClose }: { ride: ScatterPoint; onClose: () => void 
                       setBrushEnd(null);
                     }
                   }
-                }}
+                }
+              }}
+            >
+            <ResponsiveContainer width="100%" height={200}>
+              <LineChart
+                data={chartData}
+                margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
                 <XAxis
@@ -382,6 +420,7 @@ function RideModal({ ride, onClose }: { ride: ScatterPoint; onClose: () => void 
                 />
               </LineChart>
             </ResponsiveContainer>
+            </div>
           )}
           {/* Brush stats display */}
           {brushStats && (
