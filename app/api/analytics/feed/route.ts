@@ -5,6 +5,8 @@ import { calendarDaysFromToday } from '@/lib/calendar-days';
 
 export const runtime = 'nodejs';
 
+import { CYCLING_TYPES } from '@/lib/sport-types';
+
 const PR_DURATIONS = [
   { label: '1 min',  seconds: 60 },
   { label: '5 min',  seconds: 300 },
@@ -24,22 +26,57 @@ function rollingBest(arr: number[], w: number): number {
   return Math.round(best / w);
 }
 
-async function ensurePRTable(client: import('pg').PoolClient) {
-  await client.query(`
-    CREATE TABLE IF NOT EXISTS power_prs (
-      duration_seconds INTEGER PRIMARY KEY,
-      watts            INTEGER NOT NULL,
-      activity_id      BIGINT,
-      achieved_at      TIMESTAMPTZ
-    )
-  `);
+/** Query the true all-time best rolling-average power for a set of durations
+ *  by scanning raw watt streams across ALL cycling activities. */
+async function allTimeBests(client: import('pg').PoolClient): Promise<Map<number, number>> {
+  const maxDuration = Math.max(...PR_DURATIONS.map(d => d.seconds));
+  const minDuration = Math.min(...PR_DURATIONS.map(d => d.seconds));
+
+  // Build one window expression per duration, all scanning the array once
+  const windowExprs = PR_DURATIONS.map(
+    d => `SUM(COALESCE(w,0)::numeric) OVER (ORDER BY idx ROWS BETWEEN ${d.seconds - 1} PRECEDING AND CURRENT ROW) AS ws${d.seconds}`
+  ).join(',\n              ');
+
+  const lateralExprs = PR_DURATIONS.map(
+    d => `MAX(CASE WHEN idx >= ${d.seconds} THEN ws${d.seconds} END) AS max_ws${d.seconds}`
+  ).join(',\n            ');
+
+  const selectExprs = PR_DURATIONS.map(
+    d => `ROUND(MAX(bp.max_ws${d.seconds}) / ${d.seconds}.0)::int AS best_${d.seconds}`
+  ).join(',\n          ');
+
+  const res = await client.query(`
+    SELECT
+      ${selectExprs}
+    FROM activities a
+    JOIN activity_streams s ON s.activity_id = a.id
+    CROSS JOIN LATERAL (
+      SELECT
+        ${lateralExprs}
+      FROM (
+        SELECT
+          idx,
+          ${windowExprs}
+        FROM unnest(s.watts) WITH ORDINALITY AS t(w, idx)
+      ) sub
+    ) bp
+    WHERE a.average_watts IS NOT NULL
+      AND a.sport_type = ANY($1::text[])
+      AND array_length(s.watts, 1) >= ${minDuration}
+  `, [CYCLING_TYPES]);
+
+  const row = res.rows[0] ?? {};
+  const map = new Map<number, number>();
+  for (const d of PR_DURATIONS) {
+    const val = Number(row[`best_${d.seconds}`]);
+    if (Number.isFinite(val) && val > 0) map.set(d.seconds, val);
+  }
+  return map;
 }
 
 export async function GET() {
   const client = await pool.connect();
   try {
-    await ensurePRTable(client);
-
     // Parallel: recent rides, daily TSS (for fitness), profile, WTD stats
     const [ridesRes, dailyTssRes, profile] = await Promise.all([
       client.query(`
@@ -131,45 +168,22 @@ export async function GET() {
       if (streamRes.rows[0]?.watts) {
         const wattsArr: number[] = streamRes.rows[0].watts;
 
-        // Load stored PRs
-        const prRes = await client.query(`SELECT duration_seconds, watts FROM power_prs`);
-        const storedPRs = new Map<number, number>(
-          prRes.rows.map((r: { duration_seconds: number; watts: number }) => [r.duration_seconds, r.watts])
-        );
-
-        const toUpsert: { seconds: number; watts: number; actId: number }[] = [];
+        // Compute true all-time bests from all historical stream data
+        const allTime = await allTimeBests(client);
 
         for (const dur of PR_DURATIONS) {
           const best = rollingBest(wattsArr, dur.seconds);
           if (!best) continue;
-          const prev = storedPRs.get(dur.seconds) ?? null;
-          // Only flag as "new PR" if we have a previous best AND this ride beats it.
-          // If prev is null (first time tracking this duration), just show the watts without PR badge.
-          const isNew = prev !== null && best > prev;
+          const prev = allTime.get(dur.seconds) ?? null;
 
           powerHighlights.push({
             label: dur.label,
             seconds: dur.seconds,
             watts: best,
             prevBest: prev,
-            isNew,
+            // isNew = this ride's effort beats the all-time best
+            isNew: prev !== null && best > prev,
           });
-
-          // Always persist the best known value for this duration
-          if (prev === null || best > prev) {
-            toUpsert.push({ seconds: dur.seconds, watts: best, actId: lastCyclingRide.id });
-          }
-        }
-
-        // Persist new PRs
-        for (const { seconds, watts, actId } of toUpsert) {
-          await client.query(`
-            INSERT INTO power_prs (duration_seconds, watts, activity_id, achieved_at)
-            VALUES ($1, $2, $3, NOW())
-            ON CONFLICT (duration_seconds) DO UPDATE
-              SET watts = $2, activity_id = $3, achieved_at = NOW()
-            WHERE power_prs.watts < $2
-          `, [seconds, watts, actId]);
         }
       }
     }
