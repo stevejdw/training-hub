@@ -98,7 +98,6 @@ export const ALL_NAV_ITEMS: NavItem[] = [
   { key: 'activities',     href: '/activities',     label: 'Activities',     matchPrefixes: ['/activities'],              icon: activitiesIcon },
   { key: 'performance',    href: '/performance',    label: 'Performance',    matchPrefixes: ['/performance', '/fitness'], icon: performanceIcon },
   { key: 'training',       href: '/training',       label: 'Training',       matchPrefixes: ['/training'],                icon: trainingIcon },
-  { key: 'training-plans', href: '/training-plans', label: 'Training Plans', matchPrefixes: ['/training-plans'],          icon: trainingPlansIcon },
   { key: 'events',         href: '/events',         label: 'Events',         matchPrefixes: ['/events'],                  icon: eventsIcon },
   { key: 'goals',          href: '/goals',          label: 'Goals',          matchPrefixes: ['/goals'],                   icon: goalsIcon },
   { key: 'chat',           href: '/chat',           label: 'Coach AI',       matchPrefixes: ['/chat'],                    icon: chatIcon },

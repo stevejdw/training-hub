@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { getProfile, effectiveFtp } from '@/lib/profile';
+import { calculateFitness } from '@/lib/fitness';
 import pool from '@/lib/db';
 
 export const runtime = 'nodejs';
@@ -9,9 +10,8 @@ export const maxDuration = 60;
 const client = new Anthropic();
 
 function startOfWeekSydney(): string {
-  // Get current Sydney date (UTC+10/11 — use +10 simple offset)
   const now = new Date(Date.now() + 10 * 60 * 60 * 1000);
-  const dow = now.getUTCDay(); // 0=Sun, 1=Mon...
+  const dow = now.getUTCDay();
   const daysFromMon = dow === 0 ? 6 : dow - 1;
   const mon = new Date(now.getTime() - daysFromMon * 86400000);
   return mon.toISOString().slice(0, 10);
@@ -28,20 +28,123 @@ const DOW_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 interface DaySetting { maxMinutes: number; isGroupRide: boolean }
 type DaySettingsMap = Record<number, DaySetting>;
 
+/** Build rich context for the AI: recent fitness, power curve, readiness, etc. */
+async function buildRichContext(ftp: number): Promise<string> {
+  const ctx: string[] = [];
+  const client = await pool.connect();
+  try {
+    // 1. CTL/ATL/TSB — current fitness state
+    const dailyTssRes = await client.query(`
+      WITH strava_tss AS (
+        SELECT TO_CHAR(start_date AT TIME ZONE 'Australia/Sydney', 'YYYY-MM-DD') AS date,
+               SUM(COALESCE(tss, hrss, 0)) AS tss
+        FROM activities GROUP BY 1
+      ),
+      intervals_tss AS (
+        SELECT TO_CHAR(date, 'YYYY-MM-DD') AS date, icu_tss AS tss
+        FROM daily_wellness WHERE icu_tss IS NOT NULL
+      )
+      SELECT COALESCE(i.date, s.date) AS date, COALESCE(i.tss, s.tss, 0) AS tss
+      FROM intervals_tss i FULL OUTER JOIN strava_tss s ON i.date = s.date
+      ORDER BY 1
+    `);
+    const dailyTss = dailyTssRes.rows.map(r => ({ date: String(r.date), tss: Number(r.tss) }));
+    const fitness = calculateFitness(dailyTss);
+    ctx.push(`## Current Fitness
+- CTL (chronic training load / fitness): ${fitness.ctl}
+- ATL (acute training load / fatigue): ${fitness.atl}
+- TSB (training stress balance / form): ${fitness.tsb}${fitness.tsb >= 5 ? ' (fresh)' : fitness.tsb <= -20 ? ' (fatigued)' : ' (neutral)'}
+`);
+
+    // 2. Recent 28-day detailed activity summary (with power data)
+    const recentRes = await client.query(`
+      SELECT COUNT(*)::int AS total,
+        ROUND(AVG(moving_time)::numeric / 3600.0, 1) AS avg_hours,
+        ROUND(SUM(distance)::numeric / 1000.0, 0)::int AS total_km,
+        ROUND(AVG(COALESCE(tss, hrss, 0))::numeric, 0)::int AS avg_tss,
+        ROUND(AVG(COALESCE(normalized_power, average_watts, 0))::numeric, 0)::int AS avg_np,
+        ROUND(AVG(COALESCE(intensity_factor, 0))::numeric, 2)::float AS avg_if
+      FROM activities
+      WHERE start_date >= NOW() - INTERVAL '28 days'
+        AND sport_type = ANY(ARRAY['Ride','VirtualRide','GravelRide','MountainBikeRide','EBikeRide','EMountainBikeRide'])
+    `);
+    const r = recentRes.rows[0];
+    ctx.push(`## Recent Training (last 28 days)
+- ${r.total} rides, avg ${r.avg_hours}h, ${r.total_km}km total
+- Avg TSS ${r.avg_tss} per ride, Avg NP ${r.avg_np}W, Avg IF ${r.avg_if}
+`);
+
+    // 3. Readiness / HRV from daily_wellness
+    const readinessRes = await client.query(`
+      SELECT ROUND(AVG(icu_readiness)::numeric, 0)::int AS avg_readiness,
+             ROUND(AVG(morning_hrv)::numeric, 0)::int AS avg_hrv
+      FROM daily_wellness
+      WHERE date >= NOW() - INTERVAL '14 days'
+        AND (
+          icu_readiness IS NOT NULL
+          OR morning_hrv IS NOT NULL
+        )
+    `);
+    const rdy = readinessRes.rows[0];
+    if (rdy && (rdy.avg_readiness || rdy.avg_hrv)) {
+      ctx.push(`## Readiness (last 14 days)
+- Avg readiness: ${rdy.avg_readiness ?? 'N/A'}/10
+- Avg morning HRV: ${rdy.avg_hrv ?? 'N/A'}ms
+`);
+    }
+
+    // 4. Best power curve (top efforts)
+    const powerRes = await client.query(`
+      SELECT duration_seconds, ROUND(AVG(best_power)::numeric, 0)::int AS best_power
+      FROM best_efforts
+      WHERE duration_seconds IN (5, 60, 300, 600, 1200, 3600)
+      GROUP BY duration_seconds
+      ORDER BY duration_seconds
+    `);
+    if (powerRes.rows.length > 0) {
+      const powerLines = powerRes.rows.map(p => {
+        const label = p.duration_seconds <= 5 ? 'Sprint (5s)' :
+                      p.duration_seconds <= 60 ? '1 min' :
+                      p.duration_seconds <= 300 ? '5 min' :
+                      p.duration_seconds <= 600 ? '10 min' :
+                      p.duration_seconds <= 1200 ? '20 min' : '60 min (FTP proxy)';
+        return `- ${label}: ${p.best_power}W`;
+      });
+      ctx.push(`## Best Power Curve\n${powerLines.join('\n')}\n`);
+    }
+
+    // 5. TSS plan config if set
+    const profile = await getProfile();
+    if (profile.tss_plan && profile.tss_plan.mode) {
+      const tss = profile.tss_plan;
+      ctx.push(`## TSS Plan Targets
+- Mode: ${tss.mode}
+- Starting TSS: ${tss.starting_tss}
+- Weekly increase: ${tss.weekly_increase_pct}%
+- Block weeks: ${tss.block_weeks} (final week is recovery at ${tss.recovery_pct}% of build week)
+- Anchor date: ${tss.anchor_date}
+`);
+    }
+  } finally {
+    client.release();
+  }
+  return ctx.join('\n');
+}
+
 function buildSystemPrompt(
   ftp: number,
   profile: { weight_kg: number | null; training_goals: string; events: { name: string; date: string }[]; ai_training_plan_guidance?: string | null },
   recentSummary: string,
+  richContext: string,
   totalWeeks: number,
   goal: string,
-  trainingDays: number[], // 0=Mon…6=Sun
+  trainingDays: number[],
   daySettings: DaySettingsMap = {},
 ) {
   const dayNames = trainingDays.length > 0
     ? trainingDays.map(d => DOW_NAMES[d]).join(', ')
     : 'any days';
 
-  // Build per-day constraint lines
   const dayConstraints = trainingDays.map(d => {
     const s = daySettings[d];
     if (!s) return null;
@@ -55,7 +158,9 @@ function buildSystemPrompt(
     : '';
 
   return `You are an expert cycling coach. Output ONLY a JSON array — no markdown, no explanation, no code fences.
-Athlete: FTP=${ftp}W${profile.weight_kg ? ', ' + profile.weight_kg + 'kg' : ''}. ${profile.training_goals || 'General fitness'}. ${recentSummary}.
+Athlete: FTP=${ftp}W${profile.weight_kg ? ', ' + profile.weight_kg + 'kg' : ''}. ${profile.training_goals || 'General fitness'}.
+${recentSummary}
+${richContext}
 Events: ${profile.events.length > 0 ? profile.events.map(e => `${e.name} ${e.date}`).join(', ') : 'none'}.
 Goal: ${goal || 'base fitness'}.
 ${planGuidance}
@@ -129,7 +234,8 @@ export async function POST(req: NextRequest) {
       const weekEnd = addDays(weekStart, 6);
       const weekNum = weekIndex + 1;
 
-      const systemPrompt = buildSystemPrompt(ftp, profile, recentSummary, totalWeeks, goal, trainingDays, daySettings);
+      const richContext = await buildRichContext(ftp);
+      const systemPrompt = buildSystemPrompt(ftp, profile, recentSummary, richContext, totalWeeks, goal, trainingDays, daySettings);
       const userPrompt = `Generate week ${weekNum} of ${totalWeeks} (${weekStart} to ${weekEnd}). Week ${weekNum} load level: ${weekNum % 4 === 0 ? 'recovery (60% of peak TSS)' : weekNum % 4 === 1 ? 'build 1' : weekNum % 4 === 2 ? 'build 2' : 'peak'}. ${notes ? 'Notes: ' + notes : ''}`;
 
       const message = await client.messages.create({
@@ -155,7 +261,8 @@ export async function POST(req: NextRequest) {
 
     // Legacy single-shot mode (kept for compatibility, 4-week only)
     const planStart = startOfWeekSydney();
-    const systemPrompt = buildSystemPrompt(ftp, profile, recentSummary, weeks, goal, trainingDays, daySettings);
+    const richContext = await buildRichContext(ftp);
+    const systemPrompt = buildSystemPrompt(ftp, profile, recentSummary, richContext, weeks, goal, trainingDays, daySettings);
 
     const allDays: unknown[] = [];
     const name = `${weeks}-Week Plan${goal ? ': ' + goal.slice(0, 40) : ''}`;

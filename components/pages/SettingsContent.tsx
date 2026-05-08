@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { type ThemePreference, getThemePreference, setThemePreference } from '@/components/ThemeProvider';
 import { iconFor } from '@/components/nav-items';
 import { PageShell, useProfileEdit } from '@/lib/use-profile-edit';
+import TrainingPlansSettings from '@/components/training/TrainingPlansSettings';
 
 interface HistoryStatus {
   total:       number;
@@ -476,6 +477,9 @@ export default function SettingsContent() {
           </div>
         </div>
       </div>
+
+      {/* Training Plans */}
+      <TrainingPlansSettings />
 
       {/* Strava Connection */}
       <div className="bg-gray-900 rounded-xl p-5 space-y-4 border border-gray-800">

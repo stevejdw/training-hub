@@ -11,6 +11,7 @@ interface Props {
 const DOW_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 export default function CreatePlanModal({ onClose, onCreated }: Props) {
+  const [planName, setPlanName] = useState('');
   const [goal, setGoal] = useState('');
   const [notes, setNotes] = useState('');
   const [weeks, setWeeks] = useState(4);
@@ -37,7 +38,7 @@ export default function CreatePlanModal({ onClose, onCreated }: Props) {
       const mon = new Date(now.getTime() - daysFromMon * 86400000);
       const planStartDate = mon.toISOString().slice(0, 10);
 
-      const planName = `${weeks}-Week Plan${goal ? ': ' + goal.slice(0, 40) : ''}`;
+      const resolvedName = planName || `${weeks}-Week Plan${goal ? ': ' + goal.slice(0, 40) : ''}`;
       const planGoal = goal || 'Base fitness';
 
       // Generate all weeks in parallel — each call handles 1 week (~2s per call)
@@ -67,7 +68,7 @@ export default function CreatePlanModal({ onClose, onCreated }: Props) {
       const saveRes = await fetch('/api/training/plans', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: planName, goal: planGoal, days: allDays }),
+        body: JSON.stringify({ name: resolvedName, goal: planGoal, days: allDays }),
       });
       const saved = await saveRes.json();
       if (!saveRes.ok || saved.error) {
@@ -96,6 +97,16 @@ export default function CreatePlanModal({ onClose, onCreated }: Props) {
         </div>
 
         <div className="space-y-3">
+          <div>
+            <label className="text-xs text-gray-400 uppercase tracking-wider block mb-1">Name</label>
+            <input
+              value={planName}
+              onChange={e => setPlanName(e.target.value)}
+              disabled={busy}
+              placeholder="e.g. Summer Base 2026"
+              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-orange-500"
+            />
+          </div>
           <div>
             <label className="text-xs text-gray-400 uppercase tracking-wider block mb-1">Goal (optional)</label>
             <input
@@ -143,7 +154,7 @@ export default function CreatePlanModal({ onClose, onCreated }: Props) {
             </div>
           </div>
           <div>
-            <label className="text-xs text-gray-400 uppercase tracking-wider block mb-1">Additional notes (optional)</label>
+            <label className="text-xs text-gray-400 uppercase tracking-wider block mb-1">Additional instructions (optional)</label>
             <textarea
               value={notes}
               onChange={e => setNotes(e.target.value)}

@@ -246,11 +246,11 @@ export default function EditPlanModal({ plan, onClose, onUpdated }: Props) {
                 <button
                   onClick={() => updateDaySetting(i, 'isGroupRide', !daySettings[i]?.isGroupRide)}
                   disabled={busy}
-                  className={`relative w-9 h-5 rounded-full transition-colors flex-shrink-0 ${
+                  className={`relative w-9 h-5 rounded-full transition-colors duration-200 flex-shrink-0 ${
                     daySettings[i]?.isGroupRide ? 'bg-blue-500' : 'bg-gray-700'
                   }`}
                 >
-                  <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
+                  <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 ${
                     daySettings[i]?.isGroupRide ? 'translate-x-4' : 'translate-x-0.5'
                   }`} />
                 </button>
@@ -285,16 +285,9 @@ export default function EditPlanModal({ plan, onClose, onUpdated }: Props) {
           <button
             onClick={handleSaveGoalOnly}
             disabled={busy}
-            className="py-2 px-3 rounded-lg bg-gray-700 text-gray-300 hover:text-white text-sm transition-colors disabled:opacity-50"
-          >
-            Save goal
-          </button>
-          <button
-            onClick={handleRegenerate}
-            disabled={busy}
             className="flex-1 py-2 rounded-lg bg-orange-500 hover:bg-orange-400 text-white text-sm font-medium transition-colors disabled:opacity-50"
           >
-            {busy ? 'Working…' : 'Regenerate'}
+            {busy ? 'Working…' : 'Save'}
           </button>
         </div>
       </div>
