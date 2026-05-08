@@ -2,8 +2,7 @@ import pool from '@/lib/db';
 import { getProfile, effectiveFtp } from '@/lib/profile';
 import { NextRequest } from 'next/server';
 import { CYCLING_TYPES } from '@/lib/sport-types';
-import { ensureBestPowerTable } from '@/lib/strava-sync';
-import { warmMissingActivities, computeBestPower } from '@/lib/best-power';
+import { ensureBestPowerTable, warmMissingActivities } from '@/lib/best-power';
 
 export type PeriodKey = string;
 
@@ -11,14 +10,14 @@ function periodToClause(period: PeriodKey): string {
   if (period === 'all') return '';
   if (period.startsWith('y:')) {
     const year = parseInt(period.slice(2), 10);
-    return `AND a.start_date >= '${year}-01-01'::date AND a.start_date < '${year + 1}-01-01'::date`;
+    return `AND start_date >= '${year}-01-01'::date AND start_date < '${year + 1}-01-01'::date`;
   }
   const intervals: Record<string, string> = {
     '7d':  '7 days',  '30d': '30 days', '60d': '60 days',
     '90d': '90 days', '6m':  '180 days', '1y':  '365 days',
     '4w':  '28 days', '6w':  '42 days', '3m':  '90 days', '12m': '365 days',
   };
-  if (intervals[period]) return `AND a.start_date >= NOW() - INTERVAL '${intervals[period]}'`;
+  if (intervals[period]) return `AND start_date >= NOW() - INTERVAL '${intervals[period]}'`;
   return '';
 }
 
@@ -37,66 +36,23 @@ const CURVE_DURATIONS = [
   { label: '15h', seconds: 54000 },
 ];
 
-/**
- * For a given duration and filter clause, compute best power by scanning
- * raw power streams of the 200 most recent qualifying activities.
- * This is the fallback when best_power_efforts has no data for an interval.
- */
-async function computeDurationFromStreams(
-  client: any,
-  seconds: number,
-  clause: string,
-): Promise<number | null> {
-  const streamRes = await client.query(`
-    SELECT s.watts
-    FROM activity_streams s
-    JOIN activities a ON a.id = s.activity_id
-    WHERE a.sport_type = ANY($1::text[])
-      AND array_length(s.watts, 1) >= $2
-      ${clause}
-    ORDER BY a.start_date DESC
-    LIMIT 200
-  `, [CYCLING_TYPES, seconds]);
-
-  let best = 0;
-  for (const row of streamRes.rows) {
-    const watts = row.watts as (number | null)[];
-    const clean = watts.map((w: number | null) => w ?? 0);
-    const len = clean.length;
-    if (len < seconds) continue;
-
-    // Sliding window sum
-    let sum = 0;
-    for (let i = 0; i < seconds; i++) sum += clean[i];
-    let max = sum;
-    for (let i = seconds; i < len; i++) {
-      sum += clean[i] - clean[i - seconds];
-      if (sum > max) max = sum;
-    }
-    const avg = Math.round(max / seconds);
-    if (avg > best) best = avg;
-  }
-  return best > 0 ? best : null;
-}
-
 async function fetchCurve(period: PeriodKey) {
   const clause = periodToClause(period);
   const secondsList = CURVE_DURATIONS.map(d => d.seconds);
 
   const client = await pool.connect();
   try {
-    // Warm the table in background for future requests
+    // Fire-and-forget warm for future requests
     warmMissingActivities(500).catch(() => {});
 
-    // Read whatever is in best_power_efforts already
+    // Read from denormalized best_power_efforts — no join needed!
     const res = await client.query(`
-      SELECT be.seconds, MAX(be.best_watts) AS best_watts
-      FROM best_power_efforts be
-      JOIN activities a ON a.id = be.activity_id
-      WHERE a.sport_type = ANY($1::text[])
-        AND be.seconds = ANY($2::int[])
+      SELECT seconds, MAX(best_watts) AS best_watts
+      FROM best_power_efforts
+      WHERE sport_type = ANY($1::text[])
+        AND seconds = ANY($2::int[])
         ${clause}
-      GROUP BY be.seconds
+      GROUP BY seconds
     `, [CYCLING_TYPES, secondsList]);
 
     const precomputed = new Map<number, number>();
@@ -107,28 +63,20 @@ async function fetchCurve(period: PeriodKey) {
     const points: { label: string; power: number }[] = [];
 
     for (const d of CURVE_DURATIONS) {
-      // 1) Try pre-computed table
       const val = precomputed.get(d.seconds);
       if (val != null && Number.isFinite(val) && val > 0) {
         points.push({ label: d.label, power: val });
         continue;
       }
 
-      // 2) Fallback: scan streams for this specific duration
-      const streamVal = await computeDurationFromStreams(client, d.seconds, clause);
-      if (streamVal != null) {
-        points.push({ label: d.label, power: streamVal });
-        continue;
-      }
-
-      // 3) For long intervals (>= 30 min), fall back to NP/AP
+      // Fallback for long intervals (≥ 30 min): NP/AP from activities table
       if (d.seconds >= 1800) {
         const npRes = await client.query(`
           SELECT ROUND(MAX(COALESCE(normalized_power, weighted_average_watts, average_watts))::numeric) AS best
-          FROM activities a
-          WHERE a.sport_type = ANY($1::text[])
-            AND a.moving_time >= $2
-            AND COALESCE(a.normalized_power, a.weighted_average_watts, a.average_watts) IS NOT NULL
+          FROM activities
+          WHERE sport_type = ANY($1::text[])
+            AND moving_time >= $2
+            AND COALESCE(normalized_power, weighted_average_watts, average_watts) IS NOT NULL
             ${clause}
         `, [CYCLING_TYPES, d.seconds]);
         if (npRes.rows[0]?.best != null && npRes.rows[0].best > 0) {

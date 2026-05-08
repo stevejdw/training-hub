@@ -250,26 +250,6 @@ export async function syncRecentActivities(): Promise<{ synced: number; names: s
   return { synced: names.length, names };
 }
 
-/** Ensure the best_power_efforts table exists. */
-export async function ensureBestPowerTable(): Promise<void> {
-  const client = await pool.connect();
-  try {
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS best_power_efforts (
-        activity_id  BIGINT       NOT NULL,
-        seconds      INT          NOT NULL,
-        best_watts   NUMERIC(10,1),
-        PRIMARY KEY (activity_id, seconds)
-      )
-    `);
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_best_power_seconds ON best_power_efforts(seconds, best_watts DESC)
-    `);
-  } finally {
-    client.release();
-  }
-}
-
 export async function ensureSegmentTables(): Promise<void> {
   const client = await pool.connect();
   try {
@@ -465,21 +445,24 @@ export async function syncActivity(activityId: number): Promise<void> {
     // ── Compute & store best power for all intervals ───────────────────
     if (powerStream && powerStream.length > 0) {
       const results = computeBestPower(powerStream);
-      // Batched upsert using multi-row insert
-      // Build VALUES tuples: (activity_id, seconds, best_watts)
+      const startDate = a.start_date as string;
+      const sportType = (a.sport_type ?? a.type) as string;
       const valueClauses: string[] = [];
       const valueParams: unknown[] = [];
       for (const r of results) {
         if (r.best_watts != null) {
-          valueClauses.push(`($${valueParams.length + 1}, $${valueParams.length + 2}, $${valueParams.length + 3})`);
-          valueParams.push(activityId, r.seconds, r.best_watts);
+          valueClauses.push(`($${valueParams.length + 1}, $${valueParams.length + 2}, $${valueParams.length + 3}, $${valueParams.length + 4}::timestamptz, $${valueParams.length + 5})`);
+          valueParams.push(activityId, r.seconds, r.best_watts, startDate, sportType);
         }
       }
       if (valueClauses.length > 0) {
         await client.query(`
-          INSERT INTO best_power_efforts (activity_id, seconds, best_watts)
+          INSERT INTO best_power_efforts (activity_id, seconds, best_watts, start_date, sport_type)
           VALUES ${valueClauses.join(', ')}
-          ON CONFLICT (activity_id, seconds) DO UPDATE SET best_watts = EXCLUDED.best_watts
+          ON CONFLICT (activity_id, seconds) DO UPDATE SET
+            best_watts = EXCLUDED.best_watts,
+            start_date = COALESCE(best_power_efforts.start_date, EXCLUDED.start_date),
+            sport_type = COALESCE(best_power_efforts.sport_type, EXCLUDED.sport_type)
         `, valueParams);
       }
     }

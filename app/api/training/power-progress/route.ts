@@ -1,11 +1,10 @@
 import pool from '@/lib/db';
 import { NextRequest } from 'next/server';
 import { getProfile, effectiveFtp } from '@/lib/profile';
-import { ensureBestPowerTable } from '@/lib/strava-sync';
-import { warmMissingActivities } from '@/lib/best-power';
+import { ensureBestPowerTable, warmMissingActivities } from '@/lib/best-power';
 
 export const runtime = 'nodejs';
-export const maxDuration = 45;
+export const maxDuration = 10;
 
 const CYCLING_TYPES = ['Ride','VirtualRide','GravelRide','MountainBikeRide','EBikeRide','EMountainBikeRide'];
 
@@ -18,9 +17,6 @@ const DEFAULTS = [
   { seconds: 3600, label: '60 min' },
 ];
 
-/** FTP-relative target for an arbitrary duration. Used when the profile
- *  doesn't have a matching power_target seconds value. Rough rider model:
- *  super-short = anaerobic, getting closer to FTP at 30min, sub-FTP after. */
 function ftpMultiplier(seconds: number): number {
   if (seconds <= 30)   return 2.50;
   if (seconds <= 60)   return 1.80;
@@ -40,14 +36,13 @@ function secondsToLabel(s: number): string {
   return `${m.toFixed(1)} min`;
 }
 
-// Chart colours — assigned by position
 const COLORS = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#60a5fa', '#a78bfa', '#f472b6'];
 
 export async function GET(req: NextRequest) {
   try {
     await ensureBestPowerTable();
-    // Warm the table so subsequent loads are fast
-    await warmMissingActivities(200);
+    // Fire-and-forget: warm table in background so next load is even faster
+    warmMissingActivities(200).catch(() => {});
 
     const sp = req.nextUrl.searchParams;
     const days  = Math.min(99999, Math.max(1, parseInt(sp.get('days')  ?? '90', 10) || 90));
@@ -60,7 +55,6 @@ export async function GET(req: NextRequest) {
 
     const profileTargets = profile.power_targets ?? [];
 
-    // Build duration list
     let durations: { seconds: number; label: string }[];
     if (durationsParam) {
       const parsed = durationsParam.split(',')
@@ -97,22 +91,20 @@ export async function GET(req: NextRequest) {
 
     const client = await pool.connect();
     try {
-      // ── Weekly bests from best_power_efforts ─────────────────────
+      // ── Weekly bests from best_power_efforts (no join needed) ─────
       const weeklyRes = await client.query(`
         SELECT
-          date_trunc('week', (a.start_date AT TIME ZONE '${tz}'))::date::text AS week_start,
-          be.seconds,
-          MAX(be.best_watts) AS best_watts
-        FROM best_power_efforts be
-        JOIN activities a ON a.id = be.activity_id
-        WHERE a.sport_type = ANY($1::text[])
-          AND a.start_date >= NOW() - INTERVAL '${weeks} weeks'
-          AND be.seconds = ANY($2::int[])
-        GROUP BY week_start, be.seconds
-        ORDER BY week_start, be.seconds
+          date_trunc('week', (start_date AT TIME ZONE '${tz}'))::date::text AS week_start,
+          seconds,
+          MAX(best_watts) AS best_watts
+        FROM best_power_efforts
+        WHERE sport_type = ANY($1::text[])
+          AND start_date >= NOW() - INTERVAL '${weeks} weeks'
+          AND seconds = ANY($2::int[])
+        GROUP BY week_start, seconds
+        ORDER BY week_start, seconds
       `, [CYCLING_TYPES, secondsList]);
 
-      // Pivot weekly results: group rows into { week_start, d_180: ..., d_300: ... }
       const weeklyMap = new Map<string, Record<string, number | string | null>>();
       for (const row of weeklyRes.rows) {
         const ws = row.week_start as string;
@@ -126,18 +118,15 @@ export async function GET(req: NextRequest) {
         weeklyMap.get(ws)![`d_${sec}`] = watts;
       }
 
-      // ── Current bests (last N days) from best_power_efforts ──────
+      // ── Current bests (last N days) from best_power_efforts (no join) ──
       const currentRes = await client.query(`
-        SELECT
-          be.seconds,
-          MAX(be.best_watts) AS best_watts
-        FROM best_power_efforts be
-        JOIN activities a ON a.id = be.activity_id
-        WHERE a.sport_type = ANY($1::text[])
-          AND a.start_date >= NOW() - INTERVAL '${days} days'
-          AND be.seconds = ANY($2::int[])
-        GROUP BY be.seconds
-        ORDER BY be.seconds
+        SELECT seconds, MAX(best_watts) AS best_watts
+        FROM best_power_efforts
+        WHERE sport_type = ANY($1::text[])
+          AND start_date >= NOW() - INTERVAL '${days} days'
+          AND seconds = ANY($2::int[])
+        GROUP BY seconds
+        ORDER BY seconds
       `, [CYCLING_TYPES, secondsList]);
 
       const current: Record<string, number | null> = {};

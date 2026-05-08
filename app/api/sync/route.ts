@@ -1,5 +1,5 @@
-import { syncRecentActivities, ensureBestPowerTable } from '@/lib/strava-sync';
-import { warmMissingActivities } from '@/lib/best-power';
+import { syncRecentActivities } from '@/lib/strava-sync';
+import { ensureBestPowerTable, warmMissingActivities } from '@/lib/best-power';
 import pool from '@/lib/db';
 
 export const runtime = 'nodejs';
