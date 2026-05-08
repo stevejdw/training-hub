@@ -2,7 +2,7 @@ import pool from '@/lib/db';
 import { getProfile, effectiveFtp } from '@/lib/profile';
 import { NextRequest } from 'next/server';
 import { CYCLING_TYPES } from '@/lib/sport-types';
-import { ensureBestPowerTable, warmMissingActivities } from '@/lib/best-power';
+import { ensureBestPowerTableForRead } from '@/lib/best-power';
 
 export type PeriodKey = string;
 
@@ -42,9 +42,6 @@ async function fetchCurve(period: PeriodKey) {
 
   const client = await pool.connect();
   try {
-    // Fire-and-forget warm for future requests
-    warmMissingActivities(500).catch(() => {});
-
     // Read from denormalized best_power_efforts — no join needed!
     const res = await client.query(`
       SELECT seconds, MAX(best_watts) AS best_watts
@@ -96,7 +93,7 @@ export async function GET(req: NextRequest) {
   const p2 = req.nextUrl.searchParams.get('p2') ?? 'none';
 
   try {
-    await ensureBestPowerTable();
+    await ensureBestPowerTableForRead();
     const [curve1, profile] = await Promise.all([
       fetchCurve(p1),
       getProfile(),

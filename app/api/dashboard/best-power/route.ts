@@ -1,7 +1,7 @@
 import pool from '@/lib/db';
 import { CYCLING_TYPES } from '@/lib/sport-types';
 import { NextRequest } from 'next/server';
-import { ensureBestPowerTable, warmMissingActivities } from '@/lib/best-power';
+import { ensureBestPowerTableForRead } from '@/lib/best-power';
 
 export const runtime = 'nodejs';
 export const maxDuration = 10;
@@ -12,9 +12,7 @@ export async function GET(req: NextRequest) {
   const days    = Math.max(0, parseInt(sp.get('days')    ?? '90',  10));
 
   try {
-    await ensureBestPowerTable();
-    // Fire-and-forget warm for future requests
-    warmMissingActivities(500).catch(() => {});
+    await ensureBestPowerTableForRead();
 
     const client = await pool.connect();
     try {

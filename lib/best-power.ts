@@ -87,7 +87,11 @@ export function computeBestPower(watts: (number | null)[]): BestPowerResult[] {
   });
 }
 
-/** Ensure best_power_efforts table with denormalized columns and indexes. */
+/**
+ * Full table / index creation — only called from sync paths.
+ * Avoids calling this on read paths because every DDL statement
+ * triggers an implicit commit (even CREATE INDEX IF NOT EXISTS).
+ */
 export async function ensureBestPowerTable(): Promise<void> {
   const client = await pool.connect();
   try {
@@ -106,10 +110,39 @@ export async function ensureBestPowerTable(): Promise<void> {
     await client.query(`ALTER TABLE best_power_efforts ADD COLUMN IF NOT EXISTS sport_type TEXT`);
     // Index for the queries we actually run: filter by seconds + date, order by best_watts
     await client.query(`CREATE INDEX IF NOT EXISTS idx_bpe_lookup ON best_power_efforts(seconds, start_date DESC, best_watts DESC)`);
+  } finally {
+    client.release();
+  }
+}
 
-    // Backfill a small batch of rows with NULL sport_type so data becomes
-    // visible gradually without blocking the request.
-    await client.query(`
+/**
+ * Lightweight read-path check — verifies the table exists with a trivial
+ * query.  If the table is missing (first deploy), falls back to the full
+ * migration.  Once created, this is a ~1ms no-op.
+ */
+export async function ensureBestPowerTableForRead(): Promise<void> {
+  try {
+    const client = await pool.connect();
+    try {
+      await client.query(`SELECT 1 FROM best_power_efforts LIMIT 1`);
+    } finally {
+      client.release();
+    }
+  } catch {
+    // Table doesn't exist yet — do the full migration
+    await ensureBestPowerTable();
+  }
+}
+
+/**
+ * Backfill rows that have NULL sport_type (legacy rows written before
+ * the denormalized columns existed).  Call this from sync / backfill
+ * endpoints only, NOT from read paths.
+ */
+export async function backfillBestPowerMetadata(limit = 5000): Promise<number> {
+  const client = await pool.connect();
+  try {
+    const res = await client.query(`
       UPDATE best_power_efforts bpe
       SET start_date = a.start_date, sport_type = a.sport_type
       FROM activities a
@@ -118,9 +151,11 @@ export async function ensureBestPowerTable(): Promise<void> {
         AND bpe.activity_id IN (
           SELECT activity_id FROM best_power_efforts
           WHERE sport_type IS NULL
-          LIMIT 1000
+          LIMIT $1
         )
-    `);
+      RETURNING bpe.activity_id
+    `, [limit]);
+    return res.rowCount ?? 0;
   } finally {
     client.release();
   }

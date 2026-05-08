@@ -1,5 +1,5 @@
 import { syncRecentActivities } from '@/lib/strava-sync';
-import { ensureBestPowerTable, warmMissingActivities } from '@/lib/best-power';
+import { ensureBestPowerTable, warmMissingActivities, backfillBestPowerMetadata } from '@/lib/best-power';
 import pool from '@/lib/db';
 
 export const runtime = 'nodejs';
@@ -10,9 +10,11 @@ export async function POST() {
     // Ensure the best_power_efforts table exists before syncing
     await ensureBestPowerTable();
     // Warm up any activities that haven't been processed yet
-    await warmMissingActivities(500);
+    const warmResult = await warmMissingActivities(500);
+    // Backfill metadata for any legacy rows still missing sport_type/start_date
+    const backfilled = await backfillBestPowerMetadata(5000);
     const result = await syncRecentActivities();
-    return Response.json(result);
+    return Response.json({ ...result, warmed: warmResult.processed, backfilled });
   } catch (err) {
     console.error('Manual sync error:', err);
     return Response.json({ error: String(err) }, { status: 500 });
