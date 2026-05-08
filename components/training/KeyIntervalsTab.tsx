@@ -379,9 +379,11 @@ export default function KeyIntervalsTab() {
 
   const tf = TIMEFRAMES.find(t => t.key === timeframe) ?? TIMEFRAMES[1];
   const qs = `days=${tf.days}&weeks=${tf.weeks}&durations=${durations.join(',')}`;
+  // Cache-bust version — increment to invalidate all old cache entries
+  const CACHE_VERSION = 2;
   const { data, loading } = useCachedFetch<ProgressData>(
     `/api/training/power-progress?${qs}`,
-    `cache-training-power-progress-${qs}`,
+    `cache-v${CACHE_VERSION}-training-power-progress-${qs}`,
   );
 
   function effectiveTargetFor(t: Target): number {

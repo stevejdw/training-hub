@@ -3,7 +3,7 @@ import { getProfile, effectiveFtp } from '@/lib/profile';
 import { NextRequest } from 'next/server';
 import { CYCLING_TYPES } from '@/lib/sport-types';
 import { ensureBestPowerTable } from '@/lib/strava-sync';
-import { warmMissingActivities, computeBestPower, BEST_POWER_INTERVALS } from '@/lib/best-power';
+import { warmMissingActivities, computeBestPower } from '@/lib/best-power';
 
 export type PeriodKey = string;
 
