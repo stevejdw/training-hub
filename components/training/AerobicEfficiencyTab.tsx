@@ -137,9 +137,10 @@ function RideModal({ ride, onClose }: { ride: ScatterPoint; onClose: () => void 
   // Brush selection state
   const [brushStart, setBrushStart] = useState<number | null>(null);
   const [brushEnd, setBrushEnd] = useState<number | null>(null);
-  const [isBrushing, setIsBrushing] = useState(false);
   const chartContainerRef = useRef<HTMLDivElement>(null);
-  const chartDataMax = useRef(0);
+  const isBrushingRef = useRef(false);
+  const brushStartRef = useRef<number | null>(null);
+  const brushEndRef = useRef<number | null>(null);
 
   // Fetch stream data on mount
   useState(() => {
@@ -285,30 +286,8 @@ function RideModal({ ride, onClose }: { ride: ScatterPoint; onClose: () => void 
             <div
               ref={chartContainerRef}
               className="relative select-none"
-              style={{ cursor: isBrushing ? 'ew-resize' : 'crosshair' }}
+              style={{ cursor: isBrushingRef.current ? 'ew-resize' : 'crosshair' }}
               onMouseDown={(e) => {
-                // Get the chart area bounds from the SVG rendered inside
-                const el = chartContainerRef.current;
-                if (!el) return;
-                const svg = el.querySelector('svg');
-                if (!svg) return;
-                const rect = svg.getBoundingClientRect();
-                // Chart margins: top:4, right:8, left:0, bottom:0
-                const chartLeft = rect.left + 0;   // left margin
-                const chartRight = rect.right - 8; // right margin
-                const chartWidth = chartRight - chartLeft;
-                if (chartWidth <= 0) return;
-                const maxT = chartData.length > 0 ? chartData[chartData.length - 1].t : 0;
-                if (maxT <= 0) return;
-                const mouseX = e.clientX;
-                const pct = Math.max(0, Math.min(1, (mouseX - chartLeft) / chartWidth));
-                const t = Math.round(pct * maxT);
-                setBrushStart(t);
-                setBrushEnd(t);
-                setIsBrushing(true);
-              }}
-              onMouseMove={(e) => {
-                if (!isBrushing) return;
                 const el = chartContainerRef.current;
                 if (!el) return;
                 const svg = el.querySelector('svg');
@@ -323,26 +302,57 @@ function RideModal({ ride, onClose }: { ride: ScatterPoint; onClose: () => void 
                 const mouseX = e.clientX;
                 const pct = Math.max(0, Math.min(1, (mouseX - chartLeft) / chartWidth));
                 const t = Math.round(pct * maxT);
+                brushStartRef.current = t;
+                brushEndRef.current = t;
+                isBrushingRef.current = true;
+                setBrushStart(t);
+                setBrushEnd(t);
+              }}
+              onMouseMove={(e) => {
+                if (!isBrushingRef.current) return;
+                const el = chartContainerRef.current;
+                if (!el) return;
+                const svg = el.querySelector('svg');
+                if (!svg) return;
+                const rect = svg.getBoundingClientRect();
+                const chartLeft = rect.left + 0;
+                const chartRight = rect.right - 8;
+                const chartWidth = chartRight - chartLeft;
+                if (chartWidth <= 0) return;
+                const maxT = chartData.length > 0 ? chartData[chartData.length - 1].t : 0;
+                if (maxT <= 0) return;
+                const mouseX = e.clientX;
+                const pct = Math.max(0, Math.min(1, (mouseX - chartLeft) / chartWidth));
+                const t = Math.round(pct * maxT);
+                brushEndRef.current = t;
                 setBrushEnd(t);
               }}
               onMouseUp={() => {
-                setIsBrushing(false);
-                if (brushStart != null && brushEnd != null) {
-                  const lo = Math.min(brushStart, brushEnd);
-                  const hi = Math.max(brushStart, brushEnd);
+                isBrushingRef.current = false;
+                const s = brushStartRef.current;
+                const e = brushEndRef.current;
+                if (s != null && e != null) {
+                  const lo = Math.min(s, e);
+                  const hi = Math.max(s, e);
                   if (hi - lo < 1) {
+                    brushStartRef.current = null;
+                    brushEndRef.current = null;
                     setBrushStart(null);
                     setBrushEnd(null);
                   }
                 }
               }}
               onMouseLeave={() => {
-                if (isBrushing) {
-                  setIsBrushing(false);
-                  if (brushStart != null && brushEnd != null) {
-                    const lo = Math.min(brushStart, brushEnd);
-                    const hi = Math.max(brushStart, brushEnd);
+                if (isBrushingRef.current) {
+                  isBrushingRef.current = false;
+                  const s = brushStartRef.current;
+                  const e = brushEndRef.current;
+                  if (s != null && e != null) {
+                    const lo = Math.min(s, e);
+                    const hi = Math.max(s, e);
                     if (hi - lo < 1) {
+                      brushStartRef.current = null;
+                      brushEndRef.current = null;
                       setBrushStart(null);
                       setBrushEnd(null);
                     }
