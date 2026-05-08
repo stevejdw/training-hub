@@ -200,9 +200,21 @@ export async function GET(req: Request) {
     let dayPoints: TssDayPoint[] | undefined;
     if (granularity === 'day' && ranges.length === 1) {
       const { start, end } = ranges[0];
-      const dayTssTargets = cfg?.mode === 'formula'
-        ? null // formula targets are weekly only; no daily breakdown
-        : planByDate;
+      // For formula mode, distribute the weekly target evenly across 7 days
+      // so the blue target line is visible and aligned with the weekly plan.
+      let dayTssTargets: Map<string, number> | null = null;
+      if (cfg?.mode === 'formula') {
+        const { target } = formulaTarget(start, cfg);
+        const dailyTarget = Math.round(target / 7);
+        dayTssTargets = new Map<string, number>();
+        const cur = new Date(start);
+        while (cur <= end) {
+          dayTssTargets.set(fmtDate(cur), dailyTarget);
+          cur.setUTCDate(cur.getUTCDate() + 1);
+        }
+      } else {
+        dayTssTargets = planByDate;
+      }
       const days: TssDayPoint[] = [];
       const cur = new Date(start);
       let di = 0;
@@ -219,6 +231,7 @@ export async function GET(req: Request) {
       }
       dayPoints = days;
     }
+
 
     return Response.json({ weeks: weekPoints, days: dayPoints, config: cfg } satisfies TssSummaryResponse);
   } finally {

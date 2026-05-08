@@ -118,18 +118,15 @@ export default function TssRollingChart({ compact }: { compact?: boolean }) {
 
   // Show the last (most recent) week's data in the summary boxes
   const lastWeek = points.length > 0 ? points[points.length - 1] : null;
+  // For day view, sum daily actual TSS; for week view, use the week-level actual.
   const totalActual = isDayView
     ? (days ?? []).reduce((s, d) => s + d.actual_tss, 0)
     : lastWeek ? lastWeek.actual_tss : points.reduce((s, p) => s + p.actual_tss, 0);
-  const totalTarget = isDayView
-    ? (days ?? []).reduce((s, d) => s + d.target_tss, 0)
-    : lastWeek ? lastWeek.target_tss : points.reduce((s, p) => s + p.target_tss, 0);
-  // In day view with formula mode, daily targets are 0 (formula is weekly).
-  // Fall back to the weekly target from the week-level data for the on-track calculation.
-  const effectiveTarget = isDayView && totalTarget === 0 && lastWeek
-    ? lastWeek.target_tss
-    : totalTarget;
-  const onTrack     = effectiveTarget > 0 ? Math.round((totalActual / effectiveTarget) * 100) : null;
+  // Always use the weekly target from the week-level data so the summary
+  // boxes (Actual / Target / On track) are consistent regardless of view.
+  const totalTarget = lastWeek ? lastWeek.target_tss : 0;
+  const onTrack     = totalTarget > 0 ? Math.round((totalActual / totalTarget) * 100) : null;
+
 
 
   const modeLabel = config?.mode === 'formula' ? 'Custom formula' :
