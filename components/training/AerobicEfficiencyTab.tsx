@@ -226,9 +226,9 @@ function RideModal({ ride, onClose }: { ride: ScatterPoint; onClose: () => void 
           </div>
         </div>
 
-        {/* Power / HR time series */}
+        {/* EF time series */}
         <div className="p-4">
-          <p className="text-[11px] text-gray-500 uppercase tracking-wider mb-3">Power & HR Over Ride</p>
+          <p className="text-[11px] text-gray-500 uppercase tracking-wider mb-3">Efficiency Factor (EF) Over Ride</p>
           {loading ? (
             <div className="h-48 animate-pulse bg-gray-800 rounded-lg" />
           ) : err ? (
@@ -247,38 +247,20 @@ function RideModal({ ride, onClose }: { ride: ScatterPoint; onClose: () => void 
                   tickFormatter={v => `${v}m`}
                   tickCount={6}
                 />
-                {/* Watts Y-axis (left) */}
+                {/* EF Y-axis */}
                 <YAxis
-                  yAxisId="w"
+                  yAxisId="ef"
                   domain={['auto', 'auto']}
-                  tick={{ fill: '#f97316', fontSize: 10 }}
-                  axisLine={false}
-                  tickLine={false}
-                  width={36}
-                  tickFormatter={v => `${v}W`}
-                />
-                {/* HR Y-axis (right) */}
-                <YAxis
-                  yAxisId="hr"
-                  orientation="right"
-                  domain={['auto', 'auto']}
-                  tick={{ fill: '#60a5fa', fontSize: 10 }}
+                  tick={{ fill: '#ffffff', fontSize: 10 }}
                   axisLine={false}
                   tickLine={false}
                   width={40}
-                  tickFormatter={v => `${v}`}
-                />
-                {/* EF Y-axis (hidden) */}
-                <YAxis
-                  yAxisId="ef"
-                  orientation="right"
-                  domain={['auto', 'auto']}
-                  hide
+                  tickFormatter={v => v.toFixed(2)}
                 />
                 {/* Shade first vs second half */}
                 {halfMin > 0 && (
                   <ReferenceArea
-                    yAxisId="w"
+                    yAxisId="ef"
                     x1={0}
                     x2={halfMin}
                     fill="#f97316"
@@ -288,7 +270,7 @@ function RideModal({ ride, onClose }: { ride: ScatterPoint; onClose: () => void 
                 )}
                 {halfMin > 0 && (
                   <ReferenceLine
-                    yAxisId="w"
+                    yAxisId="ef"
                     x={halfMin}
                     stroke="#374151"
                     strokeDasharray="4 3"
@@ -296,41 +278,17 @@ function RideModal({ ride, onClose }: { ride: ScatterPoint; onClose: () => void 
                   />
                 )}
                 <Line
-                  yAxisId="w"
-                  dataKey="watts"
-                  stroke="#f97316"
-                  strokeWidth={1.5}
-                  dot={false}
-                  isAnimationActive={false}
-                  connectNulls
-                />
-                <Line
-                  yAxisId="hr"
-                  dataKey="hr"
-                  stroke="#60a5fa"
-                  strokeWidth={1.5}
-                  dot={false}
-                  isAnimationActive={false}
-                  connectNulls
-                />
-                <Line
                   yAxisId="ef"
                   dataKey="ef"
                   stroke="#ffffff"
-                  strokeWidth={1.5}
+                  strokeWidth={2}
                   dot={false}
                   isAnimationActive={false}
                   connectNulls
-                  opacity={0.7}
                 />
               </LineChart>
             </ResponsiveContainer>
           )}
-          <p className="text-[10px] text-gray-600 mt-2">
-            <span className="text-orange-400">—</span> Power (W) ·
-            <span className="text-blue-400 ml-1.5">—</span> Heart rate (bpm) ·
-            <span className="text-white ml-1.5">—</span> EF
-          </p>
         </div>
         {ride.hrv_low === true && (
           <div className="mx-4 mb-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg px-3 py-2 text-xs text-yellow-400">

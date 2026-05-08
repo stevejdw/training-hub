@@ -81,7 +81,7 @@ export async function GET(req: NextRequest) {
         AND a.normalized_power IS NOT NULL
         AND a.average_watts    > 0
         AND a.average_heartrate > 60
-        AND (a.normalized_power::float / a.average_watts) < 1.05
+        AND (a.normalized_power::float / a.average_watts) < 1.10
         AND s.watts IS NOT NULL
         AND s.hr    IS NOT NULL
         AND array_length(s.watts, 1) > 60

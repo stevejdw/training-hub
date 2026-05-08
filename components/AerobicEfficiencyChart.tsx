@@ -86,6 +86,9 @@ export default function AerobicEfficiencyChart({ activityId, showCompare }: { ac
   const [comparePeriod, setComparePeriod] = useState<ComparePeriod | null>(null);
   const [compareData, setCompareData] = useState<AerobicData | null>(null);
   const [compareLoading, setCompareLoading] = useState(false);
+  const [showPower, setShowPower] = useState(true);
+  const [showHr, setShowHr] = useState(true);
+  const [showEf, setShowEf] = useState(true);
 
   useEffect(() => {
     setLoading(true);
@@ -240,6 +243,39 @@ export default function AerobicEfficiencyChart({ activityId, showCompare }: { ac
       <div>
         <div className="flex items-center justify-between mb-3">
           <p className="text-[11px] text-gray-500 uppercase tracking-wider">Efficiency Graph</p>
+          {/* Toggle buttons */}
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => setShowPower(p => !p)}
+              className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors border ${
+                showPower
+                  ? 'bg-orange-500/20 text-orange-400 border-orange-500/50'
+                  : 'bg-gray-800 text-gray-600 border-transparent'
+              }`}
+            >
+              W
+            </button>
+            <button
+              onClick={() => setShowHr(h => !h)}
+              className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors border ${
+                showHr
+                  ? 'bg-blue-500/20 text-blue-400 border-blue-500/50'
+                  : 'bg-gray-800 text-gray-600 border-transparent'
+              }`}
+            >
+              ♥
+            </button>
+            <button
+              onClick={() => setShowEf(e => !e)}
+              className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors border ${
+                showEf
+                  ? 'bg-white/10 text-white border-white/40'
+                  : 'bg-gray-800 text-gray-600 border-transparent'
+              }`}
+            >
+              EF
+            </button>
+          </div>
           {/* Compare period selector — only shown in fitness screen */}
           {showCompare && (
             <div className="flex items-center gap-1.5">
@@ -275,38 +311,44 @@ export default function AerobicEfficiencyChart({ activityId, showCompare }: { ac
                   tickFormatter={v => `${v}m`}
                   tickCount={6}
                 />
-                {/* Watts Y-axis (left) */}
-                <YAxis
-                  yAxisId="w"
-                  domain={['auto', 'auto']}
-                  tick={{ fill: '#f97316', fontSize: 10 }}
-                  axisLine={false}
-                  tickLine={false}
-                  width={36}
-                  tickFormatter={v => `${v}W`}
-                />
-                {/* HR Y-axis (right) */}
-                <YAxis
-                  yAxisId="hr"
-                  orientation="right"
-                  domain={['auto', 'auto']}
-                  tick={{ fill: '#60a5fa', fontSize: 10 }}
-                  axisLine={false}
-                  tickLine={false}
-                  width={36}
-                  tickFormatter={v => `${v}`}
-                />
-                {/* EF Y-axis (far right) */}
-                <YAxis
-                  yAxisId="ef"
-                  orientation="right"
-                  domain={efDomain}
-                  tick={{ fill: '#ffffff', fontSize: 10 }}
-                  axisLine={false}
-                  tickLine={false}
-                  width={40}
-                  tickFormatter={v => v.toFixed(2)}
-                />
+                {/* Watts Y-axis (left) — hidden when Power toggled off */}
+                {showPower && (
+                  <YAxis
+                    yAxisId="w"
+                    domain={['auto', 'auto']}
+                    tick={{ fill: '#f97316', fontSize: 10 }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={36}
+                    tickFormatter={v => `${v}W`}
+                  />
+                )}
+                {/* HR Y-axis (right) — hidden when HR toggled off */}
+                {showHr && (
+                  <YAxis
+                    yAxisId="hr"
+                    orientation="right"
+                    domain={['auto', 'auto']}
+                    tick={{ fill: '#60a5fa', fontSize: 10 }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={36}
+                    tickFormatter={v => `${v}`}
+                  />
+                )}
+                {/* EF Y-axis (far right) — hidden when EF toggled off */}
+                {showEf && (
+                  <YAxis
+                    yAxisId="ef"
+                    orientation="right"
+                    domain={efDomain}
+                    tick={{ fill: '#ffffff', fontSize: 10 }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={40}
+                    tickFormatter={v => v.toFixed(2)}
+                  />
+                )}
                 {/* Shade first vs second half */}
                 {halfMin > 0 && (
                   <ReferenceArea
@@ -328,85 +370,97 @@ export default function AerobicEfficiencyChart({ activityId, showCompare }: { ac
                   />
                 )}
                 <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#374151', strokeWidth: 1 }} />
-                <Line
-                  yAxisId="w"
-                  dataKey="watts"
-                  stroke="#f97316"
-                  strokeWidth={1.5}
-                  dot={false}
-                  isAnimationActive={false}
-                  connectNulls
-                />
-                <Line
-                  yAxisId="hr"
-                  dataKey="hr"
-                  stroke="#60a5fa"
-                  strokeWidth={1.5}
-                  dot={false}
-                  isAnimationActive={false}
-                  connectNulls
-                />
-                <Line
-                  yAxisId="ef"
-                  dataKey="ef"
-                  stroke="#ffffff"
-                  strokeWidth={1.5}
-                  dot={false}
-                  isAnimationActive={false}
-                  connectNulls
-                  opacity={0.7}
-                />
-                {/* Comparison overlay lines */}
+                {showPower && (
+                  <Line
+                    yAxisId="w"
+                    dataKey="watts"
+                    stroke="#f97316"
+                    strokeWidth={1.5}
+                    dot={false}
+                    isAnimationActive={false}
+                    connectNulls
+                  />
+                )}
+                {showHr && (
+                  <Line
+                    yAxisId="hr"
+                    dataKey="hr"
+                    stroke="#60a5fa"
+                    strokeWidth={1.5}
+                    dot={false}
+                    isAnimationActive={false}
+                    connectNulls
+                  />
+                )}
+                {showEf && (
+                  <Line
+                    yAxisId="ef"
+                    dataKey="ef"
+                    stroke="#ffffff"
+                    strokeWidth={1.5}
+                    dot={false}
+                    isAnimationActive={false}
+                    connectNulls
+                    opacity={0.7}
+                  />
+                )}
+                {/* Comparison overlay lines — match active toggles */}
                 {compareChartData.length > 0 && (
                   <>
-                    <Line
-                      yAxisId="w"
-                      data={compareChartData}
-                      dataKey="watts"
-                      stroke="#f97316"
-                      strokeWidth={1}
-                      dot={false}
-                      isAnimationActive={false}
-                      connectNulls
-                      strokeDasharray="4 3"
-                      opacity={0.5}
-                    />
-                    <Line
-                      yAxisId="hr"
-                      data={compareChartData}
-                      dataKey="hr"
-                      stroke="#60a5fa"
-                      strokeWidth={1}
-                      dot={false}
-                      isAnimationActive={false}
-                      connectNulls
-                      strokeDasharray="4 3"
-                      opacity={0.5}
-                    />
-                    <Line
-                      yAxisId="ef"
-                      data={compareChartData}
-                      dataKey="ef"
-                      stroke="#ffffff"
-                      strokeWidth={1}
-                      dot={false}
-                      isAnimationActive={false}
-                      connectNulls
-                      strokeDasharray="4 3"
-                      opacity={0.35}
-                    />
+                    {showPower && (
+                      <Line
+                        yAxisId="w"
+                        data={compareChartData}
+                        dataKey="watts"
+                        stroke="#f97316"
+                        strokeWidth={1}
+                        dot={false}
+                        isAnimationActive={false}
+                        connectNulls
+                        strokeDasharray="4 3"
+                        opacity={0.5}
+                      />
+                    )}
+                    {showHr && (
+                      <Line
+                        yAxisId="hr"
+                        data={compareChartData}
+                        dataKey="hr"
+                        stroke="#60a5fa"
+                        strokeWidth={1}
+                        dot={false}
+                        isAnimationActive={false}
+                        connectNulls
+                        strokeDasharray="4 3"
+                        opacity={0.5}
+                      />
+                    )}
+                    {showEf && (
+                      <Line
+                        yAxisId="ef"
+                        data={compareChartData}
+                        dataKey="ef"
+                        stroke="#ffffff"
+                        strokeWidth={1}
+                        dot={false}
+                        isAnimationActive={false}
+                        connectNulls
+                        strokeDasharray="4 3"
+                        opacity={0.35}
+                      />
+                    )}
                   </>
                 )}
               </LineChart>
             </ResponsiveContainer>
             <p className="text-[10px] text-gray-600 mt-2">
-              <span className="text-orange-400">—</span> Power (W) ·
-              <span className="text-blue-400 ml-1.5">—</span> Heart rate (bpm) ·
-              <span className="text-white ml-1.5">—</span> EF
+              {showPower && <><span className="text-orange-400">—</span> Power (W) ·</>}
+              {showHr && <><span className="text-blue-400 ml-1.5">—</span> Heart rate (bpm) ·</>}
+              {showEf && <><span className="text-white ml-1.5">—</span> EF ·</>}
               {comparePeriod && compareChartData.length > 0 && (
-                <span className="text-gray-500 ml-1.5">· <span className="opacity-50">- -</span> {COMPARE_LABELS[comparePeriod]}</span>
+                <span className="text-gray-500"><span className="opacity-50">- -</span> {COMPARE_LABELS[comparePeriod]} ·</span>
               )}
-              <span className="ml-3 text-gray-600">· First half shaded</span>
+              <span className="text-gray-600">First half shaded</span>
             </p>
           </>
         )}
