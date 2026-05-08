@@ -77,10 +77,13 @@ export default function DashboardBestPower() {
     try {
       const raw = localStorage.getItem(cacheKey);
       if (raw) cachedResults = JSON.parse(raw);
-    } catch {}
+    } catch {
+      // Corrupt cache — clear it
+      try { localStorage.removeItem(cacheKey); } catch {}
+    }
 
-    // Show cache immediately, then refresh in background
-    if (cachedResults) {
+    // Only use cache if it has valid data (empty array means "no data for this period" is OK)
+    if (cachedResults && Array.isArray(cachedResults)) {
       setResults(cachedResults);
       setLoading(false);
     } else {
@@ -109,6 +112,7 @@ export default function DashboardBestPower() {
 
     return () => controller.abort();
   }, [seconds, days]);
+
 
   const intervalLabel = INTERVALS.find(i => i.seconds === seconds)?.label ?? '';
 
