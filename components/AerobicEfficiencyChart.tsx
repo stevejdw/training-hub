@@ -144,7 +144,11 @@ export default function AerobicEfficiencyChart({ activityId, showCompare }: { ac
     }));
   }, [compareData]);
 
-  const halfMin = data ? Math.round((data.moving_time / 2) / 60) : 0;
+  // Half-way point based on actual chart data midpoint, not moving_time
+  const halfMin = chartData.length > 0
+    ? chartData[Math.floor(chartData.length / 2)].t
+    : 0;
+
 
   if (loading) {
     return <div className="h-64 bg-gray-800 rounded-xl animate-pulse" />;

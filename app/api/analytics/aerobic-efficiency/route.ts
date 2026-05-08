@@ -10,13 +10,17 @@ const CYCLING = ['Ride', 'VirtualRide', 'GravelRide', 'MountainBikeRide'];
 /**
  * Aerobic efficiency / decoupling per ride.
  *
- * Filters to "steady" rides (Variability Index < 1.05) so that EF is
+ * Filters to "steady" rides (Variability Index < 1.10) so that EF is
  * meaningful — VI compares NP to avg power; ≈1.0 means a flat-line effort.
  *
  * Decoupling % = ((EF_h1 − EF_h2) / EF_h1) × 100
  * where EF = avg_watts / avg_hr for each half of the ride. >5% indicates
  * meaningful aerobic decoupling (cardiac drift), often a marker of fatigue
  * or insufficient base aerobic fitness.
+ *
+ * Rides shorter than 90 minutes are excluded to ensure meaningful decoupling data.
+ * Rides can be individually excluded by adding their ID to the excluded_rides array
+ * in the athlete_profile.
  */
 export async function GET(req: NextRequest) {
   const range = req.nextUrl.searchParams.get('range') ?? '90d';
@@ -64,6 +68,19 @@ export async function GET(req: NextRequest) {
     }
     const hrvByDate = new Map(wRes.rows.map(r => [r.date, r.hrv_rmssd]));
 
+    // Get excluded ride IDs from profile
+    const excludedRides: number[] = (profile as any).excluded_rides ?? [];
+
+    const params: unknown[] = [CYCLING];
+    let paramIdx = 2;
+
+    let excludeClause = '';
+    if (excludedRides.length > 0) {
+      excludeClause = `AND a.id <> ALL($${paramIdx}::bigint[])`;
+      params.push(excludedRides);
+      paramIdx++;
+    }
+
     const sql = `
       SELECT
         a.id,
@@ -83,16 +100,19 @@ export async function GET(req: NextRequest) {
         AND a.average_watts    > 0
         AND a.average_heartrate > 60
         AND (a.normalized_power::float / a.average_watts) < 1.10
+        AND a.moving_time >= 5400  -- exclude rides shorter than 90 minutes
         AND s.watts IS NOT NULL
         AND s.hr    IS NOT NULL
         AND array_length(s.watts, 1) > 60
         AND array_length(s.hr, 1)    > 60
         ${interval ? `AND a.start_date >= NOW() - INTERVAL '${interval}'` : ''}
+        ${excludeClause}
       ORDER BY a.start_date ASC
       LIMIT 500
     `;
 
-    const res = await client.query(sql, [CYCLING]);
+    const res = await client.query(sql, params);
+
 
     const rides = res.rows.map(r => {
       const watts = (r.watts ?? []) as (number | null)[];

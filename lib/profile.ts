@@ -89,6 +89,9 @@ export interface AthleteProfile {
   intervals_last_synced?: string; // ISO date of most recent wellness record synced
   // Weekly TSS targets configuration (for rolling 4-week chart)
   tss_plan?: TssPlanConfig;
+  // Activity IDs excluded from aerobic efficiency analysis
+  excluded_rides?: number[];
+
 }
 
 export interface TssPlanConfig {

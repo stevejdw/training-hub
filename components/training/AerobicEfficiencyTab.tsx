@@ -131,6 +131,9 @@ function RideModal({ ride, onClose }: { ride: ScatterPoint; onClose: () => void 
   const [stream, setStream] = useState<StreamData | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
+  const [excluding, setExcluding] = useState(false);
+  const [excluded, setExcluded] = useState(false);
+
 
   // Fetch stream data on mount
   useState(() => {
@@ -157,7 +160,12 @@ function RideModal({ ride, onClose }: { ride: ScatterPoint; onClose: () => void 
     }));
   }, [stream]);
 
-  const halfMin = stream ? Math.round((stream.moving_time / 2) / 60) : 0;
+  // Half-way point based on actual chart data midpoint, not moving_time
+  // This ensures the half marker aligns with the actual data points
+  const halfMin = chartData.length > 0
+    ? chartData[Math.floor(chartData.length / 2)].t
+    : 0;
+
   const ef = (ride.np / ride.avg_hr).toFixed(3);
 
   return (
@@ -306,8 +314,40 @@ function RideModal({ ride, onClose }: { ride: ScatterPoint; onClose: () => void 
           </div>
         )}
 
-        {/* View full activity */}
-        <div className="p-4 border-t border-gray-800">
+        {/* Exclude + View full activity */}
+        <div className="p-4 border-t border-gray-800 flex items-center justify-between">
+          <button
+            onClick={async () => {
+              if (excluding || excluded) return;
+              setExcluding(true);
+              try {
+                const r = await fetch('/api/profile');
+                const profile = await r.json();
+                const excludedRides: number[] = profile.excluded_rides ?? [];
+                if (!excludedRides.includes(ride.id)) {
+                  excludedRides.push(ride.id);
+                }
+                await fetch('/api/profile', {
+                  method: 'PUT',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ ...profile, excluded_rides: excludedRides }),
+                });
+                setExcluded(true);
+              } catch {
+                // ignore
+              } finally {
+                setExcluding(false);
+              }
+            }}
+            disabled={excluding || excluded}
+            className={`text-xs font-medium transition-colors ${
+              excluded
+                ? 'text-green-400'
+                : 'text-red-400 hover:text-red-300'
+            }`}
+          >
+            {excluded ? '✓ Excluded from analysis' : excluding ? 'Excluding…' : 'Exclude from analysis'}
+          </button>
           <Link
             href={`/activities/${ride.id}`}
             className="inline-flex items-center gap-1.5 text-xs font-medium text-orange-400 hover:text-orange-300 transition-colors"
@@ -318,6 +358,7 @@ function RideModal({ ride, onClose }: { ride: ScatterPoint; onClose: () => void 
             </svg>
           </Link>
         </div>
+
       </div>
     </div>
   );
@@ -441,8 +482,10 @@ export default function AerobicEfficiencyTab() {
         <div className="bg-gray-800/60 rounded-xl p-3 text-center">
           <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Steady rides</p>
           <p className="text-2xl font-bold text-white">{scatterData.length}</p>
-          <p className="text-[10px] text-gray-500 mt-0.5">VI &lt; 1.05</p>
+          <p className="text-[10px] text-gray-500 mt-0.5">VI &lt; 1.10 · ≥90 min</p>
+
         </div>
+
         <div className="bg-gray-800/60 rounded-xl p-3 text-center">
           <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Avg decoupling</p>
           <p className={`text-2xl font-bold ${avgDecoupling >= 5 ? 'text-red-400' : avgDecoupling >= 3 ? 'text-yellow-400' : 'text-green-400'}`}>
@@ -484,7 +527,7 @@ export default function AerobicEfficiencyTab() {
           <div className="h-64 animate-pulse bg-gray-800 rounded-lg" />
         ) : scatterData.length === 0 ? (
           <div className="h-64 flex items-center justify-center text-gray-500 text-sm text-center px-4">
-            No steady rides (VI &lt; 1.05) with power + HR in this range
+            No steady rides (VI &lt; 1.10) with power + HR in this range
           </div>
         ) : (
           <ResponsiveContainer width="100%" height={280}>
