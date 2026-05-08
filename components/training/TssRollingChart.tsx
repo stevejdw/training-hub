@@ -2,9 +2,10 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import {
-  ComposedChart, Bar, Line, XAxis, YAxis,
+  ComposedChart, Bar, Line, ReferenceLine, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
+
 import { useCachedFetch } from '@/lib/use-cached-fetch';
 import type { TssSummaryResponse, TssWeekPoint, TssDayPoint } from '@/app/api/training/tss-summary/route';
 import type { TssPlanConfig, AthleteProfile } from '@/lib/profile';
@@ -260,10 +261,19 @@ export default function TssRollingChart({ compact }: { compact?: boolean }) {
               )}
             />
             <Bar  dataKey="actual_tss" fill="#f97316" name="actual_tss" radius={[3,3,0,0]} />
-            <Line dataKey="target_tss" stroke="#60a5fa" name="target_tss" strokeWidth={2}
-                  dot={{ r: 4, fill: '#60a5fa', strokeWidth: 0 }}
-                  activeDot={{ r: 5 }} isAnimationActive={false} />
+            {/* In day view with formula mode, show the weekly target as a horizontal reference line.
+                In plan mode (or week view), show per-day/per-week target as a line series. */}
+            {isDayView && config?.mode === 'formula' && totalTarget > 0 ? (
+              <ReferenceLine y={totalTarget} stroke="#60a5fa" strokeWidth={2}
+                strokeDasharray="6 3"
+                label={{ value: `Weekly target: ${totalTarget}`, position: 'right', fill: '#60a5fa', fontSize: 10 }} />
+            ) : (
+              <Line dataKey="target_tss" stroke="#60a5fa" name="target_tss" strokeWidth={2}
+                    dot={{ r: 4, fill: '#60a5fa', strokeWidth: 0 }}
+                    activeDot={{ r: 5 }} isAnimationActive={false} />
+            )}
           </ComposedChart>
+
         </ResponsiveContainer>
       )}
 
