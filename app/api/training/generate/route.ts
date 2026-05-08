@@ -30,7 +30,7 @@ type DaySettingsMap = Record<number, DaySetting>;
 
 function buildSystemPrompt(
   ftp: number,
-  profile: { weight_kg: number | null; training_goals: string; events: { name: string; date: string }[] },
+  profile: { weight_kg: number | null; training_goals: string; events: { name: string; date: string }[]; ai_training_plan_guidance?: string | null },
   recentSummary: string,
   totalWeeks: number,
   goal: string,
@@ -50,10 +50,15 @@ function buildSystemPrompt(
     return `- ${DOW_NAMES[d]}: up to ${hrs}${flag}`;
   }).filter(Boolean).join('\n');
 
+  const planGuidance = profile.ai_training_plan_guidance
+    ? `\n## Training Philosophy\n${profile.ai_training_plan_guidance}\n`
+    : '';
+
   return `You are an expert cycling coach. Output ONLY a JSON array — no markdown, no explanation, no code fences.
 Athlete: FTP=${ftp}W${profile.weight_kg ? ', ' + profile.weight_kg + 'kg' : ''}. ${profile.training_goals || 'General fitness'}. ${recentSummary}.
 Events: ${profile.events.length > 0 ? profile.events.map(e => `${e.name} ${e.date}`).join(', ') : 'none'}.
 Goal: ${goal || 'base fitness'}.
+${planGuidance}
 Overall plan: ${totalWeeks} weeks total. Build load through weeks; every 4th week is recovery (~60% TSS).
 Training days: ${dayNames}. ALL other days MUST be type "rest".
 ${dayConstraints ? `\nDay constraints:\n${dayConstraints}\nNever exceed the listed available time per day. For group ride days, use endurance/tempo type and steady power targets.` : ''}

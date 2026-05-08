@@ -50,10 +50,18 @@ export async function GET() {
     ]);
     const ftp = effectiveFtp(profile);
 
+    const personaLine = profile.coach_persona
+      ? `\n${profile.coach_persona}\n`
+      : '';
+
+    const feedbackLine = profile.ai_coaching_feedback
+      ? `\n## Feedback Style\n${profile.ai_coaching_feedback}\n`
+      : '';
+
     const response = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 120,
-      system: `You are a cycling coach for ${profile.name}. FTP: ${ftp}W.\n\n${trainingContext}`,
+      system: `You are a cycling coach for ${profile.name}. FTP: ${ftp}W.${personaLine}${feedbackLine}\n\n${trainingContext}`,
       messages: [
         {
           role: 'user',

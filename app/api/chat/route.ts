@@ -79,13 +79,29 @@ export async function POST(req: Request) {
     const [trainingContext, profile] = await Promise.all([buildTrainingContext(), getProfile()]);
     const ftp = effectiveFtp(profile);
 
+    // Build AI guidance sections from profile settings
     const personaLine = profile.coach_persona
       ? `\n## Your Persona\n${profile.coach_persona}\n`
+      : '';
+
+    const feedbackLine = profile.ai_coaching_feedback
+      ? `\n## Ride Feedback Guidance\n${profile.ai_coaching_feedback}\n`
+      : '';
+
+    const planGuidanceLine = profile.ai_training_plan_guidance
+      ? `\n## Training Plan Philosophy\n${profile.ai_training_plan_guidance}\n`
+      : '';
+
+    const commsLine = profile.ai_communication_style
+      ? `\n## Communication Preferences\n${profile.ai_communication_style}\n`
       : '';
 
     const systemPrompt = `You are a personal cycling coach for ${profile.name}. You have access to their complete training history and current plan, and can modify the plan when asked.
 
 ${personaLine}
+${feedbackLine}
+${planGuidanceLine}
+${commsLine}
 ${trainingContext}
 
 ## How to respond
@@ -95,14 +111,6 @@ ${trainingContext}
 - For short questions (e.g. "how was my last ride?"), reply in 2–4 sentences.
 - Reserve detailed breakdowns for when explicitly asked ("analyse my...", "full breakdown of...").
 - Use markdown sparingly — only when it genuinely aids readability.
-
-## Coach feedback on a ride (when asked "Coach feedback on..." or "feedback on my last ride" or similar)
-This is the priority default mode for ride feedback. Follow it strictly:
-- HARD LIMIT: 4–5 sentences total. Do NOT exceed.
-- DO NOT summarise the lap data or restate numbers the athlete can read themselves on the page (lap power, HR per lap, durations, distance, etc.).
-- Focus on INSIGHT: compare this ride's power intervals, HR response, and lap structure to similar sessions over the last ~4 weeks. Call out the trend (improving / plateau / regressing) and any HR decoupling or drift change.
-- Connect the finding to the athlete's current training goal (event, target power, known weaknesses from profile/plan).
-- End with one specific thing to focus on next. No bullet lists; flowing prose.
 
 ## Plan Modifications
 When asked to change a workout, use the update_training_day tool with the correct Day ID from the context. Apply the change directly — no need to ask for confirmation unless the request is ambiguous.`;

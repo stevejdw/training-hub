@@ -79,6 +79,10 @@ export interface AthleteProfile {
   bike_weight_kg?: number | null;
   // Coach AI
   coach_persona?: string;
+  // AI Settings — structured guidance for the coaching model
+  ai_coaching_feedback?: string;
+  ai_training_plan_guidance?: string;
+  ai_communication_style?: string;
   // intervals.icu integration
   intervals_athlete_id?: string;
   intervals_api_key?: string;
