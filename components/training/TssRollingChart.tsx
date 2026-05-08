@@ -6,10 +6,10 @@ import {
   CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
 import { useCachedFetch } from '@/lib/use-cached-fetch';
-import type { TssSummaryResponse, TssWeekPoint } from '@/app/api/training/tss-summary/route';
+import type { TssSummaryResponse, TssWeekPoint, TssDayPoint } from '@/app/api/training/tss-summary/route';
 import type { TssPlanConfig, AthleteProfile } from '@/lib/profile';
 
-const RANGE_OPTIONS = [4, 8, 12];
+const RANGE_OPTIONS = [1, 4, 8, 12];
 
 function fmtWeekLabel(weekStart: string): string {
   const M = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -37,7 +37,20 @@ function defaultConfig(): TssPlanConfig {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function CustomTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null;
-  const p = payload[0]?.payload as TssWeekPoint;
+  const p = payload[0]?.payload as ChartPoint;
+  // Day view (has date property)
+  if (p.date) {
+    return (
+      <div className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-xs shadow-lg space-y-0.5">
+        <p className="text-gray-400">{label} {p.date}</p>
+        <p className="text-orange-400">{p.actual_tss} TSS <span className="text-gray-500 font-normal">actual</span></p>
+        {p.target_tss > 0 && (
+          <p className="text-blue-400">{p.target_tss} TSS <span className="text-gray-500 font-normal">target</span></p>
+        )}
+      </div>
+    );
+  }
+  // Week view
   return (
     <div className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-xs shadow-lg space-y-0.5">
       <p className="text-gray-400">Week of {label}</p>
@@ -59,29 +72,58 @@ function CustomTooltip({ active, payload, label }: any) {
   );
 }
 
+const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+type ChartPoint = {
+  label: string;
+  actual_tss: number;
+  target_tss: number;
+  // day-specific (optional)
+  date?: string;
+  day_label?: string;
+  // week-specific (optional)
+  week_start?: string;
+  week_end?: string;
+  is_recovery?: boolean;
+  target_source?: string;
+  high_duration_recovery_warning?: boolean;
+};
+
 export default function TssRollingChart({ compact }: { compact?: boolean }) {
   const [weeks,        setWeeks]        = useState(4);
   const [offset,       setOffset]       = useState(0);   // weeks to scroll back
   const [editing,      setEditing]      = useState(false);
   const [refreshKey,   setRefreshKey]   = useState(0);
 
+  const isDayView = weeks === 1;
+
   const { data, loading } = useCachedFetch<TssSummaryResponse>(
-    `/api/training/tss-summary?weeks=${weeks}&offset=${offset}&_=${refreshKey}`,
+    `/api/training/tss-summary?weeks=${weeks}&offset=${offset}&granularity=${isDayView ? 'day' : 'week'}&_=${refreshKey}`,
     `cache-tss-summary-${weeks}-${offset}-${refreshKey}`,
   );
 
   const points = data?.weeks ?? [];
+  const days = data?.days ?? undefined;
   const config = data?.config ?? null;
 
-  const chartData = points.map(p => ({
-    ...p,
-    label: fmtWeekLabel(p.week_start),
-  }));
+  const chartData: ChartPoint[] = isDayView && days
+    ? days.map(d => ({
+        ...d,
+        label: d.day_label,
+      }))
+    : points.map(p => ({
+        ...p,
+        label: fmtWeekLabel(p.week_start),
+      }));
 
   // Show the last (most recent) week's data in the summary boxes
   const lastWeek = points.length > 0 ? points[points.length - 1] : null;
-  const totalActual = lastWeek ? lastWeek.actual_tss : points.reduce((s, p) => s + p.actual_tss, 0);
-  const totalTarget = lastWeek ? lastWeek.target_tss : points.reduce((s, p) => s + p.target_tss, 0);
+  const totalActual = isDayView
+    ? (days ?? []).reduce((s, d) => s + d.actual_tss, 0)
+    : lastWeek ? lastWeek.actual_tss : points.reduce((s, p) => s + p.actual_tss, 0);
+  const totalTarget = isDayView
+    ? (days ?? []).reduce((s, d) => s + d.target_tss, 0)
+    : lastWeek ? lastWeek.target_tss : points.reduce((s, p) => s + p.target_tss, 0);
   const onTrack     = totalTarget > 0 ? Math.round((totalActual / totalTarget) * 100) : null;
 
   const modeLabel = config?.mode === 'formula' ? 'Custom formula' :
@@ -137,7 +179,9 @@ export default function TssRollingChart({ compact }: { compact?: boolean }) {
   // Date range label from chart data
   const firstLabel = points.length > 0 ? fmtWeekLabel(points[0].week_start) : '';
   const lastLabel  = points.length > 0 ? fmtWeekLabel(points[points.length - 1].week_start) : '';
-  const rangeLabel = firstLabel && lastLabel ? `${firstLabel} – ${lastLabel}` : '';
+  const rangeLabel = isDayView && days && days.length > 0
+    ? `${days[0].date} – ${days[days.length - 1].date}`
+    : firstLabel && lastLabel ? `${firstLabel} – ${lastLabel}` : '';
 
   return (
     <div className="bg-gray-900 rounded-xl border border-gray-800 p-4 space-y-3">
@@ -246,17 +290,18 @@ export default function TssRollingChart({ compact }: { compact?: boolean }) {
         </button>
       </div>
 
-      {/* Per-week breakdown row */}
+      {/* Per-week breakdown row (only for multi-week views) */}
+      {!isDayView && (
+        <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${chartData.length}, 1fr)` }}>
+          {chartData.map((p, i) => (
+            <div key={p.week_start ?? `w${i}`} className="text-center">
+              {p.is_recovery && <span className="text-[8px] text-green-400 font-medium uppercase">recovery</span>}
+            </div>
+          ))}
+        </div>
+      )}
 
-      <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${chartData.length}, 1fr)` }}>
-        {chartData.map(p => (
-          <div key={p.week_start} className="text-center">
-            {p.is_recovery && <span className="text-[8px] text-green-400 font-medium uppercase">recovery</span>}
-          </div>
-        ))}
-      </div>
-
-      {chartData.some(p => p.high_duration_recovery_warning) && (
+      {!isDayView && chartData.some(p => p.high_duration_recovery_warning) && (
         <div
           role="status"
           className="rounded-lg border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-200/95 leading-snug"

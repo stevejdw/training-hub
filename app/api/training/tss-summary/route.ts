@@ -19,8 +19,16 @@ export interface TssWeekPoint {
   high_duration_recovery_warning: boolean;
 }
 
+export interface TssDayPoint {
+  date:        string; // YYYY-MM-DD
+  day_label:   string; // Mon, Tue, etc.
+  actual_tss:  number;
+  target_tss:  number;
+}
+
 export interface TssSummaryResponse {
   weeks:  TssWeekPoint[];
+  days?:  TssDayPoint[];   // present when granularity=day
   config: TssPlanConfig | null;
 }
 
@@ -67,10 +75,13 @@ function formulaTarget(weekStart: Date, cfg: TssPlanConfig): { target: number; i
   };
 }
 
+const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const weeks = Math.max(1, Math.min(26, Number(searchParams.get('weeks') ?? '4')));
   const offset = Math.max(0, Number(searchParams.get('offset') ?? '0'));
+  const granularity = searchParams.get('granularity') ?? 'week';
 
   const profile = await getProfile();
   const cfg = profile.tss_plan ?? null;
@@ -185,7 +196,31 @@ export async function GET(req: Request) {
       };
     });
 
-    return Response.json({ weeks: weekPoints, config: cfg } satisfies TssSummaryResponse);
+    // Build daily points when granularity=day (single week view)
+    let dayPoints: TssDayPoint[] | undefined;
+    if (granularity === 'day' && ranges.length === 1) {
+      const { start, end } = ranges[0];
+      const dayTssTargets = cfg?.mode === 'formula'
+        ? null // formula targets are weekly only; no daily breakdown
+        : planByDate;
+      const days: TssDayPoint[] = [];
+      const cur = new Date(start);
+      let di = 0;
+      while (cur <= end) {
+        const k = fmtDate(cur);
+        days.push({
+          date:       k,
+          day_label:  DAY_LABELS[di % 7],
+          actual_tss: Math.round(tssByDate.get(k) ?? 0),
+          target_tss: dayTssTargets ? Math.round(dayTssTargets.get(k) ?? 0) : 0,
+        });
+        cur.setUTCDate(cur.getUTCDate() + 1);
+        di++;
+      }
+      dayPoints = days;
+    }
+
+    return Response.json({ weeks: weekPoints, days: dayPoints, config: cfg } satisfies TssSummaryResponse);
   } finally {
     client.release();
   }
