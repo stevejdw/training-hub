@@ -30,9 +30,9 @@ export async function POST(req: Request) {
   // Respond immediately — Strava requires a reply within 2 seconds
   after(async () => {
     try {
-      if (body.object_type === 'activity' && body.aspect_type === 'create') {
+      if (body.object_type === 'activity' && (body.aspect_type === 'create' || body.aspect_type === 'update')) {
         await syncActivity(body.object_id);
-        console.log(`Webhook: synced activity ${body.object_id}`);
+        console.log(`Webhook: synced activity ${body.object_id} (${body.aspect_type})`);
       }
     } catch (err) {
       console.error('Webhook sync error:', err);
