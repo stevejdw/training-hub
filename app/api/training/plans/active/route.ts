@@ -40,7 +40,7 @@ export async function GET() {
               (start_date AT TIME ZONE 'Australia/Sydney')::date::text AS date,
               moving_time, distance, total_elevation_gain,
               average_watts, normalized_power, weighted_average_watts,
-              average_heartrate, COALESCE(tss, hrss, 0))::int AS tss, intensity_factor
+              average_heartrate, COALESCE(tss, hrss, 0)::int AS tss, intensity_factor
             FROM activities
             WHERE (start_date AT TIME ZONE 'Australia/Sydney')::date >= $1
               AND (start_date AT TIME ZONE 'Australia/Sydney')::date <= $2
