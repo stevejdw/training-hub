@@ -134,6 +134,10 @@ function RideModal({ ride, onClose }: { ride: ScatterPoint; onClose: () => void 
   const [excluding, setExcluding] = useState(false);
   const [excluded, setExcluded] = useState(false);
 
+  // Brush selection state
+  const [brushStart, setBrushStart] = useState<number | null>(null);
+  const [brushEnd, setBrushEnd] = useState<number | null>(null);
+  const [isBrushing, setIsBrushing] = useState(false);
 
   // Fetch stream data on mount
   useState(() => {
@@ -165,6 +169,27 @@ function RideModal({ ride, onClose }: { ride: ScatterPoint; onClose: () => void 
   const halfMin = chartData.length > 0
     ? chartData[Math.floor(chartData.length / 2)].t
     : 0;
+
+  // Compute averages for the selected brush range
+  const brushStats = useMemo(() => {
+    if (brushStart == null || brushEnd == null) return null;
+    const lo = Math.min(brushStart, brushEnd);
+    const hi = Math.max(brushStart, brushEnd);
+    const selected = chartData.filter(d => d.t >= lo && d.t <= hi && d.watts != null && d.hr != null && d.hr! > 0);
+    if (selected.length === 0) return null;
+    const avgW = selected.reduce((s, d) => s + d.watts!, 0) / selected.length;
+    const avgH = selected.reduce((s, d) => s + d.hr!, 0) / selected.length;
+    const avgE = avgW / avgH;
+    const durationMin = hi - lo;
+    return {
+      fromMin: lo,
+      toMin: hi,
+      durationMin,
+      avgWatts: Math.round(avgW),
+      avgHr: Math.round(avgH),
+      ef: avgE.toFixed(3),
+    };
+  }, [brushStart, brushEnd, chartData]);
 
   const ef = (ride.np / ride.avg_hr).toFixed(3);
 
@@ -256,7 +281,42 @@ function RideModal({ ride, onClose }: { ride: ScatterPoint; onClose: () => void 
             <div className="h-48 flex items-center justify-center text-gray-500 text-sm">No stream data</div>
           ) : (
             <ResponsiveContainer width="100%" height={200}>
-              <LineChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+              <LineChart
+                data={chartData}
+                margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
+                onMouseDown={(e) => {
+                  const label = e?.activeLabel;
+                  if (label != null) {
+                    const t = typeof label === 'number' ? label : Number(label);
+                    if (!isNaN(t)) {
+                      setBrushStart(t);
+                      setBrushEnd(t);
+                      setIsBrushing(true);
+                    }
+                  }
+                }}
+                onMouseMove={(e) => {
+                  if (isBrushing) {
+                    const label = e?.activeLabel;
+                    if (label != null) {
+                      const t = typeof label === 'number' ? label : Number(label);
+                      if (!isNaN(t)) setBrushEnd(t);
+                    }
+                  }
+                }}
+                onMouseUp={() => {
+                  setIsBrushing(false);
+                  // If the selection is too small (single point), clear it
+                  if (brushStart != null && brushEnd != null) {
+                    const lo = Math.min(brushStart, brushEnd);
+                    const hi = Math.max(brushStart, brushEnd);
+                    if (hi - lo < 1) {
+                      setBrushStart(null);
+                      setBrushEnd(null);
+                    }
+                  }
+                }}
+              >
                 <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
                 <XAxis
                   dataKey="t"
@@ -298,6 +358,19 @@ function RideModal({ ride, onClose }: { ride: ScatterPoint; onClose: () => void 
                     label={{ value: 'Half', fill: '#6b7280', fontSize: 9, position: 'insideTopRight' }}
                   />
                 )}
+                {/* Brush selection highlight */}
+                {brushStart != null && brushEnd != null && (
+                  <ReferenceArea
+                    yAxisId="ef"
+                    x1={Math.min(brushStart, brushEnd)}
+                    x2={Math.max(brushStart, brushEnd)}
+                    fill="#3b82f6"
+                    fillOpacity={0.08}
+                    stroke="#3b82f6"
+                    strokeWidth={1}
+                    strokeDasharray="3 3"
+                  />
+                )}
                 <Line
                   yAxisId="ef"
                   dataKey="ef"
@@ -309,6 +382,36 @@ function RideModal({ ride, onClose }: { ride: ScatterPoint; onClose: () => void 
                 />
               </LineChart>
             </ResponsiveContainer>
+          )}
+          {/* Brush stats display */}
+          {brushStats && (
+            <div className="mt-3 bg-blue-500/10 border border-blue-500/30 rounded-xl p-3">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-[10px] text-blue-400 uppercase tracking-wider font-medium">
+                  Selection: {brushStats.fromMin}m – {brushStats.toMin}m ({brushStats.durationMin} min)
+                </p>
+                <button
+                  onClick={() => { setBrushStart(null); setBrushEnd(null); }}
+                  className="text-[10px] text-gray-500 hover:text-gray-300"
+                >
+                  Clear
+                </button>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <div className="text-center">
+                  <p className="text-[10px] text-gray-500 uppercase">Avg Power</p>
+                  <p className="text-sm font-bold text-orange-400">{brushStats.avgWatts}W</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-[10px] text-gray-500 uppercase">Avg HR</p>
+                  <p className="text-sm font-bold text-blue-400">{brushStats.avgHr} bpm</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-[10px] text-gray-500 uppercase">EF</p>
+                  <p className="text-sm font-bold text-white">{brushStats.ef}</p>
+                </div>
+              </div>
+            </div>
           )}
         </div>
         {ride.hrv_low === true && (
