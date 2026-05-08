@@ -19,32 +19,22 @@ export async function GET(req: NextRequest) {
       dateClause = `AND a.start_date >= NOW() - ($${params.length}::int * INTERVAL '1 day')`;
     }
 
-    // For each activity with a stored power stream, compute the max rolling-average
-    // over `seconds` consecutive samples, then return the top 10.
+    // Read from the pre-computed best_power_efforts table instead of
+    // re-scanning raw power streams every time.
     const res = await client.query(`
       SELECT
         a.id,
         a.name,
         a.start_date,
         a.sport_type,
-        bp.best_watts
-      FROM activities a
-      JOIN activity_streams s ON s.activity_id = a.id
-      JOIN LATERAL (
-        SELECT ROUND(MAX(rolling_sum) / $1::numeric)::int AS best_watts
-        FROM (
-          SELECT SUM(COALESCE(w, 0)::numeric) OVER (
-            ORDER BY idx
-            ROWS BETWEEN ($1::int - 1) PRECEDING AND CURRENT ROW
-          ) AS rolling_sum
-          FROM unnest(s.watts) WITH ORDINALITY AS t(w, idx)
-        ) sub
-      ) bp ON bp.best_watts IS NOT NULL
-      WHERE a.average_watts IS NOT NULL
+        be.best_watts
+      FROM best_power_efforts be
+      JOIN activities a ON a.id = be.activity_id
+      WHERE be.seconds = $1::int
+        AND a.average_watts IS NOT NULL
         AND a.sport_type = ANY($2::text[])
-        AND array_length(s.watts, 1) >= $1::int
         ${dateClause}
-      ORDER BY bp.best_watts DESC
+      ORDER BY be.best_watts DESC
       LIMIT 10
     `, params);
 

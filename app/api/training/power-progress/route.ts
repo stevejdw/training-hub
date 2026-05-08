@@ -44,7 +44,6 @@ const COLORS = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#60a5fa', '#a78bfa'
 export async function GET(req: NextRequest) {
   try {
     const sp = req.nextUrl.searchParams;
-    // Lookback windows. `days` for the "best" tile, `weeks` for the trend line.
     const days  = Math.min(99999, Math.max(1, parseInt(sp.get('days')  ?? '90', 10) || 90));
     const weeks = Math.min(99999, Math.max(1, parseInt(sp.get('weeks') ?? '26', 10) || 26));
     const durationsParam = sp.get('durations');
@@ -55,16 +54,13 @@ export async function GET(req: NextRequest) {
 
     const profileTargets = profile.power_targets ?? [];
 
-    // Build duration list:
-    //   1. If client passed `?durations=180,300,...`, use those verbatim
-    //   2. Otherwise: profile targets, padded with DEFAULTS up to 6 entries
+    // Build duration list
     let durations: { seconds: number; label: string }[];
     if (durationsParam) {
       const parsed = durationsParam.split(',')
         .map(s => parseInt(s.trim(), 10))
         .filter(s => Number.isInteger(s) && s > 0)
         .map(seconds => ({ seconds, label: secondsToLabel(seconds) }));
-      // Dedupe by seconds, keep order
       const seen = new Set<number>();
       durations = parsed.filter(d => seen.has(d.seconds) ? false : (seen.add(d.seconds), true));
     } else {
@@ -91,67 +87,58 @@ export async function GET(req: NextRequest) {
       return Response.json({ weekly: [], current: {}, targets: [], ftp });
     }
 
-    const minSeconds = Math.min(...durations.map(d => d.seconds));
-
-    // Build dynamic SQL fragments
-    const windowExprs = durations
-      .map(d => `SUM(COALESCE(w,0)::numeric) OVER (ORDER BY idx ROWS BETWEEN ${d.seconds - 1} PRECEDING AND CURRENT ROW) AS ws${d.seconds}`)
-      .join(',\n              ');
-
-    const lateralExprs = durations
-      .map(d => `MAX(CASE WHEN idx >= ${d.seconds} THEN ws${d.seconds} END) AS max_ws${d.seconds}`)
-      .join(',\n            ');
-
-    const selectExprs = durations
-      .map(d => `MAX(CASE WHEN bp.max_ws${d.seconds} IS NOT NULL THEN ROUND(bp.max_ws${d.seconds} / ${d.seconds}.0)::int END) AS d_${d.seconds}`)
-      .join(',\n          ');
+    const secondsList = durations.map(d => d.seconds);
 
     const client = await pool.connect();
     try {
+      // ── Weekly bests from best_power_efforts ─────────────────────
       const weeklyRes = await client.query(`
         SELECT
           date_trunc('week', (a.start_date AT TIME ZONE '${tz}'))::date::text AS week_start,
-          ${selectExprs}
-        FROM activities a
-        JOIN activity_streams s ON s.activity_id = a.id
-        CROSS JOIN LATERAL (
-          SELECT
-            ${lateralExprs}
-          FROM (
-            SELECT
-              idx,
-              ${windowExprs}
-            FROM unnest(s.watts) WITH ORDINALITY AS t(w, idx)
-          ) sub
-        ) bp
+          be.seconds,
+          MAX(be.best_watts) AS best_watts
+        FROM best_power_efforts be
+        JOIN activities a ON a.id = be.activity_id
         WHERE a.sport_type = ANY($1::text[])
           AND a.start_date >= NOW() - INTERVAL '${weeks} weeks'
-          AND array_length(s.watts, 1) >= ${minSeconds}
-        GROUP BY week_start
-        ORDER BY week_start
-      `, [CYCLING_TYPES]);
+          AND be.seconds = ANY($2::int[])
+        GROUP BY week_start, be.seconds
+        ORDER BY week_start, be.seconds
+      `, [CYCLING_TYPES, secondsList]);
 
+      // Pivot weekly results: group rows into { week_start, d_180: ..., d_300: ... }
+      const weeklyMap = new Map<string, Record<string, number | string | null>>();
+      for (const row of weeklyRes.rows) {
+        const ws = row.week_start as string;
+        const sec = Number(row.seconds);
+        const watts = Number(row.best_watts);
+        if (!weeklyMap.has(ws)) {
+          const obj: Record<string, number | string | null> = { week_start: ws };
+          for (const s of secondsList) obj[`d_${s}`] = null;
+          weeklyMap.set(ws, obj);
+        }
+        weeklyMap.get(ws)![`d_${sec}`] = watts;
+      }
+
+      // ── Current bests (last N days) from best_power_efforts ──────
       const currentRes = await client.query(`
         SELECT
-          ${selectExprs}
-        FROM activities a
-        JOIN activity_streams s ON s.activity_id = a.id
-        CROSS JOIN LATERAL (
-          SELECT
-            ${lateralExprs}
-          FROM (
-            SELECT
-              idx,
-              ${windowExprs}
-            FROM unnest(s.watts) WITH ORDINALITY AS t(w, idx)
-          ) sub
-        ) bp
+          be.seconds,
+          MAX(be.best_watts) AS best_watts
+        FROM best_power_efforts be
+        JOIN activities a ON a.id = be.activity_id
         WHERE a.sport_type = ANY($1::text[])
           AND a.start_date >= NOW() - INTERVAL '${days} days'
-          AND array_length(s.watts, 1) >= ${minSeconds}
-      `, [CYCLING_TYPES]);
+          AND be.seconds = ANY($2::int[])
+        GROUP BY be.seconds
+        ORDER BY be.seconds
+      `, [CYCLING_TYPES, secondsList]);
 
-      const current = currentRes.rows[0] ?? {};
+      const current: Record<string, number | null> = {};
+      for (const s of secondsList) current[`d_${s}`] = null;
+      for (const row of currentRes.rows) {
+        current[`d_${Number(row.seconds)}`] = Number(row.best_watts);
+      }
 
       const targets = durations.map((d, i) => {
         const match = profileTargets.find(t => t.seconds === d.seconds);
@@ -170,7 +157,7 @@ export async function GET(req: NextRequest) {
       });
 
       return Response.json({
-        weekly:  weeklyRes.rows,
+        weekly:  Array.from(weeklyMap.values()),
         current,
         targets,
         ftp,

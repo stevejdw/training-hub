@@ -1,5 +1,6 @@
 import pool from './db';
 import { getProfile, effectiveFtp } from './profile';
+import { computeBestPower, BEST_POWER_INTERVALS, BestPowerResult } from './best-power';
 
 const CLIENT_ID     = process.env.STRAVA_CLIENT_ID!;
 const CLIENT_SECRET = process.env.STRAVA_CLIENT_SECRET!;
@@ -249,6 +250,26 @@ export async function syncRecentActivities(): Promise<{ synced: number; names: s
   return { synced: names.length, names };
 }
 
+/** Ensure the best_power_efforts table exists. */
+export async function ensureBestPowerTable(): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS best_power_efforts (
+        activity_id  BIGINT       NOT NULL,
+        seconds      INT          NOT NULL,
+        best_watts   NUMERIC(10,1),
+        PRIMARY KEY (activity_id, seconds)
+      )
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_best_power_seconds ON best_power_efforts(seconds, best_watts DESC)
+    `);
+  } finally {
+    client.release();
+  }
+}
+
 export async function ensureSegmentTables(): Promise<void> {
   const client = await pool.connect();
   try {
@@ -439,6 +460,28 @@ export async function syncActivity(activityId: number): Promise<void> {
               latlng      = COALESCE(EXCLUDED.latlng,      activity_streams.latlng),
               time_s      = COALESCE(EXCLUDED.time_s,      activity_streams.time_s)
       `, [activityId, powerStream, hrStream, altStream, distStream, latlngStream, timeStream]);
+    }
+
+    // ── Compute & store best power for all intervals ───────────────────
+    if (powerStream && powerStream.length > 0) {
+      const results = computeBestPower(powerStream);
+      // Batched upsert using multi-row insert
+      // Build VALUES tuples: (activity_id, seconds, best_watts)
+      const valueClauses: string[] = [];
+      const valueParams: unknown[] = [];
+      for (const r of results) {
+        if (r.best_watts != null) {
+          valueClauses.push(`($${valueParams.length + 1}, $${valueParams.length + 2}, $${valueParams.length + 3})`);
+          valueParams.push(activityId, r.seconds, r.best_watts);
+        }
+      }
+      if (valueClauses.length > 0) {
+        await client.query(`
+          INSERT INTO best_power_efforts (activity_id, seconds, best_watts)
+          VALUES ${valueClauses.join(', ')}
+          ON CONFLICT (activity_id, seconds) DO UPDATE SET best_watts = EXCLUDED.best_watts
+        `, valueParams);
+      }
     }
 
     // Store laps

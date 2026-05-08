@@ -6,9 +6,10 @@ import { CYCLING_TYPES } from '@/lib/sport-types';
 export type PeriodKey = string;
 
 function periodToClause(period: PeriodKey): string {
+  if (period === 'all') return ''; // no date filter
   if (period.startsWith('y:')) {
     const year = parseInt(period.slice(2), 10);
-    return `AND EXTRACT(YEAR FROM a.start_date AT TIME ZONE 'Australia/Sydney') = ${year}`;
+    return `AND a.start_date >= '${year}-01-01'::date AND a.start_date < '${year + 1}-01-01'::date`;
   }
   const intervals: Record<string, string> = {
     '7d':  '7 days',
@@ -47,50 +48,33 @@ const CURVE_DURATIONS = [
 
 async function fetchCurve(period: PeriodKey) {
   const clause = periodToClause(period);
-  const minSeconds = 1; // always include 1s peak
-
-  const durations = CURVE_DURATIONS.filter(d => d.seconds > 0);
-
-  const windowExprs = durations
-    .map(d => `SUM(COALESCE(w,0)::numeric) OVER (ORDER BY idx ROWS BETWEEN ${d.seconds - 1} PRECEDING AND CURRENT ROW) AS ws${d.seconds}`)
-    .join(',\n              ');
-
-  const lateralExprs = durations
-    .map(d => `MAX(CASE WHEN idx >= ${d.seconds} THEN ws${d.seconds} END) AS max_ws${d.seconds}`)
-    .join(',\n            ');
-
-  const selectExprs = durations
-    .map(d => `ROUND(MAX(bp.max_ws${d.seconds}) / ${d.seconds}.0)::int AS best_${d.seconds}`)
-    .join(',\n          ');
 
   const client = await pool.connect();
   try {
+    // Read best power from the pre-computed table
     const res = await client.query(`
       SELECT
-        ${selectExprs}
-      FROM activities a
-      JOIN activity_streams s ON s.activity_id = a.id
-      CROSS JOIN LATERAL (
-        SELECT
-          ${lateralExprs}
-        FROM (
-          SELECT
-            idx,
-            ${windowExprs}
-          FROM unnest(s.watts) WITH ORDINALITY AS t(w, idx)
-        ) sub
-      ) bp
+        be.seconds,
+        MAX(be.best_watts) AS best_watts
+      FROM best_power_efforts be
+      JOIN activities a ON a.id = be.activity_id
       WHERE a.average_watts IS NOT NULL
         AND a.sport_type = ANY($1::text[])
-        AND array_length(s.watts, 1) >= ${minSeconds}
+        AND be.seconds = ANY($2::int[])
         ${clause}
-    `, [CYCLING_TYPES]);
+      GROUP BY be.seconds
+      ORDER BY be.seconds
+    `, [CYCLING_TYPES, CURVE_DURATIONS.map(d => d.seconds)]);
 
-    const row = res.rows[0] ?? {};
+    const rowMap = new Map<number, number>();
+    for (const row of res.rows) {
+      rowMap.set(Number(row.seconds), Number(row.best_watts));
+    }
+
     const points: { label: string; power: number }[] = [];
-    for (const d of durations) {
-      const val = Number(row[`best_${d.seconds}`]);
-      if (Number.isFinite(val) && val > 0) {
+    for (const d of CURVE_DURATIONS) {
+      const val = rowMap.get(d.seconds);
+      if (val != null && Number.isFinite(val) && val > 0) {
         points.push({ label: d.label, power: val });
       }
     }
