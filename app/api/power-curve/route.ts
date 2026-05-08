@@ -2,6 +2,7 @@ import pool from '@/lib/db';
 import { getProfile, effectiveFtp } from '@/lib/profile';
 import { NextRequest } from 'next/server';
 import { CYCLING_TYPES } from '@/lib/sport-types';
+import { ensureBestPowerTable } from '@/lib/strava-sync';
 
 export type PeriodKey = string;
 
@@ -120,6 +121,7 @@ export async function GET(req: NextRequest) {
   const p2 = req.nextUrl.searchParams.get('p2') ?? 'none';
 
   try {
+    await ensureBestPowerTable();
     const [curve1, profile] = await Promise.all([
       fetchCurve(p1),
       getProfile(),

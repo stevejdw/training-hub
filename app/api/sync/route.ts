@@ -1,4 +1,4 @@
-import { syncRecentActivities } from '@/lib/strava-sync';
+import { syncRecentActivities, ensureBestPowerTable } from '@/lib/strava-sync';
 import pool from '@/lib/db';
 
 export const runtime = 'nodejs';
@@ -6,6 +6,8 @@ export const maxDuration = 60;
 
 export async function POST() {
   try {
+    // Ensure the best_power_efforts table exists before syncing
+    await ensureBestPowerTable();
     const result = await syncRecentActivities();
     return Response.json(result);
   } catch (err) {
