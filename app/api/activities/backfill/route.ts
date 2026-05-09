@@ -17,8 +17,9 @@ export const maxDuration = 60;
  */
 
 export async function GET() {
-  const client = await pool.connect();
+  let client: PoolClient | undefined;
   try {
+    client = await pool.connect();
     const res = await client.query(
       `SELECT COUNT(*) AS n FROM activities WHERE segments_synced_at IS NULL`
     );
@@ -26,7 +27,7 @@ export async function GET() {
   } catch (err) {
     return Response.json({ remaining: 0, error: String(err) });
   } finally {
-    client.release();
+    client?.release();
   }
 }
 
