@@ -110,6 +110,8 @@ export async function ensureBestPowerTable(): Promise<void> {
     await client.query(`ALTER TABLE best_power_efforts ADD COLUMN IF NOT EXISTS sport_type TEXT`);
     // Index for the queries we actually run: filter by seconds + date, order by best_watts
     await client.query(`CREATE INDEX IF NOT EXISTS idx_bpe_lookup ON best_power_efforts(seconds, start_date DESC, best_watts DESC)`);
+    // Power-curve and dashboard best-power both filter by sport_type first; lead with it
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_bpe_sport_seconds ON best_power_efforts(sport_type, seconds, best_watts DESC)`);
   } finally {
     client.release();
   }

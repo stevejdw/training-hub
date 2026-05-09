@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import PowerCurveChart from '@/components/PowerCurveChart';
+import { useCachedFetch } from '@/lib/use-cached-fetch';
 
 const PERIODS = [
   { key: '7d',  label: '7d'  },
@@ -32,19 +33,11 @@ export default function PowerCurveWidget() {
   const [p1, setP1] = useState<PeriodKey>('90d');
   const [p2, setP2] = useState<PeriodKey | 'none'>('none');
   const [comparing, setComparing] = useState(false);
-  const [data, setData] = useState<CurveResponse | null>(null);
-  const [loading, setLoading] = useState(true);
 
-  const load = useCallback(() => {
-    setLoading(true);
-    const url = `/api/power-curve?p1=${p1}&p2=${comparing && p2 !== 'none' ? p2 : 'none'}`;
-    fetch(url)
-      .then(r => r.json())
-      .then(d => { setData(d); setLoading(false); })
-      .catch(() => setLoading(false));
-  }, [p1, p2, comparing]);
-
-  useEffect(() => { load(); }, [load]);
+  const effectiveP2 = comparing && p2 !== 'none' ? p2 : 'none';
+  const url = `/api/power-curve?p1=${p1}&p2=${effectiveP2}`;
+  const cacheKey = `cache-power-curve-${p1}-${effectiveP2}`;
+  const { data, loading } = useCachedFetch<CurveResponse>(url, cacheKey, 30 * 60 * 1000);
 
   // When compare is toggled off, reset p2
   useEffect(() => {

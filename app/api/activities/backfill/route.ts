@@ -1,4 +1,5 @@
 import pool from '@/lib/db';
+import type { PoolClient } from 'pg';
 import { getStravaToken } from '@/lib/strava-sync';
 
 export const runtime = 'nodejs';
@@ -30,7 +31,7 @@ export async function GET() {
 }
 
 export async function POST() {
-  let client;
+  let client: PoolClient | undefined;
   let processed = 0;
   let remaining = 0;
 
@@ -42,6 +43,7 @@ export async function POST() {
 
   try {
     client = await pool.connect();
+    const c = client;
     const token = await getStravaToken();
 
     // Grab 15 unscanned activities. With batch-inserted efforts the per-
@@ -97,7 +99,7 @@ export async function POST() {
             const gear   = a.gear as { id?: string; name?: string; nickname?: string; retired?: boolean } | null;
             const gearId = gear?.id ?? (a.gear_id as string | null) ?? null;
             if (gearId) {
-              await client.query(
+              await c.query(
                 `INSERT INTO gear (id, name, nickname, retired, synced_at)
                  VALUES ($1,$2,$3,$4,NOW())
                  ON CONFLICT (id) DO UPDATE SET
@@ -107,7 +109,7 @@ export async function POST() {
                    synced_at = NOW()`,
                 [gearId, gear?.name ?? null, gear?.nickname ?? null, gear?.retired ?? null]
               ).catch(() => {});
-              await client.query(
+              await c.query(
                 `UPDATE activities SET gear_id = $1 WHERE id = $2 AND gear_id IS DISTINCT FROM $1`,
                 [gearId, activityId]
               ).catch(() => {});
@@ -145,7 +147,7 @@ export async function POST() {
                 );
                 params.push(...r);
               });
-              await client.query(
+              await c.query(
                 `INSERT INTO segment_efforts
                    (id, activity_id, segment_id, name, elapsed_time, moving_time,
                     start_date, distance, average_watts, average_heartrate,
@@ -161,14 +163,14 @@ export async function POST() {
             }
           }
 
-          await client.query(
+          await c.query(
             `UPDATE activities SET segments_synced_at = NOW() WHERE id = $1`,
             [activityId]
           );
           processed++;
         } catch {
           // Mark as synced anyway to avoid retrying indefinitely
-          await client.query(
+          await c.query(
             `UPDATE activities SET segments_synced_at = NOW() WHERE id = $1`,
             [activityId]
           ).catch(() => {});

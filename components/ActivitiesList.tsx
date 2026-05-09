@@ -4,6 +4,14 @@ import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { SPORT_FILTER_LABELS, SportFilter, sportLabel, sportColor } from '@/lib/sport-types';
+import { useCachedFetch } from '@/lib/use-cached-fetch';
+
+interface ActivitiesResponse {
+  activities: Activity[];
+  total: number;
+  page: number;
+  pages: number;
+}
 
 function timeAgo(iso: string): string {
   const diff = (Date.now() - new Date(iso).getTime()) / 1000; // seconds
@@ -83,12 +91,6 @@ export default function ActivitiesList() {
 
   // Pagination
   const [page, setPage]   = useState(1);
-  const [pages, setPages] = useState(1);
-  const [total, setTotal] = useState(0);
-
-  // Data
-  const [activities, setActivities] = useState<Activity[]>([]);
-  const [loading,    setLoading]    = useState(true);
 
   // Gear filter
   const [gearList,    setGearList]    = useState<GearItem[]>([]);
@@ -234,33 +236,31 @@ export default function ActivitiesList() {
 
   const hasActiveFilters = selected.length > 0 || selectedGear.length > 0 || dateFrom || dateTo || minMins || maxMins || minKm || maxKm;
 
-  useEffect(() => {
-    setLoading(true);
-    const filtersParam = selected.length > 0 ? selected.join(',') : 'All';
-    const params = new URLSearchParams({
-      filters: filtersParam,
-      page:    String(page),
-      sortBy,
-      sortDir,
-    });
-    if (dateFrom) params.set('from',    dateFrom);
-    if (dateTo)   params.set('dateTo',  dateTo);
-    if (minMins)  params.set('minMins', minMins);
-    if (maxMins)  params.set('maxMins', maxMins);
-    if (minKm)    params.set('minKm',   minKm);
-    if (maxKm)    params.set('maxKm',   maxKm);
-    if (selectedGear.length > 0) params.set('gear', selectedGear.join(','));
+  const filtersParam = selected.length > 0 ? selected.join(',') : 'All';
+  const queryParams = new URLSearchParams({
+    filters: filtersParam,
+    page:    String(page),
+    sortBy,
+    sortDir,
+  });
+  if (dateFrom) queryParams.set('from',    dateFrom);
+  if (dateTo)   queryParams.set('dateTo',  dateTo);
+  if (minMins)  queryParams.set('minMins', minMins);
+  if (maxMins)  queryParams.set('maxMins', maxMins);
+  if (minKm)    queryParams.set('minKm',   minKm);
+  if (maxKm)    queryParams.set('maxKm',   maxKm);
+  if (selectedGear.length > 0) queryParams.set('gear', selectedGear.join(','));
+  const queryString = queryParams.toString();
 
-    fetch(`/api/activities?${params}`)
-      .then(r => r.json())
-      .then(d => {
-        setActivities(d.activities ?? []);
-        setPages(d.pages ?? 1);
-        setTotal(d.total ?? 0);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
-  }, [selected, selectedGear, page, sortBy, sortDir, dateFrom, dateTo, minMins, maxMins, minKm, maxKm]);
+  const { data, loading } = useCachedFetch<ActivitiesResponse>(
+    `/api/activities?${queryString}`,
+    `cache-activities-${queryString}`,
+    30 * 60 * 1000,
+  );
+
+  const activities = data?.activities ?? [];
+  const pages = data?.pages ?? 1;
+  const total = data?.total ?? 0;
 
   return (
     <div className="h-full flex flex-col md:max-w-5xl md:mx-auto md:w-full">
