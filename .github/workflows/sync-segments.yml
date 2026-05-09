@@ -12,9 +12,14 @@ jobs:
       - name: Refresh starred segments
         env:
           APP_URL: ${{ secrets.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
           if [ -z "$APP_URL" ]; then
             echo "ERROR: APP_URL secret is not set"
+            exit 1
+          fi
+          if [ -z "$CRON_SECRET" ]; then
+            echo "ERROR: CRON_SECRET secret is not set"
             exit 1
           fi
           URL=$(echo "$APP_URL" | tr -d '[:space:]')
@@ -24,6 +29,7 @@ jobs:
           http_code=$(curl -sS -o /tmp/resp.txt -w "%{http_code}" \
             -X POST "${URL}/api/segments/starred" \
             -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
             --max-time 120)
 
           echo "HTTP status: $http_code"

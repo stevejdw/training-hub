@@ -9,12 +9,32 @@ const PUBLIC_ROUTES = [
   '/api/strava/callback',
 ];
 
+/**
+ * API routes called by GitHub Actions cron workflows. They authenticate via
+ * a shared secret in the Authorization header rather than a session cookie.
+ */
+const CRON_ROUTES = [
+  '/api/activities/backfill',
+  '/api/segments/starred',
+];
+
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   // Allow public routes
   if (PUBLIC_ROUTES.some(route => pathname.startsWith(route))) {
     return NextResponse.next();
+  }
+
+  // Allow cron routes when the shared secret matches
+  if (CRON_ROUTES.some(route => pathname.startsWith(route))) {
+    const expected = process.env.CRON_SECRET;
+    const provided = req.headers.get('authorization');
+    if (expected && provided === `Bearer ${expected}`) {
+      return NextResponse.next();
+    }
+    // Otherwise fall through to session-based auth below — a logged-in user
+    // (e.g. clicking a button in Settings) should still be able to call these.
   }
 
   // Allow static files and Next.js internals
