@@ -30,7 +30,7 @@ export async function GET() {
 }
 
 export async function POST() {
-  const client = await pool.connect();
+  let client;
   let processed = 0;
   let remaining = 0;
 
@@ -41,6 +41,7 @@ export async function POST() {
   const timeLeft = () => TIME_BUDGET_MS - (Date.now() - startedAt);
 
   try {
+    client = await pool.connect();
     const token = await getStravaToken();
 
     // Grab 15 unscanned activities. With batch-inserted efforts the per-
@@ -194,6 +195,6 @@ export async function POST() {
     // Always return 200 so the cron workflow doesn't fail — the error is logged above
     return Response.json({ processed, remaining, error: String(err) });
   } finally {
-    client.release();
+    client?.release();
   }
 }
