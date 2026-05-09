@@ -117,12 +117,17 @@ export async function ensureBestPowerTable(): Promise<void> {
   }
 }
 
+// Module-level flag — skips the SELECT 1 round-trip on warm instances
+let _tableReady = false;
+
 /**
  * Lightweight read-path check — verifies the table exists with a trivial
  * query.  If the table is missing (first deploy), falls back to the full
- * migration.  Once created, this is a ~1ms no-op.
+ * migration.  After the first successful check in a given instance this
+ * becomes a true no-op (no DB round-trip).
  */
 export async function ensureBestPowerTableForRead(): Promise<void> {
+  if (_tableReady) return;
   try {
     const client = await pool.connect();
     try {
@@ -130,9 +135,11 @@ export async function ensureBestPowerTableForRead(): Promise<void> {
     } finally {
       client.release();
     }
+    _tableReady = true;
   } catch {
     // Table doesn't exist yet — do the full migration
     await ensureBestPowerTable();
+    _tableReady = true;
   }
 }
 

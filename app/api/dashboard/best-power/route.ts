@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
       const params: unknown[] = [seconds, CYCLING_TYPES];
       if (days > 0) {
         params.push(days);
-        dateClause = `AND start_date >= NOW() - ($3::int * INTERVAL '1 day')`;
+        dateClause = `AND b.start_date >= NOW() - ($3::int * INTERVAL '1 day')`;
       }
 
       const res = await client.query(`

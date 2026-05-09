@@ -40,14 +40,17 @@ const COLORS = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#60a5fa', '#a78bfa'
 
 export async function GET(req: NextRequest) {
   try {
-    await ensureBestPowerTableForRead();
-
     const sp = req.nextUrl.searchParams;
     const days  = Math.min(99999, Math.max(1, parseInt(sp.get('days')  ?? '90', 10) || 90));
     const weeks = Math.min(99999, Math.max(1, parseInt(sp.get('weeks') ?? '26', 10) || 26));
     const durationsParam = sp.get('durations');
 
-    const profile = await getProfile();
+    // Fetch profile and verify table in parallel
+    const [profile] = await Promise.all([
+      getProfile(),
+      ensureBestPowerTableForRead(),
+    ]);
+
     const ftp     = effectiveFtp(profile);
     const tz      = profile.timezone || 'Australia/Sydney';
 
@@ -87,10 +90,9 @@ export async function GET(req: NextRequest) {
 
     const secondsList = durations.map(d => d.seconds);
 
-    const client = await pool.connect();
-    try {
-      // ── Weekly bests from best_power_efforts (no join needed) ─────
-      const weeklyRes = await client.query(`
+    // Run both aggregation queries in parallel (each uses pool.query for its own connection)
+    const [weeklyRes, currentRes] = await Promise.all([
+      pool.query(`
         SELECT
           date_trunc('week', (start_date AT TIME ZONE '${tz}'))::date::text AS week_start,
           seconds,
@@ -101,23 +103,8 @@ export async function GET(req: NextRequest) {
           AND seconds = ANY($2::int[])
         GROUP BY week_start, seconds
         ORDER BY week_start, seconds
-      `, [CYCLING_TYPES, secondsList]);
-
-      const weeklyMap = new Map<string, Record<string, number | string | null>>();
-      for (const row of weeklyRes.rows) {
-        const ws = row.week_start as string;
-        const sec = Number(row.seconds);
-        const watts = Number(row.best_watts);
-        if (!weeklyMap.has(ws)) {
-          const obj: Record<string, number | string | null> = { week_start: ws };
-          for (const s of secondsList) obj[`d_${s}`] = null;
-          weeklyMap.set(ws, obj);
-        }
-        weeklyMap.get(ws)![`d_${sec}`] = watts;
-      }
-
-      // ── Current bests (last N days) from best_power_efforts (no join) ──
-      const currentRes = await client.query(`
+      `, [CYCLING_TYPES, secondsList]),
+      pool.query(`
         SELECT seconds, MAX(best_watts) AS best_watts
         FROM best_power_efforts
         WHERE sport_type = ANY($1::text[])
@@ -125,39 +112,50 @@ export async function GET(req: NextRequest) {
           AND seconds = ANY($2::int[])
         GROUP BY seconds
         ORDER BY seconds
-      `, [CYCLING_TYPES, secondsList]);
+      `, [CYCLING_TYPES, secondsList]),
+    ]);
 
-      const current: Record<string, number | null> = {};
-      for (const s of secondsList) current[`d_${s}`] = null;
-      for (const row of currentRes.rows) {
-        current[`d_${Number(row.seconds)}`] = Number(row.best_watts);
+    const weeklyMap = new Map<string, Record<string, number | string | null>>();
+    for (const row of weeklyRes.rows) {
+      const ws = row.week_start as string;
+      const sec = Number(row.seconds);
+      const watts = Number(row.best_watts);
+      if (!weeklyMap.has(ws)) {
+        const obj: Record<string, number | string | null> = { week_start: ws };
+        for (const s of secondsList) obj[`d_${s}`] = null;
+        weeklyMap.set(ws, obj);
       }
-
-      const targets = durations.map((d, i) => {
-        const match = profileTargets.find(t => t.seconds === d.seconds);
-        const targetWatts = match
-          ? match.target_watts
-          : Math.round(ftp * ftpMultiplier(d.seconds));
-        return {
-          key:          `d_${d.seconds}`,
-          label:        d.label,
-          seconds:      d.seconds,
-          repeats:      match?.repeats ?? null,
-          target_watts: targetWatts,
-          color:        COLORS[i % COLORS.length],
-          source:       match ? 'profile' as const : 'ftp' as const,
-        };
-      });
-
-      return Response.json({
-        weekly:  Array.from(weeklyMap.values()),
-        current,
-        targets,
-        ftp,
-      });
-    } finally {
-      client.release();
+      weeklyMap.get(ws)![`d_${sec}`] = watts;
     }
+
+    const current: Record<string, number | null> = {};
+    for (const s of secondsList) current[`d_${s}`] = null;
+    for (const row of currentRes.rows) {
+      current[`d_${Number(row.seconds)}`] = Number(row.best_watts);
+    }
+
+    const targets = durations.map((d, i) => {
+      const match = profileTargets.find(t => t.seconds === d.seconds);
+      const targetWatts = match
+        ? match.target_watts
+        : Math.round(ftp * ftpMultiplier(d.seconds));
+      return {
+        key:          `d_${d.seconds}`,
+        label:        d.label,
+        seconds:      d.seconds,
+        repeats:      match?.repeats ?? null,
+        target_watts: targetWatts,
+        color:        COLORS[i % COLORS.length],
+        source:       match ? 'profile' as const : 'ftp' as const,
+      };
+    });
+
+    return Response.json({
+      weekly:  Array.from(weeklyMap.values()),
+      current,
+      targets,
+      ftp,
+    });
   } catch (err) {
     console.error('Power progress error:', err);
     return Response.json({ error: String(err) }, { status: 500 });
