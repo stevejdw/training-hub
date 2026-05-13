@@ -120,6 +120,18 @@ export async function buildTrainingContext(): Promise<string> {
       lapsByActivity.get(key)!.push(lap);
     }
 
+    // 4b. Wellness — last 14 days of HRV / resting HR / sleep / readiness
+    const wellnessResult = await client.query<{
+      date: string; hrv_rmssd: number | null; resting_hr: number | null;
+      sleep_score: number | null; readiness_score: number | null; sleep_secs: number | null;
+    }>(`
+      SELECT TO_CHAR(date, 'YYYY-MM-DD') AS date,
+             hrv_rmssd, resting_hr, sleep_score, readiness_score, sleep_secs
+      FROM daily_wellness
+      WHERE date >= (NOW() AT TIME ZONE 'Australia/Sydney')::date - INTERVAL '14 days'
+      ORDER BY date DESC
+    `);
+
     // 5. Annual totals
     const annualResult = await client.query(`
       SELECT
@@ -154,7 +166,25 @@ ${profile.events.length > 0 ? profile.events.map(e => {
 - ATL (fatigue, 7-day): ${fitness.atl}
 - TSB (form): ${fitness.tsb} ${fitness.tsb >= 5 ? '(fresh)' : fitness.tsb <= -20 ? '(fatigued)' : '(neutral)'}
 
-## Annual Training Volumes
+## Wellness (last 14 days — HRV / resting HR / sleep / readiness)
+`;
+    if (wellnessResult.rows.length === 0) {
+      ctx += `- No wellness data available.\n`;
+    } else {
+      for (const w of wellnessResult.rows) {
+        const sleepHrs = w.sleep_secs ? (w.sleep_secs / 3600).toFixed(1) + 'h' : null;
+        const wparts = [
+          w.hrv_rmssd != null ? `HRV ${Math.round(w.hrv_rmssd)}` : null,
+          w.resting_hr != null ? `RHR ${w.resting_hr}` : null,
+          w.readiness_score != null ? `Readiness ${w.readiness_score}` : null,
+          w.sleep_score != null ? `SleepScore ${w.sleep_score}` : null,
+          sleepHrs ? `Sleep ${sleepHrs}` : null,
+        ].filter(Boolean);
+        if (wparts.length > 0) ctx += `- ${w.date}: ${wparts.join(' | ')}\n`;
+      }
+    }
+
+    ctx += `\n## Annual Training Volumes
 `;
     for (const yr of annualResult.rows) {
       ctx += `- ${yr.year}: ${yr.activities} activities, ${yr.hours}h, ${yr.km}km, ${yr.elevation}m gain\n`;
