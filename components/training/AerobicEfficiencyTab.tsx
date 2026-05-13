@@ -247,10 +247,10 @@ function RideModal({ ride, onClose }: { ride: ScatterPoint; onClose: () => void 
   const ef = (ride.np / ride.avg_hr).toFixed(3);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4 pt-[100px] pb-[80px] md:p-4" onClick={onClose}>
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
       <div
-        className="relative bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl"
+        className="relative bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-2xl max-h-full overflow-y-auto shadow-2xl"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
