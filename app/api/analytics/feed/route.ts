@@ -75,10 +75,14 @@ async function allTimeBests(client: import('pg').PoolClient): Promise<Map<number
 }
 
 export async function GET() {
+  // Fetch profile before acquiring the pool client so we never hold two
+  // connections simultaneously (pool max is 5; concurrent page-load requests
+  // would otherwise exhaust it and cause connection-timeout 500s).
+  const profile = await getProfile();
   const client = await pool.connect();
   try {
-    // Parallel: recent rides, daily TSS (for fitness), profile, WTD stats
-    const [ridesRes, dailyTssRes, profile] = await Promise.all([
+    // Parallel: recent rides, daily TSS (for fitness), WTD stats
+    const [ridesRes, dailyTssRes] = await Promise.all([
       client.query(`
         SELECT id, name, sport_type, start_date, distance, moving_time,
                average_watts, normalized_power, average_heartrate, tss,
@@ -95,7 +99,6 @@ export async function GET() {
         FROM activities
         GROUP BY 1 ORDER BY 1
       `),
-      getProfile(),
     ]);
 
     const tz = profile.timezone || 'Australia/Sydney';

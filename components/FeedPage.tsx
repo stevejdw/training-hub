@@ -195,6 +195,7 @@ export default function FeedPage() {
     fetch('/api/analytics/feed')
       .then(r => r.json())
       .then(d => {
+        if (!d?.recentRides) { setLoading(false); return; }
         setData(d);
         setLoading(false);
         try { localStorage.setItem(FEED_CACHE_KEY, JSON.stringify(d)); } catch { /* ignore */ }
