@@ -105,7 +105,7 @@ function EfTooltip({ active, payload }: any) {
       <p className="text-gray-400">{new Date(row.x).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
       <p className="text-gray-300 truncate max-w-[200px] font-medium">{row.name}</p>
       <p className="text-orange-400 font-semibold pt-1">EF {ef}</p>
-      <p className="text-[10px] text-gray-500">{row.np}W NP · {row.avg_hr} bpm</p>
+      <p className="text-[10px] text-gray-500">{row.avg_watts}W avg · {row.np}W NP · {row.avg_hr} bpm</p>
       {row.hrv_low === true && <p className="text-[10px] text-yellow-400">⚠ Low HRV day</p>}
       <p className="text-[10px] text-gray-600 mt-0.5">Click for ride detail</p>
     </div>
@@ -217,10 +217,10 @@ function RideModal({ ride, onClose }: { ride: ScatterPoint; onClose: () => void 
     return result;
   }, [stream]);
 
-  // Half-way point based on actual chart data midpoint, not moving_time
-  // This ensures the half marker aligns with the actual data points
+  // Half-way point based on time (max t / 2), not data point count
+  // This ensures the half marker is visually at the 50% mark on the chart
   const halfMin = chartData.length > 0
-    ? chartData[Math.floor(chartData.length / 2)].t
+    ? chartData[chartData.length - 1].t / 2
     : 0;
 
   // Compute averages for the selected brush range
@@ -333,87 +333,35 @@ function RideModal({ ride, onClose }: { ride: ScatterPoint; onClose: () => void 
           ) : chartData.length === 0 ? (
             <div className="h-48 flex items-center justify-center text-gray-500 text-sm">No stream data</div>
           ) : (
-            <div
-              ref={chartContainerRef}
-              className="relative select-none"
-              style={{ cursor: isBrushingRef.current ? 'ew-resize' : 'crosshair' }}
-              onMouseDown={(e) => {
-                const el = chartContainerRef.current;
-                if (!el) return;
-                const svg = el.querySelector('svg');
-                if (!svg) return;
-                const rect = svg.getBoundingClientRect();
-                const chartLeft = rect.left + 0;
-                const chartRight = rect.right - 8;
-                const chartWidth = chartRight - chartLeft;
-                if (chartWidth <= 0) return;
-                const maxT = chartData.length > 0 ? chartData[chartData.length - 1].t : 0;
-                if (maxT <= 0) return;
-                const mouseX = e.clientX;
-                const pct = Math.max(0, Math.min(1, (mouseX - chartLeft) / chartWidth));
-                const t = Math.round(pct * maxT);
-                brushStartRef.current = t;
-                brushEndRef.current = t;
-                isBrushingRef.current = true;
-                setBrushStart(t);
-                setBrushEnd(t);
-              }}
-              onMouseMove={(e) => {
-                if (!isBrushingRef.current) return;
-                const el = chartContainerRef.current;
-                if (!el) return;
-                const svg = el.querySelector('svg');
-                if (!svg) return;
-                const rect = svg.getBoundingClientRect();
-                const chartLeft = rect.left + 0;
-                const chartRight = rect.right - 8;
-                const chartWidth = chartRight - chartLeft;
-                if (chartWidth <= 0) return;
-                const maxT = chartData.length > 0 ? chartData[chartData.length - 1].t : 0;
-                if (maxT <= 0) return;
-                const mouseX = e.clientX;
-                const pct = Math.max(0, Math.min(1, (mouseX - chartLeft) / chartWidth));
-                const t = Math.round(pct * maxT);
-                brushEndRef.current = t;
-                setBrushEnd(t);
-              }}
-              onMouseUp={() => {
-                isBrushingRef.current = false;
-                const s = brushStartRef.current;
-                const e = brushEndRef.current;
-                if (s != null && e != null) {
-                  const lo = Math.min(s, e);
-                  const hi = Math.max(s, e);
-                  if (hi - lo < 1) {
-                    brushStartRef.current = null;
-                    brushEndRef.current = null;
-                    setBrushStart(null);
-                    setBrushEnd(null);
-                  }
-                }
-              }}
-              onMouseLeave={() => {
-                if (isBrushingRef.current) {
-                  isBrushingRef.current = false;
-                  const s = brushStartRef.current;
-                  const e = brushEndRef.current;
-                  if (s != null && e != null) {
-                    const lo = Math.min(s, e);
-                    const hi = Math.max(s, e);
-                    if (hi - lo < 1) {
-                      brushStartRef.current = null;
-                      brushEndRef.current = null;
-                      setBrushStart(null);
-                      setBrushEnd(null);
-                    }
-                  }
-                }
-              }}
-            >
+            <div ref={chartContainerRef} className="relative select-none">
             <ResponsiveContainer width="100%" height={200}>
               <LineChart
                 data={chartData}
                 margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
+                onMouseDown={(_nextState, event) => {
+                  // Recharts onMouseDown receives (nextState, event)
+                  // nextState has activeCoordinate, activeLabel, etc.
+                  // event is the MouseEvent proxy
+                  const el = chartContainerRef.current;
+                  if (!el) return;
+                  const svg = el.querySelector('svg');
+                  if (!svg) return;
+                  const rect = svg.getBoundingClientRect();
+                  const chartLeft = rect.left + 0;
+                  const chartRight = rect.right - 8;
+                  const chartWidth = chartRight - chartLeft;
+                  if (chartWidth <= 0) return;
+                  const maxT = chartData.length > 0 ? chartData[chartData.length - 1].t : 0;
+                  if (maxT <= 0) return;
+                  const mouseX = event.clientX;
+                  const pct = Math.max(0, Math.min(1, (mouseX - chartLeft) / chartWidth));
+                  const t = Math.round(pct * maxT);
+                  brushStartRef.current = t;
+                  brushEndRef.current = t;
+                  isBrushingRef.current = true;
+                  setBrushStart(t);
+                  setBrushEnd(t);
+                }}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
                 <XAxis
