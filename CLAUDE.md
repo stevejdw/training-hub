@@ -5,6 +5,19 @@ This project is **auto-deployed** via **Vercel Git Integration**. Every push to 
 Inspect deployment at: https://vercel.com/stevejdws-projects/training-hub
 Project dashboard: https://vercel.com/stevejdws-projects/training-hub
 
+## Deploy workflow — IMPORTANT
+
+**Do NOT push a feature branch to origin before merging it into main.** Vercel deduplicates builds by tree hash: if a branch push creates a preview build, the subsequent fast-forward merge to main has an identical tree hash and Vercel will skip the production rebuild — leaving production stuck on the previous commit.
+
+Correct sequence when shipping changes from a worktree branch:
+1. Commit on the branch locally.
+2. `git checkout main && git merge <branch> && git push origin main` — push **main first**.
+3. Optionally push the branch afterward (or just delete it).
+
+If you accidentally push the branch first and main isn't deploying, create an empty commit on main (`git commit --allow-empty -m "trigger deploy"`) and push to force a fresh production build.
+
+After pushing to main, **verify the new deployment exists** before reporting success — call `mcp__plugin_vercel_vercel__get_deployment` on `training-hub-gamma.vercel.app` and confirm the `githubCommitSha` matches what you just pushed. If it doesn't, trigger an empty-commit redeploy.
+
 ---
 
 # Task: Fix CTL/ATL/TSB formula and clean up intervals.icu UI
