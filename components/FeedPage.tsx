@@ -193,7 +193,7 @@ export default function FeedPage() {
 
   useEffect(() => {
     fetch('/api/analytics/feed')
-      .then(r => r.json())
+      .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
       .then(d => {
         setData(d);
         setLoading(false);
