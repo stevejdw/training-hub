@@ -26,50 +26,21 @@ function rollingBest(arr: number[], w: number): number {
   return Math.round(best / w);
 }
 
-/** Query the true all-time best rolling-average power for a set of durations
- *  by scanning raw watt streams across ALL cycling activities. */
+/** Read all-time best power for each PR duration from the pre-computed best_power_efforts table. */
 async function allTimeBests(client: import('pg').PoolClient): Promise<Map<number, number>> {
-  const maxDuration = Math.max(...PR_DURATIONS.map(d => d.seconds));
-  const minDuration = Math.min(...PR_DURATIONS.map(d => d.seconds));
-
-  // Build one window expression per duration, all scanning the array once
-  const windowExprs = PR_DURATIONS.map(
-    d => `SUM(COALESCE(w,0)::numeric) OVER (ORDER BY idx ROWS BETWEEN ${d.seconds - 1} PRECEDING AND CURRENT ROW) AS ws${d.seconds}`
-  ).join(',\n              ');
-
-  const lateralExprs = PR_DURATIONS.map(
-    d => `MAX(CASE WHEN idx >= ${d.seconds} THEN ws${d.seconds} END) AS max_ws${d.seconds}`
-  ).join(',\n            ');
-
-  const selectExprs = PR_DURATIONS.map(
-    d => `ROUND(MAX(bp.max_ws${d.seconds}) / ${d.seconds}.0)::int AS best_${d.seconds}`
-  ).join(',\n          ');
-
+  const secondsList = PR_DURATIONS.map(d => d.seconds);
   const res = await client.query(`
-    SELECT
-      ${selectExprs}
-    FROM activities a
-    JOIN activity_streams s ON s.activity_id = a.id
-    CROSS JOIN LATERAL (
-      SELECT
-        ${lateralExprs}
-      FROM (
-        SELECT
-          idx,
-          ${windowExprs}
-        FROM unnest(s.watts) WITH ORDINALITY AS t(w, idx)
-      ) sub
-    ) bp
-    WHERE a.average_watts IS NOT NULL
-      AND a.sport_type = ANY($1::text[])
-      AND array_length(s.watts, 1) >= ${minDuration}
-  `, [CYCLING_TYPES]);
+    SELECT seconds, MAX(best_watts)::int AS best_watts
+    FROM best_power_efforts
+    WHERE sport_type = ANY($1::text[])
+      AND seconds = ANY($2::int[])
+    GROUP BY seconds
+  `, [CYCLING_TYPES, secondsList]);
 
-  const row = res.rows[0] ?? {};
   const map = new Map<number, number>();
-  for (const d of PR_DURATIONS) {
-    const val = Number(row[`best_${d.seconds}`]);
-    if (Number.isFinite(val) && val > 0) map.set(d.seconds, val);
+  for (const row of res.rows) {
+    const val = Number(row.best_watts);
+    if (Number.isFinite(val) && val > 0) map.set(Number(row.seconds), val);
   }
   return map;
 }
