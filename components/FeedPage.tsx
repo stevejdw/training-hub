@@ -4,7 +4,6 @@ import { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { sportLabel, sportColor } from '@/lib/sport-types';
-import ReadinessResponseWidget from './ReadinessResponseWidget';
 import TssRollingChart from './training/TssRollingChart';
 import { calendarDaysFromToday } from '@/lib/calendar-days';
 
@@ -143,26 +142,56 @@ function CoachingTip() {
   }, []);
 
   return (
-    <div className="bg-gray-800/60 rounded-2xl p-4 border border-orange-500/20">
-      <div className="flex items-center gap-2 mb-2">
-        <div className="w-6 h-6 rounded-full bg-orange-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">C</div>
-        <span className="text-xs font-semibold text-orange-400 uppercase tracking-wider">Coaching Insight</span>
-      </div>
-      {loading ? (
-        <div className="space-y-2">
-          <div className="h-3 bg-gray-700 rounded animate-pulse w-full" />
-          <div className="h-3 bg-gray-700 rounded animate-pulse w-4/5" />
+    <Link href="/chat" className="block bg-gray-800/60 rounded-xl px-3 py-2 border border-orange-500/20 hover:border-orange-500/40 transition-colors">
+      <div className="flex items-start gap-2">
+        <div className="w-5 h-5 rounded-full bg-orange-500 flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0 mt-0.5">C</div>
+        <div className="min-w-0 flex-1">
+          {loading ? (
+            <div className="h-3 bg-gray-700 rounded animate-pulse w-4/5" />
+          ) : (
+            <p className="text-xs text-gray-300 leading-snug line-clamp-2">{tip}</p>
+          )}
         </div>
-      ) : (
-        <p className="text-sm text-gray-300 leading-relaxed">{tip}</p>
-      )}
-      <Link href="/chat" className="mt-3 inline-flex items-center gap-1.5 text-xs text-orange-400 hover:text-orange-300 transition-colors">
-        Ask a follow-up
-        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-        </svg>
-      </Link>
-    </div>
+      </div>
+    </Link>
+  );
+}
+
+function FitnessSummary({ fitness }: { fitness?: { ctl: number; atl: number; tsb: number } }) {
+  const tsbColor = (v: number) => (v >= 5 ? '#34d399' : v <= -20 ? '#f87171' : '#facc15');
+  const tsbLabel = (v: number) => (v >= 5 ? 'Fresh' : v <= -20 ? 'Fatigued' : 'Neutral');
+
+  return (
+    <Link href="/performance?tab=fitness" className="block group">
+      <div className="bg-gray-800/60 rounded-2xl border border-transparent hover:border-gray-700 hover:bg-gray-800/80 transition-colors h-full px-3 pt-2.5 pb-3">
+        <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider group-hover:text-orange-400 transition-colors mb-2">
+          Fitness →
+        </p>
+        {fitness ? (
+          <div className="grid grid-cols-3 gap-2">
+            <div className="text-center">
+              <p className="text-[9px] text-gray-500 uppercase tracking-wider mb-0.5">CTL</p>
+              <p className="text-lg font-bold text-blue-400 leading-none">{fitness.ctl}</p>
+              <p className="text-[9px] text-gray-500 mt-0.5">Fitness</p>
+            </div>
+            <div className="text-center">
+              <p className="text-[9px] text-gray-500 uppercase tracking-wider mb-0.5">ATL</p>
+              <p className="text-lg font-bold text-purple-400 leading-none">{fitness.atl}</p>
+              <p className="text-[9px] text-gray-500 mt-0.5">Fatigue</p>
+            </div>
+            <div className="text-center">
+              <p className="text-[9px] text-gray-500 uppercase tracking-wider mb-0.5">TSB</p>
+              <p className="text-lg font-bold leading-none" style={{ color: tsbColor(fitness.tsb) }}>
+                {fitness.tsb > 0 ? '+' : ''}{fitness.tsb}
+              </p>
+              <p className="text-[9px] mt-0.5" style={{ color: tsbColor(fitness.tsb) }}>{tsbLabel(fitness.tsb)}</p>
+            </div>
+          </div>
+        ) : (
+          <div className="h-12 bg-gray-700/40 rounded animate-pulse" />
+        )}
+      </div>
+    </Link>
   );
 }
 
@@ -421,12 +450,9 @@ export default function FeedPage() {
           )}
         </div>
 
-        {/* Coaching Insight */}
-        <CoachingTip />
-
-        {/* Row: Readiness & Response + Weekly TSS side by side */}
+        {/* Row: Fitness Summary + Weekly TSS side by side */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <ReadinessResponseWidget />
+          <FitnessSummary fitness={data?.fitness} />
 
           <Link href="/performance" className="block group">
             <div className="bg-gray-800/60 rounded-2xl border border-transparent hover:border-gray-700 hover:bg-gray-800/80 transition-colors overflow-hidden h-full">
@@ -439,6 +465,9 @@ export default function FeedPage() {
             </div>
           </Link>
         </div>
+
+        {/* Coaching Insight */}
+        <CoachingTip />
 
         {/* Power PRs */}
         {powerHighlights.length > 0 && (
