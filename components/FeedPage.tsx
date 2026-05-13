@@ -118,7 +118,7 @@ const SESSION_TYPE_COLOR: Record<string, string> = {
   race:       '#a78bfa',
 };
 
-const CACHE_KEY = 'coaching-insight-v3';
+const CACHE_KEY = 'coaching-insight-v4';
 
 function CoachingTip() {
   const cached  = typeof window !== 'undefined' ? localStorage.getItem(CACHE_KEY) ?? '' : '';
