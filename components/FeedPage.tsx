@@ -190,10 +190,10 @@ export default function FeedPage() {
         // poisoned cache from a previous error response (e.g. {error:"..."}).
         if (parsed?.recentRides) {
           setData(parsed as FeedData);
-          setLoading(false);
         } else {
           localStorage.removeItem(FEED_CACHE_KEY);
         }
+        setLoading(false);
       }
     } catch { /* ignore */ }
   }, []);
