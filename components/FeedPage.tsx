@@ -185,15 +185,26 @@ export default function FeedPage() {
     try {
       const cached = localStorage.getItem(FEED_CACHE_KEY);
       if (cached) {
-        setData(JSON.parse(cached) as FeedData);
-        setLoading(false);
+        const parsed = JSON.parse(cached);
+        // Only use cache if it contains valid feed data — guards against a
+        // poisoned cache from a previous error response (e.g. {error:"..."}).
+        if (parsed?.recentRides) {
+          setData(parsed as FeedData);
+          setLoading(false);
+        } else {
+          localStorage.removeItem(FEED_CACHE_KEY);
+        }
       }
     } catch { /* ignore */ }
   }, []);
 
   useEffect(() => {
     fetch('/api/analytics/feed')
-      .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+      .then(r => {
+        if (r.status === 401) { window.location.href = '/login'; return null; }
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
       .then(d => {
         if (!d?.recentRides) { setLoading(false); return; }
         setData(d);
