@@ -34,9 +34,10 @@ export async function GET() {
     );
     const currentMaxId: number | null = latestRes.rows[0]?.max_id ?? null;
 
-    // Return cached insight if no new activities have been synced
+    // Return cached insight if no new activities have been synced.
+    // Cache key bumped to v2 when the prompt changed (next-key-session focus).
     const cacheRes = await client.query(
-      `SELECT content, last_activity_id FROM coaching_cache WHERE key = 'insight'`
+      `SELECT content, last_activity_id FROM coaching_cache WHERE key = 'insight_v2'`
     );
     const cached = cacheRes.rows[0];
     if (cached && String(cached.last_activity_id) === String(currentMaxId)) {
@@ -60,13 +61,13 @@ export async function GET() {
 
     const response = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 120,
+      max_tokens: 220,
       system: `You are a cycling coach for ${profile.name}. FTP: ${ftp}W.${personaLine}${feedbackLine}\n\n${trainingContext}`,
       messages: [
         {
           role: 'user',
           content:
-            'Give me one concise coaching insight (2 sentences max) based on my current CTL/ATL/TSB and recent training. Be direct, use actual numbers.',
+            "Identify my next KEY session from the active plan (skip recovery/endurance — pick the next vo2max/threshold/tempo/race day). In 3-4 sentences, tell me what the session is and exactly how to prepare for it given my current CTL/ATL/TSB and recent sessions (sleep, fuelling, intensity to back off from, etc.). Be direct, use actual numbers, no fluff.",
         },
       ],
     });
@@ -77,7 +78,7 @@ export async function GET() {
     // Persist to cache
     await client.query(
       `INSERT INTO coaching_cache (key, content, last_activity_id, generated_at)
-       VALUES ('insight', $1, $2, NOW())
+       VALUES ('insight_v2', $1, $2, NOW())
        ON CONFLICT (key) DO UPDATE
          SET content = EXCLUDED.content,
              last_activity_id = EXCLUDED.last_activity_id,

@@ -118,12 +118,13 @@ const SESSION_TYPE_COLOR: Record<string, string> = {
   race:       '#a78bfa',
 };
 
-const CACHE_KEY = 'coaching-insight-v1';
+const CACHE_KEY = 'coaching-insight-v2';
 
 function CoachingTip() {
   const cached  = typeof window !== 'undefined' ? localStorage.getItem(CACHE_KEY) ?? '' : '';
   const [tip,     setTip]     = useState(cached);
   const [loading, setLoading] = useState(!cached);
+  const [expanded, setExpanded] = useState(false);
   const fetched = useRef(false);
 
   useEffect(() => {
@@ -142,18 +143,42 @@ function CoachingTip() {
   }, []);
 
   return (
-    <Link href="/chat" className="block bg-gray-800/60 rounded-xl px-3 py-2 border border-orange-500/20 hover:border-orange-500/40 transition-colors">
-      <div className="flex items-start gap-2">
-        <div className="w-5 h-5 rounded-full bg-orange-500 flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0 mt-0.5">C</div>
+    <div className="bg-gray-800/60 rounded-xl p-3 border border-orange-500/20">
+      <button
+        type="button"
+        onClick={() => setExpanded(v => !v)}
+        className="w-full text-left flex items-start gap-2.5"
+      >
+        <div className="w-6 h-6 rounded-full bg-orange-500 flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0 mt-0.5">C</div>
         <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-2 mb-1">
+            <span className="text-[10px] font-semibold text-orange-400 uppercase tracking-wider">Coaching Insight</span>
+            <svg className={`w-3 h-3 text-gray-500 transition-transform ${expanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </div>
           {loading ? (
-            <div className="h-3 bg-gray-700 rounded animate-pulse w-4/5" />
+            <div className="space-y-1.5">
+              <div className="h-3 bg-gray-700 rounded animate-pulse w-full" />
+              <div className="h-3 bg-gray-700 rounded animate-pulse w-4/5" />
+            </div>
           ) : (
-            <p className="text-xs text-gray-300 leading-snug line-clamp-2">{tip}</p>
+            <p className={`text-xs text-gray-300 leading-snug ${expanded ? '' : 'line-clamp-2'}`}>{tip}</p>
           )}
         </div>
-      </div>
-    </Link>
+      </button>
+      {expanded && !loading && (
+        <Link
+          href="/chat"
+          className="mt-3 ml-8 inline-flex items-center gap-1.5 text-xs font-medium text-orange-400 hover:text-orange-300 transition-colors"
+        >
+          Open Coach
+          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+          </svg>
+        </Link>
+      )}
+    </div>
   );
 }
 
