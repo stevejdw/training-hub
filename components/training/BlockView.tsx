@@ -125,7 +125,12 @@ function SwipeableCard({
         <div className="absolute inset-0 flex items-center justify-end rounded-xl bg-red-600">
           <button
             type="button"
-            onClick={(e) => { e.stopPropagation(); onDelete(day); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsOpen(false);
+              setDragOffset(0);
+              onDelete(day);
+            }}
             className="w-[88px] h-full flex flex-col items-center justify-center gap-1 text-white active:bg-red-700 rounded-r-xl"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
