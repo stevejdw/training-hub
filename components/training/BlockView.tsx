@@ -76,7 +76,7 @@ function formatDate(dateStr: string): string {
   return d.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' });
 }
 
-// ─── Swipeable wrapper ───────────────────────────────────────────────────────
+// ─── Swipeable wrapper (no visible trash icon) ────────────────────────────────
 
 function SwipeableCard({
   day,
@@ -97,7 +97,6 @@ function SwipeableCard({
   const [offsetX, setOffsetX] = useState(0);
   const startX = useRef(0);
   const currentX = useRef(0);
-  const cardRef = useRef<HTMLDivElement>(null);
 
   const onTouchStart = useCallback((e: React.TouchEvent) => {
     startX.current = e.touches[0].clientX;
@@ -108,7 +107,6 @@ function SwipeableCard({
   const onTouchMove = useCallback((e: React.TouchEvent) => {
     currentX.current = e.touches[0].clientX;
     const diff = currentX.current - startX.current;
-    // Only allow swiping left (negative diff)
     if (diff < 0) {
       setOffsetX(Math.max(diff, -120));
     }
@@ -117,7 +115,6 @@ function SwipeableCard({
   const onTouchEnd = useCallback(() => {
     setSwiping(false);
     if (offsetX < -80) {
-      // Trigger delete
       onDelete(day);
     }
     setOffsetX(0);
@@ -125,14 +122,9 @@ function SwipeableCard({
 
   return (
     <div className="relative overflow-hidden rounded-xl">
-      {/* Delete background revealed on swipe */}
-      <div className="absolute inset-0 flex items-center justify-end pr-5 bg-red-900/40 rounded-xl">
-        <svg className="w-5 h-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-        </svg>
-      </div>
+      {/* Red background revealed on swipe — no icon */}
+      <div className="absolute inset-0 bg-red-900/40 rounded-xl" />
       <div
-        ref={cardRef}
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
@@ -298,10 +290,12 @@ function DraggableDayCard({
 
 function DropZone({
   date,
+  day,
   onDrop,
 }: {
   date: string;
-  onDrop: (dayId: number, fromDate: string, toDate: string) => void;
+  day: TrainingDay;
+  onDrop: (dayId: number, fromDate: string, toDate: string, targetDayId: number) => void;
 }) {
   const [isOver, setIsOver] = useState(false);
 
@@ -320,21 +314,21 @@ function DropZone({
     setIsOver(false);
     try {
       const data = JSON.parse(e.dataTransfer.getData('application/json'));
-      onDrop(data.dayId, data.fromDate, date);
+      onDrop(data.dayId, data.fromDate, date, day.id);
     } catch {
       // ignore invalid drops
     }
-  }, [date, onDrop]);
+  }, [date, day.id, onDrop]);
 
   return (
     <div
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className={`rounded-xl border-2 border-dashed transition-all ${
+      className={`rounded-xl border-2 border-dashed transition-all duration-150 ${
         isOver
-          ? 'border-orange-500 bg-orange-500/10 py-4'
-          : 'border-transparent py-0'
+          ? 'border-orange-500 bg-orange-500/15 py-4'
+          : 'border-transparent py-0.5'
       }`}
     >
       {isOver && (
@@ -391,20 +385,42 @@ export default function BlockView({ days, activities, onSelectDay, onDaysChanged
       new Date(weekEnd + 'T00:00:00Z').toLocaleDateString('en-AU', { day: 'numeric', month: 'short', timeZone: 'UTC' })
     : `Week ${weekIdx + 1}`;
 
-  // ── Move day handler ──
-  const handleMoveDay = useCallback(async (dayId: number, _fromDate: string, toDate: string) => {
+  // ── Move day handler with swap support ──
+  const handleMoveDay = useCallback(async (dayId: number, _fromDate: string, toDate: string, targetDayId: number) => {
     try {
-      const res = await fetch(`/api/training/days/${dayId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date: toDate }),
-      });
-      if (!res.ok) throw new Error('Move failed');
+      // If the target day is a rest day (no session to swap), just move
+      const targetDay = days.find(d => d.id === targetDayId);
+      if (!targetDay || targetDay.type === 'rest') {
+        const res = await fetch(`/api/training/days/${dayId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ date: toDate }),
+        });
+        if (!res.ok) throw new Error('Move failed');
+      } else {
+        // Swap: move dragged day to target date, move target day to dragged day's original date
+        const fromDate = days.find(d => d.id === dayId)?.date;
+        if (!fromDate) throw new Error('Could not find source date');
+
+        const res1 = await fetch(`/api/training/days/${dayId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ date: toDate }),
+        });
+        if (!res1.ok) throw new Error('Swap step 1 failed');
+
+        const res2 = await fetch(`/api/training/days/${targetDayId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ date: fromDate }),
+        });
+        if (!res2.ok) throw new Error('Swap step 2 failed');
+      }
       onDaysChanged?.();
     } catch (err) {
       console.error('Move day error:', err);
     }
-  }, [onDaysChanged]);
+  }, [days, onDaysChanged]);
 
   // ── Delete day handler ──
   const handleDeleteDay = useCallback(async (day: TrainingDay) => {
@@ -471,7 +487,7 @@ export default function BlockView({ days, activities, onSelectDay, onDaysChanged
       </p>
 
       {/* Day cards */}
-      <div className="space-y-2">
+      <div className="space-y-0">
         {week.map((day, di) => {
           const acts    = actByDate.get(day.date) ?? [];
           const status  = completionStatus(day, acts);
@@ -494,8 +510,8 @@ export default function BlockView({ days, activities, onSelectDay, onDaysChanged
                 onSelectDay={onSelectDay}
                 onDelete={handleDeleteDay}
               />
-              {/* Drop zone below each day card */}
-              <DropZone date={day.date} onDrop={handleMoveDay} />
+              {/* Drop zone below each day card — always has a small hit area */}
+              <DropZone date={day.date} day={day} onDrop={handleMoveDay} />
             </div>
           );
         })}
