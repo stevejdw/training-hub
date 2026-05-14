@@ -37,7 +37,7 @@ export async function GET() {
     // Return cached insight if no new activities have been synced.
     // Cache key bumped to v2 when the prompt changed (next-key-session focus).
     const cacheRes = await client.query(
-      `SELECT content, last_activity_id FROM coaching_cache WHERE key = 'insight_v5'`
+      `SELECT content, last_activity_id FROM coaching_cache WHERE key = 'insight_v6'`
     );
     const cached = cacheRes.rows[0];
     if (cached && String(cached.last_activity_id) === String(currentMaxId)) {
@@ -51,6 +51,10 @@ export async function GET() {
     ]);
     const ftp = effectiveFtp(profile);
 
+    // Explicit Sydney date/time so the model never confuses today vs tomorrow
+    const sydneyNow = new Date().toLocaleString('en-AU', { timeZone: 'Australia/Sydney', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    const sydneyDateISO = new Date().toLocaleDateString('en-CA', { timeZone: 'Australia/Sydney' }); // YYYY-MM-DD
+
     const personaLine = profile.coach_persona
       ? `\n${profile.coach_persona}\n`
       : '';
@@ -62,7 +66,12 @@ export async function GET() {
     const response = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 420,
-      system: `You are ${profile.name}'s personal cycling coach. You know them well and you talk to them like a real coach — warm, encouraging, conversational. FTP: ${ftp}W.${personaLine}${feedbackLine}\n\n${trainingContext}`,
+      system: `You are ${profile.name}'s personal cycling coach. You know them well and you talk to them like a real coach — warm, encouraging, conversational. FTP: ${ftp}W.${personaLine}${feedbackLine}
+
+IMPORTANT — Current date/time (Sydney/Australia timezone): ${sydneyNow} (${sydneyDateISO}).
+Use this as your reference for "today", "yesterday", "tomorrow", and day-of-week references. Any activity or plan day on ${sydneyDateISO} is TODAY. Activities before it are in the past. Plan days after it are in the future. Never refer to today's date as tomorrow.
+
+${trainingContext}`,
       messages: [
         {
           role: 'user',
@@ -108,7 +117,7 @@ Example PREVIEW MODE tone: "Your next key session is this Friday — 20-30min Po
     // Persist to cache
     await client.query(
       `INSERT INTO coaching_cache (key, content, last_activity_id, generated_at)
-       VALUES ('insight_v5', $1, $2, NOW())
+       VALUES ('insight_v6', $1, $2, NOW())
        ON CONFLICT (key) DO UPDATE
          SET content = EXCLUDED.content,
              last_activity_id = EXCLUDED.last_activity_id,
