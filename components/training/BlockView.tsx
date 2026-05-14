@@ -116,20 +116,25 @@ function SwipeableCard({
 
   const translateX = dragging ? dragOffset : (isOpen ? SWIPE_OPEN_PX : 0);
 
+  const showDeleteUI = dragging || isOpen;
+
   return (
     <div className="relative overflow-hidden rounded-xl">
-      {/* Delete button revealed behind the sliding card */}
-      <div className="absolute inset-0 flex items-center justify-end rounded-xl bg-red-900/60">
-        <button
-          onClick={() => onDelete(day)}
-          className="w-[88px] h-full flex flex-col items-center justify-center gap-1 text-red-300 active:bg-red-800/80 rounded-r-xl"
-        >
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-          </svg>
-          <span className="text-xs font-semibold">Delete</span>
-        </button>
-      </div>
+      {/* Delete button revealed only while swiping / when open */}
+      {showDeleteUI && (
+        <div className="absolute inset-0 flex items-center justify-end rounded-xl bg-red-600">
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onDelete(day); }}
+            className="w-[88px] h-full flex flex-col items-center justify-center gap-1 text-white active:bg-red-700 rounded-r-xl"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+            <span className="text-xs font-semibold">Delete</span>
+          </button>
+        </div>
+      )}
 
       {/* Sliding card */}
       <div
