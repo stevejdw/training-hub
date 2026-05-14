@@ -118,6 +118,7 @@ export default function TrainingPlanTab() {
               days={plan.days}
               activities={activities}
               onSelectDay={day => setView({ type: 'day', day })}
+              onDaysChanged={() => { if (activePlanId) loadPlan(activePlanId); }}
             />
           )}
           {view.type === 'day' && (

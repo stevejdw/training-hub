@@ -142,7 +142,7 @@ export async function deletePlan(id: number): Promise<void> {
 
 export async function updateTrainingDay(
   dayId: number,
-  fields: Partial<Pick<TrainingDay, 'title' | 'type' | 'duration_min' | 'tss_target' | 'description' | 'segments'>>,
+  fields: Partial<Pick<TrainingDay, 'title' | 'type' | 'duration_min' | 'tss_target' | 'description' | 'segments' | 'date'>>,
 ): Promise<void> {
   const client = await pool.connect();
   try {
@@ -155,9 +155,19 @@ export async function updateTrainingDay(
     if (fields.tss_target !== undefined)   { updates.push(`tss_target = $${i++}`);   values.push(fields.tss_target); }
     if (fields.description !== undefined)  { updates.push(`description = $${i++}`);  values.push(fields.description); }
     if (fields.segments !== undefined)     { updates.push(`segments = $${i++}`);     values.push(JSON.stringify(fields.segments)); }
+    if (fields.date !== undefined)         { updates.push(`date = $${i++}`);         values.push(fields.date); }
     if (!updates.length) return;
     values.push(dayId);
     await client.query(`UPDATE training_days SET ${updates.join(', ')} WHERE id = $${i}`, values);
+  } finally {
+    client.release();
+  }
+}
+
+export async function deleteTrainingDay(dayId: number): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query('DELETE FROM training_days WHERE id = $1', [dayId]);
   } finally {
     client.release();
   }
