@@ -118,7 +118,7 @@ const SESSION_TYPE_COLOR: Record<string, string> = {
   race:       '#a78bfa',
 };
 
-const CACHE_KEY = 'coaching-insight-v5';
+const CACHE_KEY = 'coaching-insight-v6';
 
 function CoachingTip() {
   const cached  = typeof window !== 'undefined' ? localStorage.getItem(CACHE_KEY) ?? '' : '';
@@ -476,6 +476,9 @@ export default function FeedPage() {
           )}
         </div>
 
+        {/* Coaching Insight */}
+        <CoachingTip />
+
         {/* Row: Fitness Summary + Weekly TSS side by side */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <FitnessSummary fitness={data?.fitness} />
@@ -491,9 +494,6 @@ export default function FeedPage() {
             </div>
           </Link>
         </div>
-
-        {/* Coaching Insight */}
-        <CoachingTip />
 
         {/* Power PRs */}
         {powerHighlights.length > 0 && (
