@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { TrainingDay } from '@/lib/training-plans';
+import type { BaselineTssResponse } from '@/app/api/training/baseline-tss/route';
 
 interface Props {
   onClose: () => void;
@@ -16,8 +17,25 @@ export default function CreatePlanModal({ onClose, onCreated }: Props) {
   const [notes, setNotes] = useState('');
   const [weeks, setWeeks] = useState(4);
   const [trainingDays, setTrainingDays] = useState<number[]>([1, 2, 4, 5, 6]); // Tue/Wed/Fri/Sat/Sun
+  const [weeklyTssTarget, setWeeklyTssTarget] = useState<number | ''>('');
+  const [tssSource, setTssSource] = useState<BaselineTssResponse['source'] | null>(null);
+  const [tssDetail, setTssDetail] = useState<string>('');
   const [status, setStatus] = useState<'idle' | 'generating' | 'saving' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState('');
+
+  // Fetch the suggested weekly TSS baseline once on mount.
+  useEffect(() => {
+    fetch('/api/training/baseline-tss')
+      .then(r => r.json() as Promise<BaselineTssResponse>)
+      .then(data => {
+        if (typeof data.suggested === 'number') {
+          setWeeklyTssTarget(data.suggested);
+          setTssSource(data.source);
+          setTssDetail(data.detail);
+        }
+      })
+      .catch(console.error);
+  }, []);
 
   function toggleDay(d: number) {
     setTrainingDays(prev =>
@@ -47,7 +65,10 @@ export default function CreatePlanModal({ onClose, onCreated }: Props) {
           const r = await fetch('/api/training/generate', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ goal, notes, trainingDays, weekIndex: i, planStartDate, totalWeeks: weeks, planName, planGoal }),
+            body: JSON.stringify({
+              goal, notes, trainingDays, weekIndex: i, planStartDate, totalWeeks: weeks, planName, planGoal,
+              weeklyTssTarget: typeof weeklyTssTarget === 'number' && weeklyTssTarget > 0 ? weeklyTssTarget : null,
+            }),
           });
           const text = await r.text();
           let data: Record<string, unknown>;
@@ -133,6 +154,33 @@ export default function CreatePlanModal({ onClose, onCreated }: Props) {
                 </button>
               ))}
             </div>
+          </div>
+          <div>
+            <label className="text-xs text-gray-400 uppercase tracking-wider block mb-1">
+              Weekly TSS target
+              {tssSource && (
+                <span className="ml-2 normal-case tracking-normal text-[10px] text-gray-500">
+                  · {tssSource === 'configured' ? 'from your settings' : tssSource === '4-week-avg' ? 'suggested from last 4 weeks' : 'default'}
+                </span>
+              )}
+            </label>
+            <input
+              type="number"
+              inputMode="numeric"
+              min={0}
+              step={10}
+              value={weeklyTssTarget}
+              onChange={e => {
+                const v = e.target.value;
+                setWeeklyTssTarget(v === '' ? '' : Math.max(0, Number(v)));
+              }}
+              disabled={busy}
+              placeholder="e.g. 400"
+              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-orange-500"
+            />
+            {tssDetail && (
+              <p className="text-[10px] text-gray-500 mt-1">{tssDetail}. Edit to override.</p>
+            )}
           </div>
           <div>
             <label className="text-xs text-gray-400 uppercase tracking-wider block mb-2">Training days</label>

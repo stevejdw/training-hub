@@ -141,18 +141,17 @@ export async function GET(req: Request) {
       }
     }
 
-    // Plan targets — sum of training_days.tss_target per day, only when mode='plan' or no config
-    let planByDate: Map<string, number> | null = null;
-    if (!cfg || cfg.mode === 'plan') {
-      const planRes = await client.query<{ d: string; tt: string }>(`
-        SELECT date::text AS d, COALESCE(SUM(tss_target), 0)::int AS tt
-        FROM training_days
-        WHERE plan_id = (SELECT id FROM training_plans ORDER BY created_at DESC LIMIT 1)
-          AND date BETWEEN $1 AND $2
-        GROUP BY 1
-      `, [startDateStr, endDateStr]);
-      planByDate = new Map(planRes.rows.map(r => [r.d, Number(r.tt)]));
-    }
+    // Plan targets — always fetch when an active plan exists so the chart's
+    // weekly target stays explicitly linked to the training plan. Formula
+    // mode is only used as a fallback when no plan target is present.
+    const planRes = await client.query<{ d: string; tt: string }>(`
+      SELECT date::text AS d, COALESCE(SUM(tss_target), 0)::int AS tt
+      FROM training_days
+      WHERE plan_id = (SELECT id FROM training_plans ORDER BY created_at DESC LIMIT 1)
+        AND date BETWEEN $1 AND $2
+      GROUP BY 1
+    `, [startDateStr, endDateStr]);
+    const planByDate: Map<string, number> = new Map(planRes.rows.map(r => [r.d, Number(r.tt)]));
 
     // Build week summaries
     const weekPoints: TssWeekPoint[] = ranges.map(({ start, end }) => {
@@ -170,14 +169,16 @@ export async function GET(req: Request) {
       let is_recovery   = false;
       let target_source: TssWeekPoint['target_source'] = 'none';
 
-      if (cfg && cfg.mode === 'formula') {
+      // Plan target wins whenever the active plan has TSS targets for this week.
+      // Formula mode only kicks in when the plan has no target for the week.
+      if (plan_tss > 0) {
+        target_tss    = plan_tss;
+        target_source = 'plan';
+      } else if (cfg && cfg.mode === 'formula') {
         const { target, isRecovery } = formulaTarget(start, cfg);
         target_tss    = target;
         is_recovery   = isRecovery;
         target_source = 'formula';
-      } else if (plan_tss > 0) {
-        target_tss    = plan_tss;
-        target_source = 'plan';
       }
 
       const ws = fmtDate(start);
@@ -200,9 +201,9 @@ export async function GET(req: Request) {
     let dayPoints: TssDayPoint[] | undefined;
     if (granularity === 'day' && ranges.length === 1) {
       const { start, end } = ranges[0];
-      // Formula mode has no daily breakdown — daily targets are 0.
-      // Plan mode uses the actual per-day targets from the training plan.
-      const dayTssTargets = cfg?.mode === 'formula' ? null : planByDate;
+      // Per-day targets always come from the plan when present;
+      // formula mode is week-level only and has no daily breakdown.
+      const dayTssTargets = planByDate;
       const days: TssDayPoint[] = [];
       const cur = new Date(start);
       let di = 0;

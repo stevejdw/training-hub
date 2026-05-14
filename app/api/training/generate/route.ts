@@ -140,6 +140,7 @@ function buildSystemPrompt(
   goal: string,
   trainingDays: number[],
   daySettings: DaySettingsMap = {},
+  weeklyTssTarget: number | null = null,
 ) {
   const dayNames = trainingDays.length > 0
     ? trainingDays.map(d => DOW_NAMES[d]).join(', ')
@@ -157,13 +158,17 @@ function buildSystemPrompt(
     ? `\n## Training Philosophy\n${profile.ai_training_plan_guidance}\n`
     : '';
 
+  const tssTargetGuidance = weeklyTssTarget && weeklyTssTarget > 0
+    ? `\nWeekly TSS target for a build week: ~${weeklyTssTarget} TSS. Distribute this across the listed training days, with the largest sessions on the longest available days. Recovery weeks (every 4th week) should be ~60% of this.\n`
+    : '';
+
   return `You are an expert cycling coach. Output ONLY a JSON array — no markdown, no explanation, no code fences.
 Athlete: FTP=${ftp}W${profile.weight_kg ? ', ' + profile.weight_kg + 'kg' : ''}. ${profile.training_goals || 'General fitness'}.
 ${recentSummary}
 ${richContext}
 Events: ${profile.events.length > 0 ? profile.events.map(e => `${e.name} ${e.date}`).join(', ') : 'none'}.
 Goal: ${goal || 'base fitness'}.
-${planGuidance}
+${planGuidance}${tssTargetGuidance}
 Overall plan: ${totalWeeks} weeks total. Build load through weeks; every 4th week is recovery (~60% TSS).
 Training days: ${dayNames}. ALL other days MUST be type "rest".
 ${dayConstraints ? `\nDay constraints:\n${dayConstraints}\nNever exceed the listed available time per day. For group ride days, use endurance/tempo type and steady power targets.` : ''}
@@ -204,7 +209,7 @@ function extractJson(text: string): string {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { goal = '', weeks = 4, notes = '', weekIndex, planStartDate: bodyStartDate, totalWeeks, planName, planGoal, trainingDays = [], daySettings = {} } = body;
+    const { goal = '', weeks = 4, notes = '', weekIndex, planStartDate: bodyStartDate, totalWeeks, planName, planGoal, trainingDays = [], daySettings = {}, weeklyTssTarget = null } = body;
 
     const profile = await getProfile();
     const ftp = effectiveFtp(profile);
@@ -235,7 +240,7 @@ export async function POST(req: NextRequest) {
       const weekNum = weekIndex + 1;
 
       const richContext = await buildRichContext(ftp);
-      const systemPrompt = buildSystemPrompt(ftp, profile, recentSummary, richContext, totalWeeks, goal, trainingDays, daySettings);
+      const systemPrompt = buildSystemPrompt(ftp, profile, recentSummary, richContext, totalWeeks, goal, trainingDays, daySettings, weeklyTssTarget);
       const userPrompt = `Generate week ${weekNum} of ${totalWeeks} (${weekStart} to ${weekEnd}). Week ${weekNum} load level: ${weekNum % 4 === 0 ? 'recovery (60% of peak TSS)' : weekNum % 4 === 1 ? 'build 1' : weekNum % 4 === 2 ? 'build 2' : 'peak'}. ${notes ? 'Notes: ' + notes : ''}`;
 
       const message = await client.messages.create({
@@ -262,7 +267,7 @@ export async function POST(req: NextRequest) {
     // Legacy single-shot mode (kept for compatibility, 4-week only)
     const planStart = startOfWeekSydney();
     const richContext = await buildRichContext(ftp);
-    const systemPrompt = buildSystemPrompt(ftp, profile, recentSummary, richContext, weeks, goal, trainingDays, daySettings);
+    const systemPrompt = buildSystemPrompt(ftp, profile, recentSummary, richContext, weeks, goal, trainingDays, daySettings, weeklyTssTarget);
 
     const allDays: unknown[] = [];
     const name = `${weeks}-Week Plan${goal ? ': ' + goal.slice(0, 40) : ''}`;
