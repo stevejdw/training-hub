@@ -5,6 +5,7 @@ import { TrainingPlan, TrainingDay } from '@/lib/training-plans';
 import BlockView from '@/components/training/BlockView';
 import DayView from '@/components/training/DayView';
 import EditPlanModal from '@/components/training/EditPlanModal';
+import ErrorBoundary from '@/components/training/ErrorBoundary';
 
 interface PlanMeta { id: number; name: string; goal: string; created_at: string }
 
@@ -42,8 +43,8 @@ export default function TrainingPlanTab() {
       .finally(() => setLoadingPlan(false));
   }, []);
 
-  const loadPlan = useCallback((id: number) => {
-    setLoadingPlan(true);
+  const loadPlan = useCallback((id: number, { silent = false } = {}) => {
+    if (!silent) setLoadingPlan(true);
     fetch(`/api/training/plans/${id}`)
       .then(r => r.json() as Promise<TrainingPlan>)
       .then(data => {
@@ -55,7 +56,7 @@ export default function TrainingPlanTab() {
         }
       })
       .catch(console.error)
-      .finally(() => setLoadingPlan(false));
+      .finally(() => { if (!silent) setLoadingPlan(false); });
   }, []);
 
   // Suppress unused warning — loadPlan is referenced by TrainingPlansSettings onSelect
@@ -114,12 +115,14 @@ export default function TrainingPlanTab() {
       {!loadingPlan && plan && (
         <>
           {view.type === 'block' && (
-            <BlockView
-              days={plan.days}
-              activities={activities}
-              onSelectDay={day => setView({ type: 'day', day })}
-              onDaysChanged={() => { if (activePlanId) loadPlan(activePlanId); }}
-            />
+            <ErrorBoundary>
+              <BlockView
+                days={plan.days}
+                activities={activities}
+                onSelectDay={day => setView({ type: 'day', day })}
+                onDaysChanged={() => { if (activePlanId) loadPlan(activePlanId, { silent: true }); }}
+              />
+            </ErrorBoundary>
           )}
           {view.type === 'day' && (
             <DayView

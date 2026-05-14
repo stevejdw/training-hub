@@ -368,7 +368,9 @@ export default function BlockView({ days, activities, onSelectDay, onDaysChanged
 
   if (!weeks.length) return null;
 
-  const week = weeks[weekIdx] ?? [];
+  // Safety: clamp weekIdx to valid range
+  const safeWeekIdx = Math.min(weekIdx, weeks.length - 1);
+  const week = weeks[safeWeekIdx] ?? [];
   const actByDate = new Map<string, ActivitySummary[]>();
   for (const a of activities) {
     const arr = actByDate.get(a.date) ?? [];
