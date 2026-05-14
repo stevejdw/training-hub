@@ -70,7 +70,9 @@ function completionStatus(day: TrainingDay, acts: ActivitySummary[]): 'done' | '
   return 'done';
 }
 
-// ─── Swipeable wrapper (no visible trash icon) ────────────────────────────────
+// ─── Swipeable wrapper ────────────────────────────────────────────────────────
+
+const SWIPE_OPEN_PX = -88; // how far the card slides to reveal the delete button
 
 function SwipeableCard({
   day,
@@ -87,43 +89,58 @@ function SwipeableCard({
   children: React.ReactNode;
   onDelete: (day: TrainingDay) => void;
 }) {
-  const [swiping, setSwiping] = useState(false);
-  const [offsetX, setOffsetX] = useState(0);
+  const [isOpen, setIsOpen] = useState(false);
+  const [dragging, setDragging] = useState(false);
+  const [dragOffset, setDragOffset] = useState(0);
   const startX = useRef(0);
-  const currentX = useRef(0);
+  const startOffset = useRef(0);
 
   const onTouchStart = useCallback((e: React.TouchEvent) => {
     startX.current = e.touches[0].clientX;
-    currentX.current = e.touches[0].clientX;
-    setSwiping(true);
-  }, []);
+    startOffset.current = isOpen ? SWIPE_OPEN_PX : 0;
+    setDragging(true);
+    setDragOffset(startOffset.current);
+  }, [isOpen]);
 
   const onTouchMove = useCallback((e: React.TouchEvent) => {
-    currentX.current = e.touches[0].clientX;
-    const diff = currentX.current - startX.current;
-    if (diff < 0) {
-      setOffsetX(Math.max(diff, -120));
-    }
+    const diff = e.touches[0].clientX - startX.current;
+    setDragOffset(Math.min(0, Math.max(SWIPE_OPEN_PX, startOffset.current + diff)));
   }, []);
 
   const onTouchEnd = useCallback(() => {
-    setSwiping(false);
-    if (offsetX < -80) {
-      onDelete(day);
-    }
-    setOffsetX(0);
-  }, [offsetX, onDelete, day]);
+    setDragging(false);
+    // Snap open if past halfway, else snap closed
+    setIsOpen(dragOffset < SWIPE_OPEN_PX / 2);
+    setDragOffset(0);
+  }, [dragOffset]);
+
+  const translateX = dragging ? dragOffset : (isOpen ? SWIPE_OPEN_PX : 0);
 
   return (
     <div className="relative overflow-hidden rounded-xl">
-      {/* Red background revealed on swipe — no icon */}
-      <div className="absolute inset-0 bg-red-900/40 rounded-xl" />
+      {/* Delete button revealed behind the sliding card */}
+      <div className="absolute inset-0 flex items-center justify-end rounded-xl bg-red-900/60">
+        <button
+          onClick={() => onDelete(day)}
+          className="w-[88px] h-full flex flex-col items-center justify-center gap-1 text-red-300 active:bg-red-800/80 rounded-r-xl"
+        >
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          </svg>
+          <span className="text-xs font-semibold">Delete</span>
+        </button>
+      </div>
+
+      {/* Sliding card */}
       <div
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
-        style={{ transform: swiping ? `translateX(${offsetX}px)` : 'translateX(0)', transition: swiping ? 'none' : 'transform 0.3s ease' }}
-        className={`relative rounded-xl border transition-colors ${
+        style={{
+          transform: `translateX(${translateX}px)`,
+          transition: dragging ? 'none' : 'transform 0.3s ease',
+        }}
+        className={`relative rounded-xl border ${
           isToday
             ? 'border-orange-500/50 bg-gray-800/80'
             : isRest
@@ -132,6 +149,13 @@ function SwipeableCard({
         }`}
       >
         {children}
+        {/* Transparent overlay when open: tapping anywhere on the card closes it */}
+        {isOpen && (
+          <div
+            className="absolute inset-0 z-10 rounded-xl"
+            onClick={() => setIsOpen(false)}
+          />
+        )}
       </div>
     </div>
   );
