@@ -462,11 +462,20 @@ export default function BlockView({ days, activities, onSelectDay, onDaysChanged
     }
   }, [days, onDaysChanged]);
 
-  // ── Delete day handler ──
+  // ── Delete day handler: convert to a rest day so other days keep their dates ──
   const handleDeleteDay = useCallback(async (day: TrainingDay) => {
     try {
       const res = await fetch(`/api/training/days/${day.id}`, {
-        method: 'DELETE',
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'rest',
+          title: 'Rest day',
+          duration_min: 0,
+          tss_target: null,
+          description: '',
+          segments: [],
+        }),
       });
       if (!res.ok) throw new Error('Delete failed');
       onDaysChanged?.();
