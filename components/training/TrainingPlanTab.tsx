@@ -52,7 +52,7 @@ export default function TrainingPlanTab() {
         setView({ type: 'block' });
         if (data.days?.length) {
           fetch(`/api/training/activities?from=${data.days[0].date}&to=${data.days[data.days.length - 1].date}`)
-            .then(r => r.json()).then(setActivities).catch(console.error);
+            .then(r => r.json()).then(acts => { if (Array.isArray(acts)) setActivities(acts); }).catch(console.error);
         }
       })
       .catch(console.error)

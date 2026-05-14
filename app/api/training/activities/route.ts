@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
           normalized_power,
           weighted_average_watts,
           average_heartrate,
-          COALESCE(tss, hrss, 0))::int AS tss,
+          COALESCE(tss, hrss, 0)::int AS tss,
           intensity_factor
         FROM activities
         WHERE (start_date AT TIME ZONE 'Australia/Sydney')::date >= $1
