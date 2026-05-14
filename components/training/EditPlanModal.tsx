@@ -71,6 +71,9 @@ export default function EditPlanModal({ plan, onClose, onUpdated }: Props) {
   });
   const [status, setStatus] = useState<'idle' | 'generating' | 'saving' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState('');
+  const [aiMessage, setAiMessage] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
 
   function toggleDay(d: number) {
     setTrainingDays(prev =>
@@ -80,6 +83,28 @@ export default function EditPlanModal({ plan, onClose, onUpdated }: Props) {
 
   function updateDaySetting<K extends keyof DaySetting>(dow: number, key: K, value: DaySetting[K]) {
     setDaySettings(prev => ({ ...prev, [dow]: { ...prev[dow], [key]: value } }));
+  }
+
+  async function handleAiEdit() {
+    if (!aiMessage.trim() || aiLoading || busy) return;
+    setAiLoading(true);
+    setAiError(null);
+
+    try {
+      const res = await fetch(`/api/training/plans/${plan.id}/ai-edit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: aiMessage }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error ?? 'AI edit failed');
+
+      onUpdated();
+    } catch (err) {
+      setAiError(String(err));
+    } finally {
+      setAiLoading(false);
+    }
   }
 
   async function handleRegenerate() {
@@ -250,14 +275,51 @@ export default function EditPlanModal({ plan, onClose, onUpdated }: Props) {
                     daySettings[i]?.isGroupRide ? 'bg-blue-500' : 'bg-gray-700'
                   }`}
                 >
-                  <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 ${
-                    daySettings[i]?.isGroupRide ? 'translate-x-4' : 'translate-x-0.5'
+                  <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all duration-200 ${
+                    daySettings[i]?.isGroupRide ? 'left-[18px]' : 'left-0.5'
                   }`} />
                 </button>
               </div>
             ))}
           </div>
           <p className="text-[10px] text-gray-600 mt-1.5">Group ride days use steady-state targets, not structured intervals.</p>
+        </div>
+
+        {/* ── AI Edit ── */}
+        <div className="border-t border-gray-800 pt-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <svg className="w-4 h-4 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+            </svg>
+            <span className="text-xs font-semibold text-gray-300 uppercase tracking-wider">Coach AI — Edit Plan</span>
+          </div>
+          <p className="text-[10px] text-gray-500 leading-relaxed">
+            Tell Coach AI how to modify your plan. It will review your recent training data (rides, intensity, terrain, laps) and rebuild the plan accordingly.
+          </p>
+          <textarea
+            value={aiMessage}
+            onChange={e => setAiMessage(e.target.value)}
+            disabled={busy || aiLoading}
+            rows={3}
+            placeholder='e.g. "Review my activities from the previous week, look at the duration, intensity, laps, terrain and use this as a baseline for my training plan. Identify key sessions and build progressive overload keeping the overall structure the same."'
+            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-orange-500 resize-none disabled:opacity-50"
+          />
+          <button
+            onClick={handleAiEdit}
+            disabled={!aiMessage.trim() || busy || aiLoading}
+            className="w-full py-2 rounded-lg bg-orange-500 hover:bg-orange-400 disabled:opacity-50 text-white text-sm font-medium transition-colors flex items-center justify-center gap-2"
+          >
+            {aiLoading ? (
+              <>
+                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                </svg>
+                Analysing training data…
+              </>
+            ) : 'Ask Coach AI'}
+          </button>
+          {aiError && <p className="text-xs text-red-400">{aiError}</p>}
         </div>
 
         {status === 'generating' && (
