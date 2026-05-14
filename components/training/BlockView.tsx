@@ -70,12 +70,6 @@ function completionStatus(day: TrainingDay, acts: ActivitySummary[]): 'done' | '
   return 'done';
 }
 
-/** Format a date string for display in the drop zone */
-function formatDate(dateStr: string): string {
-  const d = new Date(dateStr + 'T00:00:00Z');
-  return d.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' });
-}
-
 // ─── Swipeable wrapper (no visible trash icon) ────────────────────────────────
 
 function SwipeableCard({
@@ -134,7 +128,7 @@ function SwipeableCard({
             ? 'border-orange-500/50 bg-gray-800/80'
             : isRest
             ? 'border-gray-800 bg-gray-900/40'
-            : 'border-gray-800 bg-gray-800/60 cursor-pointer hover:bg-gray-700/60 hover:border-gray-700'
+            : 'border-gray-800 bg-gray-800/60'
         }`}
       >
         {children}
@@ -143,9 +137,9 @@ function SwipeableCard({
   );
 }
 
-// ─── Draggable day card ──────────────────────────────────────────────────────
+// ─── Day card that is both a drop target and contains draggable content ──────
 
-function DraggableDayCard({
+function DayCard({
   day,
   acts,
   status,
@@ -156,6 +150,7 @@ function DraggableDayCard({
   dateNum,
   onSelectDay,
   onDelete,
+  onDropOnDay,
 }: {
   day: TrainingDay;
   acts: ActivitySummary[];
@@ -167,14 +162,58 @@ function DraggableDayCard({
   dateNum: number;
   onSelectDay: (day: TrainingDay) => void;
   onDelete: (day: TrainingDay) => void;
+  onDropOnDay: (dayId: number, targetDayId: number) => void;
 }) {
+  const [isDragOver, setIsDragOver] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const dragCounter = useRef(0);
 
+  // ── Drag over handlers (make this a drop target) ──
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  }, []);
+
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    dragCounter.current++;
+    if (dragCounter.current === 1) {
+      setIsDragOver(true);
+    }
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    dragCounter.current--;
+    if (dragCounter.current === 0) {
+      setIsDragOver(false);
+    }
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    dragCounter.current = 0;
+    setIsDragOver(false);
+    try {
+      const data = JSON.parse(e.dataTransfer.getData('application/json'));
+      if (data.dayId !== day.id) {
+        onDropOnDay(data.dayId, day.id);
+      }
+    } catch {
+      // ignore invalid drops
+    }
+  }, [day.id, onDropOnDay]);
+
+  // ── Drag start (make this draggable) ──
   const handleDragStart = useCallback((e: React.DragEvent) => {
-    e.dataTransfer.setData('application/json', JSON.stringify({ dayId: day.id, fromDate: day.date }));
+    if (isRest) {
+      e.preventDefault();
+      return;
+    }
+    e.dataTransfer.setData('application/json', JSON.stringify({ dayId: day.id }));
     e.dataTransfer.effectAllowed = 'move';
     setIsDragging(true);
-  }, [day]);
+  }, [day, isRest]);
 
   const handleDragEnd = useCallback(() => {
     setIsDragging(false);
@@ -183,160 +222,127 @@ function DraggableDayCard({
   return (
     <SwipeableCard day={day} isToday={isToday} isRest={isRest} isPast={isPast} onDelete={onDelete}>
       <div
-        draggable={!isRest}
-        onDragStart={!isRest ? handleDragStart : undefined}
-        onDragEnd={handleDragEnd}
-        onClick={() => !isRest && !isDragging && onSelectDay(day)}
-        className={`${isDragging ? 'opacity-50' : ''} ${!isRest ? 'cursor-grab active:cursor-grabbing' : ''}`}
+        // Drop target events on the outer wrapper
+        onDragOver={handleDragOver}
+        onDragEnter={handleDragEnter}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        className={`rounded-xl transition-all duration-150 ${
+          isDragOver
+            ? 'ring-2 ring-orange-500 bg-orange-500/10'
+            : ''
+        }`}
       >
-        <div className="flex items-start gap-3 px-4 py-3">
+        <div
+          // Drag source events on the inner content
+          draggable={!isRest}
+          onDragStart={!isRest ? handleDragStart : undefined}
+          onDragEnd={handleDragEnd}
+          onClick={() => !isRest && !isDragging && onSelectDay(day)}
+          className={`${isDragging ? 'opacity-50' : ''}`}
+        >
+          <div className="flex items-start gap-3 px-4 py-3">
 
-          {/* Day label column */}
-          <div className="flex-shrink-0 w-12 text-center pt-0.5">
-            <p className={`text-xs font-semibold ${isToday ? 'text-orange-400' : 'text-gray-400'}`}>
-              {DOW_SHORT[di]}
-            </p>
-            <p className={`text-lg font-bold leading-tight ${isToday ? 'text-orange-400' : isPast ? 'text-gray-600' : 'text-gray-300'}`}>
-              {dateNum}
-            </p>
-          </div>
+            {/* Grab handle + Day label column */}
+            <div className="flex-shrink-0 w-12 text-center pt-0.5">
+              {!isRest && (
+                <div className="flex justify-center mb-1 cursor-grab active:cursor-grabbing text-gray-600 hover:text-gray-400 transition-colors">
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M8 6a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm8 0a2 2 0 1 1 0-4 2 2 0 0 1 0 4zM8 14a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm8 0a2 2 0 1 1 0-4 2 2 0 0 1 0 4zM8 22a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm8 0a2 2 0 1 1 0-4 2 2 0 0 1 0 4z" />
+                  </svg>
+                </div>
+              )}
+              <p className={`text-xs font-semibold ${isToday ? 'text-orange-400' : 'text-gray-400'}`}>
+                {DOW_SHORT[di]}
+              </p>
+              <p className={`text-lg font-bold leading-tight ${isToday ? 'text-orange-400' : isPast ? 'text-gray-600' : 'text-gray-300'}`}>
+                {dateNum}
+              </p>
+            </div>
 
-          {/* Divider */}
-          <div className={`w-px self-stretch mx-1 flex-shrink-0 ${isToday ? 'bg-orange-500/40' : 'bg-gray-700'}`} />
+            {/* Divider */}
+            <div className={`w-px self-stretch mx-1 flex-shrink-0 ${isToday ? 'bg-orange-500/40' : 'bg-gray-700'}`} />
 
-          {/* Content */}
-          <div className="flex-1 min-w-0">
-            {isRest ? (
-              <div className="flex items-center gap-2 py-1">
-                <div className={`w-2 h-2 rounded-full flex-shrink-0 ${TYPE_DOT.rest}`} />
-                <span className="text-sm text-gray-500 italic">Rest day</span>
-              </div>
-            ) : (
-              <>
-                {/* Title row */}
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-2 min-w-0 flex-1">
-                    <div className={`w-2 h-2 rounded-full flex-shrink-0 mt-1.5 ${TYPE_DOT[day.type] ?? 'bg-gray-500'} ${isPast && status === 'none' ? 'opacity-40' : ''}`} />
-                    <p className={`text-sm font-semibold leading-snug ${isPast && status === 'none' ? 'text-gray-500' : 'text-white'}`}>
-                      {day.title}
+            {/* Content */}
+            <div className="flex-1 min-w-0">
+              {isRest ? (
+                <div className="flex items-center gap-2 py-1">
+                  <div className={`w-2 h-2 rounded-full flex-shrink-0 ${TYPE_DOT.rest}`} />
+                  <span className="text-sm text-gray-500 italic">Rest day</span>
+                </div>
+              ) : (
+                <>
+                  {/* Title row */}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <div className={`w-2 h-2 rounded-full flex-shrink-0 mt-1.5 ${TYPE_DOT[day.type] ?? 'bg-gray-500'} ${isPast && status === 'none' ? 'opacity-40' : ''}`} />
+                      <p className={`text-sm font-semibold leading-snug ${isPast && status === 'none' ? 'text-gray-500' : 'text-white'}`}>
+                        {day.title}
+                      </p>
+                    </div>
+                    {/* Status tick */}
+                    {status === 'done' && (
+                      <svg className="w-4 h-4 text-green-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                    {status === 'logged' && (
+                      <svg className="w-4 h-4 text-yellow-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </div>
+
+                  {/* Meta row: type badge + duration + TSS */}
+                  <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                    <span className={`text-[10px] rounded px-1.5 py-0.5 capitalize font-medium ${TYPE_BADGE[day.type] ?? TYPE_BADGE.endurance}`}>
+                      {day.type}
+                    </span>
+                    {day.duration_min > 0 && (
+                      <span className="text-[11px] text-gray-500">{fmtMins(day.duration_min)}</span>
+                    )}
+                    {day.tss_target && day.tss_target > 0 && (
+                      <span className="text-[11px] text-orange-400/70">{day.tss_target} TSS</span>
+                    )}
+                  </div>
+
+                  {/* Description snippet */}
+                  {day.description && (
+                    <p className={`text-xs mt-1.5 line-clamp-2 leading-relaxed ${isPast && status === 'none' ? 'text-gray-600' : 'text-gray-400'}`}>
+                      {day.description}
                     </p>
-                  </div>
-                  {/* Status tick */}
-                  {status === 'done' && (
-                    <svg className="w-4 h-4 text-green-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                    </svg>
                   )}
-                  {status === 'logged' && (
-                    <svg className="w-4 h-4 text-yellow-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                    </svg>
-                  )}
-                </div>
 
-                {/* Meta row: type badge + duration + TSS */}
-                <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                  <span className={`text-[10px] rounded px-1.5 py-0.5 capitalize font-medium ${TYPE_BADGE[day.type] ?? TYPE_BADGE.endurance}`}>
-                    {day.type}
-                  </span>
-                  {day.duration_min > 0 && (
-                    <span className="text-[11px] text-gray-500">{fmtMins(day.duration_min)}</span>
+                  {/* Logged activities */}
+                  {acts.length > 0 && (
+                    <div className="mt-2 space-y-1">
+                      {acts.map(a => (
+                        <div key={a.id} className="flex items-center gap-1.5">
+                          <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${status === 'done' ? 'bg-green-500' : 'bg-yellow-500'}`} />
+                          <span className={`text-[11px] truncate ${status === 'done' ? 'text-green-400' : 'text-yellow-400'}`}>
+                            {a.name}
+                          </span>
+                          <span className="text-[10px] text-gray-600 flex-shrink-0 ml-auto">
+                            {a.tss > 0 ? `${a.tss} TSS` : fmtActTime(a.moving_time)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
                   )}
-                  {day.tss_target && day.tss_target > 0 && (
-                    <span className="text-[11px] text-orange-400/70">{day.tss_target} TSS</span>
-                  )}
-                </div>
+                </>
+              )}
+            </div>
 
-                {/* Description snippet */}
-                {day.description && (
-                  <p className={`text-xs mt-1.5 line-clamp-2 leading-relaxed ${isPast && status === 'none' ? 'text-gray-600' : 'text-gray-400'}`}>
-                    {day.description}
-                  </p>
-                )}
-
-                {/* Logged activities */}
-                {acts.length > 0 && (
-                  <div className="mt-2 space-y-1">
-                    {acts.map(a => (
-                      <div key={a.id} className="flex items-center gap-1.5">
-                        <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${status === 'done' ? 'bg-green-500' : 'bg-yellow-500'}`} />
-                        <span className={`text-[11px] truncate ${status === 'done' ? 'text-green-400' : 'text-yellow-400'}`}>
-                          {a.name}
-                        </span>
-                        <span className="text-[10px] text-gray-600 flex-shrink-0 ml-auto">
-                          {a.tss > 0 ? `${a.tss} TSS` : fmtActTime(a.moving_time)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </>
+            {/* Chevron for non-rest days */}
+            {!isRest && (
+              <svg className="w-4 h-4 text-gray-600 flex-shrink-0 mt-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+              </svg>
             )}
           </div>
-
-          {/* Chevron for non-rest days */}
-          {!isRest && (
-            <svg className="w-4 h-4 text-gray-600 flex-shrink-0 mt-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-            </svg>
-          )}
         </div>
       </div>
     </SwipeableCard>
-  );
-}
-
-// ─── Drop zone for each day ──────────────────────────────────────────────────
-
-function DropZone({
-  date,
-  day,
-  onDrop,
-}: {
-  date: string;
-  day: TrainingDay;
-  onDrop: (dayId: number, fromDate: string, toDate: string, targetDayId: number) => void;
-}) {
-  const [isOver, setIsOver] = useState(false);
-
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    setIsOver(true);
-  }, []);
-
-  const handleDragLeave = useCallback(() => {
-    setIsOver(false);
-  }, []);
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsOver(false);
-    try {
-      const data = JSON.parse(e.dataTransfer.getData('application/json'));
-      onDrop(data.dayId, data.fromDate, date, day.id);
-    } catch {
-      // ignore invalid drops
-    }
-  }, [date, day.id, onDrop]);
-
-  return (
-    <div
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
-      className={`rounded-xl border-2 border-dashed transition-all duration-150 ${
-        isOver
-          ? 'border-orange-500 bg-orange-500/15 py-4'
-          : 'border-transparent py-0.5'
-      }`}
-    >
-      {isOver && (
-        <p className="text-center text-xs text-orange-400 font-medium">
-          Drop here → {formatDate(date)}
-        </p>
-      )}
-    </div>
   );
 }
 
@@ -386,33 +392,36 @@ export default function BlockView({ days, activities, onSelectDay, onDaysChanged
     : `Week ${weekIdx + 1}`;
 
   // ── Move day handler with swap support ──
-  const handleMoveDay = useCallback(async (dayId: number, _fromDate: string, toDate: string, targetDayId: number) => {
+  const handleDropOnDay = useCallback(async (draggedDayId: number, targetDayId: number) => {
     try {
-      // If the target day is a rest day (no session to swap), just move
+      const draggedDay = days.find(d => d.id === draggedDayId);
       const targetDay = days.find(d => d.id === targetDayId);
-      if (!targetDay || targetDay.type === 'rest') {
-        const res = await fetch(`/api/training/days/${dayId}`, {
+      if (!draggedDay || !targetDay) throw new Error('Day not found');
+
+      const draggedDate = draggedDay.date;
+      const targetDate = targetDay.date;
+
+      if (targetDay.type === 'rest') {
+        // Just move the dragged session to the target date
+        const res = await fetch(`/api/training/days/${draggedDayId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ date: toDate }),
+          body: JSON.stringify({ date: targetDate }),
         });
         if (!res.ok) throw new Error('Move failed');
       } else {
-        // Swap: move dragged day to target date, move target day to dragged day's original date
-        const fromDate = days.find(d => d.id === dayId)?.date;
-        if (!fromDate) throw new Error('Could not find source date');
-
-        const res1 = await fetch(`/api/training/days/${dayId}`, {
+        // Swap: move dragged day to target date, move target day to dragged day's date
+        const res1 = await fetch(`/api/training/days/${draggedDayId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ date: toDate }),
+          body: JSON.stringify({ date: targetDate }),
         });
         if (!res1.ok) throw new Error('Swap step 1 failed');
 
         const res2 = await fetch(`/api/training/days/${targetDayId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ date: fromDate }),
+          body: JSON.stringify({ date: draggedDate }),
         });
         if (!res2.ok) throw new Error('Swap step 2 failed');
       }
@@ -483,11 +492,11 @@ export default function BlockView({ days, activities, onSelectDay, onDaysChanged
 
       {/* Drag hint */}
       <p className="text-[10px] text-gray-600 text-center">
-        Drag a session to move it to a different day · Swipe left to delete
+        Use the grip handle to drag a session to a different day · Swipe left to delete
       </p>
 
-      {/* Day cards */}
-      <div className="space-y-0">
+      {/* Day cards — no separate drop zones, each card IS a drop target */}
+      <div className="space-y-2">
         {week.map((day, di) => {
           const acts    = actByDate.get(day.date) ?? [];
           const status  = completionStatus(day, acts);
@@ -497,22 +506,20 @@ export default function BlockView({ days, activities, onSelectDay, onDaysChanged
           const dateNum = new Date(day.date + 'T00:00:00Z').getUTCDate();
 
           return (
-            <div key={day.date}>
-              <DraggableDayCard
-                day={day}
-                acts={acts}
-                status={status}
-                isToday={isToday}
-                isPast={isPast}
-                isRest={isRest}
-                di={di}
-                dateNum={dateNum}
-                onSelectDay={onSelectDay}
-                onDelete={handleDeleteDay}
-              />
-              {/* Drop zone below each day card — always has a small hit area */}
-              <DropZone date={day.date} day={day} onDrop={handleMoveDay} />
-            </div>
+            <DayCard
+              key={day.id}
+              day={day}
+              acts={acts}
+              status={status}
+              isToday={isToday}
+              isPast={isPast}
+              isRest={isRest}
+              di={di}
+              dateNum={dateNum}
+              onSelectDay={onSelectDay}
+              onDelete={handleDeleteDay}
+              onDropOnDay={handleDropOnDay}
+            />
           );
         })}
       </div>
