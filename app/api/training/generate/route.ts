@@ -95,20 +95,20 @@ async function buildRichContext(ftp: number): Promise<string> {
 
     // 4. Best power curve (top efforts)
     const powerRes = await client.query(`
-      SELECT duration_seconds, ROUND(AVG(best_power)::numeric, 0)::int AS best_power
-      FROM best_efforts
-      WHERE duration_seconds IN (5, 60, 300, 600, 1200, 3600)
-      GROUP BY duration_seconds
-      ORDER BY duration_seconds
+      SELECT seconds, MAX(best_watts)::int AS best_watts
+      FROM best_power_efforts
+      WHERE seconds IN (5, 60, 300, 600, 1200, 3600)
+      GROUP BY seconds
+      ORDER BY seconds
     `);
     if (powerRes.rows.length > 0) {
       const powerLines = powerRes.rows.map(p => {
-        const label = p.duration_seconds <= 5 ? 'Sprint (5s)' :
-                      p.duration_seconds <= 60 ? '1 min' :
-                      p.duration_seconds <= 300 ? '5 min' :
-                      p.duration_seconds <= 600 ? '10 min' :
-                      p.duration_seconds <= 1200 ? '20 min' : '60 min (FTP proxy)';
-        return `- ${label}: ${p.best_power}W`;
+        const label = p.seconds <= 5 ? 'Sprint (5s)' :
+                      p.seconds <= 60 ? '1 min' :
+                      p.seconds <= 300 ? '5 min' :
+                      p.seconds <= 600 ? '10 min' :
+                      p.seconds <= 1200 ? '20 min' : '60 min (FTP proxy)';
+        return `- ${label}: ${p.best_watts}W`;
       });
       ctx.push(`## Best Power Curve\n${powerLines.join('\n')}\n`);
     }
