@@ -41,8 +41,7 @@ const TYPE_BADGE: Record<string, string> = {
 const DOW_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 function todaySydney(): string {
-  const d = new Date(Date.now() + 10 * 60 * 60 * 1000);
-  return d.toISOString().slice(0, 10);
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'Australia/Sydney' });
 }
 
 function fmtMins(mins: number): string {
@@ -459,7 +458,15 @@ export default function BlockView({ days, activities, onSelectDay, onDaysChanged
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ date: draggedDate }),
         });
-        if (!res2.ok) throw new Error('Swap step 2 failed');
+        if (!res2.ok) {
+          // Roll back step 1 so both days don't end up on the same date
+          await fetch(`/api/training/days/${draggedDayId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ date: draggedDate }),
+          });
+          throw new Error('Swap step 2 failed');
+        }
       }
       onDaysChanged?.();
     } catch (err) {
