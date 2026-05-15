@@ -5,6 +5,8 @@ import { isAuthenticated } from '@/lib/auth';
 /** Routes that do NOT require authentication. */
 const PUBLIC_ROUTES = [
   '/login',
+  '/api/auth/login',
+  '/api/auth/logout',
   '/api/strava/auth',
   '/api/strava/callback',
   '/api/strava/webhook',  // Strava posts activity events here without a session
