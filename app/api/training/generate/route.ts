@@ -76,13 +76,13 @@ async function buildRichContext(ftp: number): Promise<string> {
 
     // 3. Readiness / HRV from daily_wellness
     const readinessRes = await client.query(`
-      SELECT ROUND(AVG(icu_readiness)::numeric, 0)::int AS avg_readiness,
-             ROUND(AVG(morning_hrv)::numeric, 0)::int AS avg_hrv
+      SELECT ROUND(AVG(readiness_score)::numeric, 0)::int AS avg_readiness,
+             ROUND(AVG(hrv_rmssd)::numeric, 0)::int AS avg_hrv
       FROM daily_wellness
       WHERE date >= NOW() - INTERVAL '14 days'
         AND (
-          icu_readiness IS NOT NULL
-          OR morning_hrv IS NOT NULL
+          readiness_score IS NOT NULL
+          OR hrv_rmssd IS NOT NULL
         )
     `);
     const rdy = readinessRes.rows[0];
