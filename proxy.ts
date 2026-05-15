@@ -7,6 +7,7 @@ const PUBLIC_ROUTES = [
   '/login',
   '/api/strava/auth',
   '/api/strava/callback',
+  '/api/strava/webhook',  // Strava posts activity events here without a session
 ];
 
 /**
