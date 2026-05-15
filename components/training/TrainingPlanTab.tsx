@@ -5,6 +5,7 @@ import { TrainingPlan, TrainingDay } from '@/lib/training-plans';
 import BlockView from '@/components/training/BlockView';
 import DayView from '@/components/training/DayView';
 import EditPlanModal from '@/components/training/EditPlanModal';
+import CreatePlanModal from '@/components/training/CreatePlanModal';
 import ErrorBoundary from '@/components/training/ErrorBoundary';
 
 interface PlanMeta { id: number; name: string; goal: string; created_at: string }
@@ -30,18 +31,22 @@ export default function TrainingPlanTab() {
   const [view, setView]                 = useState<View>({ type: 'block' });
   const [loadingPlan, setLoadingPlan]   = useState(true);
   const [editingPlan, setEditingPlan]   = useState(false);
+  const [creatingPlan, setCreatingPlan] = useState(false);
 
-  useEffect(() => {
+  const fetchActivePlan = useCallback(() => {
     setLoadingPlan(true);
-    fetch('/api/training/plans/active')
+    return fetch('/api/training/plans/active')
       .then(r => r.json())
       .then((data: { plans: PlanMeta[]; plan: TrainingPlan | null; activities: ActivitySummary[] }) => {
         if (data.plan) { setPlan(data.plan); setActivePlanId(data.plan.id); }
+        else           { setPlan(null);      setActivePlanId(null); }
         if (data.activities) setActivities(data.activities);
       })
       .catch(console.error)
       .finally(() => setLoadingPlan(false));
   }, []);
+
+  useEffect(() => { fetchActivePlan(); }, [fetchActivePlan]);
 
   const loadPlan = useCallback((id: number, { silent = false } = {}) => {
     if (!silent) setLoadingPlan(true);
@@ -98,11 +103,19 @@ export default function TrainingPlanTab() {
         );
       })()}
 
-      {/* No plan message */}
+      {/* No plan — empty state with Add plan CTA */}
       {!loadingPlan && !plan && (
-        <div className="bg-gray-800/40 border border-gray-700 border-dashed rounded-2xl p-8 text-center">
-          <p className="text-sm text-gray-400">No active training plan.</p>
-          <p className="text-xs text-gray-600 mt-1">Go to Training Plans to create or activate one.</p>
+        <div className="bg-gray-800/40 border border-gray-700 border-dashed rounded-2xl p-8 text-center space-y-4">
+          <div>
+            <p className="text-sm text-gray-300 font-medium">No active training plan</p>
+            <p className="text-xs text-gray-500 mt-1">Generate an AI-personalised plan based on your profile and goals.</p>
+          </div>
+          <button
+            onClick={() => setCreatingPlan(true)}
+            className="px-4 py-2.5 text-sm font-medium bg-orange-500 hover:bg-orange-400 text-white rounded-lg transition-colors"
+          >
+            + Add plan
+          </button>
         </div>
       )}
 
@@ -140,6 +153,13 @@ export default function TrainingPlanTab() {
           plan={plan}
           onClose={() => setEditingPlan(false)}
           onUpdated={() => { setEditingPlan(false); if (activePlanId) loadPlan(activePlanId); }}
+        />
+      )}
+
+      {creatingPlan && (
+        <CreatePlanModal
+          onClose={() => setCreatingPlan(false)}
+          onCreated={() => { setCreatingPlan(false); fetchActivePlan(); }}
         />
       )}
     </div>
