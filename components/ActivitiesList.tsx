@@ -564,13 +564,19 @@ export default function ActivitiesList() {
               >
                 Avg HR <SortArrow col="average_heartrate" sortBy={sortBy} sortDir={sortDir} />
               </th>
+              <th
+                className="text-right px-4 py-3 text-gray-400 font-medium cursor-pointer hover:text-white select-none whitespace-nowrap"
+                onClick={() => handleSort('tss')}
+              >
+                TSS <SortArrow col="tss" sortBy={sortBy} sortDir={sortDir} />
+              </th>
             </tr>
           </thead>
           <tbody>
             {loading
               ? Array.from({ length: 10 }).map((_, i) => (
                   <tr key={i} className="border-b border-gray-800/50">
-                    {Array.from({ length: 7 }).map((_, j) => (
+                    {Array.from({ length: 8 }).map((_, j) => (
                       <td key={j} className="px-4 py-3">
                         <div className="h-4 bg-gray-800 rounded animate-pulse" />
                       </td>
@@ -610,6 +616,9 @@ export default function ActivitiesList() {
                       </td>
                       <td className="px-4 py-3 text-right text-gray-300">
                         {a.average_heartrate ? Math.round(a.average_heartrate) : '—'}
+                      </td>
+                      <td className="px-4 py-3 text-right text-gray-300">
+                        {a.tss ? Math.round(a.tss) : '—'}
                       </td>
                     </tr>
                   );
