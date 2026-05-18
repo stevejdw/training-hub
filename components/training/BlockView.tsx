@@ -344,8 +344,8 @@ function DayCard({
         }`}
       >
         <div
-          draggable={!isRest}
-          onDragStart={!isRest ? handleDragStart : undefined}
+          draggable={!isRest && !isMoving && !isSwapTarget}
+          onDragStart={!isRest && !isMoving && !isSwapTarget ? handleDragStart : undefined}
           onDragEnd={handleDragEnd}
           onClick={handleCardClick}
           className={isDragging ? 'opacity-40' : ''}
@@ -357,10 +357,14 @@ function DayCard({
               {!isRest && (
                 <button
                   type="button"
-                  // Stop BOTH touch and pointer events so SwipeableCard's swipe
-                  // handlers don't fire when the user taps/holds the grip
+                  // Stop touch/pointer events so SwipeableCard's swipe handlers
+                  // don't fire when the user taps/holds the grip.
+                  // onTouchEnd calls e.preventDefault() so the browser won't
+                  // synthesise a click — we fire onGripTap() directly here
+                  // (iOS Safari suppresses synthesised clicks on draggable
+                  // parents, so going through click is unreliable on mobile).
                   onTouchStart={e => e.stopPropagation()}
-                  onTouchEnd={e => e.stopPropagation()}
+                  onTouchEnd={e => { e.stopPropagation(); e.preventDefault(); onGripTap(); }}
                   onPointerDown={e => e.stopPropagation()}
                   onClick={e => { e.stopPropagation(); onGripTap(); }}
                   // min 44px touch target per Apple HIG
