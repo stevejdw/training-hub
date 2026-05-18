@@ -11,7 +11,24 @@ interface Props {
 
 const DOW_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
+const TIME_OPTIONS = [
+  { label: '1h',   minutes: 60  },
+  { label: '1.5h', minutes: 90  },
+  { label: '2h',   minutes: 120 },
+  { label: '2.5h', minutes: 150 },
+  { label: '3h',   minutes: 180 },
+  { label: '3.5h', minutes: 210 },
+  { label: '4h',   minutes: 240 },
+];
+
+interface DaySetting {
+  maxMinutes: number;
+  isGroupRide: boolean;
+}
+type DaySettingsMap = Record<number, DaySetting>;
+
 /** Compute the Monday of the current week in Sydney time. */
+
 function currentMondaySydney(): string {
   const now = new Date(Date.now() + 10 * 60 * 60 * 1000);
   const dow = now.getUTCDay();
@@ -33,8 +50,16 @@ export default function CreatePlanModal({ onClose, onCreated }: Props) {
   const [weeks, setWeeks] = useState(4);
   const [planStartDate, setPlanStartDate] = useState(currentMondaySydney);
   const [trainingDays, setTrainingDays] = useState<number[]>([1, 2, 4, 5, 6]); // Tue/Wed/Fri/Sat/Sun
+  const [daySettings, setDaySettings] = useState<DaySettingsMap>(() => {
+    const map: DaySettingsMap = {};
+    DOW_LABELS.forEach((_, i) => {
+      map[i] = { maxMinutes: 120, isGroupRide: false };
+    });
+    return map;
+  });
 
   const [weeklyTssTarget, setWeeklyTssTarget] = useState<number | ''>('');
+
   const [tssSource, setTssSource] = useState<BaselineTssResponse['source'] | null>(null);
   const [tssDetail, setTssDetail] = useState<string>('');
   const [status, setStatus] = useState<'idle' | 'generating' | 'saving' | 'error'>('idle');
@@ -61,7 +86,12 @@ export default function CreatePlanModal({ onClose, onCreated }: Props) {
     );
   }
 
+  function updateDaySetting<K extends keyof DaySetting>(dow: number, key: K, value: DaySetting[K]) {
+    setDaySettings(prev => ({ ...prev, [dow]: { ...prev[dow], [key]: value } }));
+  }
+
   async function handleGenerate() {
+
     if (status !== 'idle') return;
     setStatus('generating');
     setErrorMsg('');
@@ -86,9 +116,10 @@ export default function CreatePlanModal({ onClose, onCreated }: Props) {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                goal, notes, trainingDays, weekIndex: i, planStartDate, totalWeeks: weeks, planName, planGoal,
+                goal, notes, trainingDays, daySettings, weekIndex: i, planStartDate, totalWeeks: weeks, planName, planGoal,
                 weeklyTssTarget: typeof weeklyTssTarget === 'number' && weeklyTssTarget > 0 ? weeklyTssTarget : null,
               }),
+
             });
             if (!r.body) throw new Error(`Week ${i + 1}: no response body (HTTP ${r.status})`);
 
@@ -259,8 +290,58 @@ export default function CreatePlanModal({ onClose, onCreated }: Props) {
               ))}
             </div>
           </div>
+
+          {/* Per-day settings */}
+          <div>
+            <label className="text-xs text-gray-400 uppercase tracking-wider block mb-2">Day settings</label>
+            <div className="space-y-1.5">
+              {/* Header row */}
+              <div className="grid grid-cols-[56px_1fr_auto] gap-2 px-1">
+                <span className="text-[10px] text-gray-600 uppercase tracking-wider">Day</span>
+                <span className="text-[10px] text-gray-600 uppercase tracking-wider">Available time</span>
+                <span className="text-[10px] text-gray-600 uppercase tracking-wider">Group ride</span>
+              </div>
+              {trainingDays.map(i => (
+                <div key={i} className="grid grid-cols-[56px_1fr_auto] gap-2 items-center bg-gray-800/50 rounded-lg px-2 py-1.5">
+                  <span className="text-xs font-medium text-gray-300">{DOW_LABELS[i]}</span>
+                  {/* Time pills */}
+                  <div className="flex gap-1 flex-wrap">
+                    {TIME_OPTIONS.map(opt => (
+                      <button
+                        key={opt.minutes}
+                        onClick={() => updateDaySetting(i, 'maxMinutes', opt.minutes)}
+                        disabled={busy}
+                        className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${
+                          daySettings[i]?.maxMinutes === opt.minutes
+                            ? 'bg-orange-500 text-white'
+                            : 'bg-gray-700 text-gray-400 hover:text-white'
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                  {/* Group ride toggle */}
+                  <button
+                    onClick={() => updateDaySetting(i, 'isGroupRide', !daySettings[i]?.isGroupRide)}
+                    disabled={busy}
+                    className={`relative w-9 h-5 rounded-full transition-colors duration-200 flex-shrink-0 ${
+                      daySettings[i]?.isGroupRide ? 'bg-blue-500' : 'bg-gray-700'
+                    }`}
+                  >
+                    <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all duration-200 ${
+                      daySettings[i]?.isGroupRide ? 'left-[18px]' : 'left-0.5'
+                    }`} />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <p className="text-[10px] text-gray-600 mt-1.5">Group ride days use steady-state targets, not structured intervals.</p>
+          </div>
+
           <div>
             <label className="text-xs text-gray-400 uppercase tracking-wider block mb-1">Additional instructions (optional)</label>
+
             <textarea
               value={notes}
               onChange={e => setNotes(e.target.value)}

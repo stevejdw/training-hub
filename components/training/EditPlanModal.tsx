@@ -86,6 +86,9 @@ export default function EditPlanModal({ plan, onClose, onUpdated }: Props) {
   const [aiMessage, setAiMessage] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
 
 
   function toggleDay(d: number) {
@@ -230,9 +233,26 @@ export default function EditPlanModal({ plan, onClose, onUpdated }: Props) {
   }
 
 
-  const busy = status === 'generating' || status === 'saving';
+  async function handleDelete() {
+    if (deleting) return;
+    setDeleting(true);
+    setErrorMsg('');
+    try {
+      const res = await fetch(`/api/training/plans/${plan.id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error ?? 'Delete failed');
+      onUpdated();
+    } catch (err) {
+      setErrorMsg(String(err));
+      setDeleting(false);
+      setConfirmDelete(false);
+    }
+  }
+
+  const busy = status === 'generating' || status === 'saving' || deleting;
 
   return (
+
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
       <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-md max-h-[90vh] flex flex-col">
       <div className="p-6 overflow-y-auto flex-1 space-y-5">
@@ -409,21 +429,52 @@ export default function EditPlanModal({ plan, onClose, onUpdated }: Props) {
         </div>
         {/* Sticky footer */}
         <div className="flex gap-2 p-4 border-t border-gray-800 flex-shrink-0">
-          <button
-            onClick={onClose}
-            disabled={busy}
-            className="flex-1 py-2 rounded-lg bg-gray-800 text-gray-400 hover:text-white text-sm transition-colors disabled:opacity-50"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSaveGoalOnly}
-            disabled={busy}
-            className="flex-1 py-2 rounded-lg bg-orange-500 hover:bg-orange-400 text-white text-sm font-medium transition-colors disabled:opacity-50"
-          >
-            {busy ? 'Working…' : 'Save'}
-          </button>
+          {confirmDelete ? (
+            <>
+              <button
+                onClick={() => { setConfirmDelete(false); setErrorMsg(''); }}
+                disabled={busy}
+                className="flex-1 py-2 rounded-lg bg-gray-800 text-gray-400 hover:text-white text-sm transition-colors disabled:opacity-50"
+              >
+                Keep plan
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={busy}
+                className="flex-1 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white text-sm font-medium transition-colors disabled:opacity-50"
+              >
+                {deleting ? 'Deleting…' : 'Yes, delete'}
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                onClick={() => setConfirmDelete(true)}
+                disabled={busy}
+                className="py-2 px-3 rounded-lg bg-gray-800 text-red-400 hover:text-red-300 text-sm transition-colors disabled:opacity-50 flex-shrink-0"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </button>
+              <button
+                onClick={onClose}
+                disabled={busy}
+                className="flex-1 py-2 rounded-lg bg-gray-800 text-gray-400 hover:text-white text-sm transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveGoalOnly}
+                disabled={busy}
+                className="flex-1 py-2 rounded-lg bg-orange-500 hover:bg-orange-400 text-white text-sm font-medium transition-colors disabled:opacity-50"
+              >
+                {busy ? 'Working…' : 'Save'}
+              </button>
+            </>
+          )}
         </div>
+
       </div>
     </div>
   );
