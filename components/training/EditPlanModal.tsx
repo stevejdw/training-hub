@@ -17,9 +17,7 @@ const TIME_OPTIONS = [
   { label: '1h',   minutes: 60  },
   { label: '1.5h', minutes: 90  },
   { label: '2h',   minutes: 120 },
-  { label: '2.5h', minutes: 150 },
   { label: '3h',   minutes: 180 },
-  { label: '3.5h', minutes: 210 },
   { label: '4h',   minutes: 240 },
 ];
 
@@ -65,6 +63,9 @@ export default function EditPlanModal({ plan, onClose, onUpdated }: Props) {
   const [trainingDays, setTrainingDays] = useState<number[]>(() => detectTrainingDays(plan.days));
   const [daySettings, setDaySettings] = useState<DaySettingsMap>(() => {
     // Initialise with 2h per day, detect group rides from existing plan descriptions
+    const validMins = TIME_OPTIONS.map(o => o.minutes);
+    const snapToNearest = (m: number) =>
+      validMins.reduce((best, v) => Math.abs(v - m) < Math.abs(best - m) ? v : best, validMins[0]);
     const map: DaySettingsMap = {};
     const first7 = plan.days.slice(0, 7);
     DOW_LABELS.forEach((_, i) => {
@@ -72,7 +73,7 @@ export default function EditPlanModal({ plan, onClose, onUpdated }: Props) {
       const isGroup = existing
         ? /group|bunch|club|social/i.test(existing.title + ' ' + (existing.description ?? ''))
         : false;
-      map[i] = { maxMinutes: existing?.duration_min ?? 120, isGroupRide: isGroup };
+      map[i] = { maxMinutes: snapToNearest(existing?.duration_min ?? 120), isGroupRide: isGroup };
     });
     return map;
   });

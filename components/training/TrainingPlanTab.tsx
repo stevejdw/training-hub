@@ -51,8 +51,9 @@ export default function TrainingPlanTab() {
   const loadPlan = useCallback((id: number, { silent = false } = {}) => {
     if (!silent) setLoadingPlan(true);
     fetch(`/api/training/plans/${id}`)
-      .then(r => r.json() as Promise<TrainingPlan>)
+      .then(r => { if (!r.ok) throw new Error(`${r.status}`); return r.json() as Promise<TrainingPlan>; })
       .then(data => {
+        if (!data?.days) { setPlan(null); setActivePlanId(null); return; }
         setPlan(data);
         setView({ type: 'block' });
         if (data.days?.length) {
@@ -152,7 +153,7 @@ export default function TrainingPlanTab() {
         <EditPlanModal
           plan={plan}
           onClose={() => setEditingPlan(false)}
-          onUpdated={() => { setEditingPlan(false); if (activePlanId) loadPlan(activePlanId); }}
+          onUpdated={() => { setEditingPlan(false); fetchActivePlan(); }}
         />
       )}
 
