@@ -10,6 +10,7 @@ const PUBLIC_ROUTES = [
   '/api/strava/auth',
   '/api/strava/callback',
   '/api/strava/webhook',  // Strava posts activity events here without a session
+  '/theme-preview',       // Colour profile preview page — no sensitive data
 ];
 
 /**

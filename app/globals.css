@@ -9,6 +9,218 @@
   --bottom-nav-h: 56px;
 }
 
+/* ── Ocean Light theme ── */
+[data-theme="ocean-light"] {
+  --background: #f0f9ff;
+  --foreground: #0c4a6e;
+
+  /* Remap gray scale to sky-tinted light tones */
+  --color-white:    #0c4a6e;   /* text-white → sky-900 navy                */
+  --color-gray-950: #f0f9ff;   /* page bg → sky-50                         */
+  --color-gray-900: #ffffff;   /* card bg → white                          */
+  --color-gray-800: #e0f2fe;   /* secondary card → sky-100                 */
+  --color-gray-700: #bae6fd;   /* tertiary surface → sky-200               */
+  --color-gray-600: #7dd3fc;   /* borders → sky-300                        */
+  --color-gray-500: #0369a1;   /* muted text → sky-700                     */
+  --color-gray-400: #075985;   /* secondary text → sky-800                 */
+  --color-gray-300: #0c4a6e;   /* strong secondary → sky-900               */
+  --color-gray-200: #082f49;
+  --color-gray-100: #0c4a6e;
+
+  /* Accent → sky blue (same family as Ocean dark) */
+  --color-orange-500: #0ea5e9;
+  --color-orange-400: #38bdf8;
+  --color-orange-300: #7dd3fc;
+  --color-orange-200: #bae6fd;
+  --color-orange-100: #e0f2fe;
+  --color-orange-600: #0284c7;
+}
+
+/* ── Sand Dark theme ── */
+[data-theme="sand-dark"] {
+  --background: #1a100a;
+  --foreground: #fdf0e0;
+
+  /* Remap gray scale to warm dark brown tones */
+  --color-white:    #fdf0e0;   /* text-white → warm off-white              */
+  --color-gray-950: #1a100a;   /* page bg → near-black warm                */
+  --color-gray-900: #261510;   /* card bg → dark warm                      */
+  --color-gray-800: #3a200e;   /* secondary card                           */
+  --color-gray-700: #4d2d15;   /* borders                                  */
+  --color-gray-600: #66401e;   /* muted borders                            */
+  --color-gray-500: #b08060;   /* muted text — AA contrast on dark bg      */
+  --color-gray-400: #d4a870;   /* secondary text                           */
+  --color-gray-300: #f0c890;   /* strong secondary                         */
+  --color-gray-200: #fcd9a8;
+  --color-gray-100: #fdf0e0;
+
+  /* Accent → sky blue (same family as Sand light) */
+  --color-orange-500: #0ea5e9;
+  --color-orange-400: #38bdf8;
+  --color-orange-300: #7dd3fc;
+  --color-orange-200: #bae6fd;
+  --color-orange-100: #e0f2fe;
+  --color-orange-600: #0284c7;
+}
+
+/* ── Chrome theme ── */
+[data-theme="chrome"] {
+  --background: #080e1a;
+  --foreground: #dde8f0;
+
+  --color-white:    #dde8f0;
+  --color-gray-950: #080e1a;
+  --color-gray-900: #0f1827;   /* card bg */
+  --color-gray-800: #172237;   /* secondary card */
+  --color-gray-700: #1e2f48;   /* borders */
+  --color-gray-600: #264059;   /* muted borders */
+  --color-gray-500: #4d7090;   /* muted text */
+  --color-gray-400: #7093b0;   /* secondary text */
+  --color-gray-300: #9db8cf;   /* strong secondary */
+  --color-gray-200: #bdd2e4;
+  --color-gray-100: #dde8f0;
+
+  /* Accent → amber/gold (warm vs cool surface) */
+  --color-orange-500: #f59e0b;
+  --color-orange-400: #fbbf24;
+  --color-orange-300: #fcd34d;
+  --color-orange-200: #fde68a;
+  --color-orange-100: #fef3c7;
+  --color-orange-600: #d97706;
+}
+
+/* ── Sand theme ── */
+[data-theme="sand"] {
+  --background: #f8f4ef;
+  --foreground: #2c1810;
+
+  /* Remap gray scale to warm sand/linen tones */
+  --color-white:    #2c1810;   /* text-white → dark warm brown              */
+  --color-gray-950: #f8f4ef;   /* page bg → warm sand                       */
+  --color-gray-900: #ffffff;   /* card bg → white                           */
+  --color-gray-800: #f2ebe1;   /* secondary card → warm linen               */
+  --color-gray-700: #e6d8c8;   /* tertiary surface → warm beige             */
+  --color-gray-600: #d4c0a8;   /* borders → warm tan                        */
+  --color-gray-500: #9a7d65;   /* muted text → warm mid-brown               */
+  --color-gray-400: #7d5a42;   /* secondary text → deeper warm              */
+  --color-gray-300: #4a2e1a;   /* strong secondary → dark brown             */
+  --color-gray-200: #2c1810;
+  --color-gray-100: #1a0e08;
+
+  /* Accent → sky blue (cool vs warm surface) */
+  --color-orange-500: #0369a1;
+  --color-orange-400: #0284c7;
+  --color-orange-300: #38bdf8;
+  --color-orange-200: #bae6fd;
+  --color-orange-100: #e0f2fe;
+  --color-orange-600: #075985;
+}
+
+/* ── Ocean theme ── */
+[data-theme="ocean"] {
+  --background: #000d1a;
+  --foreground: #e0f2fe;
+
+  --color-white:    #e0f2fe;
+  --color-gray-950: #000d1a;
+  --color-gray-900: #00172e;
+  --color-gray-800: #002447;
+  --color-gray-700: #003a70;
+  --color-gray-600: #005299;
+  --color-gray-500: #4a9fd4;
+  --color-gray-400: #7ec8e3;
+  --color-gray-300: #b8e4f9;
+  --color-gray-200: #cceeff;
+  --color-gray-100: #e0f2fe;
+
+  /* Accent → sky blue */
+  --color-orange-500: #0ea5e9;
+  --color-orange-400: #38bdf8;
+  --color-orange-300: #7dd3fc;
+  --color-orange-200: #bae6fd;
+  --color-orange-100: #e0f2fe;
+  --color-orange-600: #0284c7;
+}
+
+/* ── Cosmic theme ── */
+[data-theme="cosmic"] {
+  --background: #0a0514;
+  --foreground: #f3e8ff;
+
+  --color-white:    #f3e8ff;
+  --color-gray-950: #0a0514;
+  --color-gray-900: #130a24;
+  --color-gray-800: #1e1035;
+  --color-gray-700: #2d1a50;
+  --color-gray-600: #3d2566;
+  --color-gray-500: #7c4daa;
+  --color-gray-400: #a78bca;
+  --color-gray-300: #c4a8e0;
+  --color-gray-200: #ddd6fe;
+  --color-gray-100: #f3e8ff;
+
+  /* Accent → violet */
+  --color-orange-500: #8b5cf6;
+  --color-orange-400: #a78bfa;
+  --color-orange-300: #c4b5fd;
+  --color-orange-200: #ddd6fe;
+  --color-orange-100: #ede9fe;
+  --color-orange-600: #7c3aed;
+}
+
+/* ── Forest theme ── */
+[data-theme="forest"] {
+  --background: #021007;
+  --foreground: #ecfdf5;
+
+  --color-white:    #ecfdf5;
+  --color-gray-950: #021007;
+  --color-gray-900: #041f0e;
+  --color-gray-800: #063318;
+  --color-gray-700: #0a4d24;
+  --color-gray-600: #0d6630;
+  --color-gray-500: #2d9b5a;
+  --color-gray-400: #6dc98c;
+  --color-gray-300: #a7e8c0;
+  --color-gray-200: #d1fae5;
+  --color-gray-100: #ecfdf5;
+
+  /* Accent → emerald */
+  --color-orange-500: #10b981;
+  --color-orange-400: #34d399;
+  --color-orange-300: #6ee7b7;
+  --color-orange-200: #a7f3d0;
+  --color-orange-100: #d1fae5;
+  --color-orange-600: #059669;
+}
+
+/* ── Ivory theme ── */
+[data-theme="ivory"] {
+  --background: #fdf8f0;
+  --foreground: #1c1917;
+
+  /* Remap gray scale to warm amber tones */
+  --color-white:    #1c1917;   /* text-white → dark stone                  */
+  --color-gray-950: #fdf8f0;   /* page bg → warm cream                     */
+  --color-gray-900: #ffffff;   /* card bg → white                          */
+  --color-gray-800: #fef3dc;   /* secondary card → warm amber-50           */
+  --color-gray-700: #f5e6c0;   /* tertiary surface → warm amber-100        */
+  --color-gray-600: #e8d5a3;   /* borders → warm amber-200                 */
+  --color-gray-500: #9a7b4b;   /* muted text → warm brown                  */
+  --color-gray-400: #7c5c2e;   /* secondary text → darker warm             */
+  --color-gray-300: #4a3318;   /* strong secondary → dark warm             */
+  --color-gray-200: #2d1f0e;   /* near-dark                                */
+  --color-gray-100: #1c1917;   /* darkest                                  */
+
+  /* Accent → amber */
+  --color-orange-500: #d97706;
+  --color-orange-400: #f59e0b;
+  --color-orange-300: #fbbf24;
+  --color-orange-200: #fde68a;
+  --color-orange-100: #fef3c7;
+  --color-orange-600: #b45309;
+}
+
 /* ── Light theme ── */
 [data-theme="light"] {
   --background: #f8fafc;

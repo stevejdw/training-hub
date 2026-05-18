@@ -2,10 +2,11 @@
 
 import { useEffect } from 'react';
 
-export type ThemePreference = 'dark' | 'light' | 'auto';
+export type AppliedTheme = 'dark' | 'light' | 'ocean' | 'ocean-light' | 'sand' | 'sand-dark' | 'cosmic' | 'forest' | 'ivory' | 'chrome';
+export type ThemePreference = AppliedTheme | 'auto';
 
 /** Resolve the actual theme to apply given the user's preference. */
-export function resolveTheme(pref: ThemePreference): 'dark' | 'light' {
+export function resolveTheme(pref: ThemePreference): AppliedTheme {
   if (pref === 'auto') {
     const h = new Date().getHours();
     return h >= 7 && h < 19 ? 'light' : 'dark';

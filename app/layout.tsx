@@ -30,7 +30,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" data-theme="dark" className={`${geistFonts} antialiased`}>
       {/* Anti-flash: apply stored theme before first paint */}
       <head>
-        <script dangerouslySetInnerHTML={{ __html: `(function(){try{var p=localStorage.getItem('theme')||'dark';var t=p==='auto'?(new Date().getHours()>=7&&new Date().getHours()<19?'light':'dark'):p;document.documentElement.setAttribute('data-theme',t);}catch(e){}})();` }} />
+        <script dangerouslySetInnerHTML={{ __html: `(function(){try{var p=localStorage.getItem('theme')||'dark';var valid={'dark':1,'light':1,'ocean':1,'ocean-light':1,'sand':1,'sand-dark':1,'cosmic':1,'forest':1,'ivory':1,'chrome':1};var t=p==='auto'?(new Date().getHours()>=7&&new Date().getHours()<19?'light':'dark'):(valid[p]?p:'dark');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();` }} />
       </head>
       <body className="flex flex-col bg-gray-950 text-white">
         <ThemeProvider />
