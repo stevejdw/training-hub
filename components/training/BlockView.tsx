@@ -192,7 +192,7 @@ function SwipeableCard({
         }}
         className={`relative rounded-xl border ${
           isToday
-            ? 'border-orange-500/50 bg-gray-800/80'
+            ? 'border-gray-700 bg-gray-800/90'
             : isRest
             ? 'border-gray-800 bg-gray-900/40'
             : 'border-gray-800 bg-gray-800/60'
@@ -229,6 +229,9 @@ function DayCard({
   onEdit,
   onDropOnDay,
   onGripTap,
+  onDragEnterDay,
+  onDragLeaveDay,
+  isDragOver,
 }: {
   day: TrainingDay;
   acts: ActivitySummary[];
@@ -245,8 +248,10 @@ function DayCard({
   onEdit: (day: TrainingDay) => void;
   onDropOnDay: (dayId: number, targetDayId: number) => void;
   onGripTap: () => void;
+  onDragEnterDay: (dayId: number) => void;
+  onDragLeaveDay: (dayId: number) => void;
+  isDragOver: boolean;
 }) {
-  const [isDragOver, setIsDragOver] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
 
   // ── Desktop drag-over (drop target) ──────────────────────────────────────
@@ -255,21 +260,21 @@ function DayCard({
     e.dataTransfer.dropEffect = 'move';
   }, []);
 
-  // Use relatedTarget check to avoid counter getting stuck
+  // isDragOver is now managed at BlockView level to prevent stuck state
   const handleDragEnter = useCallback((e: React.DragEvent) => {
     e.preventDefault();
-    setIsDragOver(true);
-  }, []);
+    onDragEnterDay(day.id);
+  }, [day.id, onDragEnterDay]);
 
   const handleDragLeave = useCallback((e: React.DragEvent) => {
-    // Only clear if drag has truly left this element (not just moved to a child)
+    // Only clear if drag truly left this card (not just moved to a child)
     if (e.currentTarget.contains(e.relatedTarget as Node)) return;
-    setIsDragOver(false);
-  }, []);
+    onDragLeaveDay(day.id);
+  }, [day.id, onDragLeaveDay]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
-    setIsDragOver(false);
+    onDragLeaveDay(day.id); // clear highlight
     try {
       const data = JSON.parse(e.dataTransfer.getData('application/json'));
       if (data.dayId !== day.id) {
@@ -278,7 +283,7 @@ function DayCard({
     } catch {
       // ignore invalid drops
     }
-  }, [day.id, onDropOnDay]);
+  }, [day.id, onDropOnDay, onDragLeaveDay]);
 
   // ── Desktop drag-start ────────────────────────────────────────────────────
   const handleDragStart = useCallback((e: React.DragEvent) => {
@@ -290,8 +295,8 @@ function DayCard({
 
   const handleDragEnd = useCallback(() => {
     setIsDragging(false);
-    setIsDragOver(false);
-  }, []);
+    onDragLeaveDay(day.id); // ensure our own highlight clears on cancel/drop
+  }, [day.id, onDragLeaveDay]);
 
   // ── Swap-target tap (mobile move mode) ───────────────────────────────────
   const handleCardClick = useCallback(() => {
@@ -319,9 +324,9 @@ function DayCard({
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         className={`rounded-xl transition-all duration-150 ${
-          isDragOver  ? 'ring-2 ring-orange-500 bg-orange-500/10' :
+          isDragOver   ? 'ring-2 ring-blue-400 bg-blue-500/10' :
           isSwapTarget ? 'ring-2 ring-blue-500 bg-blue-500/10' :
-          isMoving     ? 'ring-2 ring-orange-400 bg-orange-500/5' :
+          isMoving     ? 'ring-2 ring-gray-400 bg-gray-500/10' :
           ''
         }`}
       >
@@ -339,21 +344,27 @@ function DayCard({
               {!isRest && (
                 <button
                   type="button"
-                  onPointerDown={e => e.stopPropagation()} // prevent card drag from grip
+                  // Stop BOTH touch and pointer events so SwipeableCard's swipe
+                  // handlers don't fire when the user taps/holds the grip
+                  onTouchStart={e => e.stopPropagation()}
+                  onTouchEnd={e => e.stopPropagation()}
+                  onPointerDown={e => e.stopPropagation()}
                   onClick={e => { e.stopPropagation(); onGripTap(); }}
-                  className={`flex justify-center mb-1 w-full cursor-grab active:cursor-grabbing transition-colors ${
-                    isMoving ? 'text-orange-400' : 'text-gray-600 hover:text-gray-400'
+                  // min 44px touch target per Apple HIG
+                  style={{ touchAction: 'manipulation', minHeight: 44 }}
+                  className={`flex items-center justify-center w-full transition-colors rounded ${
+                    isMoving ? 'text-orange-400' : 'text-gray-500 hover:text-gray-300 active:text-white'
                   }`}
-                  title={isMoving ? 'Cancel move' : 'Tap to move this session'}
+                  aria-label={isMoving ? 'Cancel move' : 'Move this session'}
                 >
                   {isMoving ? (
                     /* X to cancel */
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                     </svg>
                   ) : (
                     /* Grip dots */
-                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                       <path d="M8 6a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm8 0a2 2 0 1 1 0-4 2 2 0 0 1 0 4zM8 14a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm8 0a2 2 0 1 1 0-4 2 2 0 0 1 0 4zM8 22a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm8 0a2 2 0 1 1 0-4 2 2 0 0 1 0 4z" />
                     </svg>
                   )}
@@ -477,21 +488,32 @@ export default function BlockView({ days, activities, onSelectDay, onDaysChanged
 
   // Default to the current week, else week 0
   const defaultIdx = weeks.findIndex(w => w.some(d => d.date === today));
-  const [weekIdx,     setWeekIdx]     = useState(defaultIdx >= 0 ? defaultIdx : 0);
-  const [movingDayId, setMovingDayId] = useState<number | null>(null);
+  const [weekIdx,       setWeekIdx]       = useState(defaultIdx >= 0 ? defaultIdx : 0);
+  const [movingDayId,   setMovingDayId]   = useState<number | null>(null);
+  const [dragOverDayId, setDragOverDayId] = useState<number | null>(null);
 
   // If days prop changes (new plan loaded), reset to current week
   useEffect(() => {
     const idx = weeks.findIndex(w => w.some(d => d.date === today));
     setWeekIdx(idx >= 0 ? idx : 0);
     setMovingDayId(null);
+    setDragOverDayId(null);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [days]);
 
   // Cancel move mode when switching weeks
   useEffect(() => {
     setMovingDayId(null);
+    setDragOverDayId(null);
   }, [weekIdx]);
+
+  // Global dragend safety net: clears stuck drag-over highlight if drag is
+  // cancelled mid-flight (e.g. Escape key, drag outside window)
+  useEffect(() => {
+    const clear = () => setDragOverDayId(null);
+    document.addEventListener('dragend', clear);
+    return () => document.removeEventListener('dragend', clear);
+  }, []);
 
   if (!weeks.length) return null;
 
@@ -688,6 +710,9 @@ export default function BlockView({ days, activities, onSelectDay, onDaysChanged
               onEdit={onSelectDay}
               onDropOnDay={handleDropOnDay}
               onGripTap={() => handleGripTap(day.id)}
+              onDragEnterDay={(id) => setDragOverDayId(id)}
+              onDragLeaveDay={() => setDragOverDayId(null)}
+              isDragOver={dragOverDayId === day.id}
             />
           );
         })}
