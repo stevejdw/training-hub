@@ -83,6 +83,7 @@ export default function EditPlanModal({ plan, onClose, onUpdated }: Props) {
   const [aiError, setAiError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [repairing, setRepairing] = useState(false);
 
 
 
@@ -244,7 +245,23 @@ export default function EditPlanModal({ plan, onClose, onUpdated }: Props) {
     }
   }
 
-  const busy = status === 'generating' || status === 'saving' || deleting;
+  async function handleRepairDates() {
+    if (busy || repairing) return;
+    setRepairing(true);
+    setErrorMsg('');
+    try {
+      const res = await fetch(`/api/training/plans/${plan.id}/repair-dates`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error ?? 'Repair failed');
+      onUpdated();
+    } catch (err) {
+      setErrorMsg(String(err));
+    } finally {
+      setRepairing(false);
+    }
+  }
+
+  const busy = status === 'generating' || status === 'saving' || deleting || repairing;
 
   return (
 
@@ -286,7 +303,17 @@ export default function EditPlanModal({ plan, onClose, onUpdated }: Props) {
               Plan runs {planStartDate} – {addDays(planStartDate, weeks * 7 - 1)} ({weeks} weeks)
             </p>
           )}
-
+          {/* Repair button — visible when dates look corrupted */}
+          <button
+            onClick={handleRepairDates}
+            disabled={busy}
+            className="mt-2 text-[11px] text-yellow-500 hover:text-yellow-300 disabled:opacity-40 transition-colors flex items-center gap-1"
+          >
+            <svg className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+            </svg>
+            {repairing ? 'Fixing dates…' : 'Fix corrupted dates'}
+          </button>
         </div>
 
         {/* Additional notes */}

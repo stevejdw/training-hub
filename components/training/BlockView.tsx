@@ -708,6 +708,9 @@ export default function BlockView({ days, activities, onSelectDay, onDaysChanged
           const isMoving    = movingDayId === day.id;
           // Rest days can also be swap targets (to move a session onto them)
           const isSwapTarget = movingDayId !== null && !isMoving;
+          // Derive day-of-week from the actual date (not array index) so
+          // corrupted/swapped dates still show the right label
+          const dowIdx = (new Date(day.date + 'T00:00:00Z').getUTCDay() + 6) % 7;
 
           return (
             <DayCard
@@ -718,7 +721,7 @@ export default function BlockView({ days, activities, onSelectDay, onDaysChanged
               isToday={isToday}
               isPast={isPast}
               isRest={isRest}
-              di={di}
+              di={dowIdx}
               dateNum={dateNum}
               isMoving={isMoving}
               isSwapTarget={isSwapTarget}

@@ -173,6 +173,47 @@ export async function deleteTrainingDay(dayId: number): Promise<void> {
   }
 }
 
+/**
+ * Repair corrupted plan dates by reassigning sequential daily dates.
+ *
+ * Sorts all days in the plan by (date ASC, id ASC), takes the earliest
+ * date as the plan start, then assigns startDate+0, startDate+1, … to
+ * each row in order.  This fixes cases where repeated swap operations
+ * left multiple rows sharing the same date (all showing the same number
+ * in the UI).
+ */
+export async function repairPlanDates(planId: number): Promise<void> {
+  await ensureTables();
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const res = await client.query<{ id: number; date: string }>(
+      `SELECT id, date::text FROM training_days WHERE plan_id = $1 ORDER BY date ASC, id ASC`,
+      [planId],
+    );
+
+    if (res.rows.length === 0) { await client.query('ROLLBACK'); return; }
+
+    const startMs = new Date(res.rows[0].date + 'T00:00:00Z').getTime();
+
+    for (let i = 0; i < res.rows.length; i++) {
+      const newDate = new Date(startMs + i * 86400000).toISOString().slice(0, 10);
+      await client.query(
+        `UPDATE training_days SET date = $1 WHERE id = $2`,
+        [newDate, res.rows[i].id],
+      );
+    }
+
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
 export async function updatePlanMeta(planId: number, name: string, goal: string): Promise<void> {
   const client = await pool.connect();
   try {
