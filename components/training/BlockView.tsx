@@ -71,7 +71,8 @@ function completionStatus(day: TrainingDay, acts: ActivitySummary[]): 'done' | '
 
 // ─── Swipeable wrapper ────────────────────────────────────────────────────────
 
-const SWIPE_OPEN_PX = -88; // how far the card slides to reveal the delete button
+const SWIPE_DELETE_PX = -88; // slide left to reveal delete
+const SWIPE_EDIT_PX   =  72; // slide right threshold to trigger edit
 
 function SwipeableCard({
   day,
@@ -80,6 +81,7 @@ function SwipeableCard({
   isPast,
   children,
   onDelete,
+  onEdit,
 }: {
   day: TrainingDay;
   isToday: boolean;
@@ -87,47 +89,86 @@ function SwipeableCard({
   isPast: boolean;
   children: React.ReactNode;
   onDelete: (day: TrainingDay) => void;
+  onEdit: (day: TrainingDay) => void;
 }) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [dragging, setDragging] = useState(false);
-  const [dragOffset, setDragOffset] = useState(0);
-  const startX = useRef(0);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [swiping,    setSwiping]    = useState(false);
+  const [swipeX,     setSwipeX]     = useState(0);
+  const startX      = useRef(0);
   const startOffset = useRef(0);
+  const didSwipe    = useRef(false); // track if touch moved enough to count as swipe
 
   const onTouchStart = useCallback((e: React.TouchEvent) => {
-    startX.current = e.touches[0].clientX;
-    startOffset.current = isOpen ? SWIPE_OPEN_PX : 0;
-    setDragging(true);
-    setDragOffset(startOffset.current);
-  }, [isOpen]);
+    startX.current      = e.touches[0].clientX;
+    startOffset.current = deleteOpen ? SWIPE_DELETE_PX : 0;
+    didSwipe.current    = false;
+    setSwiping(true);
+    setSwipeX(startOffset.current);
+  }, [deleteOpen]);
 
   const onTouchMove = useCallback((e: React.TouchEvent) => {
-    const diff = e.touches[0].clientX - startX.current;
-    setDragOffset(Math.min(0, Math.max(SWIPE_OPEN_PX, startOffset.current + diff)));
+    const diff   = e.touches[0].clientX - startX.current;
+    const newX   = Math.min(SWIPE_EDIT_PX, Math.max(SWIPE_DELETE_PX, startOffset.current + diff));
+    if (Math.abs(diff) > 8) didSwipe.current = true;
+    setSwipeX(newX);
   }, []);
 
   const onTouchEnd = useCallback(() => {
-    setDragging(false);
-    // Snap open if past halfway, else snap closed
-    setIsOpen(dragOffset < SWIPE_OPEN_PX / 2);
-    setDragOffset(0);
-  }, [dragOffset]);
+    setSwiping(false);
+    if (!didSwipe.current) {
+      // Treat as a tap — just close if open
+      if (deleteOpen) setDeleteOpen(false);
+      setSwipeX(0);
+      return;
+    }
+    // Swipe right → edit (non-rest only)
+    if (!isRest && swipeX >= SWIPE_EDIT_PX * 0.6) {
+      setSwipeX(0);
+      setDeleteOpen(false);
+      onEdit(day);
+      return;
+    }
+    // Swipe left → snap delete open / closed
+    if (swipeX < SWIPE_DELETE_PX / 2) {
+      setDeleteOpen(true);
+      setSwipeX(0);
+    } else {
+      setDeleteOpen(false);
+      setSwipeX(0);
+    }
+  }, [swipeX, isRest, day, onEdit, deleteOpen]);
 
-  const translateX = dragging ? dragOffset : (isOpen ? SWIPE_OPEN_PX : 0);
+  const translateX = swiping ? swipeX : (deleteOpen ? SWIPE_DELETE_PX : 0);
 
-  const showDeleteUI = dragging || isOpen;
+  // Show right-side edit hint while swiping right (non-rest only)
+  const showEditHint = !isRest && swiping && swipeX > 16;
+  // Show left-side delete button only when snapped open
+  const showDelete   = deleteOpen;
 
   return (
     <div className="relative overflow-hidden rounded-xl">
-      {/* Delete button revealed only while swiping / when open */}
-      {showDeleteUI && (
+
+      {/* Edit hint — left side, revealed by right-swipe */}
+      {showEditHint && (
+        <div className="absolute inset-0 flex items-center justify-start rounded-xl bg-blue-600/90">
+          <div className="w-[88px] h-full flex flex-col items-center justify-center gap-1 text-white rounded-l-xl pointer-events-none">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+            <span className="text-xs font-semibold">Edit</span>
+          </div>
+        </div>
+      )}
+
+      {/* Delete button — right side, revealed by left-swipe (only when snapped open) */}
+      {showDelete && (
         <div className="absolute inset-0 flex items-center justify-end rounded-xl bg-red-600">
           <button
             type="button"
             onClick={(e) => {
               e.stopPropagation();
-              setIsOpen(false);
-              setDragOffset(0);
+              setDeleteOpen(false);
+              setSwipeX(0);
               onDelete(day);
             }}
             className="w-[88px] h-full flex flex-col items-center justify-center gap-1 text-white active:bg-red-700 rounded-r-xl"
@@ -146,8 +187,8 @@ function SwipeableCard({
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
         style={{
-          transform: `translateX(${translateX}px)`,
-          transition: dragging ? 'none' : 'transform 0.3s ease',
+          transform:  `translateX(${translateX}px)`,
+          transition: swiping ? 'none' : 'transform 0.25s ease',
         }}
         className={`relative rounded-xl border ${
           isToday
@@ -158,11 +199,11 @@ function SwipeableCard({
         }`}
       >
         {children}
-        {/* Transparent overlay when open: tapping anywhere on the card closes it */}
-        {isOpen && (
+        {/* Tap anywhere on card to close delete strip */}
+        {deleteOpen && (
           <div
             className="absolute inset-0 z-10 rounded-xl"
-            onClick={() => setIsOpen(false)}
+            onClick={() => { setDeleteOpen(false); setSwipeX(0); }}
           />
         )}
       </div>
@@ -170,7 +211,7 @@ function SwipeableCard({
   );
 }
 
-// ─── Day card that is both a drop target and contains draggable content ──────
+// ─── Day card ────────────────────────────────────────────────────────────────
 
 function DayCard({
   day,
@@ -181,9 +222,13 @@ function DayCard({
   isRest,
   di,
   dateNum,
+  isMoving,
+  isSwapTarget,
   onSelectDay,
   onDelete,
+  onEdit,
   onDropOnDay,
+  onGripTap,
 }: {
   day: TrainingDay;
   acts: ActivitySummary[];
@@ -193,39 +238,37 @@ function DayCard({
   isRest: boolean;
   di: number;
   dateNum: number;
+  isMoving: boolean;
+  isSwapTarget: boolean;
   onSelectDay: (day: TrainingDay) => void;
   onDelete: (day: TrainingDay) => void;
+  onEdit: (day: TrainingDay) => void;
   onDropOnDay: (dayId: number, targetDayId: number) => void;
+  onGripTap: () => void;
 }) {
   const [isDragOver, setIsDragOver] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
-  const dragCounter = useRef(0);
 
-  // ── Drag over handlers (make this a drop target) ──
+  // ── Desktop drag-over (drop target) ──────────────────────────────────────
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
   }, []);
 
+  // Use relatedTarget check to avoid counter getting stuck
   const handleDragEnter = useCallback((e: React.DragEvent) => {
     e.preventDefault();
-    dragCounter.current++;
-    if (dragCounter.current === 1) {
-      setIsDragOver(true);
-    }
+    setIsDragOver(true);
   }, []);
 
   const handleDragLeave = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    dragCounter.current--;
-    if (dragCounter.current === 0) {
-      setIsDragOver(false);
-    }
+    // Only clear if drag has truly left this element (not just moved to a child)
+    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+    setIsDragOver(false);
   }, []);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
-    dragCounter.current = 0;
     setIsDragOver(false);
     try {
       const data = JSON.parse(e.dataTransfer.getData('application/json'));
@@ -237,53 +280,84 @@ function DayCard({
     }
   }, [day.id, onDropOnDay]);
 
-  // ── Drag start (make this draggable) ──
+  // ── Desktop drag-start ────────────────────────────────────────────────────
   const handleDragStart = useCallback((e: React.DragEvent) => {
-    if (isRest) {
-      e.preventDefault();
-      return;
-    }
+    if (isRest) { e.preventDefault(); return; }
     e.dataTransfer.setData('application/json', JSON.stringify({ dayId: day.id }));
     e.dataTransfer.effectAllowed = 'move';
     setIsDragging(true);
-  }, [day, isRest]);
+  }, [day.id, isRest]);
 
   const handleDragEnd = useCallback(() => {
     setIsDragging(false);
+    setIsDragOver(false);
   }, []);
 
+  // ── Swap-target tap (mobile move mode) ───────────────────────────────────
+  const handleCardClick = useCallback(() => {
+    if (isRest && !isSwapTarget) return;
+    if (isSwapTarget) {
+      // Tapping this card while another is moving → swap
+      onDropOnDay(-1, day.id); // -1 signals "use the pending movingDayId from parent"
+      return;
+    }
+    if (!isDragging && !isMoving) onSelectDay(day);
+  }, [isRest, isSwapTarget, isDragging, isMoving, day, onSelectDay, onDropOnDay]);
+
   return (
-    <SwipeableCard day={day} isToday={isToday} isRest={isRest} isPast={isPast} onDelete={onDelete}>
+    <SwipeableCard
+      day={day}
+      isToday={isToday}
+      isRest={isRest}
+      isPast={isPast}
+      onDelete={onDelete}
+      onEdit={onEdit}
+    >
       <div
-        // Drop target events on the outer wrapper
         onDragOver={handleDragOver}
         onDragEnter={handleDragEnter}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         className={`rounded-xl transition-all duration-150 ${
-          isDragOver
-            ? 'ring-2 ring-orange-500 bg-orange-500/10'
-            : ''
+          isDragOver  ? 'ring-2 ring-orange-500 bg-orange-500/10' :
+          isSwapTarget ? 'ring-2 ring-blue-500 bg-blue-500/10' :
+          isMoving     ? 'ring-2 ring-orange-400 bg-orange-500/5' :
+          ''
         }`}
       >
         <div
-          // Drag source events on the inner content
           draggable={!isRest}
           onDragStart={!isRest ? handleDragStart : undefined}
           onDragEnd={handleDragEnd}
-          onClick={() => !isRest && !isDragging && onSelectDay(day)}
-          className={`${isDragging ? 'opacity-50' : ''}`}
+          onClick={handleCardClick}
+          className={isDragging ? 'opacity-40' : ''}
         >
           <div className="flex items-start gap-3 px-4 py-3">
 
-            {/* Grab handle + Day label column */}
+            {/* Grip handle / Day label column */}
             <div className="flex-shrink-0 w-12 text-center pt-0.5">
               {!isRest && (
-                <div className="flex justify-center mb-1 cursor-grab active:cursor-grabbing text-gray-600 hover:text-gray-400 transition-colors">
-                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M8 6a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm8 0a2 2 0 1 1 0-4 2 2 0 0 1 0 4zM8 14a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm8 0a2 2 0 1 1 0-4 2 2 0 0 1 0 4zM8 22a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm8 0a2 2 0 1 1 0-4 2 2 0 0 1 0 4z" />
-                  </svg>
-                </div>
+                <button
+                  type="button"
+                  onPointerDown={e => e.stopPropagation()} // prevent card drag from grip
+                  onClick={e => { e.stopPropagation(); onGripTap(); }}
+                  className={`flex justify-center mb-1 w-full cursor-grab active:cursor-grabbing transition-colors ${
+                    isMoving ? 'text-orange-400' : 'text-gray-600 hover:text-gray-400'
+                  }`}
+                  title={isMoving ? 'Cancel move' : 'Tap to move this session'}
+                >
+                  {isMoving ? (
+                    /* X to cancel */
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  ) : (
+                    /* Grip dots */
+                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M8 6a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm8 0a2 2 0 1 1 0-4 2 2 0 0 1 0 4zM8 14a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm8 0a2 2 0 1 1 0-4 2 2 0 0 1 0 4zM8 22a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm8 0a2 2 0 1 1 0-4 2 2 0 0 1 0 4z" />
+                    </svg>
+                  )}
+                </button>
               )}
               <p className={`text-xs font-semibold ${isToday ? 'text-orange-400' : 'text-gray-400'}`}>
                 {DOW_SHORT[di]}
@@ -300,8 +374,14 @@ function DayCard({
             <div className="flex-1 min-w-0">
               {isRest ? (
                 <div className="flex items-center gap-2 py-1">
-                  <div className={`w-2 h-2 rounded-full flex-shrink-0 ${TYPE_DOT.rest}`} />
-                  <span className="text-sm text-gray-500 italic">Rest day</span>
+                  {isSwapTarget ? (
+                    <span className="text-sm text-blue-400 font-medium">↔ Tap to move here</span>
+                  ) : (
+                    <>
+                      <div className={`w-2 h-2 rounded-full flex-shrink-0 ${TYPE_DOT.rest}`} />
+                      <span className="text-sm text-gray-500 italic">Rest day</span>
+                    </>
+                  )}
                 </div>
               ) : (
                 <>
@@ -309,17 +389,22 @@ function DayCard({
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center gap-2 min-w-0 flex-1">
                       <div className={`w-2 h-2 rounded-full flex-shrink-0 mt-1.5 ${TYPE_DOT[day.type] ?? 'bg-gray-500'} ${isPast && status === 'none' ? 'opacity-40' : ''}`} />
-                      <p className={`text-sm font-semibold leading-snug ${isPast && status === 'none' ? 'text-gray-500' : 'text-white'}`}>
-                        {day.title}
+                      <p className={`text-sm font-semibold leading-snug ${
+                        isSwapTarget ? 'text-blue-300' :
+                        isMoving     ? 'text-orange-300' :
+                        isPast && status === 'none' ? 'text-gray-500' :
+                        'text-white'
+                      }`}>
+                        {isSwapTarget ? '↔ Tap to swap' : day.title}
                       </p>
                     </div>
                     {/* Status tick */}
-                    {status === 'done' && (
+                    {!isMoving && !isSwapTarget && status === 'done' && (
                       <svg className="w-4 h-4 text-green-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                       </svg>
                     )}
-                    {status === 'logged' && (
+                    {!isMoving && !isSwapTarget && status === 'logged' && (
                       <svg className="w-4 h-4 text-yellow-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                       </svg>
@@ -327,27 +412,29 @@ function DayCard({
                   </div>
 
                   {/* Meta row: type badge + duration + TSS */}
-                  <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                    <span className={`text-[10px] rounded px-1.5 py-0.5 capitalize font-medium ${TYPE_BADGE[day.type] ?? TYPE_BADGE.endurance}`}>
-                      {day.type}
-                    </span>
-                    {day.duration_min > 0 && (
-                      <span className="text-[11px] text-gray-500">{fmtMins(day.duration_min)}</span>
-                    )}
-                    {day.tss_target && day.tss_target > 0 && (
-                      <span className="text-[11px] text-orange-400/70">{day.tss_target} TSS</span>
-                    )}
-                  </div>
+                  {!isSwapTarget && (
+                    <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                      <span className={`text-[10px] rounded px-1.5 py-0.5 capitalize font-medium ${TYPE_BADGE[day.type] ?? TYPE_BADGE.endurance}`}>
+                        {day.type}
+                      </span>
+                      {day.duration_min > 0 && (
+                        <span className="text-[11px] text-gray-500">{fmtMins(day.duration_min)}</span>
+                      )}
+                      {day.tss_target && day.tss_target > 0 && (
+                        <span className="text-[11px] text-orange-400/70">{day.tss_target} TSS</span>
+                      )}
+                    </div>
+                  )}
 
                   {/* Description snippet */}
-                  {day.description && (
+                  {!isSwapTarget && day.description && (
                     <p className={`text-xs mt-1.5 line-clamp-2 leading-relaxed ${isPast && status === 'none' ? 'text-gray-600' : 'text-gray-400'}`}>
                       {day.description}
                     </p>
                   )}
 
                   {/* Logged activities */}
-                  {acts.length > 0 && (
+                  {!isSwapTarget && acts.length > 0 && (
                     <div className="mt-2 space-y-1">
                       {acts.map(a => (
                         <div key={a.id} className="flex items-center gap-1.5">
@@ -366,8 +453,8 @@ function DayCard({
               )}
             </div>
 
-            {/* Chevron for non-rest days */}
-            {!isRest && (
+            {/* Chevron for non-rest days (hidden while in move mode) */}
+            {!isRest && !isMoving && !isSwapTarget && (
               <svg className="w-4 h-4 text-gray-600 flex-shrink-0 mt-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
               </svg>
@@ -390,20 +477,27 @@ export default function BlockView({ days, activities, onSelectDay, onDaysChanged
 
   // Default to the current week, else week 0
   const defaultIdx = weeks.findIndex(w => w.some(d => d.date === today));
-  const [weekIdx, setWeekIdx] = useState(defaultIdx >= 0 ? defaultIdx : 0);
+  const [weekIdx,     setWeekIdx]     = useState(defaultIdx >= 0 ? defaultIdx : 0);
+  const [movingDayId, setMovingDayId] = useState<number | null>(null);
 
   // If days prop changes (new plan loaded), reset to current week
   useEffect(() => {
     const idx = weeks.findIndex(w => w.some(d => d.date === today));
     setWeekIdx(idx >= 0 ? idx : 0);
+    setMovingDayId(null);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [days]);
 
+  // Cancel move mode when switching weeks
+  useEffect(() => {
+    setMovingDayId(null);
+  }, [weekIdx]);
+
   if (!weeks.length) return null;
 
-  // Safety: clamp weekIdx to valid range
   const safeWeekIdx = Math.min(weekIdx, weeks.length - 1);
-  const week = weeks[safeWeekIdx] ?? [];
+  const week        = weeks[safeWeekIdx] ?? [];
+
   const actByDate = new Map<string, ActivitySummary[]>();
   for (const a of activities) {
     const arr = actByDate.get(a.date) ?? [];
@@ -411,10 +505,10 @@ export default function BlockView({ days, activities, onSelectDay, onDaysChanged
     actByDate.set(a.date, arr);
   }
 
-  const weekStart = week[0]?.date ?? '';
-  const weekEnd   = week[week.length - 1]?.date ?? '';
-  const weekTss   = week.reduce((s, d) => s + (d.tss_target ?? 0), 0);
-  const weekMins  = week.reduce((s, d) => s + (d.duration_min ?? 0), 0);
+  const weekStart     = week[0]?.date ?? '';
+  const weekEnd       = week[week.length - 1]?.date ?? '';
+  const weekTss       = week.reduce((s, d) => s + (d.tss_target ?? 0), 0);
+  const weekMins      = week.reduce((s, d) => s + (d.duration_min ?? 0), 0);
   const isCurrentWeek = week.some(d => d.date === today);
 
   const nonRestDays = week.filter(d => d.type !== 'rest');
@@ -426,27 +520,25 @@ export default function BlockView({ days, activities, onSelectDay, onDaysChanged
       new Date(weekEnd + 'T00:00:00Z').toLocaleDateString('en-AU', { day: 'numeric', month: 'short', timeZone: 'UTC' })
     : `Week ${weekIdx + 1}`;
 
-  // ── Move day handler with swap support ──
+  // ── Move day: support both HTML5 drop and tap-to-swap (mobile) ──────────
   const handleDropOnDay = useCallback(async (draggedDayId: number, targetDayId: number) => {
     try {
-      const draggedDay = days.find(d => d.id === draggedDayId);
-      const targetDay = days.find(d => d.id === targetDayId);
+      // -1 signals a tap-to-swap from mobile move mode; use movingDayId
+      const sourceDayId = draggedDayId === -1 ? movingDayId : draggedDayId;
+      if (!sourceDayId) return;
+      setMovingDayId(null);
+
+      const draggedDay = days.find(d => d.id === sourceDayId);
+      const targetDay  = days.find(d => d.id === targetDayId);
       if (!draggedDay || !targetDay) throw new Error('Day not found');
+      if (draggedDay.id === targetDay.id) return;
 
       const draggedDate = draggedDay.date;
-      const targetDate = targetDay.date;
+      const targetDate  = targetDay.date;
 
-      if (targetDay.type === 'rest') {
-        // Just move the dragged session to the target date
-        const res = await fetch(`/api/training/days/${draggedDayId}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ date: targetDate }),
-        });
-        if (!res.ok) throw new Error('Move failed');
-      } else {
-        // Swap: move dragged day to target date, move target day to dragged day's date
-        const res1 = await fetch(`/api/training/days/${draggedDayId}`, {
+      {
+        // Always do a full swap so the vacated slot becomes a rest day (or the other session)
+        const res1 = await fetch(`/api/training/days/${sourceDayId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ date: targetDate }),
@@ -459,8 +551,8 @@ export default function BlockView({ days, activities, onSelectDay, onDaysChanged
           body: JSON.stringify({ date: draggedDate }),
         });
         if (!res2.ok) {
-          // Roll back step 1 so both days don't end up on the same date
-          await fetch(`/api/training/days/${draggedDayId}`, {
+          // Roll back step 1
+          await fetch(`/api/training/days/${sourceDayId}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ date: draggedDate }),
@@ -472,21 +564,17 @@ export default function BlockView({ days, activities, onSelectDay, onDaysChanged
     } catch (err) {
       console.error('Move day error:', err);
     }
-  }, [days, onDaysChanged]);
+  }, [days, movingDayId, onDaysChanged]);
 
-  // ── Delete day handler: convert to a rest day so other days keep their dates ──
+  // ── Delete (convert to rest) ─────────────────────────────────────────────
   const handleDeleteDay = useCallback(async (day: TrainingDay) => {
     try {
       const res = await fetch(`/api/training/days/${day.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          type: 'rest',
-          title: 'Rest day',
-          duration_min: 0,
-          tss_target: null,
-          description: '',
-          segments: [],
+          type: 'rest', title: 'Rest day',
+          duration_min: 0, tss_target: null, description: '', segments: [],
         }),
       });
       if (!res.ok) throw new Error('Delete failed');
@@ -495,6 +583,11 @@ export default function BlockView({ days, activities, onSelectDay, onDaysChanged
       console.error('Delete day error:', err);
     }
   }, [onDaysChanged]);
+
+  // ── Grip tap: toggle move mode for this day ──────────────────────────────
+  const handleGripTap = useCallback((dayId: number) => {
+    setMovingDayId(prev => prev === dayId ? null : dayId);
+  }, []);
 
   return (
     <div className="space-y-3">
@@ -538,24 +631,44 @@ export default function BlockView({ days, activities, onSelectDay, onDaysChanged
           <span className="text-green-400 font-medium">{doneDays}/{nonRestDays.length} done</span>
         )}
         {weekMins > 0 && <span>{fmtMins(weekMins)} planned</span>}
-        {weekTss > 0  && <span className="text-orange-400">{weekTss} TSS planned</span>}
+        {weekTss  > 0 && <span className="text-orange-400">{weekTss} TSS planned</span>}
         <span className="ml-auto text-gray-600">{weekIdx + 1} / {weeks.length}</span>
       </div>
 
-      {/* Drag hint */}
-      <p className="text-[10px] text-gray-600 text-center">
-        Use the grip handle to drag a session to a different day · Swipe left to delete
-      </p>
+      {/* Move mode banner */}
+      {movingDayId !== null && (
+        <div className="flex items-center justify-between gap-2 px-3 py-2 bg-orange-500/10 border border-orange-500/30 rounded-xl">
+          <p className="text-xs text-orange-300 font-medium">
+            Tap the grip ✕ to cancel · Tap any other session to swap
+          </p>
+          <button
+            onClick={() => setMovingDayId(null)}
+            className="text-[10px] text-gray-500 hover:text-gray-300 transition-colors flex-shrink-0"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
 
-      {/* Day cards — no separate drop zones, each card IS a drop target */}
+      {/* Hint (only when not in move mode) */}
+      {movingDayId === null && (
+        <p className="text-[10px] text-gray-600 text-center">
+          Tap grip to move · Swipe left to delete · Swipe right to edit
+        </p>
+      )}
+
+      {/* Day cards */}
       <div className="space-y-2">
         {week.map((day, di) => {
-          const acts    = actByDate.get(day.date) ?? [];
-          const status  = completionStatus(day, acts);
-          const isToday = day.date === today;
-          const isPast  = day.date < today;
-          const isRest  = day.type === 'rest';
-          const dateNum = new Date(day.date + 'T00:00:00Z').getUTCDate();
+          const acts        = actByDate.get(day.date) ?? [];
+          const status      = completionStatus(day, acts);
+          const isToday     = day.date === today;
+          const isPast      = day.date < today;
+          const isRest      = day.type === 'rest';
+          const dateNum     = new Date(day.date + 'T00:00:00Z').getUTCDate();
+          const isMoving    = movingDayId === day.id;
+          // Rest days can also be swap targets (to move a session onto them)
+          const isSwapTarget = movingDayId !== null && !isMoving;
 
           return (
             <DayCard
@@ -568,9 +681,13 @@ export default function BlockView({ days, activities, onSelectDay, onDaysChanged
               isRest={isRest}
               di={di}
               dateNum={dateNum}
+              isMoving={isMoving}
+              isSwapTarget={isSwapTarget}
               onSelectDay={onSelectDay}
               onDelete={handleDeleteDay}
+              onEdit={onSelectDay}
               onDropOnDay={handleDropOnDay}
+              onGripTap={() => handleGripTap(day.id)}
             />
           );
         })}
