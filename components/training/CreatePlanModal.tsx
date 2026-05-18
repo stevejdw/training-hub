@@ -241,9 +241,12 @@ export default function CreatePlanModal({ onClose, onCreated }: Props) {
               disabled={busy}
               className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-orange-500 [color-scheme:dark]"
             />
-            <p className="text-[10px] text-gray-500 mt-1">
-              Plan runs {planStartDate} – {addDays(planStartDate, weeks * 7 - 1)} ({weeks} weeks)
-            </p>
+            {planStartDate && (
+              <p className="text-[10px] text-gray-500 mt-1">
+                Plan runs {planStartDate} – {addDays(planStartDate, weeks * 7 - 1)} ({weeks} weeks)
+              </p>
+            )}
+
           </div>
 
           <div>
