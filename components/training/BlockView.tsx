@@ -79,6 +79,8 @@ function SwipeableCard({
   isToday,
   isRest,
   isPast,
+  isMoving,
+  isSwapTarget,
   children,
   onDelete,
   onEdit,
@@ -87,6 +89,8 @@ function SwipeableCard({
   isToday: boolean;
   isRest: boolean;
   isPast: boolean;
+  isMoving: boolean;
+  isSwapTarget: boolean;
   children: React.ReactNode;
   onDelete: (day: TrainingDay) => void;
   onEdit: (day: TrainingDay) => void;
@@ -99,21 +103,25 @@ function SwipeableCard({
   const didSwipe    = useRef(false); // track if touch moved enough to count as swipe
 
   const onTouchStart = useCallback((e: React.TouchEvent) => {
+    // In move mode the card is either the source or a swap target — don't intercept touch
+    if (isMoving || isSwapTarget) return;
     startX.current      = e.touches[0].clientX;
     startOffset.current = deleteOpen ? SWIPE_DELETE_PX : 0;
     didSwipe.current    = false;
     setSwiping(true);
     setSwipeX(startOffset.current);
-  }, [deleteOpen]);
+  }, [deleteOpen, isMoving, isSwapTarget]);
 
   const onTouchMove = useCallback((e: React.TouchEvent) => {
+    if (isMoving || isSwapTarget) return;
     const diff   = e.touches[0].clientX - startX.current;
     const newX   = Math.min(SWIPE_EDIT_PX, Math.max(SWIPE_DELETE_PX, startOffset.current + diff));
     if (Math.abs(diff) > 8) didSwipe.current = true;
     setSwipeX(newX);
-  }, []);
+  }, [isMoving, isSwapTarget]);
 
   const onTouchEnd = useCallback(() => {
+    if (isMoving || isSwapTarget) return;
     setSwiping(false);
     if (!didSwipe.current) {
       // Treat as a tap — just close if open
@@ -136,7 +144,7 @@ function SwipeableCard({
       setDeleteOpen(false);
       setSwipeX(0);
     }
-  }, [swipeX, isRest, day, onEdit, deleteOpen]);
+  }, [swipeX, isRest, day, onEdit, deleteOpen, isMoving, isSwapTarget]);
 
   const translateX = swiping ? swipeX : (deleteOpen ? SWIPE_DELETE_PX : 0);
 
@@ -258,7 +266,10 @@ function DayCard({
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
-  }, []);
+    // Re-assert on every dragover so the highlight never disappears due to
+    // spurious dragLeave events from child elements
+    onDragEnterDay(day.id);
+  }, [day.id, onDragEnterDay]);
 
   // isDragOver is now managed at BlockView level to prevent stuck state
   const handleDragEnter = useCallback((e: React.DragEvent) => {
@@ -315,6 +326,8 @@ function DayCard({
       isToday={isToday}
       isRest={isRest}
       isPast={isPast}
+      isMoving={isMoving}
+      isSwapTarget={isSwapTarget}
       onDelete={onDelete}
       onEdit={onEdit}
     >
