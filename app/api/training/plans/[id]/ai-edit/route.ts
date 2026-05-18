@@ -182,32 +182,51 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  try {
-    const { id } = await params;
-    const planId = Number(id);
-    const { message } = await req.json() as { message: string };
+  const { id } = await params;
+  const planId = Number(id);
+  const { message } = await req.json() as { message: string };
 
-    const [plan, profile] = await Promise.all([
-      getPlan(planId),
-      getProfile(),
-    ]);
-    if (!plan) return Response.json({ error: 'Plan not found' }, { status: 404 });
+  // Stream NDJSON with heartbeats every 3s so iOS Safari / VPN / proxies
+  // don't kill the connection during the ~25s Claude call.
+  // See identical pattern in /api/training/generate.
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream({
+    async start(controller) {
+      let finished = false;
+      const heartbeat = setInterval(() => {
+        if (!finished) {
+          try { controller.enqueue(encoder.encode(JSON.stringify({ type: 'heartbeat' }) + '\n')); }
+          catch { /* stream closed */ }
+        }
+      }, 3000);
 
-    const ftp = effectiveFtp(profile);
-    const richContext = await buildRichTrainingContext(ftp);
-    const weeks = Math.round(plan.days.length / 7);
+      const send = (frame: Record<string, unknown>) => {
+        try { controller.enqueue(encoder.encode(JSON.stringify(frame) + '\n')); }
+        catch { /* stream closed */ }
+      };
 
-    // Build current plan summary
-    const planSummary = plan.days.map((d, i) => {
-      const dow = DOW_NAMES[i % 7];
-      return `- ${d.date} (${dow}): ${d.type.toUpperCase()} "${d.title}" ${d.duration_min}min${d.tss_target ? ` TSS ${d.tss_target}` : ''}${d.description ? ` — ${d.description}` : ''}`;
-    }).join('\n');
+      try {
+        const [plan, profile] = await Promise.all([
+          getPlan(planId),
+          getProfile(),
+        ]);
+        if (!plan) { send({ type: 'error', error: 'Plan not found' }); return; }
 
-    const planGuidance = profile.ai_training_plan_guidance
-      ? `\n## Training Philosophy\n${profile.ai_training_plan_guidance}\n`
-      : '';
+        const ftp = effectiveFtp(profile);
+        const richContext = await buildRichTrainingContext(ftp);
+        const weeks = Math.round(plan.days.length / 7);
 
-    const systemPrompt = `You are an expert cycling coach. You have access to the athlete's complete training history and their current training plan.
+        // Build current plan summary
+        const planSummary = plan.days.map((d, i) => {
+          const dow = DOW_NAMES[i % 7];
+          return `- ${d.date} (${dow}): ${d.type.toUpperCase()} "${d.title}" ${d.duration_min}min${d.tss_target ? ` TSS ${d.tss_target}` : ''}${d.description ? ` — ${d.description}` : ''}`;
+        }).join('\n');
+
+        const planGuidance = profile.ai_training_plan_guidance
+          ? `\n## Training Philosophy\n${profile.ai_training_plan_guidance}\n`
+          : '';
+
+        const systemPrompt = `You are an expert cycling coach. You have access to the athlete's complete training history and their current training plan.
 
 ## Athlete Profile
 - Name: ${profile.name}
@@ -242,57 +261,71 @@ Rules:
 - Progressive overload: increase load through each week, every 4th week is recovery (~60% TSS)
 - Keep the same number of days per week and same dates`;
 
-    const messageRes = await anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 4096,
-      system: systemPrompt,
-      messages: [{ role: 'user', content: message }],
-    });
+        const messageRes = await anthropic.messages.create({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 4096,
+          system: systemPrompt,
+          messages: [{ role: 'user', content: message }],
+        });
 
-    const text = messageRes.content[0].type === 'text' ? messageRes.content[0].text : '';
-    
-    // Extract JSON
-    const firstBracket = text.indexOf('[');
-    const lastBracket = text.lastIndexOf(']');
-    const firstBrace = text.indexOf('{');
-    const lastBrace = text.lastIndexOf('}');
-    
-    let jsonText = '';
-    if (firstBracket !== -1 && lastBracket > firstBracket) {
-      // Wrapped in array — find the object containing "days"
-      jsonText = text.slice(firstBracket, lastBracket + 1);
-    } else if (firstBrace !== -1 && lastBrace > firstBrace) {
-      jsonText = text.slice(firstBrace, lastBrace + 1);
-    }
+        const text = messageRes.content[0].type === 'text' ? messageRes.content[0].text : '';
 
-    if (!jsonText) {
-      return Response.json({ error: 'AI returned invalid JSON', raw: text.slice(0, 300) }, { status: 500 });
-    }
+        // Extract JSON
+        const firstBracket = text.indexOf('[');
+        const lastBracket = text.lastIndexOf(']');
+        const firstBrace = text.indexOf('{');
+        const lastBrace = text.lastIndexOf('}');
 
-    let parsed: { goal?: string; days?: unknown[] };
-    try {
-      parsed = JSON.parse(jsonText);
-      // Handle case where AI wraps in array
-      if (Array.isArray(parsed)) {
-        const wrapped = parsed.find(p => p && typeof p === 'object' && 'days' in p);
-        if (wrapped) parsed = wrapped as { goal?: string; days?: unknown[] };
-        else parsed = { days: parsed };
+        let jsonText = '';
+        if (firstBracket !== -1 && lastBracket > firstBracket) {
+          jsonText = text.slice(firstBracket, lastBracket + 1);
+        } else if (firstBrace !== -1 && lastBrace > firstBrace) {
+          jsonText = text.slice(firstBrace, lastBrace + 1);
+        }
+
+        if (!jsonText) {
+          send({ type: 'error', error: 'AI returned invalid JSON', raw: text.slice(0, 300) });
+          return;
+        }
+
+        let parsed: { goal?: string; days?: unknown[] };
+        try {
+          parsed = JSON.parse(jsonText);
+          if (Array.isArray(parsed)) {
+            const wrapped = parsed.find(p => p && typeof p === 'object' && 'days' in p);
+            if (wrapped) parsed = wrapped as { goal?: string; days?: unknown[] };
+            else parsed = { days: parsed };
+          }
+        } catch {
+          send({ type: 'error', error: 'Failed to parse AI response', raw: text.slice(0, 300) });
+          return;
+        }
+
+        if (!parsed.days || !Array.isArray(parsed.days) || parsed.days.length === 0) {
+          send({ type: 'error', error: 'AI returned no days', raw: text.slice(0, 300) });
+          return;
+        }
+
+        const newGoal = parsed.goal ?? plan.goal;
+        await replacePlanDays(planId, newGoal, parsed.days as Parameters<typeof replacePlanDays>[2]);
+
+        send({ type: 'result', ok: true, goal: newGoal, days: parsed.days.length });
+      } catch (err) {
+        console.error('AI plan edit error:', err);
+        send({ type: 'error', error: String(err) });
+      } finally {
+        finished = true;
+        clearInterval(heartbeat);
+        try { controller.close(); } catch { /* already closed */ }
       }
-    } catch {
-      return Response.json({ error: 'Failed to parse AI response', raw: text.slice(0, 300) }, { status: 500 });
-    }
+    },
+  });
 
-    if (!parsed.days || !Array.isArray(parsed.days) || parsed.days.length === 0) {
-      return Response.json({ error: 'AI returned no days', raw: text.slice(0, 300) }, { status: 500 });
-    }
-
-    // Save the plan
-    const newGoal = parsed.goal ?? plan.goal;
-    await replacePlanDays(planId, newGoal, parsed.days as Parameters<typeof replacePlanDays>[2]);
-
-    return Response.json({ ok: true, goal: newGoal, days: parsed.days.length });
-  } catch (err) {
-    console.error('AI plan edit error:', err);
-    return Response.json({ error: String(err) }, { status: 500 });
-  }
+  return new Response(stream, {
+    headers: {
+      'Content-Type':      'application/x-ndjson',
+      'Cache-Control':     'no-cache, no-transform',
+      'X-Accel-Buffering': 'no',
+    },
+  });
 }

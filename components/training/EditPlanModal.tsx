@@ -91,13 +91,42 @@ export default function EditPlanModal({ plan, onClose, onUpdated }: Props) {
     setAiError(null);
 
     try {
+      // The endpoint streams NDJSON with heartbeats every 3s to keep the
+      // connection alive through iOS Safari / VPN / proxy idle timeouts.
+      // Same pattern as /api/training/generate.
       const res = await fetch(`/api/training/plans/${plan.id}/ai-edit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: aiMessage }),
       });
-      const data = await res.json();
-      if (!res.ok || data.error) throw new Error(data.error ?? 'AI edit failed');
+      if (!res.body) throw new Error(`No response body (HTTP ${res.status})`);
+
+      const reader  = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = '';
+      let finalErr: string | null = null;
+      let succeeded = false;
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split('\n');
+        buf = lines.pop() ?? '';
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          let msg: Record<string, unknown>;
+          try { msg = JSON.parse(line); } catch { continue; }
+          if (msg.type === 'result' && msg.ok) {
+            succeeded = true;
+          } else if (msg.type === 'error') {
+            finalErr = String(msg.error ?? 'AI edit failed');
+          }
+        }
+      }
+
+      if (finalErr) throw new Error(finalErr);
+      if (!succeeded) throw new Error('Stream ended without result');
 
       onUpdated();
     } catch (err) {
