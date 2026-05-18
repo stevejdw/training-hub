@@ -22,6 +22,7 @@ export default function CreatePlanModal({ onClose, onCreated }: Props) {
   const [tssDetail, setTssDetail] = useState<string>('');
   const [status, setStatus] = useState<'idle' | 'generating' | 'saving' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState('');
+  const [weekProgress, setWeekProgress] = useState(0);
 
   // Fetch the suggested weekly TSS baseline once on mount.
   useEffect(() => {
@@ -47,6 +48,7 @@ export default function CreatePlanModal({ onClose, onCreated }: Props) {
     if (status !== 'idle') return;
     setStatus('generating');
     setErrorMsg('');
+    setWeekProgress(0);
 
     try {
       // Compute plan start date (this Monday in Sydney time, UTC+10)
@@ -59,31 +61,47 @@ export default function CreatePlanModal({ onClose, onCreated }: Props) {
       const resolvedName = planName || `${weeks}-Week Plan${goal ? ': ' + goal.slice(0, 40) : ''}`;
       const planGoal = goal || 'Base fitness';
 
-      // Generate all weeks in parallel — each call handles 1 week (~2s per call)
-      const weekResults = await Promise.all(
-        Array.from({ length: weeks }, async (_, i) => {
-          const r = await fetch('/api/training/generate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              goal, notes, trainingDays, weekIndex: i, planStartDate, totalWeeks: weeks, planName, planGoal,
-              weeklyTssTarget: typeof weeklyTssTarget === 'number' && weeklyTssTarget > 0 ? weeklyTssTarget : null,
-            }),
-          });
-          const text = await r.text();
-          let data: Record<string, unknown>;
+      // Generate weeks SEQUENTIALLY. Each call takes ~25s; iOS Safari aborts
+      // long-running parallel fetches with "TypeError: Load failed", so we
+      // can't use Promise.all here. Sequential keeps each connection short.
+      // One retry per week for transient network drops.
+      const allDays: TrainingDay[] = [];
+      for (let i = 0; i < weeks; i++) {
+        let lastErr: Error | null = null;
+        let weekDays: TrainingDay[] | null = null;
+        for (let attempt = 0; attempt < 2 && weekDays === null; attempt++) {
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 55000);
           try {
-            data = JSON.parse(text);
-          } catch {
-            throw new Error(`Week ${i + 1} failed (HTTP ${r.status}): ${text.slice(0, 200)}`);
+            const r = await fetch('/api/training/generate', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                goal, notes, trainingDays, weekIndex: i, planStartDate, totalWeeks: weeks, planName, planGoal,
+                weeklyTssTarget: typeof weeklyTssTarget === 'number' && weeklyTssTarget > 0 ? weeklyTssTarget : null,
+              }),
+              signal: controller.signal,
+            });
+            const text = await r.text();
+            let data: Record<string, unknown>;
+            try {
+              data = JSON.parse(text);
+            } catch {
+              throw new Error(`Week ${i + 1} failed (HTTP ${r.status}): ${text.slice(0, 200)}`);
+            }
+            if (data.error) throw new Error(`Week ${i + 1}: ${data.error}`);
+            weekDays = (data.days as TrainingDay[]) ?? [];
+          } catch (err) {
+            lastErr = err instanceof Error ? err : new Error(String(err));
+            // Retry once on network errors (Load failed / aborted)
+          } finally {
+            clearTimeout(timeout);
           }
-          if (data.error) throw new Error(`Week ${i + 1}: ${data.error}`);
-          return data;
-        })
-      );
-
-      // Combine all days in order
-      const allDays = weekResults.flatMap(r => (r.days as TrainingDay[]) ?? []);
+        }
+        if (weekDays === null) throw lastErr ?? new Error(`Week ${i + 1} failed after retry`);
+        allDays.push(...weekDays);
+        setWeekProgress(i + 1);
+      }
 
       setStatus('saving');
       const saveRes = await fetch('/api/training/plans', {
@@ -215,12 +233,21 @@ export default function CreatePlanModal({ onClose, onCreated }: Props) {
         </div>
 
         {status === 'generating' && (
-          <div className="flex items-center gap-2 text-sm text-orange-400">
-            <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-            </svg>
-            Claude is generating your plan…
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 text-sm text-orange-400">
+              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+              </svg>
+              Generating week {Math.min(weekProgress + 1, weeks)} of {weeks}…
+            </div>
+            <div className="h-1.5 w-full bg-gray-800 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-orange-500 transition-all duration-300"
+                style={{ width: `${(weekProgress / weeks) * 100}%` }}
+              />
+            </div>
+            <p className="text-[10px] text-gray-500">Each week takes ~25s. Please keep this tab open.</p>
           </div>
         )}
         {status === 'saving' && (
