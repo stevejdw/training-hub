@@ -203,6 +203,10 @@ export async function POST(req: NextRequest) {
     const profile = await getProfile();
     const ftp = effectiveFtp(profile);
 
+    // Fallback for empty start date (shouldn't happen, but be safe)
+    const resolvedStartDate = bodyStartDate || currentMonday(profile.timezone || 'Australia/Sydney');
+
+
     // Fetch recent activity summary
     const dbClient = await pool.connect();
     let recentSummary = '';
@@ -227,7 +231,8 @@ export async function POST(req: NextRequest) {
     // alive through iOS Safari / VPN / proxy idle timeouts (which kill
     // requests that don't transmit data for ~15s).
     if (typeof weekIndex === 'number') {
-      const weekStart = addDays(bodyStartDate, weekIndex * 7);
+      const weekStart = addDays(resolvedStartDate, weekIndex * 7);
+
       const weekEnd = addDays(weekStart, 6);
       const weekNum = weekIndex + 1;
 

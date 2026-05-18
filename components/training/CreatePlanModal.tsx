@@ -176,6 +176,9 @@ export default function CreatePlanModal({ onClose, onCreated }: Props) {
   }
 
   const busy = status === 'generating' || status === 'saving';
+  const canGenerate = status === 'idle' && !!planStartDate;
+
+
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
@@ -389,10 +392,11 @@ export default function CreatePlanModal({ onClose, onCreated }: Props) {
           </button>
           <button
             onClick={handleGenerate}
-            disabled={busy}
+            disabled={!canGenerate}
             className="flex-1 py-2 rounded-lg bg-orange-500 hover:bg-orange-400 text-white text-sm font-medium transition-colors disabled:opacity-50"
           >
-            {busy ? 'Working…' : 'Generate with AI'}
+            {status === 'generating' ? 'Generating…' : status === 'saving' ? 'Saving…' : 'Generate with AI'}
+
           </button>
         </div>
       </div>
