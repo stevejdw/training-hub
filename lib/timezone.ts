@@ -1,17 +1,10 @@
-import { getProfile } from './profile';
-
 /**
- * Get the athlete's configured timezone, falling back to 'Australia/Sydney'.
- * This is the single source of truth for timezone throughout the app.
+ * Timezone utility functions.
+ *
+ * IMPORTANT: This file must NOT import from lib/profile.ts or lib/db.ts
+ * because it is used by client components. Server-side code should call
+ * getTimezone() from lib/profile.ts directly.
  */
-export async function getTimezone(): Promise<string> {
-  try {
-    const profile = await getProfile();
-    return profile.timezone || 'Australia/Sydney';
-  } catch {
-    return 'Australia/Sydney';
-  }
-}
 
 /**
  * Get the current Monday (start of week) in the given timezone.

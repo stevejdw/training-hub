@@ -3,7 +3,8 @@ import Anthropic from '@anthropic-ai/sdk';
 import { getProfile, effectiveFtp } from '@/lib/profile';
 import { calculateFitness } from '@/lib/fitness';
 import pool from '@/lib/db';
-import { addDays, currentMonday, todayInTimezone } from '@/lib/timezone';
+import { addDays, currentMonday } from '@/lib/timezone';
+
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
