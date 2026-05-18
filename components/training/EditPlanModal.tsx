@@ -21,6 +21,11 @@ const TIME_OPTIONS = [
   { label: '4h',   minutes: 240 },
 ];
 
+const VALID_MINS = TIME_OPTIONS.map(o => o.minutes);
+function snapToNearest(m: number) {
+  return VALID_MINS.reduce((b, v) => Math.abs(v - m) < Math.abs(b - m) ? v : b, VALID_MINS[0]);
+}
+
 interface DaySetting {
   maxMinutes: number;
   isGroupRide: boolean;
@@ -62,20 +67,30 @@ export default function EditPlanModal({ plan, onClose, onUpdated }: Props) {
   const [notes, setNotes] = useState('');
   const [trainingDays, setTrainingDays] = useState<number[]>(() => detectTrainingDays(plan.days));
   const [daySettings, setDaySettings] = useState<DaySettingsMap>(() => {
-    // Initialise with 2h per day, detect group rides from existing plan descriptions
-    const validMins = TIME_OPTIONS.map(o => o.minutes);
-    const snapToNearest = (m: number) =>
-      validMins.reduce((best, v) => Math.abs(v - m) < Math.abs(best - m) ? v : best, validMins[0]);
     const map: DaySettingsMap = {};
     const first7 = plan.days.slice(0, 7);
     DOW_LABELS.forEach((_, i) => {
-      const existing = first7[i];
-      const isGroup = existing
-        ? /group|bunch|club|social/i.test(existing.title + ' ' + (existing.description ?? ''))
-        : false;
-      map[i] = { maxMinutes: snapToNearest(existing?.duration_min ?? 120), isGroupRide: isGroup };
+      const d = first7[i];
+      map[i] = {
+        maxMinutes: snapToNearest(d?.duration_min ?? 120),
+        isGroupRide: d ? /group|bunch|club|social/i.test(d.title + ' ' + (d.description ?? '')) : false,
+      };
     });
     return map;
+  });
+
+  // Snapshot at modal-open: used to detect whether a regeneration is needed.
+  const [initialSettings] = useState(() => {
+    const map: DaySettingsMap = {};
+    const first7 = plan.days.slice(0, 7);
+    DOW_LABELS.forEach((_, i) => {
+      const d = first7[i];
+      map[i] = {
+        maxMinutes: snapToNearest(d?.duration_min ?? 120),
+        isGroupRide: d ? /group|bunch|club|social/i.test(d.title + ' ' + (d.description ?? '')) : false,
+      };
+    });
+    return { trainingDays: detectTrainingDays(plan.days), daySettings: map };
   });
   const [status, setStatus] = useState<'idle' | 'generating' | 'saving' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState('');
@@ -246,6 +261,26 @@ export default function EditPlanModal({ plan, onClose, onUpdated }: Props) {
     }
   }
 
+  // Detect whether the user changed anything that requires a full regeneration
+  const trainingDaysChanged =
+    JSON.stringify([...trainingDays].sort((a, b) => a - b)) !==
+    JSON.stringify([...initialSettings.trainingDays].sort((a, b) => a - b));
+  const daySettingsChanged = trainingDays.some(i => {
+    const c = daySettings[i];
+    const init = initialSettings.daySettings[i];
+    return c?.maxMinutes !== init?.maxMinutes || c?.isGroupRide !== init?.isGroupRide;
+  });
+  const willRegenerate = trainingDaysChanged || daySettingsChanged;
+
+  /** Smart save: regenerates if training days/settings changed, quick-saves otherwise. */
+  async function handleSave() {
+    if (willRegenerate) {
+      await handleRegenerate();
+    } else {
+      await handleSaveGoalOnly();
+    }
+  }
+
   async function handleRepairDates() {
     if (busy || repairing) return;
     setRepairing(true);
@@ -266,8 +301,8 @@ export default function EditPlanModal({ plan, onClose, onUpdated }: Props) {
 
   return (
 
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
-      <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-md max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 pb-[89px] md:pb-4 bg-black/60">
+      <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-md max-h-[calc(100vh-73px-2rem)] md:max-h-[90vh] flex flex-col">
       <div className="p-6 overflow-y-auto flex-1 space-y-5">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-white">Edit Plan</h2>
@@ -454,7 +489,12 @@ export default function EditPlanModal({ plan, onClose, onUpdated }: Props) {
 
         </div>
         {/* Sticky footer */}
-        <div className="flex gap-2 p-4 border-t border-gray-800 flex-shrink-0">
+        <div className="flex gap-2 p-4 border-t border-gray-800 flex-shrink-0 flex-col">
+          {willRegenerate && !confirmDelete && (
+            <p className="text-[11px] text-yellow-400/80 text-center -mt-1 mb-1">
+              Training days or durations changed — plan will regenerate
+            </p>
+          )}
           {confirmDelete ? (
             <>
               <button
@@ -491,11 +531,11 @@ export default function EditPlanModal({ plan, onClose, onUpdated }: Props) {
                 Cancel
               </button>
               <button
-                onClick={handleSaveGoalOnly}
+                onClick={handleSave}
                 disabled={busy}
                 className="flex-1 py-2 rounded-lg bg-orange-500 hover:bg-orange-400 text-white text-sm font-medium transition-colors disabled:opacity-50"
               >
-                {busy ? 'Working…' : 'Save'}
+                {busy ? 'Working…' : willRegenerate ? '↺ Regenerate' : 'Save'}
               </button>
             </>
           )}

@@ -181,8 +181,8 @@ export default function CreatePlanModal({ onClose, onCreated }: Props) {
 
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
-      <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-md max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 pb-[89px] md:pb-4 bg-black/60">
+      <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-md max-h-[calc(100vh-73px-2rem)] md:max-h-[90vh] flex flex-col">
         <div className="p-6 overflow-y-auto flex-1 space-y-5">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-white">Generate Training Plan</h2>
