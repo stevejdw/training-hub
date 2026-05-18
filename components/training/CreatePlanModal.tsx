@@ -61,17 +61,15 @@ export default function CreatePlanModal({ onClose, onCreated }: Props) {
       const resolvedName = planName || `${weeks}-Week Plan${goal ? ': ' + goal.slice(0, 40) : ''}`;
       const planGoal = goal || 'Base fitness';
 
-      // Generate weeks SEQUENTIALLY. Each call takes ~25s; iOS Safari aborts
-      // long-running parallel fetches with "TypeError: Load failed", so we
-      // can't use Promise.all here. Sequential keeps each connection short.
-      // One retry per week for transient network drops.
+      // Generate weeks SEQUENTIALLY using an NDJSON-streaming endpoint that
+      // sends heartbeat frames every 3s. iOS Safari, VPNs, and corporate
+      // proxies kill HTTP connections that stay idle ~15s; the heartbeats
+      // keep bytes flowing so single calls survive their ~25s AI runtime.
       const allDays: TrainingDay[] = [];
       for (let i = 0; i < weeks; i++) {
         let lastErr: Error | null = null;
         let weekDays: TrainingDay[] | null = null;
         for (let attempt = 0; attempt < 2 && weekDays === null; attempt++) {
-          const controller = new AbortController();
-          const timeout = setTimeout(() => controller.abort(), 55000);
           try {
             const r = await fetch('/api/training/generate', {
               method: 'POST',
@@ -80,22 +78,39 @@ export default function CreatePlanModal({ onClose, onCreated }: Props) {
                 goal, notes, trainingDays, weekIndex: i, planStartDate, totalWeeks: weeks, planName, planGoal,
                 weeklyTssTarget: typeof weeklyTssTarget === 'number' && weeklyTssTarget > 0 ? weeklyTssTarget : null,
               }),
-              signal: controller.signal,
             });
-            const text = await r.text();
-            let data: Record<string, unknown>;
-            try {
-              data = JSON.parse(text);
-            } catch {
-              throw new Error(`Week ${i + 1} failed (HTTP ${r.status}): ${text.slice(0, 200)}`);
+            if (!r.body) throw new Error(`Week ${i + 1}: no response body (HTTP ${r.status})`);
+
+            const reader  = r.body.getReader();
+            const decoder = new TextDecoder();
+            let buf = '';
+            let finalDays: TrainingDay[] | null = null;
+            let finalErr:  string | null = null;
+
+            while (true) {
+              const { value, done } = await reader.read();
+              if (done) break;
+              buf += decoder.decode(value, { stream: true });
+              const lines = buf.split('\n');
+              buf = lines.pop() ?? '';
+              for (const line of lines) {
+                if (!line.trim()) continue;
+                let msg: Record<string, unknown>;
+                try { msg = JSON.parse(line); } catch { continue; }
+                if (msg.type === 'result' && Array.isArray(msg.days)) {
+                  finalDays = msg.days as TrainingDay[];
+                } else if (msg.type === 'error') {
+                  finalErr = String(msg.error ?? 'Generation failed');
+                }
+              }
             }
-            if (data.error) throw new Error(`Week ${i + 1}: ${data.error}`);
-            weekDays = (data.days as TrainingDay[]) ?? [];
+
+            if (finalErr)  throw new Error(`Week ${i + 1}: ${finalErr}`);
+            if (!finalDays) throw new Error(`Week ${i + 1}: stream ended without result`);
+            weekDays = finalDays;
           } catch (err) {
             lastErr = err instanceof Error ? err : new Error(String(err));
             // Retry once on network errors (Load failed / aborted)
-          } finally {
-            clearTimeout(timeout);
           }
         }
         if (weekDays === null) throw lastErr ?? new Error(`Week ${i + 1} failed after retry`);

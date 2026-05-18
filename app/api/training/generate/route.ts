@@ -233,35 +233,68 @@ export async function POST(req: NextRequest) {
       dbClient.release();
     }
 
-    // Single-week mode (called from client per-week)
+    // Single-week mode (called from client per-week).
+    // Returns NDJSON stream with heartbeats every 3s to keep the connection
+    // alive through iOS Safari / VPN / proxy idle timeouts (which kill
+    // requests that don't transmit data for ~15s).
     if (typeof weekIndex === 'number') {
       const weekStart = addDays(bodyStartDate, weekIndex * 7);
       const weekEnd = addDays(weekStart, 6);
       const weekNum = weekIndex + 1;
 
-      const richContext = await buildRichContext(ftp);
-      const systemPrompt = buildSystemPrompt(ftp, profile, recentSummary, richContext, totalWeeks, goal, trainingDays, daySettings, weeklyTssTarget);
-      const userPrompt = `Generate week ${weekNum} of ${totalWeeks} (${weekStart} to ${weekEnd}). Week ${weekNum} load level: ${weekNum % 4 === 0 ? 'recovery (60% of peak TSS)' : weekNum % 4 === 1 ? 'build 1' : weekNum % 4 === 2 ? 'build 2' : 'peak'}. ${notes ? 'Notes: ' + notes : ''}`;
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream({
+        async start(controller) {
+          let finished = false;
+          const heartbeat = setInterval(() => {
+            if (!finished) {
+              try { controller.enqueue(encoder.encode(JSON.stringify({ type: 'heartbeat' }) + '\n')); }
+              catch { /* stream closed */ }
+            }
+          }, 3000);
 
-      const message = await client.messages.create({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 2000,
-        system: systemPrompt,
-        messages: [{ role: 'user', content: userPrompt }],
+          try {
+            const richContext = await buildRichContext(ftp);
+            const systemPrompt = buildSystemPrompt(ftp, profile, recentSummary, richContext, totalWeeks, goal, trainingDays, daySettings, weeklyTssTarget);
+            const userPrompt = `Generate week ${weekNum} of ${totalWeeks} (${weekStart} to ${weekEnd}). Week ${weekNum} load level: ${weekNum % 4 === 0 ? 'recovery (60% of peak TSS)' : weekNum % 4 === 1 ? 'build 1' : weekNum % 4 === 2 ? 'build 2' : 'peak'}. ${notes ? 'Notes: ' + notes : ''}`;
+
+            const message = await client.messages.create({
+              model: 'claude-sonnet-4-6',
+              max_tokens: 2000,
+              system: systemPrompt,
+              messages: [{ role: 'user', content: userPrompt }],
+            });
+
+            const text = message.content[0].type === 'text' ? message.content[0].text : '';
+            const jsonText = extractJson(text);
+
+            let days: unknown[];
+            try {
+              days = JSON.parse(jsonText);
+              if (!Array.isArray(days)) days = (days as { days: unknown[] }).days ?? [];
+            } catch {
+              controller.enqueue(encoder.encode(JSON.stringify({ type: 'error', error: 'Claude returned invalid JSON', raw: text.slice(0, 300) }) + '\n'));
+              return;
+            }
+
+            controller.enqueue(encoder.encode(JSON.stringify({ type: 'result', days, name: planName, goal: planGoal }) + '\n'));
+          } catch (err) {
+            controller.enqueue(encoder.encode(JSON.stringify({ type: 'error', error: String(err) }) + '\n'));
+          } finally {
+            finished = true;
+            clearInterval(heartbeat);
+            try { controller.close(); } catch { /* already closed */ }
+          }
+        },
       });
 
-      const text = message.content[0].type === 'text' ? message.content[0].text : '';
-      const jsonText = extractJson(text);
-
-      let days: unknown[];
-      try {
-        days = JSON.parse(jsonText);
-        if (!Array.isArray(days)) days = (days as { days: unknown[] }).days ?? [];
-      } catch {
-        return Response.json({ error: 'Claude returned invalid JSON', raw: text.slice(0, 300) }, { status: 500 });
-      }
-
-      return Response.json({ days, name: planName, goal: planGoal });
+      return new Response(stream, {
+        headers: {
+          'Content-Type':      'application/x-ndjson',
+          'Cache-Control':     'no-cache, no-transform',
+          'X-Accel-Buffering': 'no',
+        },
+      });
     }
 
     // Legacy single-shot mode (kept for compatibility, 4-week only)
