@@ -3,27 +3,15 @@ import Anthropic from '@anthropic-ai/sdk';
 import { getProfile, effectiveFtp } from '@/lib/profile';
 import { calculateFitness } from '@/lib/fitness';
 import pool from '@/lib/db';
+import { addDays, currentMonday, todayInTimezone } from '@/lib/timezone';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
 const client = new Anthropic();
 
-function startOfWeekSydney(): string {
-  const now = new Date(Date.now() + 10 * 60 * 60 * 1000);
-  const dow = now.getUTCDay();
-  const daysFromMon = dow === 0 ? 6 : dow - 1;
-  const mon = new Date(now.getTime() - daysFromMon * 86400000);
-  return mon.toISOString().slice(0, 10);
-}
-
-function addDays(dateStr: string, days: number): string {
-  const d = new Date(dateStr + 'T00:00:00Z');
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
-}
-
 const DOW_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
 
 interface DaySetting { maxMinutes: number; isGroupRide: boolean }
 type DaySettingsMap = Record<number, DaySetting>;
@@ -298,7 +286,8 @@ export async function POST(req: NextRequest) {
     }
 
     // Legacy single-shot mode (kept for compatibility, 4-week only)
-    const planStart = startOfWeekSydney();
+    const planStart = currentMonday(profile.timezone || 'Australia/Sydney');
+
     const richContext = await buildRichContext(ftp);
     const systemPrompt = buildSystemPrompt(ftp, profile, recentSummary, richContext, weeks, goal, trainingDays, daySettings, weeklyTssTarget);
 

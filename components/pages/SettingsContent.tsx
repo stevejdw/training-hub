@@ -407,8 +407,45 @@ export default function SettingsContent() {
         </div>
       </div>
 
+      {/* Timezone */}
+      <div className="bg-gray-900 rounded-xl p-5 space-y-3 border border-gray-800">
+        <div>
+          <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Timezone</h2>
+          <p className="text-xs text-gray-500 mt-1">
+            All dates and times throughout the app will use this timezone. Used for training plan generation, activity dates, and calendar views.
+          </p>
+        </div>
+        <select
+          value={profile.timezone || 'Australia/Sydney'}
+          onChange={e => update('timezone', e.target.value)}
+          className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-orange-500"
+        >
+          <option value="Pacific/Auckland">Pacific/Auckland (UTC+12/+13)</option>
+          <option value="Australia/Sydney">Australia/Sydney (UTC+10/+11)</option>
+          <option value="Australia/Melbourne">Australia/Melbourne (UTC+10/+11)</option>
+          <option value="Australia/Brisbane">Australia/Brisbane (UTC+10)</option>
+          <option value="Australia/Adelaide">Australia/Adelaide (UTC+9:30/+10:30)</option>
+          <option value="Australia/Perth">Australia/Perth (UTC+8)</option>
+          <option value="Asia/Tokyo">Asia/Tokyo (UTC+9)</option>
+          <option value="Asia/Shanghai">Asia/Shanghai (UTC+8)</option>
+          <option value="Asia/Singapore">Asia/Singapore (UTC+8)</option>
+          <option value="Asia/Kolkata">Asia/Kolkata (UTC+5:30)</option>
+          <option value="Europe/London">Europe/London (UTC+0/+1)</option>
+          <option value="Europe/Paris">Europe/Paris (UTC+1/+2)</option>
+          <option value="Europe/Berlin">Europe/Berlin (UTC+1/+2)</option>
+          <option value="America/New_York">America/New_York (UTC-5/-4)</option>
+          <option value="America/Chicago">America/Chicago (UTC-6/-5)</option>
+          <option value="America/Denver">America/Denver (UTC-7/-6)</option>
+          <option value="America/Los_Angeles">America/Los_Angeles (UTC-8/-7)</option>
+          <option value="America/Vancouver">America/Vancouver (UTC-8/-7)</option>
+          <option value="America/Toronto">America/Toronto (UTC-5/-4)</option>
+          <option value="UTC">UTC</option>
+        </select>
+      </div>
+
       {/* Physical — used for event pacing calculations */}
       <div className="bg-gray-900 rounded-xl p-5 space-y-3 border border-gray-800">
+
         <div>
           <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Physical</h2>
           <p className="text-xs text-gray-500 mt-1">Used for climb time estimates and pacing strategy calculations.</p>

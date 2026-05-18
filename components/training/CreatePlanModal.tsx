@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { TrainingDay } from '@/lib/training-plans';
 import type { BaselineTssResponse } from '@/app/api/training/baseline-tss/route';
+import { currentMonday, addDays } from '@/lib/timezone';
 
 interface Props {
   onClose: () => void;
@@ -27,28 +28,24 @@ interface DaySetting {
 }
 type DaySettingsMap = Record<number, DaySetting>;
 
-/** Compute the Monday of the current week in Sydney time. */
-
-function currentMondaySydney(): string {
-  const now = new Date(Date.now() + 10 * 60 * 60 * 1000);
-  const dow = now.getUTCDay();
-  const daysFromMon = dow === 0 ? 6 : dow - 1;
-  const mon = new Date(now.getTime() - daysFromMon * 86400000);
-  return mon.toISOString().slice(0, 10);
-}
-
-function addDays(dateStr: string, days: number): string {
-  const d = new Date(dateStr + 'T00:00:00Z');
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
-}
-
 export default function CreatePlanModal({ onClose, onCreated }: Props) {
   const [planName, setPlanName] = useState('');
   const [goal, setGoal] = useState('');
   const [notes, setNotes] = useState('');
   const [weeks, setWeeks] = useState(4);
-  const [planStartDate, setPlanStartDate] = useState(currentMondaySydney);
+  const [planStartDate, setPlanStartDate] = useState('');
+
+  // Fetch profile timezone and set initial start date
+  useEffect(() => {
+    fetch('/api/profile')
+      .then(r => r.json())
+      .then(p => {
+        const tz = p.timezone || 'Australia/Sydney';
+        setPlanStartDate(currentMonday(tz));
+      })
+      .catch(() => setPlanStartDate(currentMonday('Australia/Sydney')));
+  }, []);
+
   const [trainingDays, setTrainingDays] = useState<number[]>([1, 2, 4, 5, 6]); // Tue/Wed/Fri/Sat/Sun
   const [daySettings, setDaySettings] = useState<DaySettingsMap>(() => {
     const map: DaySettingsMap = {};
@@ -182,7 +179,8 @@ export default function CreatePlanModal({ onClose, onCreated }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
-      <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-md p-6 space-y-4">
+      <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-md max-h-[90vh] flex flex-col">
+        <div className="p-6 overflow-y-auto flex-1 space-y-5">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-white">Generate Training Plan</h2>
           <button onClick={onClose} disabled={busy} className="text-gray-500 hover:text-white transition-colors">
@@ -192,7 +190,8 @@ export default function CreatePlanModal({ onClose, onCreated }: Props) {
           </button>
         </div>
 
-        <div className="space-y-3">
+        <div className="space-y-4">
+
           <div>
             <label className="text-xs text-gray-400 uppercase tracking-wider block mb-1">Name</label>
             <input
@@ -352,8 +351,10 @@ export default function CreatePlanModal({ onClose, onCreated }: Props) {
             />
           </div>
         </div>
+        </div> {/* end scrollable content */}
 
         {status === 'generating' && (
+
           <div className="space-y-2">
             <div className="flex items-center gap-2 text-sm text-orange-400">
               <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">

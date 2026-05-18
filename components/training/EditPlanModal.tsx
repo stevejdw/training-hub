@@ -1,7 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { TrainingPlan, TrainingDay } from '@/lib/training-plans';
+import { currentMonday, addDays, mondayOfWeek } from '@/lib/timezone';
+
 
 interface Props {
   plan: TrainingPlan;
@@ -37,34 +39,27 @@ function detectTrainingDays(days: TrainingDay[]): number[] {
   return active.length > 0 ? active : [1, 2, 4, 5, 6]; // default Tue/Wed/Fri/Sat/Sun
 }
 
-function startOfWeekSydney(): string {
-  const now = new Date(Date.now() + 10 * 60 * 60 * 1000);
-  const dow = now.getUTCDay();
-  const daysFromMon = dow === 0 ? 6 : dow - 1;
-  const mon = new Date(now.getTime() - daysFromMon * 86400000);
-  return mon.toISOString().slice(0, 10);
-}
-
-function addDays(dateStr: string, days: number): string {
-  const d = new Date(dateStr + 'T00:00:00Z');
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
-}
-
-/** Compute the Monday of the week containing the given date string (YYYY-MM-DD). */
-function mondayOfWeek(dateStr: string): string {
-  const d = new Date(dateStr + 'T00:00:00Z');
-  const dow = d.getUTCDay(); // 0=Sun, 1=Mon, ...
-  const daysFromMon = dow === 0 ? 6 : dow - 1;
-  d.setUTCDate(d.getUTCDate() - daysFromMon);
-  return d.toISOString().slice(0, 10);
-}
-
 export default function EditPlanModal({ plan, onClose, onUpdated }: Props) {
   const weeks = Math.round(plan.days.length / 7);
   // Derive the plan's current start date from the first day in the plan
-  const originalStartDate = plan.days.length > 0 ? mondayOfWeek(plan.days[0].date) : startOfWeekSydney();
-  const [planStartDate, setPlanStartDate] = useState(originalStartDate);
+  const [planStartDate, setPlanStartDate] = useState<string>('');
+
+  // Fetch timezone and set initial start date
+  useEffect(() => {
+    if (plan.days.length > 0) {
+      setPlanStartDate(mondayOfWeek(plan.days[0].date));
+    } else {
+      // Fallback: fetch profile timezone and compute current Monday
+      fetch('/api/profile')
+        .then(r => r.json())
+        .then(p => {
+          const tz = p.timezone || 'Australia/Sydney';
+          setPlanStartDate(currentMonday(tz));
+        })
+        .catch(() => setPlanStartDate(currentMonday('Australia/Sydney')));
+    }
+  }, [plan.days]);
+
   const [goal, setGoal] = useState(plan.goal);
   const [notes, setNotes] = useState('');
   const [trainingDays, setTrainingDays] = useState<number[]>(() => detectTrainingDays(plan.days));
