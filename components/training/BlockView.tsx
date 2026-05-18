@@ -72,38 +72,32 @@ function completionStatus(day: TrainingDay, acts: ActivitySummary[]): 'done' | '
 // ─── Swipeable wrapper ────────────────────────────────────────────────────────
 
 const SWIPE_DELETE_PX = -88; // slide left to reveal delete
-const SWIPE_EDIT_PX   =  72; // slide right threshold to trigger edit
 
 function SwipeableCard({
   day,
   isToday,
   isRest,
-  isPast,
   isMoving,
   isSwapTarget,
   children,
   onDelete,
-  onEdit,
 }: {
   day: TrainingDay;
   isToday: boolean;
   isRest: boolean;
-  isPast: boolean;
   isMoving: boolean;
   isSwapTarget: boolean;
   children: React.ReactNode;
   onDelete: (day: TrainingDay) => void;
-  onEdit: (day: TrainingDay) => void;
 }) {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [swiping,    setSwiping]    = useState(false);
   const [swipeX,     setSwipeX]     = useState(0);
   const startX      = useRef(0);
   const startOffset = useRef(0);
-  const didSwipe    = useRef(false); // track if touch moved enough to count as swipe
+  const didSwipe    = useRef(false);
 
   const onTouchStart = useCallback((e: React.TouchEvent) => {
-    // In move mode the card is either the source or a swap target — don't intercept touch
     if (isMoving || isSwapTarget) return;
     startX.current      = e.touches[0].clientX;
     startOffset.current = deleteOpen ? SWIPE_DELETE_PX : 0;
@@ -114,8 +108,9 @@ function SwipeableCard({
 
   const onTouchMove = useCallback((e: React.TouchEvent) => {
     if (isMoving || isSwapTarget) return;
-    const diff   = e.touches[0].clientX - startX.current;
-    const newX   = Math.min(SWIPE_EDIT_PX, Math.max(SWIPE_DELETE_PX, startOffset.current + diff));
+    const diff = e.touches[0].clientX - startX.current;
+    // Only allow leftward swipe (clamp right edge to 0)
+    const newX = Math.min(0, Math.max(SWIPE_DELETE_PX, startOffset.current + diff));
     if (Math.abs(diff) > 8) didSwipe.current = true;
     setSwipeX(newX);
   }, [isMoving, isSwapTarget]);
@@ -124,16 +119,8 @@ function SwipeableCard({
     if (isMoving || isSwapTarget) return;
     setSwiping(false);
     if (!didSwipe.current) {
-      // Treat as a tap — just close if open
       if (deleteOpen) setDeleteOpen(false);
       setSwipeX(0);
-      return;
-    }
-    // Swipe right → edit (non-rest only)
-    if (!isRest && swipeX >= SWIPE_EDIT_PX * 0.6) {
-      setSwipeX(0);
-      setDeleteOpen(false);
-      onEdit(day);
       return;
     }
     // Swipe left → snap delete open / closed
@@ -144,29 +131,13 @@ function SwipeableCard({
       setDeleteOpen(false);
       setSwipeX(0);
     }
-  }, [swipeX, isRest, day, onEdit, deleteOpen, isMoving, isSwapTarget]);
+  }, [swipeX, deleteOpen, isMoving, isSwapTarget]);
 
   const translateX = swiping ? swipeX : (deleteOpen ? SWIPE_DELETE_PX : 0);
-
-  // Show right-side edit hint while swiping right (non-rest only)
-  const showEditHint = !isRest && swiping && swipeX > 16;
-  // Show left-side delete button only when snapped open
-  const showDelete   = deleteOpen;
+  const showDelete = deleteOpen;
 
   return (
     <div className="relative overflow-hidden rounded-xl">
-
-      {/* Edit hint — left side, revealed by right-swipe */}
-      {showEditHint && (
-        <div className="absolute inset-0 flex items-center justify-start rounded-xl bg-blue-600/90">
-          <div className="w-[88px] h-full flex flex-col items-center justify-center gap-1 text-white rounded-l-xl pointer-events-none">
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-            </svg>
-            <span className="text-xs font-semibold">Edit</span>
-          </div>
-        </div>
-      )}
 
       {/* Delete button — right side, revealed by left-swipe (only when snapped open) */}
       {showDelete && (
@@ -234,7 +205,6 @@ function DayCard({
   isSwapTarget,
   onSelectDay,
   onDelete,
-  onEdit,
   onDropOnDay,
   onGripTap,
   onDragEnterDay,
@@ -253,7 +223,6 @@ function DayCard({
   isSwapTarget: boolean;
   onSelectDay: (day: TrainingDay) => void;
   onDelete: (day: TrainingDay) => void;
-  onEdit: (day: TrainingDay) => void;
   onDropOnDay: (dayId: number, targetDayId: number) => void;
   onGripTap: () => void;
   onDragEnterDay: (dayId: number) => void;
@@ -325,11 +294,9 @@ function DayCard({
       day={day}
       isToday={isToday}
       isRest={isRest}
-      isPast={isPast}
       isMoving={isMoving}
       isSwapTarget={isSwapTarget}
       onDelete={onDelete}
-      onEdit={onEdit}
     >
       <div
         onDragOver={handleDragOver}
@@ -692,7 +659,7 @@ export default function BlockView({ days, activities, onSelectDay, onDaysChanged
       {/* Hint (only when not in move mode) */}
       {movingDayId === null && (
         <p className="text-[10px] text-gray-600 text-center">
-          Tap grip to move · Swipe left to delete · Swipe right to edit
+          Tap grip to move · Swipe left to delete · Tap to open
         </p>
       )}
 
@@ -727,7 +694,6 @@ export default function BlockView({ days, activities, onSelectDay, onDaysChanged
               isSwapTarget={isSwapTarget}
               onSelectDay={onSelectDay}
               onDelete={handleDeleteDay}
-              onEdit={onSelectDay}
               onDropOnDay={handleDropOnDay}
               onGripTap={() => handleGripTap(day.id)}
               onDragEnterDay={(id) => setDragOverDayId(id)}
