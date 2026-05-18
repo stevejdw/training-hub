@@ -11,13 +11,29 @@ interface Props {
 
 const DOW_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
+/** Compute the Monday of the current week in Sydney time. */
+function currentMondaySydney(): string {
+  const now = new Date(Date.now() + 10 * 60 * 60 * 1000);
+  const dow = now.getUTCDay();
+  const daysFromMon = dow === 0 ? 6 : dow - 1;
+  const mon = new Date(now.getTime() - daysFromMon * 86400000);
+  return mon.toISOString().slice(0, 10);
+}
+
+function addDays(dateStr: string, days: number): string {
+  const d = new Date(dateStr + 'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
 export default function CreatePlanModal({ onClose, onCreated }: Props) {
   const [planName, setPlanName] = useState('');
   const [goal, setGoal] = useState('');
   const [notes, setNotes] = useState('');
   const [weeks, setWeeks] = useState(4);
-  const [weeksBack, setWeeksBack] = useState(0); // 0 = this week's Monday; >0 backdates the plan
+  const [planStartDate, setPlanStartDate] = useState(currentMondaySydney);
   const [trainingDays, setTrainingDays] = useState<number[]>([1, 2, 4, 5, 6]); // Tue/Wed/Fri/Sat/Sun
+
   const [weeklyTssTarget, setWeeklyTssTarget] = useState<number | ''>('');
   const [tssSource, setTssSource] = useState<BaselineTssResponse['source'] | null>(null);
   const [tssDetail, setTssDetail] = useState<string>('');
@@ -52,17 +68,8 @@ export default function CreatePlanModal({ onClose, onCreated }: Props) {
     setWeekProgress(0);
 
     try {
-      // Compute plan start date — Monday of (this week - weeksBack), Sydney time.
-      // weeksBack > 0 backdates the plan so the user can pick up mid-block:
-      // e.g. weeksBack=2 means week 1 was 2 weeks ago and this week is week 3.
-      const now = new Date(Date.now() + 10 * 60 * 60 * 1000);
-      const dow = now.getUTCDay();
-      const daysFromMon = dow === 0 ? 6 : dow - 1;
-      const thisMon = new Date(now.getTime() - daysFromMon * 86400000);
-      const startMon = new Date(thisMon.getTime() - weeksBack * 7 * 86400000);
-      const planStartDate = startMon.toISOString().slice(0, 10);
-
       const resolvedName = planName || `${weeks}-Week Plan${goal ? ': ' + goal.slice(0, 40) : ''}`;
+
       const planGoal = goal || 'Base fitness';
 
       // Generate weeks SEQUENTIALLY using an NDJSON-streaming endpoint that
@@ -193,37 +200,19 @@ export default function CreatePlanModal({ onClose, onCreated }: Props) {
             </div>
           </div>
           <div>
-            <label className="text-xs text-gray-400 uppercase tracking-wider block mb-1">Start week</label>
-            <div className="flex gap-1.5">
-              {[0, 1, 2, 3, 4].map(wb => {
-                const now = new Date(Date.now() + 10 * 60 * 60 * 1000);
-                const dow = now.getUTCDay();
-                const dfm = dow === 0 ? 6 : dow - 1;
-                const thisMon = new Date(now.getTime() - dfm * 86400000);
-                const mon = new Date(thisMon.getTime() - wb * 7 * 86400000);
-                const label = wb === 0 ? 'This wk' : `${wb}w ago`;
-                const date = mon.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
-                return (
-                  <button
-                    key={wb}
-                    onClick={() => setWeeksBack(wb)}
-                    disabled={busy}
-                    className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-colors flex flex-col items-center ${
-                      weeksBack === wb ? 'bg-orange-500 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'
-                    }`}
-                  >
-                    <span>{label}</span>
-                    <span className={`text-[9px] ${weeksBack === wb ? 'text-orange-100' : 'text-gray-500'}`}>{date}</span>
-                  </button>
-                );
-              })}
-            </div>
-            {weeksBack > 0 && (
-              <p className="text-[10px] text-gray-500 mt-1">
-                Plan back-dates so week 1 was {weeksBack}w ago. This week becomes week {weeksBack + 1}.
-              </p>
-            )}
+            <label className="text-xs text-gray-400 uppercase tracking-wider block mb-1">Start date (week of)</label>
+            <input
+              type="date"
+              value={planStartDate}
+              onChange={e => setPlanStartDate(e.target.value)}
+              disabled={busy}
+              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-orange-500 [color-scheme:dark]"
+            />
+            <p className="text-[10px] text-gray-500 mt-1">
+              Plan runs {planStartDate} – {addDays(planStartDate, weeks * 7 - 1)} ({weeks} weeks)
+            </p>
           </div>
+
           <div>
             <label className="text-xs text-gray-400 uppercase tracking-wider block mb-1">
               Weekly TSS target

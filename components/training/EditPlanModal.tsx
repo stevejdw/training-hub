@@ -51,8 +51,20 @@ function addDays(dateStr: string, days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
+/** Compute the Monday of the week containing the given date string (YYYY-MM-DD). */
+function mondayOfWeek(dateStr: string): string {
+  const d = new Date(dateStr + 'T00:00:00Z');
+  const dow = d.getUTCDay(); // 0=Sun, 1=Mon, ...
+  const daysFromMon = dow === 0 ? 6 : dow - 1;
+  d.setUTCDate(d.getUTCDate() - daysFromMon);
+  return d.toISOString().slice(0, 10);
+}
+
 export default function EditPlanModal({ plan, onClose, onUpdated }: Props) {
   const weeks = Math.round(plan.days.length / 7);
+  // Derive the plan's current start date from the first day in the plan
+  const originalStartDate = plan.days.length > 0 ? mondayOfWeek(plan.days[0].date) : startOfWeekSydney();
+  const [planStartDate, setPlanStartDate] = useState(originalStartDate);
   const [goal, setGoal] = useState(plan.goal);
   const [notes, setNotes] = useState('');
   const [trainingDays, setTrainingDays] = useState<number[]>(() => detectTrainingDays(plan.days));
@@ -74,6 +86,7 @@ export default function EditPlanModal({ plan, onClose, onUpdated }: Props) {
   const [aiMessage, setAiMessage] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
+
 
   function toggleDay(d: number) {
     setTrainingDays(prev =>
@@ -144,7 +157,6 @@ export default function EditPlanModal({ plan, onClose, onUpdated }: Props) {
     setErrorMsg('');
 
     try {
-      const planStartDate = startOfWeekSydney();
       const planName = plan.name;
 
       const weekResults = await Promise.all(
@@ -186,6 +198,18 @@ export default function EditPlanModal({ plan, onClose, onUpdated }: Props) {
     }
   }
 
+
+  /** Shift all plan days so the first day lands on the new planStartDate. */
+  function shiftedDays(): TrainingDay[] {
+    if (plan.days.length === 0) return plan.days;
+    const oldStart = mondayOfWeek(plan.days[0].date);
+    const diffDays = Math.round(
+      (new Date(planStartDate + 'T00:00:00Z').getTime() - new Date(oldStart + 'T00:00:00Z').getTime()) / 86400000
+    );
+    if (diffDays === 0) return plan.days;
+    return plan.days.map(d => ({ ...d, date: addDays(d.date, diffDays) }));
+  }
+
   async function handleSaveGoalOnly() {
     if (status !== 'idle') return;
     setStatus('saving');
@@ -194,7 +218,7 @@ export default function EditPlanModal({ plan, onClose, onUpdated }: Props) {
       const saveRes = await fetch(`/api/training/plans/${plan.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ goal, days: plan.days }),
+        body: JSON.stringify({ goal, days: shiftedDays() }),
       });
       const saved = await saveRes.json();
       if (!saveRes.ok || saved.error) throw new Error(saved.error ?? 'Save failed');
@@ -204,6 +228,7 @@ export default function EditPlanModal({ plan, onClose, onUpdated }: Props) {
       setStatus('error');
     }
   }
+
 
   const busy = status === 'generating' || status === 'saving';
 
@@ -231,7 +256,23 @@ export default function EditPlanModal({ plan, onClose, onUpdated }: Props) {
           />
         </div>
 
+        {/* Start date */}
+        <div>
+          <label className="text-xs text-gray-400 uppercase tracking-wider block mb-1.5">Plan start date (week of)</label>
+          <input
+            type="date"
+            value={planStartDate}
+            onChange={e => setPlanStartDate(e.target.value)}
+            disabled={busy}
+            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-orange-500 [color-scheme:dark]"
+          />
+          <p className="text-[10px] text-gray-500 mt-1">
+            Plan runs {planStartDate} – {addDays(planStartDate, weeks * 7 - 1)} ({weeks} weeks)
+          </p>
+        </div>
+
         {/* Additional notes */}
+
         <div>
           <label className="text-xs text-gray-400 uppercase tracking-wider block mb-1.5">Additional notes (optional)</label>
           <textarea
