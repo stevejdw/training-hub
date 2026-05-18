@@ -259,11 +259,16 @@ Rules:
 - FTP=${ftp}W zones: Z2=${Math.round(ftp*0.56)}-${Math.round(ftp*0.75)}W, Tempo=${Math.round(ftp*0.76)}-${Math.round(ftp*0.87)}W, Threshold=${Math.round(ftp*0.88)}-${Math.round(ftp*0.95)}W, VO2=${Math.round(ftp*1.06)}-${Math.round(ftp*1.20)}W
 - Be specific with interval structures in descriptions (reps, duration, watts, recovery)
 - Progressive overload: increase load through each week, every 4th week is recovery (~60% TSS)
-- Keep the same number of days per week and same dates`;
+- By default keep the same dates and structure, BUT if the athlete explicitly asks to shift dates, renumber weeks, or change the number of weeks, do exactly that
+- ALWAYS return the JSON object even if you can only partially fulfil the request. Never respond with prose — if you can't do something, return the plan with whatever changes you can make plus a brief "goal" field noting the limitation`;
+
+        // Each day costs ~250 tokens of JSON; 4-week plan = 28 days = ~7k tokens
+        // plus structural overhead. Scale max_tokens with plan size.
+        const maxTokens = Math.min(16000, Math.max(4096, plan.days.length * 350));
 
         const messageRes = await anthropic.messages.create({
           model: 'claude-sonnet-4-6',
-          max_tokens: 4096,
+          max_tokens: maxTokens,
           system: systemPrompt,
           messages: [{ role: 'user', content: message }],
         });

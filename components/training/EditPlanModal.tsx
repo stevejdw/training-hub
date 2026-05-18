@@ -105,6 +105,7 @@ export default function EditPlanModal({ plan, onClose, onUpdated }: Props) {
       const decoder = new TextDecoder();
       let buf = '';
       let finalErr: string | null = null;
+      let finalRaw: string | null = null;
       let succeeded = false;
 
       while (true) {
@@ -121,11 +122,12 @@ export default function EditPlanModal({ plan, onClose, onUpdated }: Props) {
             succeeded = true;
           } else if (msg.type === 'error') {
             finalErr = String(msg.error ?? 'AI edit failed');
+            if (typeof msg.raw === 'string') finalRaw = msg.raw;
           }
         }
       }
 
-      if (finalErr) throw new Error(finalErr);
+      if (finalErr) throw new Error(finalRaw ? `${finalErr}\n\nClaude said: ${finalRaw}` : finalErr);
       if (!succeeded) throw new Error('Stream ended without result');
 
       onUpdated();
@@ -348,7 +350,7 @@ export default function EditPlanModal({ plan, onClose, onUpdated }: Props) {
               </>
             ) : 'Ask Coach AI'}
           </button>
-          {aiError && <p className="text-xs text-red-400">{aiError}</p>}
+          {aiError && <pre className="text-xs text-red-400 whitespace-pre-wrap break-words max-h-40 overflow-y-auto">{aiError}</pre>}
         </div>
 
         {status === 'generating' && (
