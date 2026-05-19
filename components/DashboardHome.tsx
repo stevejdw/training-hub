@@ -268,7 +268,7 @@ function TrainingTab() {
       return '';
     }
     const month = parseInt(label.slice(0, 2), 10);
-    if (month === 1 || month % 2 === 0) return MONTHS[month - 1];
+    if (month % 2 === 1) return MONTHS[month - 1];
     return '';
   }
 

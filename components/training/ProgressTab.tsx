@@ -165,9 +165,9 @@ export default function ProgressTab() {
       }
       return '';
     }
-    // ytd — label is "MM-DD", show every 2nd month
+    // ytd — label is "MM-DD", show odd months: Jan, Mar, May, Jul, Sep, Nov
     const month = parseInt(label.slice(0, 2), 10);
-    if (month === 1 || month % 2 === 0) return MONTHS[month - 1];
+    if (month % 2 === 1) return MONTHS[month - 1];
     return '';
   }
 
