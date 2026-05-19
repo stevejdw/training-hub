@@ -427,15 +427,44 @@ function TrainingTab() {
         </button>
       </div>
 
-      {/* Cumulative area chart (same as ProgressTab) */}
-      <div className="bg-gray-800/60 rounded-xl p-3 md:p-5">
-        {progressLoading && !progressData ? (
+      {/* Chart panel (same layout as ProgressTab) */}
+      <div className="bg-gray-800/60 rounded-xl p-4 space-y-3">
+
+        {/* Total header (same as ProgressTab) */}
+        <div>
+          <p className="text-[10px] text-gray-500 uppercase tracking-wider">Total {m.label}</p>
+          {progressLoading ? (
+            <div className="h-9 w-36 bg-gray-700/50 rounded animate-pulse mt-1" />
+          ) : (
+            <div className="flex items-end gap-2.5 mt-0.5">
+              <p className="text-3xl font-bold text-white leading-tight">
+                {fmtProgress(curTotal)}
+                {m.unit && <span className="text-lg font-semibold text-gray-400 ml-1">{m.unit}</span>}
+              </p>
+              {deltaPct !== null && (
+                <p className={`text-sm font-semibold mb-0.5 ${deltaPct >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                  {deltaPct >= 0 ? '▲' : '▼'} {delta >= 0 ? '+' : ''}{fmtProgress(Math.abs(delta))}{m.unit ? ` ${m.unit}` : ''} ({Math.abs(deltaPct)}%)
+                </p>
+              )}
+            </div>
+          )}
+          <p className="text-xs text-gray-500 mt-0.5">
+            {progressData?.current ? `${progressData.current.start} – ${progressData.current.end}` : '—'}
+          </p>
+          {deltaPct !== null && priorTotal > 0 && (
+            <p className="text-[10px] text-gray-600 mt-0.5">
+              vs. prior period ({fmtProgress(priorTotal)}{m.unit ? ` ${m.unit}` : ''})
+            </p>
+          )}
+        </div>
+
+        {/* Area chart (same as ProgressTab) */}
+        {progressLoading ? (
           <div className="h-48 animate-pulse bg-gray-700/40 rounded-lg" />
         ) : chartData.length === 0 ? (
           <div className="h-48 flex items-center justify-center text-gray-600 text-sm">No data for this period</div>
         ) : (
-          <div className="h-48">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height={200}>
             <AreaChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
               <defs>
                 <linearGradient id="dashProgressGrad" x1="0" y1="0" x2="0" y2="1">
@@ -488,7 +517,6 @@ function TrainingTab() {
               />
             </AreaChart>
           </ResponsiveContainer>
-          </div>
         )}
       </div>
 
