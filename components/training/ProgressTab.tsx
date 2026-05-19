@@ -128,17 +128,18 @@ export default function ProgressTab() {
   const dateRange   = data?.current ? fmtRange(data.current.start, data.current.end, period) : '—';
 
   // Build chart data from fullPeriod for the x-axis (shows entire period range)
-  // Use priorFull for the prior line so it extends to the end of the graph
+  // Use priorFull for the prior line so it extends to the end of the graph.
+  // Since priorFull dates are from a different period (e.g. last week), we align
+  // them by index (same relative position in the period) rather than by date.
   const fullPts  = data?.fullPeriod?.points ?? [];
   const curPts   = data?.current?.points ?? [];
   const priorFullPts = data?.priorFull?.points ?? [];
   // Build a lookup of cum values keyed by date
   const curByDate   = new Map(curPts.map(p => [p.date, p.cum]));
-  const priorByDate = new Map(priorFullPts.map(p => [p.date, p.cum]));
-  const chartData = fullPts.map(p => ({
+  const chartData = fullPts.map((p, i) => ({
     label:   p.date.slice(5),
     current: curByDate.has(p.date)   ? Math.round(curByDate.get(p.date)! * 100) / 100 : null,
-    prior:   priorByDate.has(p.date) ? Math.round(priorByDate.get(p.date)! * 100) / 100 : null,
+    prior:   priorFullPts[i] != null ? Math.round(priorFullPts[i].cum * 100) / 100 : null,
   }));
 
   // ── X-axis tick formatter ───────────────────────────────────────────
