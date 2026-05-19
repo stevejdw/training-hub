@@ -100,6 +100,7 @@ export async function GET(req: NextRequest) {
 
     let cur_start: string, cur_end: string, prior_start: string, prior_end: string;
     let full_start: string, full_end: string;
+    let priorFull_start: string, priorFull_end: string;
 
     if (period === 'wtd') {
       // Shift Monday of this week by `offset` weeks
@@ -114,6 +115,9 @@ export async function GET(req: NextRequest) {
       // Full period for charting (always Mon-Sun)
       full_start = cur_start;
       full_end   = addDays(cur_start, 6);
+      // Full prior period for charting (prior Mon-Sun)
+      priorFull_start = addDays(cur_start, -7);
+      priorFull_end   = addDays(cur_start, -1);
 
     } else if (period === 'mtd') {
       cur_start = monthStartOffset(today, offset);
@@ -126,6 +130,9 @@ export async function GET(req: NextRequest) {
       // Full period for charting (full calendar month)
       full_start = cur_start;
       full_end   = endOfMonthOffset(today, offset);
+      // Full prior period for charting (full prior calendar month)
+      priorFull_start = monthStartOffset(today, offset - 1);
+      priorFull_end   = endOfMonthOffset(today, offset - 1);
 
     } else { // ytd
       const curYear = parseInt(today.slice(0, 4)) + offset;
@@ -139,6 +146,9 @@ export async function GET(req: NextRequest) {
       // Full period for charting (full calendar year)
       full_start = cur_start;
       full_end   = offset === 0 ? `${curYear}-12-31` : `${curYear}-12-31`;
+      // Full prior period for charting (full prior calendar year)
+      priorFull_start = `${curYear - 1}-01-01`;
+      priorFull_end   = `${curYear - 1}-12-31`;
     }
 
     // ── Fetch day-by-day buckets ───────────────────────────────────────
@@ -172,10 +182,11 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    const [current, prior, fullPeriod] = await Promise.all([
+    const [current, prior, fullPeriod, priorFullPeriod] = await Promise.all([
       bucketise(cur_start, cur_end),
       bucketise(prior_start, prior_end),
       bucketise(full_start, full_end),
+      bucketise(priorFull_start, priorFull_end),
     ]);
 
     const curTotal   = current.length ? current[current.length - 1].cum : 0;
@@ -186,6 +197,7 @@ export async function GET(req: NextRequest) {
       current: { start: cur_start, end: cur_end, total: curTotal, points: current },
       prior:   { start: prior_start, end: prior_end, total: priorTotal, points: prior },
       fullPeriod: { start: full_start, end: full_end, points: fullPeriod },
+      priorFull: { start: priorFull_start, end: priorFull_end, points: priorFullPeriod },
     });
   } catch (err) {
     return Response.json({ error: String(err) }, { status: 500 });

@@ -19,6 +19,7 @@ interface ProgressResponse {
   current: { start: string; end: string; total: number; points: DayPoint[] };
   prior:   { start: string; end: string; total: number; points: DayPoint[] };
   fullPeriod: { start: string; end: string; points: DayPoint[] };
+  priorFull: { start: string; end: string; points: DayPoint[] };
 }
 
 const METRICS: { key: Metric; label: string; unit: string; fmt: (v: number) => string }[] = [
@@ -127,18 +128,38 @@ export default function ProgressTab() {
   const dateRange   = data?.current ? fmtRange(data.current.start, data.current.end, period) : '—';
 
   // Build chart data from fullPeriod for the x-axis (shows entire period range)
-  // but overlay current/prior cumulative data (which may be partial for offset=0)
+  // Use priorFull for the prior line so it extends to the end of the graph
   const fullPts  = data?.fullPeriod?.points ?? [];
   const curPts   = data?.current?.points ?? [];
-  const priorPts = data?.prior?.points   ?? [];
+  const priorFullPts = data?.priorFull?.points ?? [];
   // Build a lookup of cum values keyed by date
   const curByDate   = new Map(curPts.map(p => [p.date, p.cum]));
-  const priorByDate = new Map(priorPts.map(p => [p.date, p.cum]));
+  const priorByDate = new Map(priorFullPts.map(p => [p.date, p.cum]));
   const chartData = fullPts.map(p => ({
     label:   p.date.slice(5),
     current: curByDate.has(p.date)   ? Math.round(curByDate.get(p.date)! * 100) / 100 : null,
     prior:   priorByDate.has(p.date) ? Math.round(priorByDate.get(p.date)! * 100) / 100 : null,
   }));
+
+  // ── X-axis tick formatter ───────────────────────────────────────────
+  const DAY_NAMES = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+  const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  function formatXLabel(label: string, index: number): string {
+    if (period === 'wtd') {
+      // label is "MM-DD" — derive day-of-week from index
+      return DAY_NAMES[index % 7];
+    }
+    if (period === 'mtd') {
+      // label is "MM-DD" — show 3 evenly spaced markers: ~10th, ~20th, ~30th
+      const day = parseInt(label.slice(3), 10);
+      if (day === 1 || day === 10 || day === 20) return `${MONTHS[parseInt(label.slice(0,2), 10) - 1]} ${day}`;
+      return '';
+    }
+    // ytd — label is "MM-DD", show every 2nd month
+    const month = parseInt(label.slice(0, 2), 10);
+    if (month === 1 || month % 2 === 0) return MONTHS[month - 1];
+    return '';
+  }
 
   return (
     <div className="space-y-4">
@@ -217,6 +238,7 @@ export default function ProgressTab() {
                 axisLine={false}
                 tickLine={false}
                 interval="preserveStartEnd"
+                tickFormatter={formatXLabel}
               />
               <YAxis
                 tick={{ fill: '#6b7280', fontSize: 10 }}
