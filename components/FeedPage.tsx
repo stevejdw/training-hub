@@ -483,11 +483,19 @@ export default function FeedPage() {
             )}
           </div>
 
+          {/* Mobile: Coaching Insight */}
+          <CoachingTip />
+
           {/* Mobile: Progress widget */}
           <HomeProgressWidget wtd={wtd} mtd={mtd} ytd={ytd} />
         </div>
 
         {/* ── DESKTOP LAYOUT ── */}
+        {/* Desktop: Coaching Insight */}
+        <div className="hidden md:block">
+          <CoachingTip />
+        </div>
+
         <div className="hidden md:grid md:grid-cols-3 gap-3">
 
           {/* Desktop: Next Training Session */}
@@ -548,9 +556,6 @@ export default function FeedPage() {
             </div>
           )}
         </div>
-
-        {/* Coaching Insight */}
-        <CoachingTip />
 
         {/* Row: Fitness Summary + Weekly TSS side by side */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
