@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   ResponsiveContainer,
-  AreaChart, Area,
+  AreaChart, Area, Line,
   XAxis, YAxis, Tooltip, CartesianGrid,
 } from 'recharts';
 import { SPORT_FILTER_LABELS, SportFilter } from '@/lib/sport-types';
@@ -125,9 +125,13 @@ export default function ProgressTab() {
   const deltaPct    = priorTotal > 0 ? Math.round((delta / priorTotal) * 100) : null;
   const dateRange   = data?.current ? fmtRange(data.current.start, data.current.end, period) : '—';
 
-  const chartData = (data?.current?.points ?? []).map(p => ({
-    label: p.date.slice(5),
-    value: Math.round(p.value * 100) / 100,
+  const curPts   = data?.current?.points ?? [];
+  const priorPts = data?.prior?.points   ?? [];
+  const len      = Math.max(curPts.length, priorPts.length);
+  const chartData = Array.from({ length: len }, (_, i) => ({
+    label:   curPts[i]?.date.slice(5) ?? priorPts[i]?.date.slice(5) ?? String(i + 1),
+    current: curPts[i]  != null ? Math.round(curPts[i].cum  * 100) / 100 : null,
+    prior:   priorPts[i] != null ? Math.round(priorPts[i].cum * 100) / 100 : null,
   }));
 
   return (
@@ -218,16 +222,29 @@ export default function ProgressTab() {
               <Tooltip
                 contentStyle={{ background: '#111827', border: '1px solid #374151', borderRadius: 8, fontSize: 12 }}
                 labelStyle={{ color: '#9ca3af' }}
-                formatter={(v) => [`${m.fmt(Number(v))}${m.unit ? ' ' + m.unit : ''}`, m.label]}
+                formatter={(v, name) => [
+                  `${m.fmt(Number(v))}${m.unit ? ' ' + m.unit : ''}`,
+                  name === 'current' ? 'This period' : 'Prior period',
+                ]}
+              />
+              <Line
+                type="monotone"
+                dataKey="prior"
+                stroke="#6b7280"
+                strokeWidth={1.5}
+                strokeDasharray="5 3"
+                dot={false}
+                connectNulls
               />
               <Area
                 type="monotone"
-                dataKey="value"
+                dataKey="current"
                 stroke="#f97316"
                 strokeWidth={2.5}
                 fill="url(#progressGrad)"
                 dot={false}
                 activeDot={{ r: 5, fill: '#f97316' }}
+                connectNulls
               />
             </AreaChart>
           </ResponsiveContainer>
