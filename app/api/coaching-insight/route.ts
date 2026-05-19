@@ -36,7 +36,7 @@ export async function GET() {
 
     // Return cached insight if no new activities have been synced.
     const cacheRes = await client.query(
-      `SELECT content, last_activity_id FROM coaching_cache WHERE key = 'insight_v7'`
+      `SELECT content, last_activity_id FROM coaching_cache WHERE key = 'insight_v8'`
     );
     const cached = cacheRes.rows[0];
     if (cached && String(cached.last_activity_id) === String(currentMaxId)) {
@@ -125,7 +125,7 @@ Example DETRAINING tone: "It's been four days off the bike and your CTL has slip
     // Persist to cache
     await client.query(
       `INSERT INTO coaching_cache (key, content, last_activity_id, generated_at)
-       VALUES ('insight_v7', $1, $2, NOW())
+       VALUES ('insight_v8', $1, $2, NOW())
        ON CONFLICT (key) DO UPDATE
          SET content = EXCLUDED.content,
              last_activity_id = EXCLUDED.last_activity_id,

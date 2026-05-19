@@ -146,11 +146,12 @@ export async function buildTrainingContext(): Promise<string> {
       LIMIT 5
     `);
 
-    // Build context string
+    // Build context string — all dates in AEST so the model never confuses today vs yesterday
     const today = new Date();
+    const todayAEST = today.toLocaleDateString('en-CA', { timeZone: 'Australia/Sydney' });
 
     let ctx = `# Athlete Training Context
-Generated: ${today.toISOString().slice(0, 10)}
+Generated: ${todayAEST}
 
 ## Athlete Profile
 - Name: ${profile.name}
@@ -197,7 +198,7 @@ ${profile.events.length > 0 ? profile.events.map(e => {
 
     ctx += `\n## Recent Activities (last 90 days, ${recent.length} activities)\n`;
     for (const a of recent) {
-      const date = new Date(a.start_date).toISOString().slice(0, 10);
+      const date = new Date(a.start_date).toLocaleDateString('en-CA', { timeZone: 'Australia/Sydney' });
       const parts = [
         `${date} [${a.sport_type}] "${a.name}"`,
         formatDuration(a.moving_time),
