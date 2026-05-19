@@ -177,25 +177,29 @@ export default function ProgressTab() {
       {/* Heading */}
       <h2 className="text-sm font-semibold text-white">Progress</h2>
 
-      {/* Controls: sport dropdown + metric pills */}
-      <div className="flex items-center gap-2 flex-wrap">
+      {/* Controls: sport dropdown + metric pills (scrollable row) */}
+      <div className="flex items-center gap-2">
         <SportDropdown
           selected={selected}
           onChange={v => { setSelected(v); setOffset(0); }}
         />
-        {METRICS.map(mx => (
-          <button
-            key={mx.key}
-            onClick={() => { setMetric(mx.key); setOffset(0); }}
-            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors border ${
-              metric === mx.key
-                ? 'bg-orange-500 text-white border-orange-500'
-                : 'bg-transparent text-gray-400 border-gray-700 hover:text-white hover:border-gray-500'
-            }`}
-          >
-            {mx.label}
-          </button>
-        ))}
+        <div className="overflow-x-auto scrollbar-thin -mr-4 pr-4">
+          <div className="flex items-center gap-2 min-w-max">
+            {METRICS.map(mx => (
+              <button
+                key={mx.key}
+                onClick={() => { setMetric(mx.key); setOffset(0); }}
+                className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors border ${
+                  metric === mx.key
+                    ? 'bg-orange-500 text-white border-orange-500'
+                    : 'bg-transparent text-gray-400 border-gray-700 hover:text-white hover:border-gray-500'
+                }`}
+              >
+                {mx.label}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* Chart panel */}
