@@ -60,8 +60,8 @@ const TYPE_FILTERS = SPORT_FILTER_LABELS.filter(f => f !== 'All') as SportFilter
 const METRIC_OPTS: { key: Metric; label: string; unit: string }[] = [
   { key: 'km',         label: 'Distance',  unit: 'km' },
   { key: 'hours',      label: 'Time',      unit: 'h'  },
-  { key: 'activities', label: 'Rides',     unit: ''   },
   { key: 'tss',        label: 'TSS',       unit: ''   },
+  { key: 'activities', label: 'Rides',     unit: ''   },
 ];
 
 /** Map dashboard period/week/month/year → progress API period (wtd/mtd/ytd) */
@@ -249,12 +249,22 @@ function TrainingTab() {
   // X-axis tick formatter (same as ProgressTab)
   const DAY_NAMES = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
   const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  // Compute 3 evenly-spaced tick positions for MTD based on total days in month
+  const mtdTickPositions = (() => {
+    const progPeriod = toProgressPeriod(period);
+    if (progPeriod !== 'mtd' || fullPts.length === 0) return [];
+    const totalDays = fullPts.length;
+    const step = Math.max(1, Math.floor(totalDays / 3));
+    return [0, step, step * 2].filter(i => i < totalDays);
+  })();
   function formatXLabel(label: string, index: number): string {
     const progPeriod = toProgressPeriod(period);
     if (progPeriod === 'wtd') return DAY_NAMES[index % 7];
     if (progPeriod === 'mtd') {
-      const day = parseInt(label.slice(3), 10);
-      if (day === 1 || day === 10 || day === 20) return `${MONTHS[parseInt(label.slice(0,2), 10) - 1]} ${day}`;
+      if (mtdTickPositions.includes(index)) {
+        const day = parseInt(label.slice(3), 10);
+        return `${MONTHS[parseInt(label.slice(0,2), 10) - 1]} ${day}`;
+      }
       return '';
     }
     const month = parseInt(label.slice(0, 2), 10);
@@ -342,21 +352,23 @@ function TrainingTab() {
         })() : null}
       </div>
 
-      {/* Sport filters — evenly spread above chart */}
-      <div className="grid grid-cols-4 md:grid-cols-8 gap-2">
-        {TYPE_FILTERS.map(f => (
-          <button
-            key={f}
-            onClick={() => toggleFilter(f)}
-            className={`py-1.5 rounded-lg text-xs font-medium transition-colors text-center ${
-              selected.includes(f)
-                ? 'bg-orange-500 text-white'
-                : 'bg-gray-800 text-gray-400 hover:text-white'
-            }`}
-          >
-            {f}
-          </button>
-        ))}
+      {/* Sport filters — single scrollable row */}
+      <div className="overflow-x-auto scrollbar-thin -mx-4 px-4">
+        <div className="flex gap-2 min-w-max">
+          {TYPE_FILTERS.map(f => (
+            <button
+              key={f}
+              onClick={() => toggleFilter(f)}
+              className={`flex-shrink-0 py-1.5 px-3 rounded-lg text-xs font-medium transition-colors ${
+                selected.includes(f)
+                  ? 'bg-orange-500 text-white'
+                  : 'bg-gray-800 text-gray-400 hover:text-white'
+              }`}
+            >
+              {f}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Metric toggle — evenly spread above chart */}

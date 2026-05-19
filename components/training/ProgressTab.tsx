@@ -25,9 +25,9 @@ interface ProgressResponse {
 const METRICS: { key: Metric; label: string; unit: string; fmt: (v: number) => string }[] = [
   { key: 'km',         label: 'Distance',   unit: 'km', fmt: v => v >= 100 ? Math.round(v).toString() : v.toFixed(1) },
   { key: 'time',       label: 'Time',       unit: 'h',  fmt: v => v >= 10 ? Math.round(v).toString() : v.toFixed(1) },
-  { key: 'elevation',  label: 'Elevation',  unit: 'm',  fmt: v => Math.round(v).toLocaleString() },
   { key: 'tss',        label: 'TSS',        unit: '',   fmt: v => Math.round(v).toString() },
   { key: 'activities', label: 'Activities', unit: '',   fmt: v => Math.round(v).toString() },
+  { key: 'elevation',  label: 'Elevation',  unit: 'm',  fmt: v => Math.round(v).toLocaleString() },
 ];
 
 const PERIODS: { key: Period; label: string }[] = [
@@ -145,15 +145,24 @@ export default function ProgressTab() {
   // ── X-axis tick formatter ───────────────────────────────────────────
   const DAY_NAMES = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
   const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  // Compute 3 evenly-spaced tick positions for MTD based on total days in month
+  const mtdTickPositions = (() => {
+    if (period !== 'mtd' || fullPts.length === 0) return [];
+    const totalDays = fullPts.length;
+    const step = Math.max(1, Math.floor(totalDays / 3));
+    return [0, step, step * 2].filter(i => i < totalDays);
+  })();
   function formatXLabel(label: string, index: number): string {
     if (period === 'wtd') {
       // label is "MM-DD" — derive day-of-week from index
       return DAY_NAMES[index % 7];
     }
     if (period === 'mtd') {
-      // label is "MM-DD" — show 3 evenly spaced markers: ~10th, ~20th, ~30th
-      const day = parseInt(label.slice(3), 10);
-      if (day === 1 || day === 10 || day === 20) return `${MONTHS[parseInt(label.slice(0,2), 10) - 1]} ${day}`;
+      // Show 3 evenly spaced markers based on total days in month
+      if (mtdTickPositions.includes(index)) {
+        const day = parseInt(label.slice(3), 10);
+        return `${MONTHS[parseInt(label.slice(0,2), 10) - 1]} ${day}`;
+      }
       return '';
     }
     // ytd — label is "MM-DD", show every 2nd month
