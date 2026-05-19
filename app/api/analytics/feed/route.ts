@@ -1,5 +1,5 @@
 import pool from '@/lib/db';
-import { getProfile } from '@/lib/profile';
+import { getProfile, effectiveFtp } from '@/lib/profile';
 import { calculateFitness } from '@/lib/fitness';
 import { calendarDaysFromToday } from '@/lib/calendar-days';
 
@@ -117,6 +117,11 @@ export async function GET() {
     const dailyTss = dailyTssRes.rows.map(r => ({ date: String(r.date), tss: Number(r.tss) }));
     const fitness = calculateFitness(dailyTss);
 
+    const eftp = effectiveFtp(profile);
+    const vo2max = profile.weight_kg && profile.weight_kg > 0
+      ? Math.round(((eftp / profile.weight_kg) * 10.8 + 7) * 10) / 10
+      : null;
+
     // Next event
     const today = new Date().toISOString().slice(0, 10);
     const nextEvent = profile.events
@@ -179,6 +184,8 @@ export async function GET() {
       wtd: toStats(wtdRes.rows[0]),
       mtd: toStats(mtdRes.rows[0]),
       ytd: toStats(ytdRes.rows[0]),
+      eftp,
+      vo2max,
     });
   } catch (err) {
     console.error('Analytics feed error:', err);

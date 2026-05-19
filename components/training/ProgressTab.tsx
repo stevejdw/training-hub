@@ -10,6 +10,7 @@ import {
 import { SPORT_FILTER_LABELS, SportFilter } from '@/lib/sport-types';
 import { useCachedFetch } from '@/lib/use-cached-fetch';
 import TrainingCalendar from './TrainingCalendar';
+import TssRollingChart from './TssRollingChart';
 
 type Period    = 'wtd' | 'mtd' | 'ytd';
 type Metric    = 'time' | 'km';
@@ -343,6 +344,12 @@ export default function ProgressTab() {
       {/* Training calendar */}
       <div className="border-t border-gray-800/60 pt-4">
         <TrainingCalendar numWeeks={8} />
+      </div>
+
+      {/* Weekly TSS */}
+      <div className="border-t border-gray-800/60 pt-4">
+        <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-3">Weekly TSS</p>
+        <TssRollingChart />
       </div>
 
     </div>

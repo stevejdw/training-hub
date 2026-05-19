@@ -36,13 +36,6 @@ interface PowerHighlight {
 
 interface PeriodStats { rides: number; km: number; hours: number; tss: number; elevation: number }
 
-type StatPeriod = 'wtd' | 'mtd' | 'ytd';
-const STAT_PERIODS: { key: StatPeriod; label: string }[] = [
-  { key: 'wtd', label: 'Week to Date'  },
-  { key: 'mtd', label: 'Month to Date' },
-  { key: 'ytd', label: 'Year to Date'  },
-];
-
 interface NextSession {
   id: number;
   date: string;
@@ -63,6 +56,8 @@ interface FeedData {
   wtd: PeriodStats | null;
   mtd: PeriodStats | null;
   ytd: PeriodStats | null;
+  eftp: number;
+  vo2max: number | null;
 }
 
 function fmt(s: number) {
@@ -221,17 +216,6 @@ function FitnessSummary({ fitness }: { fitness?: { ctl: number; atl: number; tsb
 }
 
 export default function FeedPage() {
-  const [statPeriod, setStatPeriod] = useState<StatPeriod>('wtd');
-  const swipeStartX = useRef<number | null>(null);
-
-  function handleStatSwipe(dir: 'left' | 'right') {
-    const idx  = STAT_PERIODS.findIndex(p => p.key === statPeriod);
-    const next = dir === 'left'
-      ? STAT_PERIODS[Math.min(STAT_PERIODS.length - 1, idx + 1)]
-      : STAT_PERIODS[Math.max(0, idx - 1)];
-    if (next && next.key !== statPeriod) setStatPeriod(next.key);
-  }
-
   const [data, setData] = useState<FeedData | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -281,9 +265,8 @@ export default function FeedPage() {
     );
   }
 
-  const { recentRides = [], nextEvent, nextSession, powerHighlights = [], wtd, mtd, ytd } = data ?? {};
-  const activeStat = statPeriod === 'mtd' ? mtd : statPeriod === 'ytd' ? ytd : wtd;
-  const newPRs   = powerHighlights.filter(p => p.isNew);
+  const { recentRides = [], nextEvent, nextSession, powerHighlights = [], wtd, fitness, eftp, vo2max } = data ?? {};
+  const newPRs = powerHighlights.filter(p => p.isNew);
 
   const sessionColor = nextSession ? (SESSION_TYPE_COLOR[nextSession.type] ?? '#9ca3af') : '#9ca3af';
 
@@ -360,31 +343,44 @@ export default function FeedPage() {
             )}
           </div>
 
-          {/* Mobile: Week to Date */}
+          {/* Mobile: Training Status */}
           <Link
-            href="/training"
+            href="/performance"
             className="block bg-gray-800/60 rounded-2xl px-3 py-2.5 border border-transparent hover:border-gray-700 hover:bg-gray-800/80 transition-colors group"
           >
             <p className="text-[9px] font-semibold text-gray-400 uppercase tracking-wider group-hover:text-orange-400 transition-colors mb-1.5">
-              Week to Date →
+              Training Status →
             </p>
-            {activeStat ? (
-              <div className="grid grid-cols-5 gap-1">
-                {[
-                  { label: 'Rides',  value: String(activeStat.rides)     },
-                  { label: 'km',     value: String(activeStat.km)        },
-                  { label: 'Hours',  value: String(activeStat.hours)     },
-                  { label: 'TSS',    value: String(activeStat.tss)       },
-                  { label: 'Elev m', value: String(activeStat.elevation) },
-                ].map(({ label, value }) => (
-                  <div key={label} className="text-center">
-                    <p className="text-xs font-bold text-white leading-tight">{value}</p>
-                    <p className="text-[9px] text-gray-500 mt-0.5">{label}</p>
-                  </div>
-                ))}
+            {data ? (
+              <div className="space-y-1.5">
+                <div className="grid grid-cols-4 gap-1">
+                  {[
+                    { label: 'eFTP',    value: eftp != null ? `${eftp}w` : '—' },
+                    { label: 'VO₂ Max', value: vo2max != null ? String(vo2max) : '—' },
+                    { label: 'CTL',     value: fitness ? String(fitness.ctl) : '—' },
+                    { label: 'Form',    value: fitness ? `${fitness.tsb > 0 ? '+' : ''}${fitness.tsb}` : '—' },
+                  ].map(({ label, value }) => (
+                    <div key={label} className="text-center">
+                      <p className="text-xs font-bold text-white leading-tight">{value}</p>
+                      <p className="text-[9px] text-gray-500 mt-0.5">{label}</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="grid grid-cols-3 gap-1">
+                  {[
+                    { label: 'TSS wtd', value: wtd ? String(wtd.tss)   : '—' },
+                    { label: 'km wtd',  value: wtd ? String(wtd.km)    : '—' },
+                    { label: 'hrs wtd', value: wtd ? String(wtd.hours) : '—' },
+                  ].map(({ label, value }) => (
+                    <div key={label} className="text-center">
+                      <p className="text-xs font-bold text-white leading-tight">{value}</p>
+                      <p className="text-[9px] text-gray-500 mt-0.5">{label}</p>
+                    </div>
+                  ))}
+                </div>
               </div>
             ) : (
-              <div className="h-6 bg-gray-700/40 rounded animate-pulse" />
+              <div className="h-10 bg-gray-700/40 rounded animate-pulse" />
             )}
           </Link>
         </div>
@@ -429,31 +425,44 @@ export default function FeedPage() {
             )}
           </Link>
 
-          {/* Desktop: Week to Date stats */}
+          {/* Desktop: Training Status */}
           <Link
-            href="/training"
+            href="/performance"
             className="rounded-2xl bg-gray-800/60 px-4 py-4 border border-transparent hover:border-gray-700 hover:bg-gray-800/80 transition-colors group"
           >
             <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider group-hover:text-orange-400 transition-colors mb-2">
-              Week to Date →
+              Training Status →
             </p>
-            {activeStat ? (
-              <div className="grid grid-cols-5 gap-1">
-                {[
-                  { label: 'Rides',  value: String(activeStat.rides)     },
-                  { label: 'km',     value: String(activeStat.km)        },
-                  { label: 'Hours',  value: String(activeStat.hours)     },
-                  { label: 'TSS',    value: String(activeStat.tss)       },
-                  { label: 'Elev m', value: String(activeStat.elevation) },
-                ].map(({ label, value }) => (
-                  <div key={label} className="text-center">
-                    <p className="text-sm font-bold text-white leading-tight">{value}</p>
-                    <p className="text-[10px] text-gray-500 mt-0.5">{label}</p>
-                  </div>
-                ))}
+            {data ? (
+              <div className="space-y-2">
+                <div className="grid grid-cols-4 gap-1">
+                  {[
+                    { label: 'eFTP',    value: eftp != null ? `${eftp}w` : '—' },
+                    { label: 'VO₂ Max', value: vo2max != null ? String(vo2max) : '—' },
+                    { label: 'CTL',     value: fitness ? String(fitness.ctl) : '—' },
+                    { label: 'Form',    value: fitness ? `${fitness.tsb > 0 ? '+' : ''}${fitness.tsb}` : '—' },
+                  ].map(({ label, value }) => (
+                    <div key={label} className="text-center">
+                      <p className="text-sm font-bold text-white leading-tight">{value}</p>
+                      <p className="text-[10px] text-gray-500 mt-0.5">{label}</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="grid grid-cols-3 gap-1">
+                  {[
+                    { label: 'TSS wtd', value: wtd ? String(wtd.tss)   : '—' },
+                    { label: 'km wtd',  value: wtd ? String(wtd.km)    : '—' },
+                    { label: 'hrs wtd', value: wtd ? String(wtd.hours) : '—' },
+                  ].map(({ label, value }) => (
+                    <div key={label} className="text-center">
+                      <p className="text-sm font-bold text-white leading-tight">{value}</p>
+                      <p className="text-[10px] text-gray-500 mt-0.5">{label}</p>
+                    </div>
+                  ))}
+                </div>
               </div>
             ) : (
-              <div className="h-8 bg-gray-700/40 rounded animate-pulse" />
+              <div className="h-12 bg-gray-700/40 rounded animate-pulse" />
             )}
           </Link>
 
