@@ -268,7 +268,8 @@ function TrainingTab() {
       return '';
     }
     const month = parseInt(label.slice(0, 2), 10);
-    if (month % 2 === 1) return MONTHS[month - 1];
+    const day   = parseInt(label.slice(3), 10);
+    if (month % 2 === 1 && day === 1) return MONTHS[month - 1];
     return '';
   }
 
