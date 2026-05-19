@@ -108,8 +108,10 @@ function LazyMap({ polyline }: { polyline: string }) {
 // ── Home Progress Widget ──────────────────────────────────────────────────────
 
 interface ProgressResponse {
-  current: { start: string; end: string; total: number; points: { date: string; value: number; cum: number }[] };
-  prior:   { start: string; end: string; total: number; points: { date: string; value: number; cum: number }[] };
+  current:    { start: string; end: string; total: number; points: { date: string; value: number; cum: number }[] };
+  prior:      { start: string; end: string; total: number; points: { date: string; value: number; cum: number }[] };
+  fullPeriod: { start: string; end: string; points: { date: string; value: number; cum: number }[] };
+  priorFull:  { start: string; end: string; points: { date: string; value: number; cum: number }[] };
 }
 
 type ProgressPeriod = 'wtd' | 'mtd' | 'ytd';
@@ -152,14 +154,16 @@ function HomeProgressWidget({ wtd, mtd, ytd }: {
   const stats = period === 'mtd' ? mtd : period === 'ytd' ? ytd : wtd;
   const priorTotal = prog?.prior?.total ?? 0;
 
-  // Build indexed chart data so current and prior share the same x-axis
-  const cur  = prog?.current?.points ?? [];
-  const prior = prog?.prior?.points  ?? [];
-  const len  = Math.max(cur.length, prior.length);
-  const chartData = Array.from({ length: len }, (_, i) => ({
+  // Build chart data from fullPeriod for the x-axis (shows entire period range).
+  // Orange line stops at today; grey prior line extends through the full period.
+  const fullPts      = prog?.fullPeriod?.points ?? [];
+  const curPts       = prog?.current?.points    ?? [];
+  const priorFullPts = prog?.priorFull?.points  ?? [];
+  const curByDate    = new Map(curPts.map(p => [p.date, p.cum]));
+  const chartData = fullPts.map((p, i) => ({
     i,
-    current: cur[i]?.cum   ?? null,
-    prior:   prior[i]?.cum ?? null,
+    current: curByDate.has(p.date) ? curByDate.get(p.date)! : null,
+    prior:   priorFullPts[i] != null ? priorFullPts[i].cum : null,
   }));
 
   function handlePeriodClick(e: React.MouseEvent, p: ProgressPeriod) {
@@ -233,7 +237,7 @@ function HomeProgressWidget({ wtd, mtd, ytd }: {
           <ResponsiveContainer width="100%" height={72}>
             <LineChart data={chartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
               <Line type="monotone" dataKey="prior"   stroke="#6b7280" strokeWidth={1.5} strokeDasharray="4 2" dot={false} connectNulls />
-              <Line type="monotone" dataKey="current" stroke="#f97316" strokeWidth={2}   dot={false} connectNulls />
+              <Line type="monotone" dataKey="current" stroke="#f97316" strokeWidth={2}   dot={false} connectNulls={false} />
             </LineChart>
           </ResponsiveContainer>
         )}
