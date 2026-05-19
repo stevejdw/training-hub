@@ -8,6 +8,7 @@ export interface Activity {
   name: string;
   sport_type: string;
   start_date: string;
+  start_date_aest: string;
   elapsed_time: number;
   moving_time: number;
   distance: number;
@@ -40,18 +41,22 @@ export async function buildTrainingContext(): Promise<string> {
   const [client, profile, plansMeta] = await Promise.all([pool.connect(), getProfile(), listPlans()]);
   const FTP = effectiveFtp(profile);
   try {
+    const tz = profile.timezone ?? 'Australia/Sydney';
+
     // 1. Recent 90 days — full detail
     const recentResult = await client.query<Activity>(`
-      SELECT * FROM activities
+      SELECT *,
+        TO_CHAR(start_date AT TIME ZONE $1, 'YYYY-MM-DD') AS start_date_aest
+      FROM activities
       WHERE start_date >= NOW() - INTERVAL '90 days'
       ORDER BY start_date DESC
-    `);
+    `, [tz]);
     const recent = recentResult.rows;
 
     // 2. Weekly summaries for the past year
     const weeklySummaryResult = await client.query(`
       SELECT
-        date_trunc('week', start_date)::date AS week_start,
+        date_trunc('week', start_date AT TIME ZONE $1)::date AS week_start,
         COUNT(*) AS activity_count,
         ROUND(SUM(moving_time) / 3600.0, 1) AS hours,
         ROUND(SUM(COALESCE(tss, hrss, 0))::numeric, 0) AS total_tss,
@@ -63,7 +68,7 @@ export async function buildTrainingContext(): Promise<string> {
         AND start_date < NOW() - INTERVAL '90 days'
       GROUP BY week_start
       ORDER BY week_start DESC
-    `);
+    `, [tz]);
     const weeklySummaries = weeklySummaryResult.rows;
 
     // 3. All-time daily TSS for CTL/ATL/TSB — prefer intervals.icu's icu_tss
@@ -71,7 +76,7 @@ export async function buildTrainingContext(): Promise<string> {
     const dailyTssResult = await client.query(`
       WITH strava_tss AS (
         SELECT
-          TO_CHAR(start_date AT TIME ZONE 'Australia/Sydney', 'YYYY-MM-DD') AS date,
+          TO_CHAR(start_date AT TIME ZONE $1, 'YYYY-MM-DD') AS date,
           SUM(COALESCE(tss, hrss, 0)) AS tss
         FROM activities
         GROUP BY 1
@@ -89,7 +94,7 @@ export async function buildTrainingContext(): Promise<string> {
       FROM intervals_tss i
       FULL OUTER JOIN strava_tss s ON i.date = s.date
       ORDER BY 1
-    `);
+    `, [tz]);
     const dailyTss = dailyTssResult.rows.map((r) => ({
       date: String(r.date),
       tss: Number(r.tss),
@@ -128,14 +133,14 @@ export async function buildTrainingContext(): Promise<string> {
       SELECT TO_CHAR(date, 'YYYY-MM-DD') AS date,
              hrv_rmssd, resting_hr, sleep_score, readiness_score, sleep_secs
       FROM daily_wellness
-      WHERE date >= (NOW() AT TIME ZONE 'Australia/Sydney')::date - INTERVAL '14 days'
+      WHERE date >= (NOW() AT TIME ZONE $1)::date - INTERVAL '14 days'
       ORDER BY date DESC
-    `);
+    `, [tz]);
 
     // 5. Annual totals
     const annualResult = await client.query(`
       SELECT
-        EXTRACT(YEAR FROM start_date) AS year,
+        EXTRACT(YEAR FROM start_date AT TIME ZONE $1) AS year,
         COUNT(*) AS activities,
         ROUND(SUM(moving_time) / 3600.0, 0) AS hours,
         ROUND(SUM(distance / 1000.0)::numeric, 0) AS km,
@@ -144,11 +149,11 @@ export async function buildTrainingContext(): Promise<string> {
       GROUP BY year
       ORDER BY year DESC
       LIMIT 5
-    `);
+    `, [tz]);
 
-    // Build context string — all dates in AEST so the model never confuses today vs yesterday
+    // Build context string — all dates in athlete's local timezone so the model never confuses today vs yesterday
     const today = new Date();
-    const todayAEST = today.toLocaleDateString('en-CA', { timeZone: 'Australia/Sydney' });
+    const todayAEST = today.toLocaleDateString('en-CA', { timeZone: tz });
 
     let ctx = `# Athlete Training Context
 Generated: ${todayAEST}
@@ -198,9 +203,12 @@ ${profile.events.length > 0 ? profile.events.map(e => {
 
     ctx += `\n## Recent Activities (last 90 days, ${recent.length} activities)\n`;
     for (const a of recent) {
-      const date = new Date(a.start_date).toLocaleDateString('en-CA', { timeZone: 'Australia/Sydney' });
+      const dateLabel = new Date(a.start_date_aest + 'T12:00:00').toLocaleDateString('en-AU', {
+        timeZone: tz,
+        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+      });
       const parts = [
-        `${date} [${a.sport_type}] "${a.name}"`,
+        `${a.start_date_aest} (${dateLabel}) [${a.sport_type}] "${a.name}"`,
         formatDuration(a.moving_time),
         a.distance > 0 ? formatDistance(a.distance) : null,
         a.total_elevation_gain > 0 ? `${Math.round(a.total_elevation_gain)}m gain` : null,
