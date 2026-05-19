@@ -70,6 +70,34 @@ export async function GET(req: NextRequest) {
       return new Date(Date.UTC(yr, mo - 1 + n, 1)).toISOString().slice(0, 10);
     }
 
+    /**
+     * Returns the same day-of-month as `d` in the month that is `n` months
+     * earlier.  If the target month doesn't have that many days (e.g. 31 in
+     * February), it clamps to the last day of the target month.
+     */
+    function sameDayPrevMonth(d: string, n: number): string {
+      const [yr, mo, dy] = d.split('-').map(Number);
+      // Target month = mo - 1 - n  (0-indexed)
+      const targetMonth = mo - 1 - n;
+      const targetYear  = yr + Math.floor(targetMonth / 12);
+      const tm          = ((targetMonth % 12) + 12) % 12;
+      const lastDay     = new Date(Date.UTC(targetYear, tm + 1, 0)).getUTCDate();
+      const clamped     = Math.min(dy, lastDay);
+      return new Date(Date.UTC(targetYear, tm, clamped)).toISOString().slice(0, 10);
+    }
+
+    /**
+     * Returns the same month-day as `d` but one year earlier.
+     * If `d` is Feb 29 and the previous year is not a leap year, returns Feb 28.
+     */
+    function sameDayPrevYear(d: string): string {
+      const [yr, mo, dy] = d.split('-').map(Number);
+      const prevYear = yr - 1;
+      const lastDay  = new Date(Date.UTC(prevYear, mo, 0)).getUTCDate(); // last day of target month
+      const clamped  = Math.min(dy, lastDay);
+      return new Date(Date.UTC(prevYear, mo - 1, clamped)).toISOString().slice(0, 10);
+    }
+
     let cur_start: string, cur_end: string, prior_start: string, prior_end: string;
 
     if (period === 'wtd') {
@@ -77,21 +105,30 @@ export async function GET(req: NextRequest) {
       const thisMonday = addDays(today, -dowMon(today));
       cur_start = addDays(thisMonday, offset * 7);
       cur_end   = offset === 0 ? today : addDays(cur_start, 6);
+      // Prior period: same relative portion (same day-of-week offset from its Monday)
       prior_start = addDays(cur_start, -7);
-      prior_end   = addDays(cur_start, -1);
+      prior_end   = offset === 0
+        ? addDays(today, -7)           // same day-of-week as today, one week back
+        : addDays(cur_start, -1);      // full prior week when navigating history
 
     } else if (period === 'mtd') {
       cur_start = monthStartOffset(today, offset);
       cur_end   = offset === 0 ? today : endOfMonthOffset(today, offset);
+      // Prior period: same day-of-month as today, one month back
       prior_start = monthStartOffset(today, offset - 1);
-      prior_end   = addDays(cur_start, -1);
+      prior_end   = offset === 0
+        ? sameDayPrevMonth(today, 1)   // same day-of-month, previous month
+        : addDays(cur_start, -1);      // full prior month when navigating history
 
     } else { // ytd
       const curYear = parseInt(today.slice(0, 4)) + offset;
       cur_start   = `${curYear}-01-01`;
       cur_end     = offset === 0 ? today : `${curYear}-12-31`;
+      // Prior period: same month-day, previous year
       prior_start = `${curYear - 1}-01-01`;
-      prior_end   = addDays(cur_start, -1);
+      prior_end   = offset === 0
+        ? sameDayPrevYear(today)       // same month-day, previous year (handles Feb 29 → Feb 28)
+        : addDays(cur_start, -1);      // full prior year when navigating history
     }
 
     // ── Fetch day-by-day buckets ───────────────────────────────────────
