@@ -35,9 +35,8 @@ export async function GET() {
     const currentMaxId: number | null = latestRes.rows[0]?.max_id ?? null;
 
     // Return cached insight if no new activities have been synced.
-    // Cache key bumped to v2 when the prompt changed (next-key-session focus).
     const cacheRes = await client.query(
-      `SELECT content, last_activity_id FROM coaching_cache WHERE key = 'insight_v6'`
+      `SELECT content, last_activity_id FROM coaching_cache WHERE key = 'insight_v7'`
     );
     const cached = cacheRes.rows[0];
     if (cached && String(cached.last_activity_id) === String(currentMaxId)) {
@@ -76,37 +75,46 @@ ${trainingContext}`,
         {
           role: 'user',
           content:
-`Write me a personal note in plain prose — NO markdown, NO headings, NO bullet points, NO bold. Sound like a real coach talking to a real athlete.
+`Write me a personal note in plain prose. NO markdown, NO headings, NO bullet points, NO bold, NO mode labels. Sound like a real coach talking to a real athlete.
 
-STEP 1 — decide which MODE you're in:
-- REVIEW MODE: my MOST RECENT activity (the top of Recent Activities) is a key session (vo2max / threshold / tempo / structured intervals with lap NP data) AND it happened in the last 48 hours. In this mode the note is a post-session debrief.
-- PREVIEW MODE: otherwise. The note is preparation for my next key session in the plan.
+STEP 1 — decide which situation applies, based on the most recent activity date vs today (${sydneyDateISO}):
 
-STEP 2 — REVIEW MODE instructions (only if you chose REVIEW MODE):
-- Pull the lap NP numbers from my latest key session. Compute the AVERAGE NP across the working efforts (ignore warm-up/cool-down laps).
-- Find my most recent previous session of the same type/structure. Compute its average NP across efforts.
-- Compare BOTH: (a) average power across efforts, AND (b) total work done (number of efforts × average watts × time). Example: 4×5min @ 320W is MORE work than 5×5min @ 305W even though there were fewer reps — say so.
-- If avg power UP or total work UP → celebrate specifically with both numbers.
-- If avg power DOWN or work DOWN meaningfully (>3-5%) → name it honestly. Then diagnose: look at the Wellness section (HRV trend, RHR, sleep hours, readiness) over the days leading into the session, and at CTL/ATL/TSB and recent TSS load. Suggest the most likely cause in one sentence (e.g. "HRV was 38 the morning of the session, well below your 14-day avg of 52 — that's autonomic fatigue, not lost fitness").
-- Use the diagnosis to ADJUST the next week's guidance — swap an intensity day for endurance, lower target watts, add a rest day, whatever fits.
-- Close with: "I look forward to seeing your results after Friday's session" (or whatever the next key day is).
+A) SESSION DEBRIEF: my most recent activity was within the last 24 hours.
+B) TRAINING STATUS: my most recent activity was more than 24 hours ago but less than 3 days ago.
+C) DETRAINING: I haven't trained in more than 3 days.
 
-STEP 3 — PREVIEW MODE instructions:
-- Mention my next KEY session by day of week and title.
-- Acknowledge how I've been going given CTL/ATL/TSB and the trend in the wellness data (HRV/sleep) if it tells a story.
-- Tell me what today's focus should be — specific numbers (e.g. "keep it under 200W today").
-- Reference one specific recent strong session by date and numbers to build confidence (or honestly call out the last key session if numbers were down).
-- Close with: "I look forward to seeing your results after Friday's session" (use the actual day).
+STEP 2 — write accordingly:
+
+If A (SESSION DEBRIEF):
+- Analyse the session. Pull lap NP and HR avg/max for each effort lap (ignore warm-up/cool-down laps).
+- Compare to my most recent previous session of the same type: average effort NP and total work (reps × avg watts × time). Note which is higher and by how much.
+- If it went well → say why, with the specific numbers.
+- If it didn't → diagnose honestly. Check HRV trend, RHR, sleep hours in the Wellness section and CTL/ATL/TSB load leading into it. Name the most likely cause in one sentence (e.g. "HRV was 38 that morning, well below your 14-day avg of 52 — autonomic fatigue, not lost fitness"). Prescribe an adjustment to the next week.
+- Keep it relaxed and to the point.
+
+If B (TRAINING STATUS):
+- Use TSS, CTL, ATL and TSB to describe where my fitness and freshness are right now, with the actual numbers.
+- Tell me how ready I am to train today.
+- Advise what the next session should focus on and whether that fits my training plan. If a plan adjustment makes sense, say so.
+- Reference any notable wellness trend (HRV, sleep) if it adds something.
+
+If C (DETRAINING):
+- Be honest but encouraging. Use actual CTL, ATL and TSB numbers to explain what's been happening to fitness and fatigue over this gap.
+- Give a clear sense of what has been lost and what hasn't.
+- Suggest a specific way to get back on track — intensity, duration, or just showing up.
 
 GLOBAL RULES:
-- Always end with "I look forward to seeing your results after [day]'s session." Never say "I'll check in".
-- Plain prose, no lists, no headings, no markdown.
+- Do NOT label which situation you chose. Just write the note naturally.
+- Plain prose only — no lists, no headings, no markdown.
 - Use actual numbers from the data. Don't fabricate.
-- 5-7 sentences total. REVIEW MODE can run slightly longer if the diagnosis needs it.
+- 5–7 sentences total. Session debrief can run slightly longer if the diagnosis needs it.
+- Always end with: "I look forward to seeing your results after [day]'s session." (use the actual next key session day). Never say "I'll check in".
 
-Example REVIEW MODE tone: "Tuesday's 4x8min was a step back from where you've been — you averaged 298W vs 315W on the same workout three weeks ago, and your total work was lower despite the same structure. Your HRV dropped from a 14-day average of 52 to 36 the morning of the session, RHR was up 5bpm, and you only got 5.8h sleep the night before — that's autonomic fatigue, not lost fitness. Let's swap Thursday's tempo for a longer endurance ride at Zone 2 and push the threshold work to next Tuesday when you're rested. Today, keep it under 160W and prioritise sleep. I look forward to seeing your results after Tuesday's session."
+Example SESSION DEBRIEF tone: "Tuesday's 4×8min was a step back from where you've been — you averaged 298W vs 315W on the same workout three weeks ago, and total work was lower despite the same structure. Your HRV dropped from a 14-day average of 52 to 36 the morning of the session, RHR was up 5bpm, and you only got 5.8h sleep the night before — that's autonomic fatigue, not lost fitness. Let's swap Thursday's tempo for a longer Zone 2 ride and push the threshold work to next Tuesday when you're rested. Today, keep it under 160W and prioritise sleep. I look forward to seeing your results after Tuesday's session."
 
-Example PREVIEW MODE tone: "Your next key session is this Friday — 20-30min Power. You've been doing really well and your fitness is sitting at a solid 67 with a fresh TSB of +8. Today's all about keeping it easy — stay under 180W so you're sharp for Friday. Your 4x10min on Tuesday averaged 315W, the best you've done at that effort. I look forward to seeing your results after Friday's session."`,
+Example TRAINING STATUS tone: "Your fitness is sitting at CTL 68 with ATL recovering nicely to give you a TSB of +6 — you're in good shape to push quality work. Your next key session is Thursday's threshold intervals, and that lines up well with where you are right now. Today would be a good day for an easy spin under 180W to stay fresh. I look forward to seeing your results after Thursday's session."
+
+Example DETRAINING tone: "It's been four days off the bike and your CTL has slipped from 72 to 68 while ATL has dropped off sharply — the good news is the fatigue is clearing, but you're starting to lose the top end of the fitness you've built. A 60–90 minute easy ride today would be enough to start reversing that trend without digging a hole. I look forward to seeing your results after your next session."`,
         },
       ],
     });
@@ -117,7 +125,7 @@ Example PREVIEW MODE tone: "Your next key session is this Friday — 20-30min Po
     // Persist to cache
     await client.query(
       `INSERT INTO coaching_cache (key, content, last_activity_id, generated_at)
-       VALUES ('insight_v6', $1, $2, NOW())
+       VALUES ('insight_v7', $1, $2, NOW())
        ON CONFLICT (key) DO UPDATE
          SET content = EXCLUDED.content,
              last_activity_id = EXCLUDED.last_activity_id,

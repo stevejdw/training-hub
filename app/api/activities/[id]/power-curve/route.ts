@@ -5,15 +5,26 @@ import { NextRequest } from 'next/server';
 export const runtime = 'nodejs';
 
 const DURATIONS = [
-  { label: '1s',  s: 1    },
-  { label: '5s',  s: 5    },
-  { label: '30s', s: 30   },
-  { label: '1m',  s: 60   },
-  { label: '5m',  s: 300  },
-  { label: '10m', s: 600  },
-  { label: '20m', s: 1200 },
-  { label: '30m', s: 1800 },
-  { label: '60m', s: 3600 },
+  { label: '1s',  s: 1     },
+  { label: '5s',  s: 5     },
+  { label: '30s', s: 30    },
+  { label: '1m',  s: 60    },
+  { label: '5m',  s: 300   },
+  { label: '10m', s: 600   },
+  { label: '20m', s: 1200  },
+  { label: '30m', s: 1800  },
+  { label: '60m', s: 3600  },
+  { label: '75m', s: 4500  },
+  { label: '90m', s: 5400  },
+  { label: '2h',  s: 7200  },
+  { label: '3h',  s: 10800 },
+  { label: '4h',  s: 14400 },
+  { label: '5h',  s: 18000 },
+  { label: '6h',  s: 21600 },
+  { label: '8h',  s: 28800 },
+  { label: '10h', s: 36000 },
+  { label: '12h', s: 43200 },
+  { label: '15h', s: 54000 },
 ];
 
 const CYCLING_SPORTS = ['Ride','GravelRide','EMountainBikeRide','MountainBikeRide','EBikeRide'];
