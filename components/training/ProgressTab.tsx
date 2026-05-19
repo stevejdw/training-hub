@@ -292,7 +292,7 @@ export default function ProgressTab() {
                 fill="url(#progressGrad)"
                 dot={false}
                 activeDot={{ r: 5, fill: '#f97316' }}
-                connectNulls
+                connectNulls={false}
               />
             </AreaChart>
           </ResponsiveContainer>

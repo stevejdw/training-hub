@@ -334,7 +334,7 @@ function TrainingTab() {
                 fill="url(#dashProgressGrad)"
                 dot={false}
                 activeDot={{ r: 5, fill: '#f97316' }}
-                connectNulls
+                connectNulls={false}
               />
             </AreaChart>
           </ResponsiveContainer>
