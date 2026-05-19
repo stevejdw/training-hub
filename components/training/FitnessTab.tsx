@@ -9,6 +9,8 @@ import {
 import { useCachedFetch } from '@/lib/use-cached-fetch';
 
 interface FitnessPoint { date: string; atl: number; ctl: number; tsb: number }
+interface EftpPoint { date: string; eftp: number; vo2max: number | null }
+interface EftpHistoryResponse { points: EftpPoint[]; weight: number | null }
 
 const FITNESS_CACHE_KEY = (d: number) => `cache-fitness-${d}`;
 const INITIAL_FITNESS_DAYS = 90;
@@ -178,6 +180,11 @@ export default function FitnessTab() {
       .catch(() => setLoading(false));
   }, [days]);
 
+  const { data: eftpData, loading: eftpLoading } = useCachedFetch<EftpHistoryResponse>(
+    '/api/analytics/eftp-history',
+    'cache-eftp-history',
+  );
+
   const latest   = data[data.length - 1];
   const tsbColor = (v: number) => v >= 5 ? '#34d399' : v <= -20 ? '#f87171' : '#facc15';
   const tsbLabel = (v: number) => v >= 5 ? 'Fresh' : v <= -20 ? 'Fatigued' : 'Neutral';
@@ -298,6 +305,71 @@ export default function FitnessTab() {
         <div><span className="text-purple-400 font-medium">ATL</span> — Acute Training Load (7d avg). Recent fatigue.</div>
         <div><span className="text-green-400 font-medium">TSB</span> — Form = CTL − ATL. Positive = fresh, negative = tired.</div>
       </div>
+
+      {/* eFTP trend */}
+      <div className="bg-gray-900 rounded-xl border border-gray-800 p-4">
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4">Estimated FTP (eFTP)</p>
+        {eftpLoading ? (
+          <div className="h-48 animate-pulse bg-gray-800 rounded-lg" />
+        ) : !eftpData?.points?.length ? (
+          <div className="h-48 flex items-center justify-center text-gray-500 text-sm">No data</div>
+        ) : (
+          <ResponsiveContainer width="100%" height={200}>
+            <LineChart data={eftpData.points} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
+              <XAxis
+                dataKey="date"
+                tickFormatter={fmtDate}
+                tick={{ fill: '#6b7280', fontSize: 10 }}
+                axisLine={false}
+                tickLine={false}
+                interval="preserveStartEnd"
+              />
+              <YAxis tick={{ fill: '#6b7280', fontSize: 10 }} axisLine={false} tickLine={false} width={36} domain={['auto', 'auto']} />
+              <Tooltip
+                contentStyle={{ background: '#111827', border: '1px solid #374151', borderRadius: 8, fontSize: 12 }}
+                labelFormatter={(s) => fmtDate(String(s))}
+                formatter={(val) => [`${val}w`, 'eFTP']}
+              />
+              <Line type="monotone" dataKey="eftp" stroke="#f97316" strokeWidth={2} dot={{ fill: '#f97316', r: 3 }} activeDot={{ r: 5 }} connectNulls />
+            </LineChart>
+          </ResponsiveContainer>
+        )}
+      </div>
+
+      {/* VO₂ Max trend — only when weight is configured */}
+      {eftpData?.weight != null && (
+        <div className="bg-gray-900 rounded-xl border border-gray-800 p-4">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4">VO₂ Max (estimated)</p>
+          {eftpLoading ? (
+            <div className="h-48 animate-pulse bg-gray-800 rounded-lg" />
+          ) : !eftpData?.points?.length ? (
+            <div className="h-48 flex items-center justify-center text-gray-500 text-sm">No data</div>
+          ) : (
+            <ResponsiveContainer width="100%" height={200}>
+              <LineChart data={eftpData.points.filter(p => p.vo2max != null)} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
+                <XAxis
+                  dataKey="date"
+                  tickFormatter={fmtDate}
+                  tick={{ fill: '#6b7280', fontSize: 10 }}
+                  axisLine={false}
+                  tickLine={false}
+                  interval="preserveStartEnd"
+                />
+                <YAxis tick={{ fill: '#6b7280', fontSize: 10 }} axisLine={false} tickLine={false} width={36} domain={['auto', 'auto']} />
+                <Tooltip
+                  contentStyle={{ background: '#111827', border: '1px solid #374151', borderRadius: 8, fontSize: 12 }}
+                  labelFormatter={(s) => fmtDate(String(s))}
+                  formatter={(val) => [`${val} ml/kg/min`, 'VO₂ Max']}
+                />
+                <Line type="monotone" dataKey="vo2max" stroke="#2dd4bf" strokeWidth={2} dot={{ fill: '#2dd4bf', r: 3 }} activeDot={{ r: 5 }} connectNulls />
+              </LineChart>
+            </ResponsiveContainer>
+          )}
+          <p className="text-[10px] text-gray-600 mt-2">Estimated via Coggan formula: eFTP ÷ weight × 10.8 + 7</p>
+        </div>
+      )}
 
     </div>
   );
