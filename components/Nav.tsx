@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -68,7 +69,11 @@ export default function Nav() {
     <>
       {/* ── Desktop: top horizontal nav ── */}
       <header className="hidden md:flex h-16 border-b border-gray-800 bg-gray-950 items-center flex-shrink-0">
-        <nav className="w-full max-w-5xl mx-auto px-8 flex gap-1 flex-wrap">
+        <nav className="w-full max-w-5xl mx-auto px-8 flex gap-1 flex-wrap items-center">
+          {/* Logo */}
+          <Link href="/home" className="mr-2 flex-shrink-0">
+            <Image src="/logo.png" alt="Training Hub" width={36} height={36} className="rounded-lg" />
+          </Link>
           {desktopItems.map(({ key, href, label, icon, matchPrefixes }) => {
             const prefixes = key === 'more' ? desktopMorePrefixes : matchPrefixes;
             const active = isActive(prefixes, pathname);
