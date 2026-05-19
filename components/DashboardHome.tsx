@@ -309,7 +309,7 @@ function TrainingTab() {
         {/* Period label — tapping navigates to the Progress screen */}
         <div className="text-center mb-2">
           <Link
-            href="/training"
+            href="/training?tab=progress#weekly-tss"
             className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wider text-gray-500 hover:text-orange-400 transition-colors group"
           >
             {period === 'week' ? 'Week to date' : period === 'month' ? 'Month to date' : 'Year to date'}

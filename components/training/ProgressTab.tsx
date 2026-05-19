@@ -337,7 +337,7 @@ export default function ProgressTab() {
       </div>
 
       {/* Weekly TSS — above calendar */}
-      <div className="border-t border-gray-800/60 pt-4">
+      <div id="weekly-tss" className="border-t border-gray-800/60 pt-4">
         <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-3">Weekly TSS</p>
         <TssRollingChart />
       </div>
