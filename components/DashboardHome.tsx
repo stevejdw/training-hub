@@ -235,24 +235,16 @@ function TrainingTab() {
   const delta      = curTotal - priorTotal;
   const deltaPct   = priorTotal > 0 ? Math.round((delta / priorTotal) * 100) : null;
 
-  // Build chart data — show full period on x-axis (full week, full month, full year)
-  // Carry forward the last known cumulative value for days after today so the
-  // current line extends to the end of the graph.
+  // Build chart data (same as ProgressTab)
   const fullPts  = progressData?.fullPeriod?.points ?? [];
   const curPts   = progressData?.current?.points ?? [];
   const priorFullPts = progressData?.priorFull?.points ?? [];
   const curByDate   = new Map(curPts.map(p => [p.date, p.cum]));
-  let lastCum: number | null = null;
-  const chartData = fullPts.map((p, i) => {
-    if (curByDate.has(p.date)) {
-      lastCum = Math.round(curByDate.get(p.date)! * 100) / 100;
-    }
-    return {
-      label:   p.date.slice(5),
-      current: lastCum,
-      prior:   priorFullPts[i] != null ? Math.round(priorFullPts[i].cum * 100) / 100 : null,
-    };
-  });
+  const chartData = fullPts.map((p, i) => ({
+    label:   p.date.slice(5),
+    current: curByDate.has(p.date)   ? Math.round(curByDate.get(p.date)! * 100) / 100 : null,
+    prior:   priorFullPts[i] != null ? Math.round(priorFullPts[i].cum * 100) / 100 : null,
+  }));
 
   // X-axis tick formatter (same as ProgressTab)
   const DAY_NAMES = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
