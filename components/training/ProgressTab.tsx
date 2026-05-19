@@ -152,6 +152,8 @@ export default function ProgressTab() {
     const step = Math.max(1, Math.floor(totalDays / 3));
     return [0, step, step * 2].filter(i => i < totalDays);
   })();
+  // Track last month shown on YTD x-axis to avoid duplicates
+  let lastYtdMonth = -1;
   function formatXLabel(label: string, index: number): string {
     if (period === 'wtd') {
       // label is "MM-DD" — derive day-of-week from index
@@ -166,10 +168,12 @@ export default function ProgressTab() {
       return '';
     }
     // ytd — label is "MM-DD", show every second month starting from Feb
-    // Only show on the 1st of the month to avoid duplicates
+    // Show label only on the first occurrence of each even month
     const month = parseInt(label.slice(0, 2), 10);
-    const day   = parseInt(label.slice(3), 10);
-    if (month % 2 === 0 && day === 1) return MONTHS[month - 1];
+    if (month % 2 === 0 && month !== lastYtdMonth) {
+      lastYtdMonth = month;
+      return MONTHS[month - 1];
+    }
     return '';
   }
 

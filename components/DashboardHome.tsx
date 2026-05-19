@@ -257,6 +257,7 @@ function TrainingTab() {
     const step = Math.max(1, Math.floor(totalDays / 3));
     return [0, step, step * 2].filter(i => i < totalDays);
   })();
+  let lastYtdMonth = -1;
   function formatXLabel(label: string, index: number): string {
     const progPeriod = toProgressPeriod(period);
     if (progPeriod === 'wtd') return DAY_NAMES[index % 7];
@@ -267,9 +268,12 @@ function TrainingTab() {
       }
       return '';
     }
+    // ytd — show every second month starting from Feb, only on first occurrence
     const month = parseInt(label.slice(0, 2), 10);
-    const day   = parseInt(label.slice(3), 10);
-    if (month % 2 === 0 && day === 1) return MONTHS[month - 1];
+    if (month % 2 === 0 && month !== lastYtdMonth) {
+      lastYtdMonth = month;
+      return MONTHS[month - 1];
+    }
     return '';
   }
 
