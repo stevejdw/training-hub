@@ -20,36 +20,33 @@ export function useCachedFetch<T>(
   cacheKey: string,
   ttlMs: number = DEFAULT_TTL_MS,
 ) {
-  const [data, setData] = useState<T | null>(() => {
-    if (typeof window === 'undefined') return null;
-    try {
-      const entry = localStorage.getItem(cacheKey);
-      if (!entry) return null;
-      const parsed = JSON.parse(entry) as { cachedAt: number; payload: T };
-      return parsed?.payload ?? null;
-    } catch {
-      return null;
-    }
-  });
-  const [loading, setLoading] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return true;
-    try {
-      const entry = localStorage.getItem(cacheKey);
-      if (!entry) return true;
-      const parsed = JSON.parse(entry) as { cachedAt: number; payload: T };
-      if (!parsed?.payload) return true;
-      // If cache is still fresh, don't show loading skeleton
-      return Date.now() - parsed.cachedAt > ttlMs;
-    } catch {
-      return true;
-    }
-  });
+  const [data, setData] = useState<T | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const fetchIdRef = useRef(0);
 
   const doFetch = useCallback(() => {
     const id = ++fetchIdRef.current;
+
+    // Reset state immediately so old data doesn't ghost
+    setData(null);
+    setLoading(true);
+    setError(null);
+
+    // Try to restore from cache instantly for a snappy feel
+    try {
+      const entry = localStorage.getItem(cacheKey);
+      if (entry) {
+        const parsed = JSON.parse(entry) as { cachedAt: number; payload: T };
+        if (parsed?.payload) {
+          setData(parsed.payload);
+          if (Date.now() - parsed.cachedAt <= ttlMs) {
+            setLoading(false);
+          }
+        }
+      }
+    } catch { /* ignore */ }
 
     fetch(url)
       .then(async r => {
@@ -69,16 +66,10 @@ export function useCachedFetch<T>(
       })
       .catch(e => {
         if (id !== fetchIdRef.current) return;
-        // Only clear cache if we have no data at all — otherwise keep stale
-        // data visible rather than showing an error state.
-        try {
-          const entry = localStorage.getItem(cacheKey);
-          if (!entry) localStorage.removeItem(cacheKey);
-        } catch {}
         setError(String(e));
         setLoading(false);
       });
-  }, [url, cacheKey]);
+  }, [url, cacheKey, ttlMs]);
 
   useEffect(() => {
     doFetch();
