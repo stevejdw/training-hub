@@ -232,7 +232,7 @@ function HomeProgressWidget({ wtd, mtd, ytd }: {
         ) : (
           <ResponsiveContainer width="100%" height={72}>
             <LineChart data={chartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
-              <Line type="monotone" dataKey="prior"   stroke="#4b5563" strokeWidth={1.5} dot={false} connectNulls />
+              <Line type="monotone" dataKey="prior"   stroke="#6b7280" strokeWidth={1.5} strokeDasharray="4 2" dot={false} connectNulls />
               <Line type="monotone" dataKey="current" stroke="#f97316" strokeWidth={2}   dot={false} connectNulls />
             </LineChart>
           </ResponsiveContainer>
