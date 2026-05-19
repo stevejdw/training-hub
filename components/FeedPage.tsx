@@ -2,8 +2,11 @@
 
 import { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
+import { ResponsiveContainer, LineChart, Line } from 'recharts';
 import { sportLabel, sportColor } from '@/lib/sport-types';
+import { useCachedFetch } from '@/lib/use-cached-fetch';
 import TssRollingChart from './training/TssRollingChart';
 import { calendarDaysFromToday } from '@/lib/calendar-days';
 
@@ -98,6 +101,143 @@ function LazyMap({ polyline }: { polyline: string }) {
   return (
     <div ref={ref} className="w-full h-44 rounded-xl overflow-hidden bg-gray-800/60">
       {visible && <ActivityMap polyline={polyline} className="w-full h-44" thumbnail />}
+    </div>
+  );
+}
+
+// ── Home Progress Widget ──────────────────────────────────────────────────────
+
+interface ProgressResponse {
+  current: { start: string; end: string; total: number; points: { date: string; value: number; cum: number }[] };
+  prior:   { start: string; end: string; total: number; points: { date: string; value: number; cum: number }[] };
+}
+
+type ProgressPeriod = 'wtd' | 'mtd' | 'ytd';
+const PROGRESS_PERIODS: { key: ProgressPeriod; label: string }[] = [
+  { key: 'wtd', label: 'WTD' },
+  { key: 'mtd', label: 'MTD' },
+  { key: 'ytd', label: 'YTD' },
+];
+const PRIOR_LABEL: Record<ProgressPeriod, string> = {
+  wtd: 'Prior week',
+  mtd: 'Prior month',
+  ytd: 'Prior year',
+};
+
+function fmtHours(h: number) {
+  const hrs = Math.floor(h);
+  const mins = Math.round((h - hrs) * 60);
+  if (hrs === 0) return `${mins}m`;
+  return mins > 0 ? `${hrs}h ${mins}m` : `${hrs}h`;
+}
+
+function fmtKm(v: number) {
+  return v >= 100 ? `${Math.round(v)} km` : `${v.toFixed(1)} km`;
+}
+
+function HomeProgressWidget({ wtd, mtd, ytd }: {
+  wtd: PeriodStats | null | undefined;
+  mtd: PeriodStats | null | undefined;
+  ytd: PeriodStats | null | undefined;
+}) {
+  const router = useRouter();
+  const [period, setPeriod] = useState<ProgressPeriod>('wtd');
+  const swipeRef = useRef<number | null>(null);
+
+  const { data: prog, loading: chartLoading } = useCachedFetch<ProgressResponse>(
+    `/api/training/progress?period=${period}&metric=km&filters=All&offset=0`,
+    `cache-home-progress-${period}`,
+  );
+
+  const stats = period === 'mtd' ? mtd : period === 'ytd' ? ytd : wtd;
+  const priorTotal = prog?.prior?.total ?? 0;
+
+  // Build indexed chart data so current and prior share the same x-axis
+  const cur  = prog?.current?.points ?? [];
+  const prior = prog?.prior?.points  ?? [];
+  const len  = Math.max(cur.length, prior.length);
+  const chartData = Array.from({ length: len }, (_, i) => ({
+    i,
+    current: cur[i]?.cum   ?? null,
+    prior:   prior[i]?.cum ?? null,
+  }));
+
+  function handlePeriodClick(e: React.MouseEvent, p: ProgressPeriod) {
+    e.stopPropagation();
+    setPeriod(p);
+  }
+
+  return (
+    <div
+      className="bg-gray-800/60 rounded-2xl border border-transparent hover:border-gray-700 hover:bg-gray-800/80 transition-colors overflow-hidden cursor-pointer"
+      onClick={() => router.push('/training?tab=progress')}
+      onTouchStart={e => { swipeRef.current = e.touches[0].clientX; }}
+      onTouchEnd={e => {
+        if (swipeRef.current === null) return;
+        const dx = e.changedTouches[0].clientX - swipeRef.current;
+        swipeRef.current = null;
+        const idx = PROGRESS_PERIODS.findIndex(p => p.key === period);
+        if (dx < -40 && idx < PROGRESS_PERIODS.length - 1) setPeriod(PROGRESS_PERIODS[idx + 1].key);
+        else if (dx > 40 && idx > 0) setPeriod(PROGRESS_PERIODS[idx - 1].key);
+      }}
+    >
+      <div className="px-3 pt-2.5 pb-0">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-[9px] font-semibold text-gray-500 uppercase tracking-wider">
+            Progress →
+          </p>
+          <div className="flex gap-0.5">
+            {PROGRESS_PERIODS.map(p => (
+              <button
+                key={p.key}
+                onClick={e => handlePeriodClick(e, p.key)}
+                className={`px-2 py-0.5 rounded text-[9px] font-semibold transition-colors ${
+                  period === p.key ? 'bg-orange-500 text-white' : 'text-gray-500 hover:text-gray-300'
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Stats row */}
+        <div className="grid grid-cols-4 gap-1 mb-1">
+          {[
+            { label: 'Time',       value: stats ? fmtHours(stats.hours) : '—' },
+            { label: 'Distance',   value: stats ? fmtKm(stats.km)       : '—' },
+            { label: 'Elev Gain',  value: stats ? `${Math.round(stats.elevation).toLocaleString()} m` : '—' },
+            { label: 'Activities', value: stats ? String(stats.rides)   : '—' },
+          ].map(({ label, value }) => (
+            <div key={label}>
+              <p className="text-[8px] text-gray-500">{label}</p>
+              <p className="text-[11px] font-bold text-white leading-tight">{value}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Prior period reference */}
+        {priorTotal > 0 && !chartLoading && (
+          <p className="text-[8px] text-gray-600 mb-1">
+            {PRIOR_LABEL[period]} · {fmtKm(priorTotal)}
+          </p>
+        )}
+      </div>
+
+      {/* Mini line chart — current (orange) vs prior (gray) */}
+      <div className="px-1 pb-2">
+        {chartLoading ? (
+          <div className="h-16 mx-2 animate-pulse bg-gray-700/30 rounded" />
+        ) : (
+          <ResponsiveContainer width="100%" height={72}>
+            <LineChart data={chartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+              <Line type="monotone" dataKey="prior"   stroke="#4b5563" strokeWidth={1.5} dot={false} connectNulls />
+              <Line type="monotone" dataKey="current" stroke="#f97316" strokeWidth={2}   dot={false} connectNulls />
+            </LineChart>
+          </ResponsiveContainer>
+        )}
+      </div>
     </div>
   );
 }
@@ -265,7 +405,7 @@ export default function FeedPage() {
     );
   }
 
-  const { recentRides = [], nextEvent, nextSession, powerHighlights = [], wtd, fitness, eftp, vo2max } = data ?? {};
+  const { recentRides = [], nextEvent, nextSession, powerHighlights = [], wtd, mtd, ytd, fitness } = data ?? {};
   const newPRs = powerHighlights.filter(p => p.isNew);
 
   const sessionColor = nextSession ? (SESSION_TYPE_COLOR[nextSession.type] ?? '#9ca3af') : '#9ca3af';
@@ -343,46 +483,8 @@ export default function FeedPage() {
             )}
           </div>
 
-          {/* Mobile: Training Status */}
-          <Link
-            href="/performance"
-            className="block bg-gray-800/60 rounded-2xl px-3 py-2.5 border border-transparent hover:border-gray-700 hover:bg-gray-800/80 transition-colors group"
-          >
-            <p className="text-[9px] font-semibold text-gray-400 uppercase tracking-wider group-hover:text-orange-400 transition-colors mb-1.5">
-              Training Status →
-            </p>
-            {data ? (
-              <div className="space-y-1.5">
-                <div className="grid grid-cols-4 gap-1">
-                  {[
-                    { label: 'eFTP',    value: eftp != null ? `${eftp}w` : '—' },
-                    { label: 'VO₂ Max', value: vo2max != null ? String(vo2max) : '—' },
-                    { label: 'CTL',     value: fitness ? String(fitness.ctl) : '—' },
-                    { label: 'Form',    value: fitness ? `${fitness.tsb > 0 ? '+' : ''}${fitness.tsb}` : '—' },
-                  ].map(({ label, value }) => (
-                    <div key={label} className="text-center">
-                      <p className="text-xs font-bold text-white leading-tight">{value}</p>
-                      <p className="text-[9px] text-gray-500 mt-0.5">{label}</p>
-                    </div>
-                  ))}
-                </div>
-                <div className="grid grid-cols-3 gap-1">
-                  {[
-                    { label: 'TSS wtd', value: wtd ? String(wtd.tss)   : '—' },
-                    { label: 'km wtd',  value: wtd ? String(wtd.km)    : '—' },
-                    { label: 'hrs wtd', value: wtd ? String(wtd.hours) : '—' },
-                  ].map(({ label, value }) => (
-                    <div key={label} className="text-center">
-                      <p className="text-xs font-bold text-white leading-tight">{value}</p>
-                      <p className="text-[9px] text-gray-500 mt-0.5">{label}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div className="h-10 bg-gray-700/40 rounded animate-pulse" />
-            )}
-          </Link>
+          {/* Mobile: Progress widget */}
+          <HomeProgressWidget wtd={wtd} mtd={mtd} ytd={ytd} />
         </div>
 
         {/* ── DESKTOP LAYOUT ── */}
@@ -425,46 +527,8 @@ export default function FeedPage() {
             )}
           </Link>
 
-          {/* Desktop: Training Status */}
-          <Link
-            href="/performance"
-            className="rounded-2xl bg-gray-800/60 px-4 py-4 border border-transparent hover:border-gray-700 hover:bg-gray-800/80 transition-colors group"
-          >
-            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider group-hover:text-orange-400 transition-colors mb-2">
-              Training Status →
-            </p>
-            {data ? (
-              <div className="space-y-2">
-                <div className="grid grid-cols-4 gap-1">
-                  {[
-                    { label: 'eFTP',    value: eftp != null ? `${eftp}w` : '—' },
-                    { label: 'VO₂ Max', value: vo2max != null ? String(vo2max) : '—' },
-                    { label: 'CTL',     value: fitness ? String(fitness.ctl) : '—' },
-                    { label: 'Form',    value: fitness ? `${fitness.tsb > 0 ? '+' : ''}${fitness.tsb}` : '—' },
-                  ].map(({ label, value }) => (
-                    <div key={label} className="text-center">
-                      <p className="text-sm font-bold text-white leading-tight">{value}</p>
-                      <p className="text-[10px] text-gray-500 mt-0.5">{label}</p>
-                    </div>
-                  ))}
-                </div>
-                <div className="grid grid-cols-3 gap-1">
-                  {[
-                    { label: 'TSS wtd', value: wtd ? String(wtd.tss)   : '—' },
-                    { label: 'km wtd',  value: wtd ? String(wtd.km)    : '—' },
-                    { label: 'hrs wtd', value: wtd ? String(wtd.hours) : '—' },
-                  ].map(({ label, value }) => (
-                    <div key={label} className="text-center">
-                      <p className="text-sm font-bold text-white leading-tight">{value}</p>
-                      <p className="text-[10px] text-gray-500 mt-0.5">{label}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div className="h-12 bg-gray-700/40 rounded animate-pulse" />
-            )}
-          </Link>
+          {/* Desktop: Progress widget */}
+          <HomeProgressWidget wtd={wtd} mtd={mtd} ytd={ytd} />
 
           {/* Desktop: Next Event */}
           {nextEvent ? (
