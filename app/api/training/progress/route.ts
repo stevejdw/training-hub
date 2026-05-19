@@ -99,6 +99,7 @@ export async function GET(req: NextRequest) {
     }
 
     let cur_start: string, cur_end: string, prior_start: string, prior_end: string;
+    let full_start: string, full_end: string;
 
     if (period === 'wtd') {
       // Shift Monday of this week by `offset` weeks
@@ -110,6 +111,9 @@ export async function GET(req: NextRequest) {
       prior_end   = offset === 0
         ? addDays(today, -7)           // same day-of-week as today, one week back
         : addDays(cur_start, -1);      // full prior week when navigating history
+      // Full period for charting (always Mon-Sun)
+      full_start = cur_start;
+      full_end   = addDays(cur_start, 6);
 
     } else if (period === 'mtd') {
       cur_start = monthStartOffset(today, offset);
@@ -119,6 +123,9 @@ export async function GET(req: NextRequest) {
       prior_end   = offset === 0
         ? sameDayPrevMonth(today, 1)   // same day-of-month, previous month
         : addDays(cur_start, -1);      // full prior month when navigating history
+      // Full period for charting (full calendar month)
+      full_start = cur_start;
+      full_end   = endOfMonthOffset(today, offset);
 
     } else { // ytd
       const curYear = parseInt(today.slice(0, 4)) + offset;
@@ -129,6 +136,9 @@ export async function GET(req: NextRequest) {
       prior_end   = offset === 0
         ? sameDayPrevYear(today)       // same month-day, previous year (handles Feb 29 → Feb 28)
         : addDays(cur_start, -1);      // full prior year when navigating history
+      // Full period for charting (full calendar year)
+      full_start = cur_start;
+      full_end   = offset === 0 ? `${curYear}-12-31` : `${curYear}-12-31`;
     }
 
     // ── Fetch day-by-day buckets ───────────────────────────────────────
@@ -162,9 +172,10 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    const [current, prior] = await Promise.all([
+    const [current, prior, fullPeriod] = await Promise.all([
       bucketise(cur_start, cur_end),
       bucketise(prior_start, prior_end),
+      bucketise(full_start, full_end),
     ]);
 
     const curTotal   = current.length ? current[current.length - 1].cum : 0;
@@ -174,6 +185,7 @@ export async function GET(req: NextRequest) {
       period, metric, filters, offset,
       current: { start: cur_start, end: cur_end, total: curTotal, points: current },
       prior:   { start: prior_start, end: prior_end, total: priorTotal, points: prior },
+      fullPeriod: { start: full_start, end: full_end, points: fullPeriod },
     });
   } catch (err) {
     return Response.json({ error: String(err) }, { status: 500 });

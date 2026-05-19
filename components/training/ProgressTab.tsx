@@ -18,6 +18,7 @@ interface DayPoint { date: string; value: number; cum: number }
 interface ProgressResponse {
   current: { start: string; end: string; total: number; points: DayPoint[] };
   prior:   { start: string; end: string; total: number; points: DayPoint[] };
+  fullPeriod: { start: string; end: string; points: DayPoint[] };
 }
 
 const METRICS: { key: Metric; label: string; unit: string; fmt: (v: number) => string }[] = [
@@ -125,13 +126,18 @@ export default function ProgressTab() {
   const deltaPct    = priorTotal > 0 ? Math.round((delta / priorTotal) * 100) : null;
   const dateRange   = data?.current ? fmtRange(data.current.start, data.current.end, period) : '—';
 
+  // Build chart data from fullPeriod for the x-axis (shows entire period range)
+  // but overlay current/prior cumulative data (which may be partial for offset=0)
+  const fullPts  = data?.fullPeriod?.points ?? [];
   const curPts   = data?.current?.points ?? [];
   const priorPts = data?.prior?.points   ?? [];
-  const len      = Math.max(curPts.length, priorPts.length);
-  const chartData = Array.from({ length: len }, (_, i) => ({
-    label:   curPts[i]?.date.slice(5) ?? priorPts[i]?.date.slice(5) ?? String(i + 1),
-    current: curPts[i]  != null ? Math.round(curPts[i].cum  * 100) / 100 : null,
-    prior:   priorPts[i] != null ? Math.round(priorPts[i].cum * 100) / 100 : null,
+  // Build a lookup of cum values keyed by date
+  const curByDate   = new Map(curPts.map(p => [p.date, p.cum]));
+  const priorByDate = new Map(priorPts.map(p => [p.date, p.cum]));
+  const chartData = fullPts.map(p => ({
+    label:   p.date.slice(5),
+    current: curByDate.has(p.date)   ? Math.round(curByDate.get(p.date)! * 100) / 100 : null,
+    prior:   priorByDate.has(p.date) ? Math.round(priorByDate.get(p.date)! * 100) / 100 : null,
   }));
 
   return (
@@ -177,7 +183,7 @@ export default function ProgressTab() {
               </p>
               {deltaPct !== null && (
                 <p className={`text-sm font-semibold mb-0.5 ${deltaPct >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                  {deltaPct >= 0 ? '▲' : '▼'} {Math.abs(deltaPct)}%
+                  {deltaPct >= 0 ? '▲' : '▼'} {delta >= 0 ? '+' : ''}{m.fmt(Math.abs(delta))}{m.unit ? ` ${m.unit}` : ''} ({Math.abs(deltaPct)}%)
                 </p>
               )}
             </div>
