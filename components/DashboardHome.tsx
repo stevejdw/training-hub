@@ -1,51 +1,22 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  AreaChart, Area, Line, CartesianGrid,
+  ResponsiveContainer,
+  AreaChart, Area, Line,
+  XAxis, YAxis, Tooltip, CartesianGrid,
 } from 'recharts';
-import { SPORT_FILTER_LABELS, CYCLING_TYPES, SportFilter, sportColor, sportLabel } from '@/lib/sport-types';
+import { SPORT_FILTER_LABELS, SportFilter, sportLabel } from '@/lib/sport-types';
 import ActivitiesList from './ActivitiesList';
 import FeedPage from './FeedPage';
 import ProfileEditor from './ProfileEditor';
 import MobileTabBar from './MobileTabBar';
 
 type Tab    = 'feed' | 'activities' | 'progress' | 'settings';
-type Period = 'week' | 'month' | 'year';
-type Metric = 'tss' | 'km' | 'hours' | 'activities';
-
-interface TypeData {
-  activities: number;
-  km: number;
-  hours: number;
-  tss: number;
-  elevation: number;
-}
-
-interface BarData {
-  label: string;
-  date: string;
-  activities: number;
-  km: number;
-  hours: number;
-  tss: number;
-  elevation: number;
-  byType: Record<string, TypeData>;
-}
-
-interface FlatBar extends BarData {
-  [key: string]: unknown;
-}
-
-interface ChartResponse {
-  label: string;
-  canGoForward: boolean;
-  summary: { activities: number; km: number; hours: number; tss: number; elevation: number };
-  bars: BarData[];
-}
+type Period = 'wtd' | 'mtd' | 'ytd';
+type Metric = 'km' | 'time' | 'elevation' | 'tss' | 'activities';
 
 interface DayPoint { date: string; value: number; cum: number }
 interface ProgressResponse {
@@ -55,26 +26,88 @@ interface ProgressResponse {
   priorFull: { start: string; end: string; points: DayPoint[] };
 }
 
-const TYPE_FILTERS = SPORT_FILTER_LABELS.filter(f => f !== 'All') as SportFilter[];
-
-const METRIC_OPTS: { key: Metric; label: string; unit: string }[] = [
-  { key: 'km',         label: 'Distance',  unit: 'km' },
-  { key: 'hours',      label: 'Time',      unit: 'h'  },
-  { key: 'tss',        label: 'TSS',       unit: ''   },
-  { key: 'activities', label: 'Rides',     unit: ''   },
+const METRICS: { key: Metric; label: string; unit: string; fmt: (v: number) => string }[] = [
+  { key: 'km',         label: 'Distance',   unit: 'km', fmt: v => v >= 100 ? Math.round(v).toString() : v.toFixed(1) },
+  { key: 'time',       label: 'Time',       unit: 'h',  fmt: v => v >= 10 ? Math.round(v).toString() : v.toFixed(1) },
+  { key: 'tss',        label: 'TSS',        unit: '',   fmt: v => Math.round(v).toString() },
+  { key: 'activities', label: 'Activities', unit: '',   fmt: v => Math.round(v).toString() },
+  { key: 'elevation',  label: 'Elevation',  unit: 'm',  fmt: v => Math.round(v).toLocaleString() },
 ];
 
-/** Map dashboard period/week/month/year → progress API period (wtd/mtd/ytd) */
-function toProgressPeriod(p: Period): 'wtd' | 'mtd' | 'ytd' {
-  if (p === 'week') return 'wtd';
-  if (p === 'month') return 'mtd';
-  return 'ytd';
+const PERIODS: { key: Period; label: string }[] = [
+  { key: 'wtd', label: 'WTD' },
+  { key: 'mtd', label: 'MTD' },
+  { key: 'ytd', label: 'YTD' },
+];
+
+const TYPE_OPTIONS = SPORT_FILTER_LABELS.filter(f => f !== 'All') as SportFilter[];
+
+function fmtRange(start: string, end: string, period: Period): string {
+  const M = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const [sy, sm, sd] = start.split('-').map(Number);
+  const [ey, em, ed] = end.split('-').map(Number);
+  if (period === 'ytd') {
+    if (sy === ey) return `Jan 1 – ${M[em-1]} ${ed}, ${sy}`;
+    return `${M[sm-1]} ${sd}, ${sy} – ${M[em-1]} ${ed}, ${ey}`;
+  }
+  if (sm === em && sy === ey) return `${M[sm-1]} ${sd} – ${ed}, ${sy}`;
+  return `${M[sm-1]} ${sd} – ${M[em-1]} ${ed}`;
 }
 
-/** Map dashboard metric → progress API metric */
-function toProgressMetric(m: Metric): 'km' | 'time' | 'tss' | 'elevation' | 'activities' {
-  if (m === 'hours') return 'time';
-  return m;
+// ── Sport Dropdown (identical to ProgressTab) ────────────────────────────────
+function SportDropdown({ selected, onChange }: {
+  selected: SportFilter[];
+  onChange: (v: SportFilter[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onMouseDown(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener('mousedown', onMouseDown);
+    return () => document.removeEventListener('mousedown', onMouseDown);
+  }, [open]);
+
+  function toggle(f: SportFilter) {
+    onChange(selected.includes(f) ? selected.filter(x => x !== f) : [...selected, f]);
+  }
+
+  const label = selected.length === 0 ? 'All' : selected.length === 1 ? selected[0] : `${selected.length} types`;
+
+  return (
+    <div ref={ref} className="relative flex-shrink-0">
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-gray-700 bg-gray-800 text-xs font-medium text-white hover:border-gray-600 transition-colors"
+      >
+        {label}
+        <svg className={`w-3 h-3 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      {open && (
+        <div className="absolute z-20 top-full left-0 mt-1.5 bg-gray-800 border border-gray-700 rounded-xl p-1.5 shadow-xl min-w-[110px]">
+          {TYPE_OPTIONS.map(f => (
+            <label
+              key={f}
+              className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg hover:bg-gray-700/60 cursor-pointer transition-colors"
+            >
+              <input
+                type="checkbox"
+                className="w-3.5 h-3.5 accent-orange-500 cursor-pointer"
+                checked={selected.includes(f)}
+                onChange={() => toggle(f)}
+              />
+              <span className="text-xs text-gray-200">{f}</span>
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 const NAV: { key: Tab; label: string; icon: React.ReactNode }[] = [
@@ -104,112 +137,14 @@ const NAV: { key: Tab; label: string; icon: React.ReactNode }[] = [
   },
 ];
 
-/** Returns the ISO date string (YYYY-MM-DD) for the start of the current
- *  period, accounting for the given offset, using UTC+10 (Sydney) math. */
-function periodStart(period: Period, offset: number): string {
-  // Use UTC+10 to approximate Sydney "today" without locale string parsing
-  const nowMs = Date.now() + 10 * 3_600_000;
-  const d = new Date(nowMs);
-  // Work in UTC (which is now effectively UTC+10)
-  if (period === 'week') {
-    const dow = d.getUTCDay(); // 0=Sun … 6=Sat
-    const toMonday = (dow === 0) ? 6 : dow - 1;
-    d.setUTCDate(d.getUTCDate() - toMonday + offset * 7);
-  } else if (period === 'month') {
-    d.setUTCDate(1);
-    d.setUTCMonth(d.getUTCMonth() + offset);
-  } else {
-    d.setUTCMonth(0, 1);
-    d.setUTCFullYear(d.getUTCFullYear() + offset);
-  }
-  return d.toISOString().slice(0, 10);
-}
-
-function StatCard({ label, value, href }: { label: string; value: string; href?: string }) {
-  const inner = (
-    <div className={`bg-gray-800 rounded-xl p-3 md:p-5 flex flex-col gap-0.5 md:gap-1 min-w-[80px] transition-colors ${href ? 'group-hover:bg-gray-700 cursor-pointer' : ''}`}>
-      <span className="text-[10px] md:text-xs text-gray-500 uppercase tracking-wider">{label}</span>
-      <span className="text-lg md:text-2xl font-bold text-white leading-tight">{value}</span>
-      {href && <span className="text-[10px] md:text-xs text-orange-400 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity">View →</span>}
-    </div>
-  );
-  if (href) return <Link href={href} className="group">{inner}</Link>;
-  return inner;
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function CustomTooltip({ active, payload, label, metric, unit }: any) {
-  if (!active || !payload?.length) return null;
-  const nonZero = (payload as { dataKey: string; value: number; fill: string }[])
-    .filter(p => Number(p.value) > 0);
-  const total = nonZero.reduce((s, p) => s + Number(p.value), 0);
-  const fmt = (v: number) => {
-    if (metric === 'km')    return v >= 100 ? Math.round(v).toString() : v.toFixed(1);
-    if (metric === 'hours') return v >= 10  ? Math.round(v).toString() : v.toFixed(1);
-    return Math.round(v).toString();
-  };
-
-  // Merge eBike + eMTB into a single line (they share the green colour).
-  const merged: { fill: string; label: string; value: number }[] = [];
-  const indexByLabel: Record<string, number> = {};
-  for (const p of nonZero) {
-    const type = p.dataKey.slice(metric.length + 1);
-    const lbl  = (type === 'EBikeRide' || type === 'EMountainBikeRide')
-      ? 'eBike / eMTB'
-      : sportLabel(type);
-    if (lbl in indexByLabel) {
-      merged[indexByLabel[lbl]].value += Number(p.value);
-    } else {
-      indexByLabel[lbl] = merged.length;
-      merged.push({ fill: p.fill, label: lbl, value: Number(p.value) });
-    }
-  }
-
-  return (
-    <div className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-xs shadow-lg">
-      <p className="text-gray-400 mb-1">{label}</p>
-      {merged.map(m => (
-        <p key={m.label} style={{ color: m.fill }} className="font-medium">
-          {m.label}: {fmt(m.value)}{unit ? ` ${unit}` : ''}
-        </p>
-      ))}
-      {merged.length > 1 && (
-        <p className="text-white font-semibold border-t border-gray-700 mt-1 pt-1">
-          Total: {fmt(total)}{unit ? ` ${unit}` : ''}
-        </p>
-      )}
-    </div>
-  );
-}
-
-const CHART_CACHE_KEY = (period: Period, offset: number, filters: string) =>
-  `cache-chart-v2-${period}-${offset}-${filters}`;
-const INITIAL_CHART_KEY = CHART_CACHE_KEY('week', 0, 'All');
-
+// ── TrainingTab (rebuild from scratch — identical logic to ProgressTab) ─────
 function TrainingTab() {
-  const [period, setPeriod]   = useState<Period>('week');
-  const [offset, setOffset]   = useState(0);
-  const [metric, setMetric]   = useState<Metric>('km');
+  const [period,   setPeriod]   = useState<Period>('wtd');
+  const [metric,   setMetric]   = useState<Metric>('km');
   const [selected, setSelected] = useState<SportFilter[]>([]);
+  const [offset,   setOffset]   = useState(0);
   const [progressData, setProgressData] = useState<ProgressResponse | null>(null);
   const [progressLoading, setProgressLoading] = useState(true);
-
-  const swipeStartX = useRef<number | null>(null);
-  const PERIOD_ORDER: Period[] = ['week', 'month', 'year'];
-
-  function changePeriod(p: Period) { setPeriod(p); setOffset(0); }
-
-  function handleStatSwipe(dir: 'left' | 'right') {
-    const idx  = PERIOD_ORDER.indexOf(period);
-    const next = dir === 'left'
-      ? PERIOD_ORDER[Math.min(PERIOD_ORDER.length - 1, idx + 1)]
-      : PERIOD_ORDER[Math.max(0, idx - 1)];
-    if (next !== period) changePeriod(next);
-  }
-
-  function toggleFilter(f: SportFilter) {
-    setSelected(prev => prev.includes(f) ? prev.filter(x => x !== f) : [...prev, f]);
-  }
 
   const filtersParam = selected.length > 0 ? selected.join(',') : 'All';
 
@@ -217,9 +152,7 @@ function TrainingTab() {
   useEffect(() => {
     setProgressLoading(true);
     setProgressData(null);
-    const progPeriod = toProgressPeriod(period);
-    const progMetric = toProgressMetric(metric);
-    fetch(`/api/training/progress?period=${progPeriod}&metric=${progMetric}&filters=${encodeURIComponent(filtersParam)}&offset=${offset}`)
+    fetch(`/api/training/progress?period=${period}&metric=${metric}&filters=${encodeURIComponent(filtersParam)}&offset=${offset}`)
       .then(r => r.json())
       .then(d => {
         if (d.error) { setProgressData(null); }
@@ -229,16 +162,21 @@ function TrainingTab() {
       .catch(() => setProgressLoading(false));
   }, [period, metric, filtersParam, offset]);
 
-  const m = METRIC_OPTS.find(x => x.key === metric)!;
-  const curTotal   = progressData?.current?.total ?? 0;
-  const priorTotal = progressData?.prior?.total   ?? 0;
-  const delta      = curTotal - priorTotal;
-  const deltaPct   = priorTotal > 0 ? Math.round((delta / priorTotal) * 100) : null;
+  const m           = METRICS.find(x => x.key === metric)!;
+  const curTotal    = progressData?.current?.total ?? 0;
+  const priorTotal  = progressData?.prior?.total   ?? 0;
+  const delta       = curTotal - priorTotal;
+  const deltaPct    = priorTotal > 0 ? Math.round((delta / priorTotal) * 100) : null;
+  const dateRange   = progressData?.current ? fmtRange(progressData.current.start, progressData.current.end, period) : '—';
 
-  // Build chart data (same as ProgressTab)
+  // Build chart data from fullPeriod for the x-axis (shows entire period range)
+  // Use priorFull for the prior line so it extends to the end of the graph.
+  // Since priorFull dates are from a different period (e.g. last week), we align
+  // them by index (same relative position in the period) rather than by date.
   const fullPts  = progressData?.fullPeriod?.points ?? [];
   const curPts   = progressData?.current?.points ?? [];
   const priorFullPts = progressData?.priorFull?.points ?? [];
+  // Build a lookup of cum values keyed by date
   const curByDate   = new Map(curPts.map(p => [p.date, p.cum]));
   const chartData = fullPts.map((p, i) => ({
     label:   p.date.slice(5),
@@ -246,29 +184,33 @@ function TrainingTab() {
     prior:   priorFullPts[i] != null ? Math.round(priorFullPts[i].cum * 100) / 100 : null,
   }));
 
-  // X-axis tick formatter (same as ProgressTab)
+  // ── X-axis tick formatter ───────────────────────────────────────────
   const DAY_NAMES = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
   const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   // Compute 3 evenly-spaced tick positions for MTD based on total days in month
   const mtdTickPositions = (() => {
-    const progPeriod = toProgressPeriod(period);
-    if (progPeriod !== 'mtd' || fullPts.length === 0) return [];
+    if (period !== 'mtd' || fullPts.length === 0) return [];
     const totalDays = fullPts.length;
     const step = Math.max(1, Math.floor(totalDays / 3));
     return [0, step, step * 2].filter(i => i < totalDays);
   })();
+  // Track last month shown on YTD x-axis to avoid duplicates
   let lastYtdMonth = -1;
   function formatXLabel(label: string, index: number): string {
-    const progPeriod = toProgressPeriod(period);
-    if (progPeriod === 'wtd') return DAY_NAMES[index % 7];
-    if (progPeriod === 'mtd') {
+    if (period === 'wtd') {
+      // label is "MM-DD" — derive day-of-week from index
+      return DAY_NAMES[index % 7];
+    }
+    if (period === 'mtd') {
+      // Show 3 evenly spaced markers based on total days in month
       if (mtdTickPositions.includes(index)) {
         const day = parseInt(label.slice(3), 10);
         return `${MONTHS[parseInt(label.slice(0,2), 10) - 1]} ${day}`;
       }
       return '';
     }
-    // ytd — show every second month starting from Feb, only on first occurrence
+    // ytd — label is "MM-DD", show every second month starting from Feb
+    // Show label only on the first occurrence of each even month
     const month = parseInt(label.slice(0, 2), 10);
     if (month % 2 === 0 && month !== lastYtdMonth) {
       lastYtdMonth = month;
@@ -277,165 +219,41 @@ function TrainingTab() {
     return '';
   }
 
-  function fmtProgress(v: number): string {
-    if (metric === 'km')    return v >= 100 ? Math.round(v).toString() : v.toFixed(1);
-    if (metric === 'hours') return v >= 10  ? Math.round(v).toString() : v.toFixed(1);
-    return Math.round(v).toString();
-  }
-
   return (
     <div className="space-y-4">
-      {/* Summary cards — swipeable left/right to change period (Week→Month→Year) */}
-      <div
-        className="select-none touch-pan-y"
-        onTouchStart={e => { swipeStartX.current = e.touches[0].clientX; }}
-        onTouchEnd={e => {
-          if (swipeStartX.current === null) return;
-          const dx = e.changedTouches[0].clientX - swipeStartX.current;
-          swipeStartX.current = null;
-          if (Math.abs(dx) > 40) handleStatSwipe(dx < 0 ? 'left' : 'right');
-        }}
-      >
-        {/* Period indicator dots */}
-        <div className="flex items-center justify-center gap-1.5 mb-2">
-          {(['week', 'month', 'year'] as Period[]).map(p => (
-            <button
-              key={p}
-              onClick={() => changePeriod(p)}
-              className={`transition-all rounded-full ${
-                period === p ? 'w-4 h-1.5 bg-orange-500' : 'w-1.5 h-1.5 bg-gray-700 hover:bg-gray-500'
-              }`}
-              aria-label={p}
-            />
-          ))}
-        </div>
 
-        {/* Period label — tapping navigates to the Progress screen */}
-        <div className="text-center mb-2">
-          <Link
-            href="/training?tab=progress#weekly-tss"
-            className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wider text-gray-500 hover:text-orange-400 transition-colors group"
-          >
-            {period === 'week' ? 'Week to date' : period === 'month' ? 'Month to date' : 'Year to date'}
-            <svg className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-            </svg>
-          </Link>
-        </div>
+      {/* Heading */}
+      <h2 className="text-sm font-semibold text-white">Progress</h2>
 
-        {progressLoading && !progressData ? (
-          <div className="space-y-2">
-            <div className="grid grid-cols-3 gap-2">
-              {Array.from({ length: 3 }).map((_, i) => <div key={i} className="bg-gray-800 rounded-xl p-3 h-16 animate-pulse" />)}
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              {Array.from({ length: 2 }).map((_, i) => <div key={i} className="bg-gray-800 rounded-xl p-3 h-16 animate-pulse" />)}
-            </div>
+      {/* Controls: sport dropdown + metric pills (scrollable row) */}
+      <div className="flex items-center gap-2">
+        <SportDropdown
+          selected={selected}
+          onChange={v => { setSelected(v); setOffset(0); }}
+        />
+        <div className="overflow-x-auto scrollbar-thin -mr-4 pr-4">
+          <div className="flex items-center gap-2 min-w-max">
+            {METRICS.map(mx => (
+              <button
+                key={mx.key}
+                onClick={() => { setMetric(mx.key); setOffset(0); }}
+                className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors border ${
+                  metric === mx.key
+                    ? 'bg-orange-500 text-white border-orange-500'
+                    : 'bg-transparent text-gray-400 border-gray-700 hover:text-white hover:border-gray-500'
+                }`}
+              >
+                {mx.label}
+              </button>
+            ))}
           </div>
-        ) : progressData ? (() => {
-          const from = periodStart(period, offset);
-          const filtersQ = selected.length > 0 ? selected.join(',') : 'All';
-          const href = `/dashboard?tab=activities&filters=${encodeURIComponent(filtersQ)}&from=${from}`;
-          return (
-            <div className="space-y-2 md:space-y-0">
-              {/* Mobile: 3+2 layout. Desktop: single 5-column row. */}
-              <div className="grid grid-cols-3 md:grid-cols-5 gap-2 md:gap-3">
-                <StatCard label="Rides" value={String(progressData.current?.points.length ?? 0)} href={href} />
-                <StatCard label="km"    value={fmtProgress(curTotal)}         href={href} />
-                <StatCard label="Hours" value={fmtProgress(curTotal)}      href={href} />
-                <div className="hidden md:contents">
-                  <StatCard label="TSS"    value={fmtProgress(curTotal)}       href={href} />
-                  <StatCard label="Elev m" value={fmtProgress(curTotal)} href={href} />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-2 md:hidden">
-                <StatCard label="TSS"    value={fmtProgress(curTotal)}       href={href} />
-                <StatCard label="Elev m" value={fmtProgress(curTotal)} href={href} />
-              </div>
-            </div>
-          );
-        })() : null}
-      </div>
-
-      {/* Sport filters — single scrollable row */}
-      <div className="overflow-x-auto scrollbar-thin -mx-4 px-4">
-        <div className="flex gap-2 min-w-max">
-          {TYPE_FILTERS.map(f => (
-            <button
-              key={f}
-              onClick={() => toggleFilter(f)}
-              className={`flex-shrink-0 py-1.5 px-3 rounded-lg text-xs font-medium transition-colors ${
-                selected.includes(f)
-                  ? 'bg-orange-500 text-white'
-                  : 'bg-gray-800 text-gray-400 hover:text-white'
-              }`}
-            >
-              {f}
-            </button>
-          ))}
         </div>
       </div>
 
-      {/* Metric toggle — evenly spread above chart */}
-      <div className="grid grid-cols-4 md:grid-cols-8 gap-2">
-        {METRIC_OPTS.map(m => (
-          <button
-            key={m.key}
-            onClick={() => setMetric(m.key)}
-            className={`py-1.5 rounded-lg text-xs font-medium transition-colors text-center ${
-              metric === m.key
-                ? 'bg-orange-500/20 text-orange-400 border border-orange-500/50'
-                : 'bg-gray-800 text-gray-500 hover:text-gray-300'
-            }`}
-          >
-            {m.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Period selector — Week / Month / Year */}
-      <div className="flex bg-gray-800 rounded-xl p-1 gap-1">
-        {(['week', 'month', 'year'] as Period[]).map(p => (
-          <button
-            key={p}
-            onClick={() => changePeriod(p)}
-            className={`flex-1 py-1.5 rounded-lg text-sm font-medium transition-colors capitalize ${
-              period === p ? 'bg-orange-500 text-white' : 'text-gray-400 hover:text-white'
-            }`}
-          >
-            {p === 'week' ? 'Week' : p === 'month' ? 'Month' : 'Year'}
-          </button>
-        ))}
-      </div>
-
-      {/* Period navigation — above chart */}
-      <div className="flex items-center justify-between">
-        <button
-          onClick={() => setOffset(o => o - 1)}
-          className="w-9 h-9 flex items-center justify-center rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-          </svg>
-        </button>
-        <span className="text-sm font-medium text-white">
-          {progressLoading && !progressData ? '…' : progressData?.current?.start ?? ''}
-        </span>
-        <button
-          onClick={() => setOffset(o => Math.min(0, o + 1))}
-          disabled={offset >= 0}
-          className="w-9 h-9 flex items-center justify-center rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-          </svg>
-        </button>
-      </div>
-
-      {/* Chart panel (same layout as ProgressTab) */}
+      {/* Chart panel */}
       <div className="bg-gray-800/60 rounded-xl p-4 space-y-3">
 
-        {/* Total header (same as ProgressTab) */}
+        {/* Total header */}
         <div>
           <p className="text-[10px] text-gray-500 uppercase tracking-wider">Total {m.label}</p>
           {progressLoading ? (
@@ -443,27 +261,25 @@ function TrainingTab() {
           ) : (
             <div className="flex items-end gap-2.5 mt-0.5">
               <p className="text-3xl font-bold text-white leading-tight">
-                {fmtProgress(curTotal)}
+                {m.fmt(curTotal)}
                 {m.unit && <span className="text-lg font-semibold text-gray-400 ml-1">{m.unit}</span>}
               </p>
               {deltaPct !== null && (
                 <p className={`text-sm font-semibold mb-0.5 ${deltaPct >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                  {deltaPct >= 0 ? '▲' : '▼'} {delta >= 0 ? '+' : ''}{fmtProgress(Math.abs(delta))}{m.unit ? ` ${m.unit}` : ''} ({Math.abs(deltaPct)}%)
+                  {deltaPct >= 0 ? '▲' : '▼'} {delta >= 0 ? '+' : ''}{m.fmt(Math.abs(delta))}{m.unit ? ` ${m.unit}` : ''} ({Math.abs(deltaPct)}%)
                 </p>
               )}
             </div>
           )}
-          <p className="text-xs text-gray-500 mt-0.5">
-            {progressData?.current ? `${progressData.current.start} – ${progressData.current.end}` : '—'}
-          </p>
+          <p className="text-xs text-gray-500 mt-0.5">{dateRange}</p>
           {deltaPct !== null && priorTotal > 0 && (
             <p className="text-[10px] text-gray-600 mt-0.5">
-              vs. prior period ({fmtProgress(priorTotal)}{m.unit ? ` ${m.unit}` : ''})
+              vs. prior period ({m.fmt(priorTotal)}{m.unit ? ` ${m.unit}` : ''})
             </p>
           )}
         </div>
 
-        {/* Area chart (same as ProgressTab) */}
+        {/* Area chart */}
         {progressLoading ? (
           <div className="h-48 animate-pulse bg-gray-700/40 rounded-lg" />
         ) : chartData.length === 0 ? (
@@ -491,13 +307,13 @@ function TrainingTab() {
                 axisLine={false}
                 tickLine={false}
                 width={36}
-                tickFormatter={v => fmtProgress(Number(v))}
+                tickFormatter={v => m.fmt(Number(v))}
               />
               <Tooltip
                 contentStyle={{ background: '#111827', border: '1px solid #374151', borderRadius: 8, fontSize: 12 }}
                 labelStyle={{ color: '#9ca3af' }}
                 formatter={(v, name) => [
-                  `${fmtProgress(Number(v))}${m.unit ? ' ' + m.unit : ''}`,
+                  `${m.fmt(Number(v))}${m.unit ? ' ' + m.unit : ''}`,
                   name === 'current' ? 'This period' : 'Prior period',
                 ]}
               />
@@ -523,6 +339,47 @@ function TrainingTab() {
             </AreaChart>
           </ResponsiveContainer>
         )}
+      </div>
+
+      {/* Period selector */}
+      <div className="flex bg-gray-800 rounded-xl p-1 gap-1">
+        {PERIODS.map(p => (
+          <button
+            key={p.key}
+            onClick={() => { setPeriod(p.key); setOffset(0); }}
+            className={`flex-1 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+              period === p.key ? 'bg-orange-500 text-white' : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Navigation arrows */}
+      <div className="flex items-center justify-between">
+        <button
+          onClick={() => setOffset(o => o - 1)}
+          className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
+          aria-label="Previous period"
+        >
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
+        <span className="text-sm text-gray-200 font-medium tabular-nums">{dateRange}</span>
+        <button
+          onClick={() => setOffset(o => Math.min(0, o + 1))}
+          disabled={offset >= 0}
+          className={`p-2 rounded-lg transition-colors ${
+            offset >= 0 ? 'text-gray-700 cursor-not-allowed' : 'text-gray-400 hover:text-white hover:bg-gray-800'
+          }`}
+          aria-label="Next period"
+        >
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
       </div>
 
     </div>
