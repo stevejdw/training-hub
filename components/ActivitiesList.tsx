@@ -37,6 +37,7 @@ interface Activity {
   trainer: boolean;
   gear_id: string | null;
   gear_name: string | null;
+  power_meter: string | null;
 }
 
 interface GearItem {
@@ -45,6 +46,7 @@ interface GearItem {
   nickname: string | null;
   retired: boolean | null;
   activity_count: number;
+  power_meter: string | null;
 }
 
 type SortCol = 'start_date' | 'distance' | 'moving_time' | 'average_watts' | 'average_heartrate' | 'tss';
@@ -136,7 +138,21 @@ export default function ActivitiesList() {
       body: JSON.stringify({ nickname: next.trim() }),
     });
     if (r.ok) {
-      // Refresh gear list
+      const data = await fetch('/api/gear').then(x => x.json());
+      setGearList(data.gear ?? []);
+      setNoGearCount(data.noGearCount ?? 0);
+    }
+  }
+
+  async function setPowerMeter(id: string, current: string | null) {
+    const next = window.prompt('Power meter (leave blank to clear)', current ?? '');
+    if (next === null) return; // cancelled
+    const r = await fetch(`/api/gear/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ power_meter: next.trim() || null }),
+    });
+    if (r.ok) {
       const data = await fetch('/api/gear').then(x => x.json());
       setGearList(data.gear ?? []);
       setNoGearCount(data.noGearCount ?? 0);
@@ -466,7 +482,12 @@ export default function ActivitiesList() {
                               readOnly
                               className="accent-orange-500 flex-shrink-0"
                             />
-                            <span className="flex-1 truncate">{label}</span>
+                            <div className="flex-1 min-w-0">
+                              <div className="truncate">{label}</div>
+                              {g.power_meter && (
+                                <div className="text-[10px] text-blue-400/70 truncate">{g.power_meter}</div>
+                              )}
+                            </div>
                             <span className="text-xs text-gray-500 flex-shrink-0">{g.activity_count}</span>
                             <button
                               onClick={(e) => { e.stopPropagation(); renameGear(g.id, label); }}
@@ -476,6 +497,16 @@ export default function ActivitiesList() {
                             >
                               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                              </svg>
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setPowerMeter(g.id, g.power_meter); }}
+                              className={`transition-colors flex-shrink-0 ${g.power_meter ? 'text-blue-400/70 hover:text-blue-400' : 'text-gray-600 hover:text-blue-400'}`}
+                              title={g.power_meter ? `Power meter: ${g.power_meter}` : 'Set power meter'}
+                              aria-label="Set power meter"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
                               </svg>
                             </button>
                           </div>
@@ -606,6 +637,9 @@ export default function ActivitiesList() {
                         >
                           {a.name}
                         </Link>
+                        {a.power_meter && (
+                          <div className="text-[10px] text-blue-400/60 mt-0.5 truncate">{a.power_meter}</div>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-right text-gray-300">
                         {a.distance > 0 ? `${(a.distance / 1000).toFixed(1)}` : '—'}

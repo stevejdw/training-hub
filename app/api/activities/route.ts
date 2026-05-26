@@ -85,7 +85,8 @@ export async function GET(req: NextRequest) {
                 a.average_watts, a.normalized_power, a.average_heartrate, a.tss,
                 a.total_elevation_gain, a.trainer,
                 a.gear_id,
-                COALESCE(g.nickname, g.name) AS gear_name
+                COALESCE(g.nickname, g.name) AS gear_name,
+                g.power_meter
          FROM activities a
          LEFT JOIN gear g ON g.id = a.gear_id
          ${where}

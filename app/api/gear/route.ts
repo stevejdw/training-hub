@@ -7,12 +7,13 @@ export const runtime = 'nodejs';
 export async function GET() {
   const client = await pool.connect();
   try {
+    await client.query(`ALTER TABLE gear ADD COLUMN IF NOT EXISTS power_meter TEXT`);
     const res = await client.query(`
-      SELECT g.id, g.name, g.nickname, g.retired,
+      SELECT g.id, g.name, g.nickname, g.retired, g.power_meter,
              COUNT(a.id)::int AS activity_count
       FROM gear g
       LEFT JOIN activities a ON a.gear_id = g.id
-      GROUP BY g.id, g.name, g.nickname, g.retired
+      GROUP BY g.id, g.name, g.nickname, g.retired, g.power_meter
       HAVING COUNT(a.id) > 0
       ORDER BY activity_count DESC, g.nickname NULLS LAST, g.name NULLS LAST
     `);
