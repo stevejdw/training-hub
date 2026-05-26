@@ -315,6 +315,18 @@ export default function ActivitiesList() {
   return (
     <div className="h-full flex flex-col md:max-w-5xl md:mx-auto md:w-full">
 
+      {/* Fixed-position toast for power meter sync result */}
+      {pmResult && (
+        <div
+          className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-3 rounded-xl shadow-2xl text-sm font-medium max-w-sm w-max text-center
+            ${pmResult.startsWith('Failed')
+              ? 'bg-red-900 text-red-200 border border-red-600'
+              : 'bg-green-900 text-green-200 border border-green-600'}`}
+        >
+          {pmResult}
+        </div>
+      )}
+
       {/* Top bar */}
       <div className="border-b border-gray-800 px-3 py-2.5 flex-shrink-0 space-y-2">
         <div className="flex items-center gap-2">
@@ -414,12 +426,6 @@ export default function ActivitiesList() {
             </button>
           </div>
         </div>
-
-        {pmResult && (
-          <div className={`px-3 py-2 rounded-lg text-sm font-medium ${pmResult.startsWith('Failed') ? 'bg-red-900/30 text-red-300 border border-red-700/50' : 'bg-green-900/30 text-green-300 border border-green-700/50'}`}>
-            {pmResult}
-          </div>
-        )}
 
         {syncResult && (
           <p className={`text-xs ${syncResult.startsWith('Error') ? 'text-red-400' : 'text-green-400'}`}>
