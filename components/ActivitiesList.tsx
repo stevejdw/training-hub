@@ -666,13 +666,14 @@ export default function ActivitiesList() {
               >
                 TSS <SortArrow col="tss" sortBy={sortBy} sortDir={sortDir} />
               </th>
+              <th className="text-left px-4 py-3 text-gray-400 font-medium whitespace-nowrap">Power Meter</th>
             </tr>
           </thead>
           <tbody>
             {loading
               ? Array.from({ length: 10 }).map((_, i) => (
                   <tr key={i} className="border-b border-gray-800/50">
-                    {Array.from({ length: 8 }).map((_, j) => (
+                    {Array.from({ length: 9 }).map((_, j) => (
                       <td key={j} className="px-4 py-3">
                         <div className="h-4 bg-gray-800 rounded animate-pulse" />
                       </td>
@@ -702,9 +703,6 @@ export default function ActivitiesList() {
                         >
                           {a.name}
                         </Link>
-                        {a.power_meter && (
-                          <div className="text-[10px] text-blue-400/60 mt-0.5 truncate">{a.power_meter}</div>
-                        )}
                       </td>
                       <td className="px-4 py-3 text-right text-gray-300">
                         {a.distance > 0 ? `${(a.distance / 1000).toFixed(1)}` : '—'}
@@ -718,6 +716,11 @@ export default function ActivitiesList() {
                       </td>
                       <td className="px-4 py-3 text-right text-gray-300">
                         {a.tss ? Math.round(a.tss) : '—'}
+                      </td>
+                      <td className="px-4 py-3 text-left whitespace-nowrap">
+                        {a.power_meter
+                          ? <span className="text-blue-400/80 text-xs">{a.power_meter}</span>
+                          : <span className="text-gray-700">—</span>}
                       </td>
                     </tr>
                   );
