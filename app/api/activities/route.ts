@@ -17,9 +17,10 @@ const SORT_COLS: Record<string, string> = {
 export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams;
 
-  const filtersParam  = sp.get('filters') ?? sp.get('filter') ?? 'All';
-  const gearParam     = sp.get('gear') ?? '';
-  const from          = sp.get('from');       // ISO date
+  const filtersParam      = sp.get('filters') ?? sp.get('filter') ?? 'All';
+  const gearParam         = sp.get('gear') ?? '';
+  const powerMeterParam   = sp.get('powerMeter') ?? '';
+  const from              = sp.get('from');       // ISO date
   const dateTo        = sp.get('dateTo');     // ISO date
   const minMins       = parseInt(sp.get('minMins') ?? '0', 10);
   const maxMins       = parseInt(sp.get('maxMins') ?? '0', 10);
@@ -75,6 +76,17 @@ export async function GET(req: NextRequest) {
       if (includeNone) {
         parts.push(`a.gear_id IS NULL`);
       }
+      conditions.push(`(${parts.join(' OR ')})`);
+    }
+
+    // Power meter filter
+    const pmTokens = powerMeterParam.split(',').map(s => s.trim()).filter(Boolean);
+    if (pmTokens.length > 0) {
+      const includeNone = pmTokens.includes('__none__');
+      const names = pmTokens.filter(t => t !== '__none__');
+      const parts: string[] = [];
+      if (names.length > 0) { parts.push(`a.power_meter = ANY($${p++}::text[])`); queryParams.push(names); }
+      if (includeNone)      { parts.push(`a.power_meter IS NULL`); }
       conditions.push(`(${parts.join(' OR ')})`);
     }
 

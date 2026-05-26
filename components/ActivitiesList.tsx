@@ -49,6 +49,11 @@ interface GearItem {
   power_meter: string | null;
 }
 
+interface PowerMeterItem {
+  power_meter: string;
+  activity_count: number;
+}
+
 type SortCol = 'start_date' | 'distance' | 'moving_time' | 'average_watts' | 'average_heartrate' | 'tss';
 type SortDir = 'ASC' | 'DESC';
 
@@ -103,18 +108,28 @@ export default function ActivitiesList() {
   });
   const [gearDropdownOpen, setGearDropdownOpen] = useState(false);
 
+  // Power meter filter
+  const [powerMeterList,     setPowerMeterList]     = useState<PowerMeterItem[]>([]);
+  const [selectedPowerMeters, setSelectedPowerMeters] = useState<string[]>([]);
+
   useEffect(() => {
     fetch('/api/gear')
       .then(r => r.json())
       .then(d => {
         setGearList(d.gear ?? []);
         setNoGearCount(d.noGearCount ?? 0);
+        setPowerMeterList(d.powerMeters ?? []);
       })
       .catch(() => { /* non-fatal */ });
   }, []);
 
   function toggleGear(id: string) {
     setSelectedGear(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+    setPage(1);
+  }
+
+  function togglePowerMeter(pm: string) {
+    setSelectedPowerMeters(prev => prev.includes(pm) ? prev.filter(x => x !== pm) : [...prev, pm]);
     setPage(1);
   }
 
@@ -265,6 +280,7 @@ export default function ActivitiesList() {
   function clearAll() {
     setSelected([]);
     setSelectedGear([]);
+    setSelectedPowerMeters([]);
     setDateFrom('');
     setDateTo('');
     setMinMins('');
@@ -284,7 +300,7 @@ export default function ActivitiesList() {
     setPage(1);
   }
 
-  const hasActiveFilters = selected.length > 0 || selectedGear.length > 0 || dateFrom || dateTo || minMins || maxMins || minKm || maxKm;
+  const hasActiveFilters = selected.length > 0 || selectedGear.length > 0 || selectedPowerMeters.length > 0 || dateFrom || dateTo || minMins || maxMins || minKm || maxKm;
 
   const filtersParam = selected.length > 0 ? selected.join(',') : 'All';
   const queryParams = new URLSearchParams({
@@ -300,6 +316,7 @@ export default function ActivitiesList() {
   if (minKm)    queryParams.set('minKm',   minKm);
   if (maxKm)    queryParams.set('maxKm',   maxKm);
   if (selectedGear.length > 0) queryParams.set('gear', selectedGear.join(','));
+  if (selectedPowerMeters.length > 0) queryParams.set('powerMeter', selectedPowerMeters.join(','));
   const queryString = queryParams.toString();
 
   const { data, loading } = useCachedFetch<ActivitiesResponse>(
@@ -604,6 +621,32 @@ export default function ActivitiesList() {
                       )}
                     </div>
                   )}
+                </div>
+              </div>
+            )}
+
+            {/* Power Meter filter */}
+            {powerMeterList.length > 0 && (
+              <div className="space-y-1 sm:col-span-2">
+                <p className="text-xs text-gray-500 uppercase tracking-wider">Power Meter</p>
+                <div className="flex flex-wrap gap-2">
+                  {powerMeterList.map(pm => {
+                    const isOn = selectedPowerMeters.includes(pm.power_meter);
+                    return (
+                      <button
+                        key={pm.power_meter}
+                        onClick={() => togglePowerMeter(pm.power_meter)}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                          isOn
+                            ? 'bg-blue-600/30 text-blue-300 border border-blue-500/50'
+                            : 'bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700'
+                        }`}
+                      >
+                        {pm.power_meter}
+                        <span className="text-gray-500">{pm.activity_count}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             )}

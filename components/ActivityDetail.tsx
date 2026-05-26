@@ -96,6 +96,7 @@ interface Activity {
   average_speed: number | null;
   gear_id: string | null;
   gear_name: string | null;
+  power_meter: string | null;
 }
 
 interface Lap {
@@ -331,7 +332,7 @@ export default function ActivityDetail({ id }: { id: string }) {
               )}
               {activity.gear_name && (
                 <div>
-                  <div className="text-[10px] text-gray-500 uppercase tracking-wider mb-0.5">Gear</div>
+                  <div className="text-[10px] text-gray-500 uppercase tracking-wider mb-0.5">Bike</div>
                   <button
                     onClick={renameGear}
                     className="text-base font-bold text-white text-left hover:text-orange-400 transition-colors group inline-flex items-center gap-1.5 max-w-full"
@@ -342,6 +343,12 @@ export default function ActivityDetail({ id }: { id: string }) {
                       <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                     </svg>
                   </button>
+                </div>
+              )}
+              {activity.power_meter && (
+                <div>
+                  <div className="text-[10px] text-gray-500 uppercase tracking-wider mb-0.5">Power Meter</div>
+                  <div className="text-base font-bold text-blue-400">{activity.power_meter}</div>
                 </div>
               )}
             </div>
