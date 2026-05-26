@@ -171,40 +171,28 @@ export default function ActivitiesList() {
     setPmSyncing(true);
     setPmResult(null);
     try {
-      // First probe to see what fields intervals.icu has
-      const probeRes = await fetch('/api/activities/backfill-power-meter', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ probe: true }),
-      });
-      const probe = await probeRes.json() as Record<string, unknown>;
-      if (probe.error) throw new Error(String(probe.error));
-
-      // Full backfill
       const res = await fetch('/api/activities/backfill-power-meter', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
       });
       const d = await res.json() as {
-        updated?: number; no_power_meter?: number; total_icu?: number;
-        sample_power_fields?: string[]; error?: string;
+        updated?: number; no_match?: number; icu_with_power_meter?: number;
+        total_icu?: number; error?: string;
       };
       if (d.error) throw new Error(d.error);
       if ((d.updated ?? 0) > 0) {
-        setPmResult(`✓ Updated ${d.updated} activit${d.updated === 1 ? 'y' : 'ies'} with power meter data`);
+        setPmResult(`✓ Updated ${d.updated} of ${d.icu_with_power_meter} activities with power meter data`);
         setPage(1);
         setSelected(prev => [...prev]);
-      } else if ((d.no_power_meter ?? 0) > 0 && (d.total_icu ?? 0) > 0) {
-        setPmResult(`No power meter field found in intervals.icu data. Fields with "power": ${(d.sample_power_fields ?? []).join(', ') || 'none'}`);
       } else {
-        setPmResult(`Already up to date (${d.total_icu ?? 0} activities checked)`);
+        setPmResult(`Already up to date — ${d.icu_with_power_meter ?? 0} activities have power meter data`);
       }
     } catch (err) {
       setPmResult(`Failed: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setPmSyncing(false);
-      setTimeout(() => setPmResult(null), 10000);
+      setTimeout(() => setPmResult(null), 30000);
     }
   }
 
@@ -428,9 +416,9 @@ export default function ActivitiesList() {
         </div>
 
         {pmResult && (
-          <p className={`text-xs ${pmResult.startsWith('Failed') || pmResult.startsWith('No power') ? 'text-amber-400' : 'text-green-400'}`}>
+          <div className={`px-3 py-2 rounded-lg text-sm font-medium ${pmResult.startsWith('Failed') ? 'bg-red-900/30 text-red-300 border border-red-700/50' : 'bg-green-900/30 text-green-300 border border-green-700/50'}`}>
             {pmResult}
-          </p>
+          </div>
         )}
 
         {syncResult && (
