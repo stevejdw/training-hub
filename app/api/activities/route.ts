@@ -40,6 +40,7 @@ export async function GET(req: NextRequest) {
 
   const client = await pool.connect();
   try {
+    await client.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS power_meter TEXT`);
     const conditions: string[] = [];
     const queryParams: unknown[] = [];
     let p = 1;
@@ -86,7 +87,7 @@ export async function GET(req: NextRequest) {
                 a.total_elevation_gain, a.trainer,
                 a.gear_id,
                 COALESCE(g.nickname, g.name) AS gear_name,
-                g.power_meter
+                a.power_meter
          FROM activities a
          LEFT JOIN gear g ON g.id = a.gear_id
          ${where}

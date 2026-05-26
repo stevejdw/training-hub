@@ -162,6 +162,52 @@ export default function ActivitiesList() {
   // Filter panel visibility
   const [showFilters, setShowFilters] = useState(false);
 
+  // Power meter backfill state
+  const [pmSyncing, setPmSyncing] = useState(false);
+  const [pmResult,  setPmResult]  = useState<string | null>(null);
+
+  async function handlePowerMeterSync() {
+    if (pmSyncing) return;
+    setPmSyncing(true);
+    setPmResult(null);
+    try {
+      // First probe to see what fields intervals.icu has
+      const probeRes = await fetch('/api/activities/backfill-power-meter', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ probe: true }),
+      });
+      const probe = await probeRes.json() as Record<string, unknown>;
+      if (probe.error) throw new Error(String(probe.error));
+
+      // Full backfill
+      const res = await fetch('/api/activities/backfill-power-meter', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      const d = await res.json() as {
+        updated?: number; no_power_meter?: number; total_icu?: number;
+        sample_power_fields?: string[]; error?: string;
+      };
+      if (d.error) throw new Error(d.error);
+      if ((d.updated ?? 0) > 0) {
+        setPmResult(`✓ Updated ${d.updated} activit${d.updated === 1 ? 'y' : 'ies'} with power meter data`);
+        setPage(1);
+        setSelected(prev => [...prev]);
+      } else if ((d.no_power_meter ?? 0) > 0 && (d.total_icu ?? 0) > 0) {
+        setPmResult(`No power meter field found in intervals.icu data. Fields with "power": ${(d.sample_power_fields ?? []).join(', ') || 'none'}`);
+      } else {
+        setPmResult(`Already up to date (${d.total_icu ?? 0} activities checked)`);
+      }
+    } catch (err) {
+      setPmResult(`Failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setPmSyncing(false);
+      setTimeout(() => setPmResult(null), 10000);
+    }
+  }
+
   // Manual sync state
   const [syncing,     setSyncing]     = useState(false);
   const [syncResult,  setSyncResult]  = useState<string | null>(null);
@@ -340,6 +386,25 @@ export default function ActivitiesList() {
               </span>
             )}
 
+            {/* Power meter sync */}
+            <button
+              onClick={handlePowerMeterSync}
+              disabled={pmSyncing}
+              title={pmSyncing ? 'Syncing power meter data…' : 'Sync power meter data from intervals.icu'}
+              className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors ${
+                pmSyncing
+                  ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
+                  : 'bg-gray-800 text-blue-400/60 hover:text-blue-400 hover:bg-gray-700'
+              }`}
+            >
+              <svg
+                className={`w-4 h-4 ${pmSyncing ? 'animate-pulse' : ''}`}
+                fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+            </button>
+
             {/* Sync */}
             <button
               onClick={handleSync}
@@ -361,6 +426,12 @@ export default function ActivitiesList() {
             </button>
           </div>
         </div>
+
+        {pmResult && (
+          <p className={`text-xs ${pmResult.startsWith('Failed') || pmResult.startsWith('No power') ? 'text-amber-400' : 'text-green-400'}`}>
+            {pmResult}
+          </p>
+        )}
 
         {syncResult && (
           <p className={`text-xs ${syncResult.startsWith('Error') ? 'text-red-400' : 'text-green-400'}`}>
