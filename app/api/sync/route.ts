@@ -1,5 +1,6 @@
 import { syncRecentActivities } from '@/lib/strava-sync';
 import { ensureBestPowerTable, warmMissingActivities, backfillBestPowerMetadata } from '@/lib/best-power';
+import { syncPowerMeters } from '@/lib/power-meter-sync';
 import pool from '@/lib/db';
 
 export const runtime = 'nodejs';
@@ -14,6 +15,13 @@ export async function POST() {
     // Backfill metadata for any legacy rows still missing sport_type/start_date
     const backfilled = await backfillBestPowerMetadata(5000);
     const result = await syncRecentActivities();
+
+    // Auto-update power meter data for the last 60 days from intervals.icu.
+    // Fire-and-forget style — don't block the sync response on it.
+    const newest = new Date().toISOString().split('T')[0];
+    const oldest = new Date(Date.now() - 60 * 86400_000).toISOString().split('T')[0];
+    syncPowerMeters(oldest, newest).catch(() => {});
+
     return Response.json({ ...result, warmed: warmResult.processed, backfilled });
   } catch (err) {
     console.error('Manual sync error:', err);
