@@ -1,5 +1,6 @@
 import { after } from 'next/server';
 import { syncActivity } from '@/lib/strava-sync';
+import { syncPowerMeters } from '@/lib/power-meter-sync';
 
 export const runtime = 'nodejs';
 
@@ -33,6 +34,10 @@ export async function POST(req: Request) {
       if (body.object_type === 'activity' && (body.aspect_type === 'create' || body.aspect_type === 'update')) {
         await syncActivity(body.object_id);
         console.log(`Webhook: synced activity ${body.object_id} (${body.aspect_type})`);
+        // Sync power meter data for the last 3 days — covers the new activity
+        const newest = new Date().toISOString().split('T')[0];
+        const oldest = new Date(Date.now() - 3 * 86400_000).toISOString().split('T')[0];
+        await syncPowerMeters(oldest, newest).catch(() => {});
       }
     } catch (err) {
       console.error('Webhook sync error:', err);
