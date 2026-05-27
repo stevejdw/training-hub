@@ -257,28 +257,54 @@ const SESSION_TYPE_COLOR: Record<string, string> = {
   race:       '#a78bfa',
 };
 
-const CACHE_KEY = 'coaching-insight-v6';
+const CACHE_KEY = 'coaching-insight-v7';
+
+function getTodayAEST() {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'Australia/Sydney' });
+}
+
+function readTodayCache(): { content: string; rideToday: boolean } | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const stored = localStorage.getItem(CACHE_KEY);
+    if (!stored) return null;
+    const parsed = JSON.parse(stored);
+    if (parsed.date !== getTodayAEST()) return null;
+    return { content: parsed.content ?? '', rideToday: parsed.rideToday ?? false };
+  } catch {
+    return null;
+  }
+}
 
 function CoachingTip() {
-  const cached  = typeof window !== 'undefined' ? localStorage.getItem(CACHE_KEY) ?? '' : '';
-  const [tip,     setTip]     = useState(cached);
-  const [loading, setLoading] = useState(!cached);
-  const [expanded, setExpanded] = useState(false);
+  const todayCache = readTodayCache();
+  const [tip,         setTip]         = useState(todayCache?.rideToday ? todayCache.content : '');
+  const [noRideToday, setNoRideToday] = useState(todayCache !== null && !todayCache.rideToday);
+  const [loading,     setLoading]     = useState(todayCache === null);
+  const [expanded,    setExpanded]    = useState(false);
   const fetched = useRef(false);
 
   useEffect(() => {
     if (fetched.current) return;
     fetched.current = true;
+    // Skip fetch only when we have a confirmed ride insight cached for today
+    if (todayCache?.rideToday) return;
 
     fetch('/api/coaching-insight')
       .then(r => r.json())
       .then(d => {
-        const content = d.content ?? '';
-        setTip(content);
+        const content   = d.content   ?? '';
+        const rideToday = d.rideToday ?? false;
+        setTip(rideToday ? content : '');
+        setNoRideToday(!rideToday);
         setLoading(false);
-        if (content) localStorage.setItem(CACHE_KEY, content);
+        localStorage.setItem(CACHE_KEY, JSON.stringify({
+          content,
+          date: getTodayAEST(),
+          rideToday,
+        }));
       })
-      .catch(() => { if (!tip) { setTip('Unable to load coaching tip.'); setLoading(false); } });
+      .catch(() => setLoading(false));
   }, []);
 
   return (
@@ -301,6 +327,8 @@ function CoachingTip() {
               <div className="h-3 bg-gray-700 rounded animate-pulse w-full" />
               <div className="h-3 bg-gray-700 rounded animate-pulse w-4/5" />
             </div>
+          ) : noRideToday ? (
+            <p className="text-xs text-gray-500 italic">No ride completed today</p>
           ) : (
             <p className={`text-xs text-gray-300 leading-snug ${expanded ? '' : 'line-clamp-2'}`}>{tip}</p>
           )}

@@ -28,6 +28,22 @@ export async function GET() {
       )
     `);
 
+    const todayDateAEST = new Date().toLocaleDateString('en-CA', { timeZone: 'Australia/Sydney' });
+
+    // Check if a ride was completed today (AEST)
+    const todayRideRes = await client.query(
+      `SELECT EXISTS(
+        SELECT 1 FROM activities
+        WHERE TO_CHAR(start_date AT TIME ZONE 'Australia/Sydney', 'YYYY-MM-DD') = $1
+      ) AS has_ride`,
+      [todayDateAEST]
+    );
+    const rideToday: boolean = todayRideRes.rows[0]?.has_ride ?? false;
+
+    if (!rideToday) {
+      return Response.json({ content: '', rideToday: false });
+    }
+
     // Latest activity ID — used as a cheap "did anything change?" signal
     const latestRes = await client.query(
       `SELECT MAX(id) AS max_id FROM activities`
@@ -40,7 +56,7 @@ export async function GET() {
     );
     const cached = cacheRes.rows[0];
     if (cached && String(cached.last_activity_id) === String(currentMaxId)) {
-      return Response.json({ content: cached.content, cached: true });
+      return Response.json({ content: cached.content, rideToday: true, cached: true });
     }
 
     // Build context and generate a fresh insight
@@ -133,7 +149,7 @@ Example DETRAINING tone: "It's been four days off the bike and your CTL has slip
       [content, currentMaxId]
     );
 
-    return Response.json({ content, cached: false });
+    return Response.json({ content, rideToday: true, cached: false });
   } catch (err) {
     console.error('[coaching-insight GET]', err);
     return Response.json({ content: '', error: String(err) });
