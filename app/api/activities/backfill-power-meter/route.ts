@@ -41,6 +41,7 @@ export async function POST(req: Request) {
       SELECT
         COUNT(*) FILTER (WHERE average_watts IS NOT NULL)::int AS icu_with_power_meter,
         $1::int AS updated
+      FROM activities
     `, [updated]);
     return Response.json({
       updated,
