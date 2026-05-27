@@ -67,8 +67,8 @@ function getPeriodRange(period: Period, offset: number): { start: Date; end: Dat
 function periodLabel(period: Period, start: Date): string {
   if (period === 'week') {
     const end = new Date(start.getTime() + 6 * 86400000);
-    const s = start.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', timeZone: 'UTC' });
-    const e = end.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+    const s = start.toLocaleDateString('en-AU', { day: 'numeric', month: 'long', timeZone: 'UTC' });
+    const e = end.toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
     return `${s} – ${e}`;
   }
   if (period === 'month') {

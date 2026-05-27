@@ -194,7 +194,7 @@ export default function DashboardBestPower() {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-white truncate">{r.name}</p>
                     <p className="text-[10px] text-gray-500">
-                      {date.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: '2-digit' })}
+                      {date.toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' })}
                     </p>
                   </div>
 

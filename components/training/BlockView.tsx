@@ -521,9 +521,9 @@ export default function BlockView({ days, activities, onSelectDay, onDaysChanged
   const doneDays    = nonRestDays.filter(d => completionStatus(d, actByDate.get(d.date) ?? []) === 'done').length;
 
   const weekLabel = weekStart
-    ? new Date(weekStart + 'T00:00:00Z').toLocaleDateString('en-AU', { day: 'numeric', month: 'short', timeZone: 'UTC' }) +
+    ? new Date(weekStart + 'T00:00:00Z').toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }) +
       ' – ' +
-      new Date(weekEnd + 'T00:00:00Z').toLocaleDateString('en-AU', { day: 'numeric', month: 'short', timeZone: 'UTC' })
+      new Date(weekEnd + 'T00:00:00Z').toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })
     : `Week ${weekIdx + 1}`;
 
   // ── Move day: support both HTML5 drop and tap-to-swap (mobile) ──────────

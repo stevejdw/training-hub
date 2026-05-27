@@ -73,7 +73,7 @@ function formatDate(ts: number): string {
   if (diffDays === 0) return 'Today';
   if (diffDays === 1) return 'Yesterday';
   if (diffDays < 7) return d.toLocaleDateString('en-AU', { weekday: 'short' });
-  return d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
+  return d.toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
 function MessageBubble({ message }: { message: Message }) {

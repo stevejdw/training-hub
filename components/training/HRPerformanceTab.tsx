@@ -31,7 +31,7 @@ interface HRData {
 function fmtWeek(iso: string) {
   const [y, m, d] = iso.split('-').map(Number);
   const dt = new Date(Date.UTC(y, m - 1, d));
-  return dt.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+  return dt.toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

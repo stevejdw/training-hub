@@ -15,7 +15,7 @@ const RANGES = [
 ];
 
 function fmtDate(iso: string) {
-  return new Date(iso).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
+  return new Date(iso).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

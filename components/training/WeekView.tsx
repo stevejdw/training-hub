@@ -69,9 +69,9 @@ export default function WeekView({ days, activities, onSelectDay, onBack, weekIn
   const weekStart = days[0]?.date;
   const weekEnd = days[days.length - 1]?.date;
   const weekLabel = weekStart
-    ? new Date(weekStart + 'T00:00:00Z').toLocaleDateString('en-AU', { day: 'numeric', month: 'short', timeZone: 'UTC' }) +
+    ? new Date(weekStart + 'T00:00:00Z').toLocaleDateString('en-AU', { day: 'numeric', month: 'long', timeZone: 'UTC' }) +
       ' – ' +
-      new Date(weekEnd + 'T00:00:00Z').toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })
+      new Date(weekEnd + 'T00:00:00Z').toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })
     : '';
 
   return (
@@ -112,7 +112,7 @@ export default function WeekView({ days, activities, onSelectDay, onBack, weekIn
                 <div className="flex items-center gap-2 mb-1 flex-wrap">
                   <span className="text-xs font-medium text-gray-400">{DOW[di]}</span>
                   <span className="text-xs text-gray-500">
-                    {new Date(day.date + 'T00:00:00Z').toLocaleDateString('en-AU', { day: 'numeric', month: 'short', timeZone: 'UTC' })}
+                    {new Date(day.date + 'T00:00:00Z').toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })}
                   </span>
                   {isToday && (
                     <span className="text-[10px] bg-orange-500/20 text-orange-400 border border-orange-500/30 rounded px-1.5 py-0.5">Today</span>

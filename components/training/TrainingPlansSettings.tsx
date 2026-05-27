@@ -13,7 +13,7 @@ interface PlanMeta {
 }
 
 function fmtDate(iso: string) {
-  return new Date(iso).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
+  return new Date(iso).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
 export default function TrainingPlansSettings() {

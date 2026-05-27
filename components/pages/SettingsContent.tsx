@@ -15,7 +15,7 @@ interface HistoryStatus {
 
 function fmtDate(iso: string | null): string {
   if (!iso) return '—';
-  return new Date(iso).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
+  return new Date(iso).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
 interface WellnessStatus {

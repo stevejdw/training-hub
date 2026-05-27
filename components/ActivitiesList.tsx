@@ -729,7 +729,7 @@ export default function ActivitiesList() {
                   return (
                     <tr key={a.id} className="border-b border-gray-800/50 hover:bg-gray-800/40 transition-colors">
                       <td className="px-4 py-3 text-gray-400 whitespace-nowrap">
-                        {date.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: '2-digit' })}
+                        {date.toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' })}
                       </td>
                       <td className="px-4 py-3">
                         <span

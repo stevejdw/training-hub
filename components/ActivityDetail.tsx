@@ -268,7 +268,7 @@ export default function ActivityDetail({ id }: { id: string }) {
                 {sportLabel(activity.sport_type)}{activity.trainer ? ' · Indoor' : ''}
               </span>
               <span className="text-xs text-gray-500">
-                {date.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
+                {date.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' })}
                 {' · '}
                 {date.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' })}
               </span>

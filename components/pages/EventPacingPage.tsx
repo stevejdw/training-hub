@@ -31,7 +31,7 @@ function fmtMovingTime(sec: number): string {
 }
 
 function fmtShortDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: '2-digit' });
+  return new Date(iso).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
 const DEFAULT_FLAT_WATTS    = 260;

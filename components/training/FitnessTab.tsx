@@ -195,7 +195,7 @@ export default function FitnessTab() {
 
   const fmtDate = (s: string) => {
     const d = new Date(s);
-    return d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
+    return d.toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' });
   };
 
   return (

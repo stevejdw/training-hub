@@ -71,7 +71,7 @@ const RANGES = [
 type ZoneFilter = 'all' | 'z2' | 'z3';
 
 function fmtDateShort(epochMs: number) {
-  return new Date(epochMs).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
+  return new Date(epochMs).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
 function fmtDuration(sec: number) {
@@ -102,7 +102,7 @@ function EfTooltip({ active, payload }: any) {
   const ef = row.np > 0 && row.avg_hr > 0 ? (row.np / row.avg_hr).toFixed(3) : '—';
   return (
     <div className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-xs shadow-lg space-y-0.5">
-      <p className="text-gray-400">{new Date(row.x).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+      <p className="text-gray-400">{new Date(row.x).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
       <p className="text-gray-300 truncate max-w-[200px] font-medium">{row.name}</p>
       <p className="text-orange-400 font-semibold pt-1">EF {ef}</p>
       <p className="text-[10px] text-gray-500">{row.avg_watts}W avg · {row.np}W NP · {row.avg_hr} bpm</p>
@@ -256,7 +256,7 @@ function RideModal({ ride, onClose }: { ride: ScatterPoint; onClose: () => void 
         {/* Header */}
         <div className="flex items-start justify-between p-4 border-b border-gray-800">
           <div>
-            <p className="text-xs text-gray-500">{new Date(ride.date).toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}</p>
+            <p className="text-xs text-gray-500">{new Date(ride.date).toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' })}</p>
             <p className="text-sm font-semibold text-white mt-0.5 leading-tight">{ride.name}</p>
           </div>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-300 text-lg leading-none ml-4">✕</button>

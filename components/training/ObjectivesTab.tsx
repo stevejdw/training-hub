@@ -10,7 +10,7 @@ function daysUntil(dateStr: string): number {
 
 function formatEventDate(dateStr: string): string {
   const d = new Date(dateStr + 'T00:00:00');
-  return d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
+  return d.toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
 function EventCard({ event }: { event: EventGoal }) {

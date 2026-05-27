@@ -76,7 +76,7 @@ function relDate(iso: string) {
   const diffD = Math.floor(diffH / 24);
   if (diffD === 1) return 'Yesterday';
   if (diffD < 7)  return `${diffD} days ago`;
-  return d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
+  return d.toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
 function timeOfDay(iso: string) {
@@ -424,7 +424,8 @@ export default function FeedPage() {
     return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-AU', {
       weekday: 'short',
       day: 'numeric',
-      month: 'short',
+      month: 'long',
+      year: 'numeric',
       timeZone: 'Australia/Sydney',
     });
   }

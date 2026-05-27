@@ -42,7 +42,7 @@ function ReadinessTooltip({ active, payload, baseline, metricLabel, metricUnit, 
 
   return (
     <div className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-xs shadow-lg space-y-0.5">
-      <p className="text-gray-400">{new Date(d.date + 'T00:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}</p>
+      <p className="text-gray-400">{new Date(d.date + 'T00:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
       {tssEntry?.value != null && (
         <p className="text-gray-300">{Math.round(tssEntry.value)} TSS</p>
       )}
@@ -130,7 +130,7 @@ export default function ReadinessResponseWidget() {
                 axisLine={false}
                 tickLine={false}
                 interval="preserveStartEnd"
-                tickFormatter={v => new Date(v + 'T00:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}
+                tickFormatter={v => new Date(v + 'T00:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' })}
               />
               <YAxis
                 yAxisId="tss"

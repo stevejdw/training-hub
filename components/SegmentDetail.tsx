@@ -573,7 +573,7 @@ export default function SegmentDetail({ id }: { id: string }) {
 
                         {/* Date */}
                         <td className="px-3 py-3 text-gray-300 text-left">
-                          {date.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          {date.toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' })}
                         </td>
 
                         {/* Time */}

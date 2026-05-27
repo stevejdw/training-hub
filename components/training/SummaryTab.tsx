@@ -205,7 +205,7 @@ function WeekCard({ week, isFirst }: { week: WeekRow; isFirst: boolean }) {
   const d7 = new Date(dates[6] + 'T00:00:00Z');
   const today = new Date();
   const currentYear = today.getFullYear();
-  const monthFmt = new Intl.DateTimeFormat('en-AU', { month: 'short', timeZone: 'UTC' });
+  const monthFmt = new Intl.DateTimeFormat('en-AU', { month: 'long', timeZone: 'UTC' });
   const weekLabel = d1.getUTCMonth() === d7.getUTCMonth()
     ? `${d1.getUTCDate()}–${d7.getUTCDate()} ${monthFmt.format(d1)}${d1.getUTCFullYear() !== currentYear ? ` ${d1.getUTCFullYear()}` : ''}`
     : `${d1.getUTCDate()} ${monthFmt.format(d1)} – ${d7.getUTCDate()} ${monthFmt.format(d7)}${d7.getUTCFullYear() !== currentYear ? ` ${d7.getUTCFullYear()}` : ''}`;
