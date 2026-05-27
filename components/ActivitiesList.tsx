@@ -335,7 +335,7 @@ export default function ActivitiesList() {
       {/* Fixed-position toast for power meter sync result */}
       {pmResult && (
         <div
-          className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-3 rounded-xl shadow-2xl text-sm font-medium max-w-sm w-max text-center
+          className={`fixed top-6 left-1/2 -translate-x-1/2 z-50 px-4 py-3 rounded-xl shadow-2xl text-sm font-medium max-w-sm w-max text-center
             ${pmResult.startsWith('Failed')
               ? 'bg-red-900 text-red-200 border border-red-600'
               : 'bg-green-900 text-green-200 border border-green-600'}`}
