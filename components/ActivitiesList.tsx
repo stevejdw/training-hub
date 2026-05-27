@@ -57,6 +57,30 @@ interface PowerMeterItem {
 type SortCol = 'start_date' | 'distance' | 'moving_time' | 'average_watts' | 'average_heartrate' | 'tss';
 type SortDir = 'ASC' | 'DESC';
 
+type ColKey = 'distance' | 'moving_time' | 'average_watts' | 'normalized_power' | 'average_heartrate' | 'tss' | 'elevation' | 'power_meter';
+
+const ALL_COLUMNS: { key: ColKey; label: string; defaultOn: boolean }[] = [
+  { key: 'distance',          label: 'Distance',    defaultOn: true  },
+  { key: 'moving_time',       label: 'Time',        defaultOn: true  },
+  { key: 'average_watts',     label: 'Avg W',       defaultOn: true  },
+  { key: 'normalized_power',  label: 'NP',          defaultOn: false },
+  { key: 'average_heartrate', label: 'Avg HR',      defaultOn: true  },
+  { key: 'tss',               label: 'TSS',         defaultOn: true  },
+  { key: 'elevation',         label: 'Elevation',   defaultOn: false },
+  { key: 'power_meter',       label: 'Power Meter', defaultOn: true  },
+];
+
+const DEFAULT_COLS = new Set(ALL_COLUMNS.filter(c => c.defaultOn).map(c => c.key)) as Set<ColKey>;
+const COLS_STORAGE_KEY = 'activities-visible-cols-v1';
+
+function loadSavedCols(): Set<ColKey> {
+  try {
+    const saved = localStorage.getItem(COLS_STORAGE_KEY);
+    if (saved) return new Set(JSON.parse(saved) as ColKey[]);
+  } catch {}
+  return new Set(DEFAULT_COLS);
+}
+
 function fmt(seconds: number): string {
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
@@ -172,6 +196,21 @@ export default function ActivitiesList() {
       setGearList(data.gear ?? []);
       setNoGearCount(data.noGearCount ?? 0);
     }
+  }
+
+  // Column visibility
+  const [visibleCols, setVisibleCols] = useState<Set<ColKey>>(() =>
+    typeof window !== 'undefined' ? loadSavedCols() : new Set(DEFAULT_COLS)
+  );
+  const [colPickerOpen, setColPickerOpen] = useState(false);
+
+  function toggleCol(key: ColKey) {
+    setVisibleCols(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      try { localStorage.setItem(COLS_STORAGE_KEY, JSON.stringify([...next])); } catch {}
+      return next;
+    });
   }
 
   // Filter panel visibility
@@ -402,6 +441,48 @@ export default function ActivitiesList() {
                 Synced {timeAgo(lastSync)}
               </span>
             )}
+
+            {/* Column picker */}
+            <div className="relative">
+              <button
+                onClick={() => setColPickerOpen(v => !v)}
+                title="Show/hide columns"
+                className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors ${
+                  colPickerOpen
+                    ? 'bg-orange-500/20 text-orange-400 border border-orange-500/50'
+                    : 'bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700'
+                }`}
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+              </button>
+              {colPickerOpen && (
+                <div className="absolute right-0 top-10 z-40 w-44 bg-gray-900 border border-gray-700 rounded-xl shadow-2xl py-2">
+                  <p className="text-[10px] text-gray-500 uppercase tracking-wider px-3 pb-1.5">Columns</p>
+                  {ALL_COLUMNS.map(col => (
+                    <button
+                      key={col.key}
+                      onClick={() => toggleCol(col.key)}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-gray-800 transition-colors text-left"
+                    >
+                      <span className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${
+                        visibleCols.has(col.key)
+                          ? 'bg-orange-500 border-orange-500'
+                          : 'border-gray-600'
+                      }`}>
+                        {visibleCols.has(col.key) && (
+                          <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </span>
+                      <span className={visibleCols.has(col.key) ? 'text-white' : 'text-gray-400'}>{col.label}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
 
             {/* Power meter sync */}
             <button
@@ -679,44 +760,47 @@ export default function ActivitiesList() {
               </th>
               <th className="text-left px-4 py-3 text-gray-400 font-medium">Type</th>
               <th className="text-left px-4 py-3 text-gray-400 font-medium">Name</th>
-              <th
-                className="text-right px-4 py-3 text-gray-400 font-medium cursor-pointer hover:text-white select-none whitespace-nowrap"
-                onClick={() => handleSort('distance')}
-              >
-                Dist <SortArrow col="distance" sortBy={sortBy} sortDir={sortDir} />
-              </th>
-              <th
-                className="text-right px-4 py-3 text-gray-400 font-medium cursor-pointer hover:text-white select-none whitespace-nowrap"
-                onClick={() => handleSort('moving_time')}
-              >
-                Time <SortArrow col="moving_time" sortBy={sortBy} sortDir={sortDir} />
-              </th>
-              <th
-                className="text-right px-4 py-3 text-gray-400 font-medium cursor-pointer hover:text-white select-none whitespace-nowrap"
-                onClick={() => handleSort('average_watts')}
-              >
-                Avg W <SortArrow col="average_watts" sortBy={sortBy} sortDir={sortDir} />
-              </th>
-              <th
-                className="text-right px-4 py-3 text-gray-400 font-medium cursor-pointer hover:text-white select-none whitespace-nowrap"
-                onClick={() => handleSort('average_heartrate')}
-              >
-                Avg HR <SortArrow col="average_heartrate" sortBy={sortBy} sortDir={sortDir} />
-              </th>
-              <th
-                className="text-right px-4 py-3 text-gray-400 font-medium cursor-pointer hover:text-white select-none whitespace-nowrap"
-                onClick={() => handleSort('tss')}
-              >
-                TSS <SortArrow col="tss" sortBy={sortBy} sortDir={sortDir} />
-              </th>
-              <th className="text-left px-4 py-3 text-gray-400 font-medium whitespace-nowrap">Power Meter</th>
+              {visibleCols.has('distance') && (
+                <th className="text-right px-4 py-3 text-gray-400 font-medium cursor-pointer hover:text-white select-none whitespace-nowrap" onClick={() => handleSort('distance')}>
+                  Dist <SortArrow col="distance" sortBy={sortBy} sortDir={sortDir} />
+                </th>
+              )}
+              {visibleCols.has('moving_time') && (
+                <th className="text-right px-4 py-3 text-gray-400 font-medium cursor-pointer hover:text-white select-none whitespace-nowrap" onClick={() => handleSort('moving_time')}>
+                  Time <SortArrow col="moving_time" sortBy={sortBy} sortDir={sortDir} />
+                </th>
+              )}
+              {visibleCols.has('average_watts') && (
+                <th className="text-right px-4 py-3 text-gray-400 font-medium cursor-pointer hover:text-white select-none whitespace-nowrap" onClick={() => handleSort('average_watts')}>
+                  Avg W <SortArrow col="average_watts" sortBy={sortBy} sortDir={sortDir} />
+                </th>
+              )}
+              {visibleCols.has('normalized_power') && (
+                <th className="text-right px-4 py-3 text-gray-400 font-medium whitespace-nowrap">NP</th>
+              )}
+              {visibleCols.has('average_heartrate') && (
+                <th className="text-right px-4 py-3 text-gray-400 font-medium cursor-pointer hover:text-white select-none whitespace-nowrap" onClick={() => handleSort('average_heartrate')}>
+                  Avg HR <SortArrow col="average_heartrate" sortBy={sortBy} sortDir={sortDir} />
+                </th>
+              )}
+              {visibleCols.has('tss') && (
+                <th className="text-right px-4 py-3 text-gray-400 font-medium cursor-pointer hover:text-white select-none whitespace-nowrap" onClick={() => handleSort('tss')}>
+                  TSS <SortArrow col="tss" sortBy={sortBy} sortDir={sortDir} />
+                </th>
+              )}
+              {visibleCols.has('elevation') && (
+                <th className="text-right px-4 py-3 text-gray-400 font-medium whitespace-nowrap">Elev</th>
+              )}
+              {visibleCols.has('power_meter') && (
+                <th className="text-left px-4 py-3 text-gray-400 font-medium whitespace-nowrap">Power Meter</th>
+              )}
             </tr>
           </thead>
           <tbody>
             {loading
               ? Array.from({ length: 10 }).map((_, i) => (
                   <tr key={i} className="border-b border-gray-800/50">
-                    {Array.from({ length: 9 }).map((_, j) => (
+                    {Array.from({ length: 3 + visibleCols.size }).map((_, j) => (
                       <td key={j} className="px-4 py-3">
                         <div className="h-4 bg-gray-800 rounded animate-pulse" />
                       </td>
@@ -747,24 +831,46 @@ export default function ActivitiesList() {
                           {a.name}
                         </Link>
                       </td>
-                      <td className="px-4 py-3 text-right text-gray-300">
-                        {a.distance > 0 ? `${(a.distance / 1000).toFixed(1)}` : '—'}
-                      </td>
-                      <td className="px-4 py-3 text-right text-gray-300">{fmt(a.moving_time)}</td>
-                      <td className="px-4 py-3 text-right text-gray-300">
-                        {a.average_watts ? `${Math.round(a.average_watts)}W` : '—'}
-                      </td>
-                      <td className="px-4 py-3 text-right text-gray-300">
-                        {a.average_heartrate ? Math.round(a.average_heartrate) : '—'}
-                      </td>
-                      <td className="px-4 py-3 text-right text-gray-300">
-                        {a.tss ? Math.round(a.tss) : '—'}
-                      </td>
-                      <td className="px-4 py-3 text-left whitespace-nowrap">
-                        {a.power_meter
-                          ? <span className="text-blue-400/80 text-xs">{a.power_meter}</span>
-                          : <span className="text-gray-700">—</span>}
-                      </td>
+                      {visibleCols.has('distance') && (
+                        <td className="px-4 py-3 text-right text-gray-300">
+                          {a.distance > 0 ? `${(a.distance / 1000).toFixed(1)}` : '—'}
+                        </td>
+                      )}
+                      {visibleCols.has('moving_time') && (
+                        <td className="px-4 py-3 text-right text-gray-300">{fmt(a.moving_time)}</td>
+                      )}
+                      {visibleCols.has('average_watts') && (
+                        <td className="px-4 py-3 text-right text-gray-300">
+                          {a.average_watts ? `${Math.round(a.average_watts)}W` : '—'}
+                        </td>
+                      )}
+                      {visibleCols.has('normalized_power') && (
+                        <td className="px-4 py-3 text-right text-gray-300">
+                          {a.normalized_power ? `${Math.round(a.normalized_power)}W` : '—'}
+                        </td>
+                      )}
+                      {visibleCols.has('average_heartrate') && (
+                        <td className="px-4 py-3 text-right text-gray-300">
+                          {a.average_heartrate ? Math.round(a.average_heartrate) : '—'}
+                        </td>
+                      )}
+                      {visibleCols.has('tss') && (
+                        <td className="px-4 py-3 text-right text-gray-300">
+                          {a.tss ? Math.round(a.tss) : '—'}
+                        </td>
+                      )}
+                      {visibleCols.has('elevation') && (
+                        <td className="px-4 py-3 text-right text-gray-300">
+                          {a.total_elevation_gain > 0 ? `${Math.round(a.total_elevation_gain)}m` : '—'}
+                        </td>
+                      )}
+                      {visibleCols.has('power_meter') && (
+                        <td className="px-4 py-3 text-left whitespace-nowrap">
+                          {a.power_meter
+                            ? <span className="text-blue-400/80 text-xs">{a.power_meter}</span>
+                            : <span className="text-gray-700">—</span>}
+                        </td>
+                      )}
                     </tr>
                   );
                 })}
