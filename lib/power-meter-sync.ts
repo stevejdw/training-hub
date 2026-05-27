@@ -71,7 +71,7 @@ export async function syncPowerMeters(oldest: string, newest: string): Promise<n
       SET power_meter        = u.pm,
           power_meter_serial = u.serial
       FROM unnest($1::timestamptz[], $2::text[], $3::text[]) AS u(ts, pm, serial)
-      WHERE ABS(EXTRACT(EPOCH FROM (a.start_date - u.ts))) < 2
+      WHERE ABS(EXTRACT(EPOCH FROM (a.start_date - u.ts))) < 60
         AND (a.power_meter IS DISTINCT FROM u.pm
              OR a.power_meter_serial IS DISTINCT FROM u.serial)
     `, [timestamps, displayNames, serials]);
