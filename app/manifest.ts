@@ -1,6 +1,12 @@
 import type { MetadataRoute } from 'next';
+import { getProfile } from '@/lib/profile';
 
-export default function manifest(): MetadataRoute.Manifest {
+export const dynamic = 'force-dynamic';
+
+export default async function manifest(): Promise<MetadataRoute.Manifest> {
+  const profile = await getProfile().catch(() => null);
+  const icon = profile?.app_icon ?? 'speed';
+
   return {
     name: 'Training Hub',
     short_name: 'Training',
@@ -12,13 +18,8 @@ export default function manifest(): MetadataRoute.Manifest {
     orientation: 'portrait',
     icons: [
       {
-        src: '/icon-192.png',
-        sizes: '192x192',
-        type: 'image/png',
-      },
-      {
-        src: '/icon-512.png',
-        sizes: '512x512',
+        src: `/app-icon-${icon}.png`,
+        sizes: '1248x1248',
         type: 'image/png',
       },
     ],

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { SPORT_FILTER_LABELS, SportFilter, sportLabel, sportColor } from '@/lib/sport-types';
@@ -216,101 +216,6 @@ export default function ActivitiesList() {
   // Filter panel visibility
   const [showFilters, setShowFilters] = useState(false);
 
-  // Power meter backfill state
-  const [pmSyncing, setPmSyncing] = useState(false);
-  const [pmResult,  setPmResult]  = useState<string | null>(null);
-
-  async function handlePowerMeterSync() {
-    if (pmSyncing) return;
-    setPmSyncing(true);
-    setPmResult(null);
-    try {
-      const res = await fetch('/api/activities/backfill-power-meter', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
-      });
-      const d = await res.json() as {
-        updated?: number; no_match?: number; icu_with_power_meter?: number;
-        total_icu?: number; error?: string;
-      };
-      if (d.error) throw new Error(d.error);
-      if ((d.updated ?? 0) > 0) {
-        setPmResult(`✓ Updated ${d.updated} of ${d.icu_with_power_meter} activities with power meter data`);
-        setPage(1);
-        setSelected(prev => [...prev]);
-      } else {
-        setPmResult(`Already up to date — ${d.icu_with_power_meter ?? 0} activities have power meter data`);
-      }
-    } catch (err) {
-      setPmResult(`Failed: ${err instanceof Error ? err.message : String(err)}`);
-    } finally {
-      setPmSyncing(false);
-      setTimeout(() => setPmResult(null), 30000);
-    }
-  }
-
-  // Manual sync state
-  const [syncing,     setSyncing]     = useState(false);
-  const [syncResult,  setSyncResult]  = useState<string | null>(null);
-  const [lastSync,    setLastSync]    = useState<string | null>(null);
-
-  // Fetch last-synced timestamp on mount and after every manual sync
-  const refreshLastSync = useCallback(async () => {
-    try {
-      const r = await fetch('/api/sync', { method: 'GET' });
-      const d = await r.json() as { last_sync: string | null };
-      setLastSync(d.last_sync);
-    } catch { /* non-fatal */ }
-  }, []);
-
-  useEffect(() => { refreshLastSync(); }, [refreshLastSync]);
-
-  async function handleSync() {
-    if (syncing) return;
-    setSyncing(true);
-    setSyncResult(null);
-
-    // Cold-lambda + cold-Neon-SSL sometimes makes the first request flake.
-    // Retry once silently before surfacing an error.
-    async function doSync(): Promise<{ synced?: number; names?: string[]; error?: string }> {
-      const r = await fetch('/api/sync', { method: 'POST' });
-      const text = await r.text();
-      try {
-        return JSON.parse(text) as { synced?: number; names?: string[]; error?: string };
-      } catch {
-        throw new Error(`HTTP ${r.status}: ${text.slice(0, 200)}`);
-      }
-    }
-
-    let d: { synced?: number; names?: string[]; error?: string };
-    try {
-      try {
-        d = await doSync();
-        if (d.error) throw new Error(d.error);
-      } catch {
-        // warm the lambda and retry once
-        await new Promise(res => setTimeout(res, 500));
-        d = await doSync();
-        if (d.error) throw new Error(d.error);
-      }
-      if (d.synced === 0) {
-        setSyncResult('Already up to date');
-      } else {
-        setSyncResult(`✓ Synced ${d.synced} new activit${d.synced === 1 ? 'y' : 'ies'}`);
-        // Refresh the list
-        setPage(1);
-        setSelected(prev => [...prev]); // trigger re-fetch
-      }
-      refreshLastSync();
-    } catch (err) {
-      setSyncResult(`Sync failed: ${err instanceof Error ? err.message : String(err)}`);
-    } finally {
-      setSyncing(false);
-      setTimeout(() => setSyncResult(null), 6000);
-    }
-  }
-
   function toggleType(f: SportFilter) {
     setSelected(prev => prev.includes(f) ? prev.filter(x => x !== f) : [...prev, f]);
     setPage(1);
@@ -371,18 +276,6 @@ export default function ActivitiesList() {
   return (
     <div className="h-full flex flex-col md:max-w-5xl md:mx-auto md:w-full">
 
-      {/* Fixed-position toast for power meter sync result */}
-      {pmResult && (
-        <div
-          className={`fixed top-6 left-1/2 -translate-x-1/2 z-50 px-4 py-3 rounded-xl shadow-2xl text-sm font-medium max-w-sm w-max text-center
-            ${pmResult.startsWith('Failed')
-              ? 'bg-red-900 text-red-200 border border-red-600'
-              : 'bg-green-900 text-green-200 border border-green-600'}`}
-        >
-          {pmResult}
-        </div>
-      )}
-
       {/* Top bar */}
       <div className="border-b border-gray-800 px-3 py-2.5 flex-shrink-0 space-y-2">
         <div className="flex items-center gap-2">
@@ -432,16 +325,6 @@ export default function ActivitiesList() {
               </svg>
             </button>
 
-            {/* Last-synced indicator */}
-            {lastSync && (
-              <span
-                className="text-[11px] text-gray-500 whitespace-nowrap"
-                title={new Date(lastSync).toLocaleString()}
-              >
-                Synced {timeAgo(lastSync)}
-              </span>
-            )}
-
             {/* Column picker */}
             <div className="relative">
               <button
@@ -484,52 +367,8 @@ export default function ActivitiesList() {
               )}
             </div>
 
-            {/* Power meter sync */}
-            <button
-              onClick={handlePowerMeterSync}
-              disabled={pmSyncing}
-              title={pmSyncing ? 'Syncing power meter data…' : 'Sync power meter data from intervals.icu'}
-              className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors ${
-                pmSyncing
-                  ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
-                  : 'bg-gray-800 text-blue-400/60 hover:text-blue-400 hover:bg-gray-700'
-              }`}
-            >
-              <svg
-                className={`w-4 h-4 ${pmSyncing ? 'animate-pulse' : ''}`}
-                fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-            </button>
-
-            {/* Sync */}
-            <button
-              onClick={handleSync}
-              disabled={syncing}
-              title={syncing ? 'Syncing…' : 'Sync from Strava'}
-              className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors ${
-                syncing
-                  ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
-                  : 'bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700'
-              }`}
-            >
-              <svg
-                className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`}
-                fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
-              >
-                <path strokeLinecap="round" strokeLinejoin="round"
-                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-            </button>
           </div>
         </div>
-
-        {syncResult && (
-          <p className={`text-xs ${syncResult.startsWith('Error') ? 'text-red-400' : 'text-green-400'}`}>
-            {syncResult}
-          </p>
-        )}
 
         {/* Expanded filter panel */}
         {showFilters && (

@@ -41,6 +41,14 @@ export default function SettingsContent() {
   const [streamBackfillLog, setStreamBackfillLog]             = useState<string[]>([]);
   const [streamBackfillDone, setStreamBackfillDone]           = useState(false);
 
+  // Strava recent sync state
+  const [stravaSyncing, setStravaSyncing] = useState(false);
+  const [stravaSyncLog, setStravaSyncLog] = useState<string[]>([]);
+
+  // Power meter backfill state
+  const [pmSyncing, setPmSyncing] = useState(false);
+  const [pmSyncLog, setPmSyncLog] = useState<string[]>([]);
+
   // intervals.icu sync state
   const [wellnessStatus, setWellnessStatus]   = useState<WellnessStatus | null>(null);
   const [wellnessLoading, setWellnessLoading] = useState(false);
@@ -175,6 +183,56 @@ export default function SettingsContent() {
     }
   }
 
+  async function runStravaSync() {
+    if (stravaSyncing) return;
+    setStravaSyncing(true);
+    setStravaSyncLog([]);
+    async function doSync(): Promise<{ synced?: number; error?: string }> {
+      const r = await fetch('/api/sync', { method: 'POST' });
+      const text = await r.text();
+      try { return JSON.parse(text) as { synced?: number; error?: string }; }
+      catch { throw new Error(`HTTP ${r.status}: ${text.slice(0, 200)}`); }
+    }
+    try {
+      let d: { synced?: number; error?: string };
+      try { d = await doSync(); if (d.error) throw new Error(d.error); }
+      catch {
+        await new Promise(res => setTimeout(res, 500));
+        d = await doSync();
+        if (d.error) throw new Error(d.error);
+      }
+      setStravaSyncLog([d.synced === 0 ? 'Already up to date' : `Synced ${d.synced} new activit${d.synced === 1 ? 'y' : 'ies'}`]);
+    } catch (err) {
+      setStravaSyncLog([`Failed: ${String(err)}`]);
+    } finally {
+      setStravaSyncing(false);
+    }
+  }
+
+  async function runPmBackfill() {
+    if (pmSyncing) return;
+    setPmSyncing(true);
+    setPmSyncLog([]);
+    try {
+      const res = await fetch('/api/activities/backfill-power-meter', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      const d = await res.json() as { updated?: number; icu_with_power_meter?: number; error?: string };
+      if (d.error) throw new Error(d.error);
+      if ((d.updated ?? 0) > 0) {
+        setPmSyncLog([`Updated ${d.updated} of ${d.icu_with_power_meter} activities with power meter data`]);
+      } else {
+        setPmSyncLog([`Already up to date — ${d.icu_with_power_meter ?? 0} activities have power meter data`]);
+      }
+    } catch (err) {
+      setPmSyncLog([`Failed: ${String(err)}`]);
+    } finally {
+      setPmSyncing(false);
+    }
+  }
+
   async function saveIntervalsCreds() {
     update('intervals_athlete_id', intervalsCreds.id.trim());
     update('intervals_api_key',    intervalsCreds.key.trim());
@@ -296,6 +354,33 @@ export default function SettingsContent() {
             <div className="w-4 h-4 rounded" style={{ background: '#f97316' }} />
           </div>
         </button>
+
+        {/* App icon */}
+        <div className="space-y-2">
+          <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Home Screen Icon</p>
+          <div className="grid grid-cols-4 gap-2">
+            {([
+              { id: 'gear'       as const, label: 'Gear'       },
+              { id: 'minimalist' as const, label: 'Minimal'    },
+              { id: 'path'       as const, label: 'Path'       },
+              { id: 'speed'      as const, label: 'Speed'      },
+            ]).map(({ id, label }) => {
+              const active = (profile.app_icon ?? 'speed') === id;
+              return (
+                <button
+                  key={id}
+                  onClick={() => { update('app_icon', id); save(); }}
+                  className={`flex flex-col items-center gap-1.5 p-2 rounded-xl border-2 transition-colors ${active ? 'border-orange-500 bg-orange-500/10' : 'border-gray-700 hover:border-gray-600'}`}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={`/app-icon-${id}.png`} alt={label} className="w-14 h-14 rounded-xl object-cover" />
+                  <span className={`text-[10px] font-semibold ${active ? 'text-orange-400' : 'text-gray-400'}`}>{label}</span>
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-[10px] text-gray-600">Takes effect when you re-add the app to your home screen.</p>
+        </div>
       </div>
 
       {/* AI Settings */}
@@ -728,6 +813,73 @@ export default function SettingsContent() {
             ))}
           </div>
         )}
+      </div>
+
+      {/* Activity Sync */}
+      <div className="bg-gray-900 rounded-xl p-5 space-y-4 border border-gray-800">
+        <div>
+          <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Activity Sync</h2>
+          <p className="text-xs text-gray-500 mt-1">
+            Sync recent activities from Strava and update power meter data from intervals.icu.
+          </p>
+        </div>
+
+        {/* Strava recent sync */}
+        <div className="space-y-2">
+          <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Strava Recent Sync</h3>
+          <p className="text-xs text-gray-500">Pull in new activities from the past few weeks.</p>
+          <button
+            onClick={runStravaSync}
+            disabled={stravaSyncing}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-white text-sm font-medium transition-colors"
+          >
+            {stravaSyncing ? (
+              <>
+                <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                  <circle cx="12" cy="12" r="10" strokeOpacity={0.25} />
+                  <path d="M12 2a10 10 0 0 1 10 10" />
+                </svg>
+                Syncing…
+              </>
+            ) : 'Sync from Strava'}
+          </button>
+          {stravaSyncLog.length > 0 && (
+            <div className="bg-gray-950 rounded-lg p-3 space-y-1">
+              {stravaSyncLog.map((line, i) => (
+                <p key={i} className="text-[11px] text-gray-400 font-mono">{line}</p>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="border-t border-gray-800" />
+
+        {/* Power meter backfill */}
+        <div className="space-y-2">
+          <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Power Meter Data</h3>
+          <p className="text-xs text-gray-500">Backfill power meter device names from intervals.icu across all activities.</p>
+          <button
+            onClick={runPmBackfill}
+            disabled={pmSyncing}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-white text-sm font-medium transition-colors"
+          >
+            {pmSyncing ? (
+              <>
+                <svg className="w-4 h-4 animate-pulse" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                Syncing…
+              </>
+            ) : 'Sync power meter data'}
+          </button>
+          {pmSyncLog.length > 0 && (
+            <div className="bg-gray-950 rounded-lg p-3 space-y-1">
+              {pmSyncLog.map((line, i) => (
+                <p key={i} className="text-[11px] text-gray-400 font-mono">{line}</p>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="flex justify-between items-center">

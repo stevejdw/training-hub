@@ -91,7 +91,8 @@ export interface AthleteProfile {
   tss_plan?: TssPlanConfig;
   // Activity IDs excluded from aerobic efficiency analysis
   excluded_rides?: number[];
-
+  // PWA home screen icon
+  app_icon?: 'gear' | 'minimalist' | 'path' | 'speed';
 }
 
 export interface TssPlanConfig {
