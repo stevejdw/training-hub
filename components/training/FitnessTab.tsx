@@ -12,6 +12,24 @@ interface FitnessPoint { date: string; atl: number; ctl: number; tsb: number }
 interface EftpPoint { date: string; eftp: number; vo2max: number | null }
 interface EftpHistoryResponse { points: EftpPoint[]; weight: number | null }
 
+type EftpPeriod = '3m' | '6m' | '1y' | 'all';
+const EFTP_PERIODS: { key: EftpPeriod; label: string; days: number }[] = [
+  { key: '3m',  label: '3m',  days: 90  },
+  { key: '6m',  label: '6m',  days: 180 },
+  { key: '1y',  label: '1y',  days: 365 },
+  { key: 'all', label: 'All', days: 9999 },
+];
+
+function getEftpWindow(allPoints: EftpPoint[], period: EftpPeriod, offset: number): EftpPoint[] {
+  if (period === 'all' || allPoints.length === 0) return allPoints;
+  const periodDays = EFTP_PERIODS.find(p => p.key === period)!.days;
+  const endMs   = Date.now() - offset * periodDays * 86400000;
+  const startMs = endMs - periodDays * 86400000;
+  const endDate   = new Date(endMs).toISOString().slice(0, 10);
+  const startDate = new Date(startMs).toISOString().slice(0, 10);
+  return allPoints.filter(p => p.date >= startDate && p.date <= endDate);
+}
+
 const FITNESS_CACHE_KEY = (d: number) => `cache-fitness-${d}`;
 const INITIAL_FITNESS_DAYS = 90;
 
@@ -185,6 +203,33 @@ export default function FitnessTab() {
     'cache-eftp-history',
   );
 
+  const [eftpPeriod, setEftpPeriod] = useState<EftpPeriod>('6m');
+  const [eftpOffset, setEftpOffset] = useState(0);
+
+  const allEftpPoints = eftpData?.points ?? [];
+  const eftpPoints    = getEftpWindow(allEftpPoints, eftpPeriod, eftpOffset);
+  const vo2Points     = eftpPoints.filter(p => p.vo2max != null);
+
+  const periodDays     = EFTP_PERIODS.find(p => p.key === eftpPeriod)!.days;
+  const canGoForward   = eftpOffset > 0;
+  const canGoBack      = eftpPeriod !== 'all' && allEftpPoints.length > 0 && (() => {
+    const startMs = Date.now() - (eftpOffset + 1) * periodDays * 86400000;
+    const startDate = new Date(startMs).toISOString().slice(0, 10);
+    return allEftpPoints.some(p => p.date < startDate || p.date >= startDate);
+  })();
+
+  function handleEftpPeriodChange(p: EftpPeriod) {
+    setEftpPeriod(p);
+    setEftpOffset(0);
+  }
+
+  const fmtEftpTick = (s: string) => {
+    const d = new Date(s + 'T00:00:00');
+    if (eftpPeriod === '3m') return d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
+    if (eftpPeriod === '6m') return d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
+    return d.toLocaleDateString('en-AU', { month: 'short', year: '2-digit' });
+  };
+
   const latest   = data[data.length - 1];
   const tsbColor = (v: number) => v >= 5 ? '#34d399' : v <= -20 ? '#f87171' : '#facc15';
   const tsbLabel = (v: number) => v >= 5 ? 'Fresh' : v <= -20 ? 'Fatigued' : 'Neutral';
@@ -306,20 +351,61 @@ export default function FitnessTab() {
         <div><span className="text-green-400 font-medium">TSB</span> — Form = CTL − ATL. Positive = fresh, negative = tired.</div>
       </div>
 
+      {/* Period selector + nav — shared by eFTP and VO₂ charts */}
+      <div className="flex items-center gap-2">
+        <div className="flex flex-1 bg-gray-800 rounded-xl p-1 gap-1">
+          {EFTP_PERIODS.map(p => (
+            <button
+              key={p.key}
+              onClick={() => handleEftpPeriodChange(p.key)}
+              className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                eftpPeriod === p.key ? 'bg-orange-500 text-white' : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+        {eftpPeriod !== 'all' && (
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setEftpOffset(o => o + 1)}
+              disabled={!canGoBack}
+              className="p-1.5 rounded-lg bg-gray-800 text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              aria-label="Previous period"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+            <button
+              onClick={() => setEftpOffset(o => Math.max(0, o - 1))}
+              disabled={!canGoForward}
+              className="p-1.5 rounded-lg bg-gray-800 text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              aria-label="Next period"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          </div>
+        )}
+      </div>
+
       {/* eFTP trend */}
       <div className="bg-gray-900 rounded-xl border border-gray-800 p-4">
         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4">Estimated FTP (eFTP)</p>
         {eftpLoading ? (
           <div className="h-48 animate-pulse bg-gray-800 rounded-lg" />
-        ) : !eftpData?.points?.length ? (
-          <div className="h-48 flex items-center justify-center text-gray-500 text-sm">No data</div>
+        ) : !eftpPoints.length ? (
+          <div className="h-48 flex items-center justify-center text-gray-500 text-sm">No data for this period</div>
         ) : (
           <ResponsiveContainer width="100%" height={200}>
-            <LineChart data={eftpData.points} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+            <LineChart data={eftpPoints} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
               <XAxis
                 dataKey="date"
-                tickFormatter={fmtDate}
+                tickFormatter={fmtEftpTick}
                 tick={{ fill: '#6b7280', fontSize: 10 }}
                 axisLine={false}
                 tickLine={false}
@@ -343,15 +429,15 @@ export default function FitnessTab() {
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4">VO₂ Max (estimated)</p>
           {eftpLoading ? (
             <div className="h-48 animate-pulse bg-gray-800 rounded-lg" />
-          ) : !eftpData?.points?.length ? (
-            <div className="h-48 flex items-center justify-center text-gray-500 text-sm">No data</div>
+          ) : !vo2Points.length ? (
+            <div className="h-48 flex items-center justify-center text-gray-500 text-sm">No data for this period</div>
           ) : (
             <ResponsiveContainer width="100%" height={200}>
-              <LineChart data={eftpData.points.filter(p => p.vo2max != null)} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+              <LineChart data={vo2Points} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
                 <XAxis
                   dataKey="date"
-                  tickFormatter={fmtDate}
+                  tickFormatter={fmtEftpTick}
                   tick={{ fill: '#6b7280', fontSize: 10 }}
                   axisLine={false}
                   tickLine={false}
