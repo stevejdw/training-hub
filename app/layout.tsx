@@ -3,29 +3,19 @@ import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 import Nav from '@/components/Nav';
 import ThemeProvider from '@/components/ThemeProvider';
-import { getProfile } from '@/lib/profile';
 
 const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] });
 const geistMono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin'] });
 
-export const dynamic = 'force-dynamic';
-
-export async function generateMetadata(): Promise<Metadata> {
-  const profile = await getProfile().catch(() => null);
-  const icon = profile?.app_icon ?? 'speed';
-  return {
+export const metadata: Metadata = {
+  title: 'Training Hub',
+  description: 'Cycling training analytics and coaching',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black',
     title: 'Training Hub',
-    description: 'Cycling training analytics and coaching',
-    appleWebApp: {
-      capable: true,
-      statusBarStyle: 'black',
-      title: 'Training Hub',
-    },
-    icons: {
-      apple: `/app-icon-${icon}.png`,
-    },
-  };
-}
+  },
+};
 
 export const viewport: Viewport = {
   width: 'device-width',
