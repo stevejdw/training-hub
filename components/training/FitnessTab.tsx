@@ -30,6 +30,16 @@ function getEftpWindow(allPoints: EftpPoint[], period: EftpPeriod, offset: numbe
   return allPoints.filter(p => p.date >= startDate && p.date <= endDate);
 }
 
+function aggregateMonthly(points: EftpPoint[]): EftpPoint[] {
+  const byMonth = new Map<string, EftpPoint>();
+  for (const p of points) {
+    const month = p.date.slice(0, 7); // "YYYY-MM"
+    const existing = byMonth.get(month);
+    if (!existing || p.eftp > existing.eftp) byMonth.set(month, p);
+  }
+  return Array.from(byMonth.values()).sort((a, b) => a.date.localeCompare(b.date));
+}
+
 const FITNESS_CACHE_KEY = (d: number) => `cache-fitness-${d}`;
 const INITIAL_FITNESS_DAYS = 90;
 
@@ -206,9 +216,10 @@ export default function FitnessTab() {
   const [eftpPeriod, setEftpPeriod] = useState<EftpPeriod>('6m');
   const [eftpOffset, setEftpOffset] = useState(0);
 
-  const allEftpPoints = eftpData?.points ?? [];
-  const eftpPoints    = getEftpWindow(allEftpPoints, eftpPeriod, eftpOffset);
-  const vo2Points     = eftpPoints.filter(p => p.vo2max != null);
+  const allEftpPoints  = eftpData?.points ?? [];
+  const windowPoints   = getEftpWindow(allEftpPoints, eftpPeriod, eftpOffset);
+  const eftpPoints     = (eftpPeriod === '6m' || eftpPeriod === '1y') ? aggregateMonthly(windowPoints) : windowPoints;
+  const vo2Points      = eftpPoints.filter(p => p.vo2max != null);
 
   const periodDays     = EFTP_PERIODS.find(p => p.key === eftpPeriod)!.days;
   const canGoForward   = eftpOffset > 0;
