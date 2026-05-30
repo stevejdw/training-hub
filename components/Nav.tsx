@@ -33,6 +33,14 @@ export default function Nav() {
   const pathname = usePathname();
 
   const [middle, setMiddle] = useState<string[]>(DEFAULT_MIDDLE);
+  const [appIcon, setAppIcon] = useState<string>('speed');
+
+  useEffect(() => {
+    fetch('/api/profile')
+      .then(r => r.json())
+      .then((p: { app_icon?: string }) => { if (p.app_icon) setAppIcon(p.app_icon); })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     setMiddle(loadMiddle());
@@ -72,7 +80,7 @@ export default function Nav() {
         <nav className="w-full max-w-5xl mx-auto px-8 flex gap-1 flex-wrap items-center">
           {/* Logo */}
           <Link href="/home" className="mr-2 flex-shrink-0">
-            <Image src="/logo.png" alt="Training Hub" width={36} height={36} className="rounded-lg" />
+            <Image src={`/app-icon-${appIcon}.png`} alt="Training Hub" width={36} height={36} className="rounded-lg" />
           </Link>
           {desktopItems.map(({ key, href, label, icon, matchPrefixes }) => {
             const prefixes = key === 'more' ? desktopMorePrefixes : matchPrefixes;
