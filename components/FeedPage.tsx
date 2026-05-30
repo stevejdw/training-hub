@@ -566,16 +566,16 @@ export default function FeedPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <FitnessSummary fitness={data?.fitness} />
 
-          <Link href="/training?tab=progress#weekly-tss" className="block group">
-            <div className="bg-gray-800/60 rounded-2xl border border-transparent hover:border-gray-700 hover:bg-gray-800/80 transition-colors overflow-hidden h-full">
-              <div className="px-3 pt-2.5 pb-1">
+          <div className="bg-gray-800/60 rounded-2xl border border-gray-700/40 overflow-hidden h-full">
+            <div className="px-3 pt-2.5 pb-1">
+              <Link href="/training?tab=progress#weekly-tss" className="inline-flex items-center group">
                 <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider group-hover:text-orange-400 transition-colors">Weekly TSS →</p>
-              </div>
-              <div className="px-1 pb-1">
-                <TssRollingChart compact />
-              </div>
+              </Link>
             </div>
-          </Link>
+            <div className="px-1 pb-1">
+              <TssRollingChart compact />
+            </div>
+          </div>
         </div>
 
         {/* Power PRs */}

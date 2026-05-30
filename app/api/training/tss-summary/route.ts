@@ -101,12 +101,18 @@ export async function GET(req: Request) {
     ranges.push({ start: s, end: e });
   }
 
+  // Fetch 4 extra weeks before the display range to compute rolling averages for historical targets
+  const ROLLING_LOOKBACK = 4;
+  const extendedStart = new Date(ranges[0].start);
+  extendedStart.setUTCDate(extendedStart.getUTCDate() - ROLLING_LOOKBACK * 7);
+
   const startDateStr = fmtDate(ranges[0].start);
   const endDateStr   = fmtDate(ranges[ranges.length - 1].end);
+  const extStartDateStr = fmtDate(extendedStart);
 
   const client = await pool.connect();
   try {
-    // Actual TSS per day (we'll bucket into weeks client-side)
+    // Actual TSS per day — fetch from extended start (includes 4 weeks before display range for rolling avg)
     // Uses COALESCE(tss, hrss, 0) to include HR-based TSS for non-power activities.
     const actualRes = await client.query<{ d: string; tss: string }>(`
       SELECT (start_date AT TIME ZONE $1)::date::text AS d,
@@ -115,10 +121,27 @@ export async function GET(req: Request) {
       WHERE sport_type = ANY($4::text[])
         AND (start_date AT TIME ZONE $1)::date BETWEEN $2 AND $3
       GROUP BY 1
-    `, [profile.timezone || 'Australia/Sydney', startDateStr, endDateStr, CYCLING_TYPES]);
+    `, [profile.timezone || 'Australia/Sydney', extStartDateStr, endDateStr, CYCLING_TYPES]);
 
     const tssByDate = new Map<string, number>();
     for (const r of actualRes.rows) tssByDate.set(r.d, Number(r.tss));
+
+    // Build actual TSS per week-start for all weeks in extended range (for rolling avg)
+    const actualByWeekStart = new Map<string, number>();
+    {
+      const cur = new Date(extendedStart);
+      while (cur <= ranges[ranges.length - 1].end) {
+        const ws = fmtDate(cur);
+        let weekTss = 0;
+        const day = new Date(cur);
+        for (let d = 0; d < 7; d++) {
+          weekTss += tssByDate.get(fmtDate(day)) ?? 0;
+          day.setUTCDate(day.getUTCDate() + 1);
+        }
+        actualByWeekStart.set(ws, weekTss);
+        cur.setUTCDate(cur.getUTCDate() + 7);
+      }
+    }
 
     const ridesRes = await client.query<{ d: string; moving_time: number }>(`
       SELECT (start_date AT TIME ZONE $1)::date::text AS d, moving_time
@@ -169,16 +192,34 @@ export async function GET(req: Request) {
       let is_recovery   = false;
       let target_source: TssWeekPoint['target_source'] = 'none';
 
+      // Determine if this is a past week (week fully ended before today)
+      const isPastWeek = end < today;
+
       // Plan target wins whenever the active plan has TSS targets for this week.
       // Formula mode only kicks in when the plan has no target for the week.
       if (plan_tss > 0) {
         target_tss    = plan_tss;
         target_source = 'plan';
       } else if (cfg && cfg.mode === 'formula') {
-        const { target, isRecovery } = formulaTarget(start, cfg);
-        target_tss    = target;
-        is_recovery   = isRecovery;
-        target_source = 'formula';
+        if (isPastWeek) {
+          // For past weeks: use rolling 4-week average of actual TSS from preceding weeks.
+          // This gives a meaningful historical baseline rather than projecting the formula backwards.
+          let rollingSum = 0;
+          let rollingCount = 0;
+          for (let w = 1; w <= ROLLING_LOOKBACK; w++) {
+            const prevWeekStart = new Date(start);
+            prevWeekStart.setUTCDate(start.getUTCDate() - w * 7);
+            const prevActual = actualByWeekStart.get(fmtDate(prevWeekStart)) ?? 0;
+            if (prevActual > 0) { rollingSum += prevActual; rollingCount++; }
+          }
+          target_tss = rollingCount > 0 ? Math.round(rollingSum / rollingCount) : 0;
+          target_source = 'formula';
+        } else {
+          const { target, isRecovery } = formulaTarget(start, cfg);
+          target_tss    = target;
+          is_recovery   = isRecovery;
+          target_source = 'formula';
+        }
       }
 
       const ws = fmtDate(start);
