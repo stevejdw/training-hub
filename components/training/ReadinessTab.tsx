@@ -117,12 +117,6 @@ export default function ReadinessTab() {
 
   return (
     <div className="space-y-3">
-      <ChartNav
-        period={period} offset={offset}
-        hasBack={canGoBack(allPoints, period, offset)}
-        setPeriod={setPeriod} setOffset={setOffset}
-      />
-
       {/* Fatigue alert */}
       {fatigue && (
         <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-medium">
@@ -162,7 +156,14 @@ export default function ReadinessTab() {
 
       {/* Chart */}
       <div className="bg-gray-900 rounded-xl border border-gray-800 p-4">
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Daily HRV vs Normal Zone</p>
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Daily HRV vs Normal Zone</p>
+          <ChartNav
+            period={period} offset={offset}
+            hasBack={canGoBack(allPoints, period, offset)}
+            setPeriod={setPeriod} setOffset={setOffset}
+          />
+        </div>
         {zone && (
           <p className="text-[11px] text-gray-600 mb-3">
             Normal zone: {zone.lower}–{zone.upper} ms &nbsp;·&nbsp; baseline avg {zone.avg} ms

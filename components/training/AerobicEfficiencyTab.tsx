@@ -642,41 +642,6 @@ export default function AerobicEfficiencyTab() {
 
   return (
     <div className="space-y-3">
-      {/* Period nav + Zone filter */}
-      <div className="flex flex-wrap gap-2 items-center justify-between">
-        <ChartNav
-          period={period} offset={offset}
-          hasBack={canGoBack(allRides, period, offset)}
-          setPeriod={setPeriod} setOffset={setOffset}
-        />
-        <div className="flex gap-1.5">
-          {([
-            { key: 'all', label: 'All zones' },
-            { key: 'z2', label: 'Zone 2' },
-            { key: 'z3', label: 'Zone 3' },
-          ] as { key: ZoneFilter; label: string }[]).map(z => (
-            <button
-              key={z.key}
-              onClick={() => setZoneFilter(z.key)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                zoneFilter === z.key
-                  ? 'bg-blue-500/20 text-blue-400 border border-blue-500/50'
-                  : 'bg-gray-800 text-gray-500 hover:text-gray-300'
-              }`}
-            >
-              {z.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Zone filter hint */}
-      {zoneFilter !== 'all' && zoneLabel && (
-        <p className="text-[11px] text-blue-400/70 -mt-1">
-          Filtering to {zoneLabel} rides · {scatterData.length} of {allScatter.length} rides shown
-          {zoneFilter === 'z2' && ' — steady Zone 2 EF trend reflects pure aerobic base.'}
-        </p>
-      )}
 
       {/* Summary cards */}
       <div className="grid grid-cols-3 gap-2">
@@ -711,16 +676,49 @@ export default function AerobicEfficiencyTab() {
 
       {/* EF Scatter chart */}
       <div className="bg-gray-900 rounded-xl border border-gray-800 p-4">
-        <div className="flex items-start justify-between gap-2 mb-1">
-          <p className="text-[11px] text-gray-600">
-            Efficiency Factor (NP ÷ avg HR) per steady ride. Higher = better aerobic fitness. Click a dot for ride detail.
-          </p>
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Aerobic Efficiency (EF)</p>
+          <ChartNav
+            period={period} offset={offset}
+            hasBack={canGoBack(allRides, period, offset)}
+            setPeriod={setPeriod} setOffset={setOffset}
+          />
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+          <div className="flex gap-1.5">
+            {([
+              { key: 'all', label: 'All zones' },
+              { key: 'z2', label: 'Zone 2' },
+              { key: 'z3', label: 'Zone 3' },
+            ] as { key: ZoneFilter; label: string }[]).map(z => (
+              <button
+                key={z.key}
+                onClick={() => setZoneFilter(z.key)}
+                className={`px-2.5 py-1 rounded-lg text-[10px] font-medium transition-colors ${
+                  zoneFilter === z.key
+                    ? 'bg-blue-500/20 text-blue-400 border border-blue-500/50'
+                    : 'bg-gray-800 text-gray-500 hover:text-gray-300'
+                }`}
+              >
+                {z.label}
+              </button>
+            ))}
+          </div>
           {trendPct !== null && (
-            <p className={`text-[11px] font-medium flex-shrink-0 ${trendPct >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+            <p className={`text-[11px] font-medium ${trendPct >= 0 ? 'text-green-400' : 'text-red-400'}`}>
               {trendPct >= 0 ? '↑' : '↓'} {Math.abs(trendPct).toFixed(1)}% over {rangeLabel}
             </p>
           )}
         </div>
+        {zoneFilter !== 'all' && zoneLabel && (
+          <p className="text-[11px] text-blue-400/70 mb-2">
+            Filtering to {zoneLabel} · {scatterData.length} of {allScatter.length} rides shown
+            {zoneFilter === 'z2' && ' — steady Zone 2 EF trend reflects pure aerobic base.'}
+          </p>
+        )}
+        <p className="text-[11px] text-gray-600 mb-1">
+          Efficiency Factor (NP ÷ avg HR) per steady ride. Higher = better aerobic fitness. Click a dot for ride detail.
+        </p>
 
         {error ? (
           <div className="h-64 flex items-center justify-center text-red-400 text-sm">{error}</div>
