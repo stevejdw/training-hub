@@ -10,7 +10,7 @@ import {
   ReferenceArea,
 } from 'recharts';
 import { useCachedFetch } from '@/lib/use-cached-fetch';
-import DurabilityCurveChart from './DurabilityCurveChart';
+
 import ActivityMap from '@/components/ActivityMap';
 import Link from 'next/link';
 
@@ -785,9 +785,6 @@ export default function AerobicEfficiencyTab() {
           )}
         </p>
       </div>
-
-      {/* Durability Curve */}
-      <DurabilityCurveChart />
 
       {/* Single Ride Modal */}
       {selectedRide && (
