@@ -13,22 +13,67 @@ interface EftpPoint  { date: string; eftp: number }
 interface Vo2Point   { date: string; vo2max: number }
 interface EftpHistoryResponse { eftpPoints: EftpPoint[]; vo2Points: Vo2Point[]; weight: number | null }
 
-type EftpPeriod = '3m' | '6m' | '1y' | 'all';
-const EFTP_PERIODS: { key: EftpPeriod; label: string; days: number }[] = [
-  { key: '3m',  label: '3m',  days: 90  },
-  { key: '6m',  label: '6m',  days: 180 },
-  { key: '1y',  label: '1y',  days: 365 },
-  { key: 'all', label: 'All', days: 9999 },
+type ChartPeriod = '3m' | '6m' | '1y';
+const CHART_PERIODS: { key: ChartPeriod; label: string; days: number }[] = [
+  { key: '3m', label: '3m', days: 90  },
+  { key: '6m', label: '6m', days: 180 },
+  { key: '1y', label: '1y', days: 365 },
 ];
 
-function getWindow<T extends { date: string }>(allPoints: T[], period: EftpPeriod, offset: number): T[] {
-  if (period === 'all' || allPoints.length === 0) return allPoints;
-  const periodDays = EFTP_PERIODS.find(p => p.key === period)!.days;
+function getWindow<T extends { date: string }>(allPoints: T[], period: ChartPeriod, offset: number): T[] {
+  if (allPoints.length === 0) return allPoints;
+  const periodDays = CHART_PERIODS.find(p => p.key === period)!.days;
   const endMs   = Date.now() - offset * periodDays * 86400000;
   const startMs = endMs - periodDays * 86400000;
   const endDate   = new Date(endMs).toISOString().slice(0, 10);
   const startDate = new Date(startMs).toISOString().slice(0, 10);
   return allPoints.filter(p => p.date >= startDate && p.date <= endDate);
+}
+
+function canGoBack<T extends { date: string }>(allPoints: T[], period: ChartPeriod, offset: number): boolean {
+  const periodDays  = CHART_PERIODS.find(p => p.key === period)!.days;
+  const windowStart = new Date(Date.now() - (offset + 1) * periodDays * 86400000).toISOString().slice(0, 10);
+  return allPoints.some(p => p.date < windowStart);
+}
+
+interface ChartNavProps {
+  period:   ChartPeriod;
+  offset:   number;
+  hasBack:  boolean;
+  setPeriod:(p: ChartPeriod) => void;
+  setOffset:(fn: (o: number) => number) => void;
+}
+
+function ChartNav({ period, offset, hasBack, setPeriod, setOffset }: ChartNavProps) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <div className="flex bg-gray-800 rounded-lg p-0.5 gap-0.5">
+        {CHART_PERIODS.map(p => (
+          <button
+            key={p.key}
+            onClick={() => { setPeriod(p.key); setOffset(() => 0); }}
+            className={`px-2 py-1 rounded-md text-[10px] font-medium transition-colors ${
+              period === p.key ? 'bg-orange-500 text-white' : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
+      <button onClick={() => setOffset(o => o + 1)} disabled={!hasBack}
+        className="p-1 rounded-lg bg-gray-800 text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+        </svg>
+      </button>
+      <button onClick={() => setOffset(o => Math.max(0, o - 1))} disabled={offset === 0}
+        className="p-1 rounded-lg bg-gray-800 text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+        </svg>
+      </button>
+    </div>
+  );
 }
 
 function aggregateMonthlyEftp(points: EftpPoint[]): EftpPoint[] {
@@ -224,35 +269,24 @@ export default function FitnessTab() {
     'cache-eftp-history-v6',
   );
 
-  const [eftpPeriod, setEftpPeriod] = useState<EftpPeriod>('6m');
+  const [eftpPeriod, setEftpPeriod] = useState<ChartPeriod>('6m');
   const [eftpOffset, setEftpOffset] = useState(0);
+  const [vo2Period,  setVo2Period]  = useState<ChartPeriod>('6m');
+  const [vo2Offset,  setVo2Offset]  = useState(0);
 
   const allEftpPoints = eftpData?.eftpPoints ?? [];
   const allVo2Points  = eftpData?.vo2Points  ?? [];
 
-  const windowEftp  = getWindow(allEftpPoints, eftpPeriod, eftpOffset);
-  const windowVo2   = getWindow(allVo2Points,  eftpPeriod, eftpOffset);
-  const eftpPoints  = (eftpPeriod === '6m' || eftpPeriod === '1y') ? aggregateMonthlyEftp(windowEftp) : windowEftp;
-  const vo2Points   = (eftpPeriod === '6m' || eftpPeriod === '1y') ? aggregateMonthlyVo2(windowVo2)   : windowVo2;
+  const windowEftp = getWindow(allEftpPoints, eftpPeriod, eftpOffset);
+  const eftpPoints = (eftpPeriod === '6m' || eftpPeriod === '1y') ? aggregateMonthlyEftp(windowEftp) : windowEftp;
 
-  const periodDays   = EFTP_PERIODS.find(p => p.key === eftpPeriod)!.days;
-  const canGoForward = eftpOffset > 0;
-  const canGoBack    = eftpPeriod !== 'all' && allEftpPoints.length > 0 && (() => {
-    const startMs   = Date.now() - (eftpOffset + 1) * periodDays * 86400000;
-    const startDate = new Date(startMs).toISOString().slice(0, 10);
-    return allEftpPoints.some(p => p.date < startDate || p.date >= startDate);
-  })();
+  const windowVo2 = getWindow(allVo2Points, vo2Period, vo2Offset);
+  const vo2Points = (vo2Period === '6m' || vo2Period === '1y') ? aggregateMonthlyVo2(windowVo2) : windowVo2;
 
-  function handleEftpPeriodChange(p: EftpPeriod) {
-    setEftpPeriod(p);
-    setEftpOffset(0);
-  }
-
-  const fmtEftpTick = (s: string) => {
+  const fmtTick = (s: string, period: ChartPeriod) => {
     const d = new Date(s + 'T00:00:00');
-    if (eftpPeriod === '3m') return d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
-    if (eftpPeriod === '6m') return d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
-    return d.toLocaleDateString('en-AU', { month: 'short', year: '2-digit' });
+    if (period === '1y') return d.toLocaleDateString('en-AU', { month: 'short', year: '2-digit' });
+    return d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
   };
 
   const latest   = data[data.length - 1];
@@ -376,50 +410,16 @@ export default function FitnessTab() {
         <div><span className="text-green-400 font-medium">TSB</span> — Form = CTL − ATL. Positive = fresh, negative = tired.</div>
       </div>
 
-      {/* Period selector + nav — shared by eFTP and VO₂ charts */}
-      <div className="flex items-center gap-2">
-        <div className="flex flex-1 bg-gray-800 rounded-xl p-1 gap-1">
-          {EFTP_PERIODS.map(p => (
-            <button
-              key={p.key}
-              onClick={() => handleEftpPeriodChange(p.key)}
-              className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                eftpPeriod === p.key ? 'bg-orange-500 text-white' : 'text-gray-400 hover:text-white'
-              }`}
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
-        {eftpPeriod !== 'all' && (
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => setEftpOffset(o => o + 1)}
-              disabled={!canGoBack}
-              className="p-1.5 rounded-lg bg-gray-800 text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-              aria-label="Previous period"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-              </svg>
-            </button>
-            <button
-              onClick={() => setEftpOffset(o => Math.max(0, o - 1))}
-              disabled={!canGoForward}
-              className="p-1.5 rounded-lg bg-gray-800 text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-              aria-label="Next period"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
-          </div>
-        )}
-      </div>
-
       {/* eFTP trend */}
       <div className="bg-gray-900 rounded-xl border border-gray-800 p-4">
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4">Estimated FTP (eFTP)</p>
+        <div className="flex items-center justify-between mb-4">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Estimated FTP (eFTP)</p>
+          <ChartNav
+            period={eftpPeriod} offset={eftpOffset}
+            hasBack={canGoBack(allEftpPoints, eftpPeriod, eftpOffset)}
+            setPeriod={setEftpPeriod} setOffset={setEftpOffset}
+          />
+        </div>
         {eftpLoading ? (
           <div className="h-48 animate-pulse bg-gray-800 rounded-lg" />
         ) : !eftpPoints.length ? (
@@ -428,23 +428,12 @@ export default function FitnessTab() {
           <ResponsiveContainer width="100%" height={200}>
             <LineChart data={eftpPoints} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
-              <XAxis
-                dataKey="date"
-                tickFormatter={fmtEftpTick}
-                tick={{ fill: '#6b7280', fontSize: 10 }}
-                axisLine={false}
-                tickLine={false}
-                interval="preserveStartEnd"
-              />
-              <YAxis
-                tick={{ fill: '#6b7280', fontSize: 10 }} axisLine={false} tickLine={false} width={36}
-                domain={[(min: number) => Math.round(min - 15), (max: number) => Math.round(max + 10)]}
-              />
-              <Tooltip
-                contentStyle={{ background: '#111827', border: '1px solid #374151', borderRadius: 8, fontSize: 12 }}
-                labelFormatter={(s) => fmtDate(String(s))}
-                formatter={(val) => [`${val}w`, 'eFTP']}
-              />
+              <XAxis dataKey="date" tickFormatter={s => fmtTick(s, eftpPeriod)}
+                tick={{ fill: '#6b7280', fontSize: 10 }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+              <YAxis tick={{ fill: '#6b7280', fontSize: 10 }} axisLine={false} tickLine={false} width={36}
+                domain={[(min: number) => Math.round(min - 15), (max: number) => Math.round(max + 10)]} />
+              <Tooltip contentStyle={{ background: '#111827', border: '1px solid #374151', borderRadius: 8, fontSize: 12 }}
+                labelFormatter={s => fmtDate(String(s))} formatter={val => [`${val}w`, 'eFTP']} />
               <Line type="monotone" dataKey="eftp" stroke="#f97316" strokeWidth={2} dot={{ fill: '#f97316', r: 3 }} activeDot={{ r: 5 }} connectNulls />
             </LineChart>
           </ResponsiveContainer>
@@ -454,7 +443,14 @@ export default function FitnessTab() {
       {/* VO₂ Max trend — only when weight is configured */}
       {eftpData?.weight != null && (
         <div className="bg-gray-900 rounded-xl border border-gray-800 p-4">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4">VO₂ Max (estimated)</p>
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">VO₂ Max (estimated)</p>
+            <ChartNav
+              period={vo2Period} offset={vo2Offset}
+              hasBack={canGoBack(allVo2Points, vo2Period, vo2Offset)}
+              setPeriod={setVo2Period} setOffset={setVo2Offset}
+            />
+          </div>
           {eftpLoading ? (
             <div className="h-48 animate-pulse bg-gray-800 rounded-lg" />
           ) : !vo2Points.length ? (
@@ -463,23 +459,12 @@ export default function FitnessTab() {
             <ResponsiveContainer width="100%" height={200}>
               <LineChart data={vo2Points} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
-                <XAxis
-                  dataKey="date"
-                  tickFormatter={fmtEftpTick}
-                  tick={{ fill: '#6b7280', fontSize: 10 }}
-                  axisLine={false}
-                  tickLine={false}
-                  interval="preserveStartEnd"
-                />
-                <YAxis
-                  tick={{ fill: '#6b7280', fontSize: 10 }} axisLine={false} tickLine={false} width={36}
-                  domain={[(min: number) => Math.round(min - 2), (max: number) => Math.round(max + 2)]}
-                />
-                <Tooltip
-                  contentStyle={{ background: '#111827', border: '1px solid #374151', borderRadius: 8, fontSize: 12 }}
-                  labelFormatter={(s) => fmtDate(String(s))}
-                  formatter={(val) => [`${val} ml/kg/min`, 'VO₂ Max']}
-                />
+                <XAxis dataKey="date" tickFormatter={s => fmtTick(s, vo2Period)}
+                  tick={{ fill: '#6b7280', fontSize: 10 }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+                <YAxis tick={{ fill: '#6b7280', fontSize: 10 }} axisLine={false} tickLine={false} width={36}
+                  domain={[(min: number) => Math.round(min - 2), (max: number) => Math.round(max + 2)]} />
+                <Tooltip contentStyle={{ background: '#111827', border: '1px solid #374151', borderRadius: 8, fontSize: 12 }}
+                  labelFormatter={s => fmtDate(String(s))} formatter={val => [`${val} ml/kg/min`, 'VO₂ Max']} />
                 <Line type="monotone" dataKey="vo2max" stroke="#2dd4bf" strokeWidth={2} dot={{ fill: '#2dd4bf', r: 3 }} activeDot={{ r: 5 }} connectNulls />
               </LineChart>
             </ResponsiveContainer>
