@@ -8,11 +8,65 @@ import {
 import { useCachedFetch } from '@/lib/use-cached-fetch';
 import type { ReadinessResponse, ReadinessPoint } from '@/app/api/analytics/readiness/route';
 
-const RANGES = [
-  { d: 30, label: '30 days' },
-  { d: 60, label: '60 days' },
-  { d: 90, label: '90 days' },
+type ChartPeriod = '3m' | '6m' | '1y';
+const CHART_PERIODS: { key: ChartPeriod; label: string; days: number }[] = [
+  { key: '3m', label: '3m', days: 90  },
+  { key: '6m', label: '6m', days: 180 },
+  { key: '1y', label: '1y', days: 365 },
 ];
+
+function getWindow<T extends { date: string }>(allPoints: T[], period: ChartPeriod, offset: number): T[] {
+  if (allPoints.length === 0) return allPoints;
+  const periodDays = CHART_PERIODS.find(p => p.key === period)!.days;
+  const endMs   = Date.now() - offset * periodDays * 86400000;
+  const startMs = endMs - periodDays * 86400000;
+  const endDate   = new Date(endMs).toISOString().slice(0, 10);
+  const startDate = new Date(startMs).toISOString().slice(0, 10);
+  return allPoints.filter(p => p.date >= startDate && p.date <= endDate);
+}
+
+function canGoBack<T extends { date: string }>(allPoints: T[], period: ChartPeriod, offset: number): boolean {
+  const periodDays  = CHART_PERIODS.find(p => p.key === period)!.days;
+  const windowStart = new Date(Date.now() - (offset + 1) * periodDays * 86400000).toISOString().slice(0, 10);
+  return allPoints.some(p => p.date < windowStart);
+}
+
+interface ChartNavProps {
+  period:    ChartPeriod;
+  offset:    number;
+  hasBack:   boolean;
+  setPeriod: (p: ChartPeriod) => void;
+  setOffset: (fn: (o: number) => number) => void;
+}
+
+function ChartNav({ period, offset, hasBack, setPeriod, setOffset }: ChartNavProps) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <div className="flex bg-gray-800 rounded-lg p-0.5 gap-0.5">
+        {CHART_PERIODS.map(p => (
+          <button key={p.key} onClick={() => { setPeriod(p.key); setOffset(() => 0); }}
+            className={`px-2 py-1 rounded-md text-[10px] font-medium transition-colors ${
+              period === p.key ? 'bg-orange-500 text-white' : 'text-gray-400 hover:text-white'
+            }`}>
+            {p.label}
+          </button>
+        ))}
+      </div>
+      <button onClick={() => setOffset(o => o + 1)} disabled={!hasBack}
+        className="p-1 rounded-lg bg-gray-800 text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+        </svg>
+      </button>
+      <button onClick={() => setOffset(o => Math.max(0, o - 1))} disabled={offset === 0}
+        className="p-1 rounded-lg bg-gray-800 text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+        </svg>
+      </button>
+    </div>
+  );
+}
 
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' });
@@ -43,37 +97,31 @@ function ReadinessTooltip({ active, payload, label }: any) {
 }
 
 export default function ReadinessTab() {
-  const [days, setDays] = useState(30);
+  const [period, setPeriod] = useState<ChartPeriod>('3m');
+  const [offset, setOffset] = useState(0);
+
+  // Fetch 1y of data once; window client-side for instant back/forward navigation
   const { data, loading } = useCachedFetch<ReadinessResponse>(
-    `/api/analytics/readiness?days=${days}`,
-    `cache-readiness-${days}`,
+    '/api/analytics/readiness?days=365',
+    'cache-readiness-365',
   );
 
-  const points  = data?.points ?? [];
-  const zone    = data?.zone   ?? null;
-  const fatigue = data?.fatigue_alert ?? false;
-  const latest  = points[points.length - 1] ?? null;
+  const allPoints = data?.points ?? [];
+  const zone      = data?.zone   ?? null;
+  const fatigue   = data?.fatigue_alert ?? false;
+
+  const points = getWindow(allPoints, period, offset);
+  const latest = points[points.length - 1] ?? null;
 
   const hasData = points.some(p => p.hrv !== null);
 
   return (
     <div className="space-y-3">
-      {/* Range selector */}
-      <div className="flex gap-1.5">
-        {RANGES.map(r => (
-          <button
-            key={r.d}
-            onClick={() => setDays(r.d)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-              days === r.d
-                ? 'bg-orange-500/20 text-orange-400 border border-orange-500/50'
-                : 'bg-gray-800 text-gray-500 hover:text-gray-300'
-            }`}
-          >
-            {r.label}
-          </button>
-        ))}
-      </div>
+      <ChartNav
+        period={period} offset={offset}
+        hasBack={canGoBack(allPoints, period, offset)}
+        setPeriod={setPeriod} setOffset={setOffset}
+      />
 
       {/* Fatigue alert */}
       {fatigue && (

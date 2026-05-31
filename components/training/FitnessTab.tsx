@@ -76,24 +76,40 @@ function ChartNav({ period, offset, hasBack, setPeriod, setOffset }: ChartNavPro
   );
 }
 
-function aggregateMonthlyEftp(points: EftpPoint[]): EftpPoint[] {
-  const byMonth = new Map<string, EftpPoint>();
-  for (const p of points) {
-    const month = p.date.slice(0, 7);
-    const existing = byMonth.get(month);
-    if (!existing || p.eftp > existing.eftp) byMonth.set(month, p);
-  }
-  return Array.from(byMonth.values()).sort((a, b) => a.date.localeCompare(b.date));
+const MAX_CHART_POINTS = 8;
+
+function evenSample<T>(arr: T[], n: number): T[] {
+  if (arr.length <= n) return arr;
+  const step = (arr.length - 1) / (n - 1);
+  return Array.from({ length: n }, (_, i) => arr[Math.round(i * step)]);
 }
 
-function aggregateMonthlyVo2(points: Vo2Point[]): Vo2Point[] {
+// eFTP is a step function — only keep points where value changes, cap at 8
+function reduceEftpPoints(points: EftpPoint[]): EftpPoint[] {
+  if (points.length === 0) return [];
+  const deduped: EftpPoint[] = [points[0]];
+  for (let i = 1; i < points.length; i++) {
+    if (points[i].eftp !== deduped[deduped.length - 1].eftp) {
+      deduped.push(points[i]);
+    }
+  }
+  // Always include the last point so the current value shows on the right edge
+  const last = points[points.length - 1];
+  if (deduped[deduped.length - 1].date !== last.date) deduped.push(last);
+  return evenSample(deduped, MAX_CHART_POINTS);
+}
+
+// VO2 varies per ride — monthly max then cap at 8
+function reduceVo2Points(points: Vo2Point[]): Vo2Point[] {
+  if (points.length === 0) return [];
   const byMonth = new Map<string, Vo2Point>();
   for (const p of points) {
     const month = p.date.slice(0, 7);
     const existing = byMonth.get(month);
     if (!existing || p.vo2max > existing.vo2max) byMonth.set(month, p);
   }
-  return Array.from(byMonth.values()).sort((a, b) => a.date.localeCompare(b.date));
+  const monthly = Array.from(byMonth.values()).sort((a, b) => a.date.localeCompare(b.date));
+  return evenSample(monthly, MAX_CHART_POINTS);
 }
 
 const FITNESS_CACHE_KEY = (d: number) => `cache-fitness-${d}`;
@@ -278,10 +294,10 @@ export default function FitnessTab() {
   const allVo2Points  = eftpData?.vo2Points  ?? [];
 
   const windowEftp = getWindow(allEftpPoints, eftpPeriod, eftpOffset);
-  const eftpPoints = (eftpPeriod === '6m' || eftpPeriod === '1y') ? aggregateMonthlyEftp(windowEftp) : windowEftp;
+  const eftpPoints = reduceEftpPoints(windowEftp);
 
   const windowVo2 = getWindow(allVo2Points, vo2Period, vo2Offset);
-  const vo2Points = (vo2Period === '6m' || vo2Period === '1y') ? aggregateMonthlyVo2(windowVo2) : windowVo2;
+  const vo2Points = reduceVo2Points(windowVo2);
 
   const fmtTick = (s: string, period: ChartPeriod) => {
     const d = new Date(s + 'T00:00:00');
