@@ -54,12 +54,15 @@ async function fetchFromIntervals(athleteId: string, apiKey: string) {
     chunkStart.setDate(chunkStart.getDate() + 1);
   }
 
-  return allActivities
+  const points = allActivities
     .filter(a => {
       const ftp = a.icu_ftp;
       if (!ftp || ftp <= 0) return false;
+      // Only exclude clearly non-cycling types; empty/unknown type is allowed through
       const t = (a.type ?? a.sport_type ?? '').toLowerCase();
-      return t.includes('ride') || t.includes('cycling') || t.includes('virtual');
+      if (!t) return true;
+      const nonCycling = ['run', 'swim', 'walk', 'hike', 'ski', 'row', 'yoga', 'weight'];
+      return !nonCycling.some(x => t.includes(x));
     })
     .map(a => ({
       date:   (a.start_date ?? '').slice(0, 10),
@@ -68,6 +71,9 @@ async function fetchFromIntervals(athleteId: string, apiKey: string) {
     }))
     .filter(p => p.date)
     .sort((a, b) => a.date.localeCompare(b.date));
+
+  console.log(`[eftp-history] intervals.icu: ${allActivities.length} activities fetched, ${points.length} cycling with icu_ftp`);
+  return points;
 }
 
 async function fetchFromStrava(weightKg: number | null) {
@@ -106,13 +112,16 @@ export async function GET() {
   const athleteId = profile.intervals_athlete_id?.trim();
   const apiKey    = profile.intervals_api_key?.trim();
 
-  try {
-    if (athleteId && apiKey) {
+  if (athleteId && apiKey) {
+    try {
       const points = await fetchFromIntervals(athleteId, apiKey);
-      return Response.json({ points, weight: profile.weight_kg ?? null, source: 'intervals' });
+      if (points.length > 0) {
+        return Response.json({ points, weight: profile.weight_kg ?? null, source: 'intervals' });
+      }
+      console.warn('[eftp-history] intervals.icu returned 0 usable points, falling back to Strava NP');
+    } catch (err) {
+      console.error('[eftp-history] intervals.icu fetch failed, falling back to Strava NP:', err);
     }
-  } catch (err) {
-    console.error('[eftp-history] intervals.icu fetch failed, falling back to Strava NP:', err);
   }
 
   const points = await fetchFromStrava(profile.weight_kg ?? null);

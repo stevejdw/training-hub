@@ -210,7 +210,7 @@ export default function FitnessTab() {
 
   const { data: eftpData, loading: eftpLoading } = useCachedFetch<EftpHistoryResponse>(
     '/api/analytics/eftp-history',
-    'cache-eftp-history-v3',
+    'cache-eftp-history-v4',
   );
 
   const [eftpPeriod, setEftpPeriod] = useState<EftpPeriod>('6m');
