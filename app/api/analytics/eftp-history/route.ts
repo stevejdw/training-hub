@@ -72,7 +72,13 @@ async function fetchFromIntervals(athleteId: string, apiKey: string) {
     .filter(p => p.date)
     .sort((a, b) => a.date.localeCompare(b.date));
 
-  console.log(`[eftp-history] intervals.icu: ${allActivities.length} activities fetched, ${points.length} cycling with icu_ftp`);
+  // Log first activity fields + ftp sample for debugging
+  if (allActivities.length > 0) {
+    const sample = allActivities[allActivities.length - 1]; // most recent
+    console.log('[eftp-history] sample activity fields:', Object.keys(sample).join(','));
+    console.log('[eftp-history] sample ftp/vo2:', JSON.stringify({ icu_ftp: sample.icu_ftp, icu_vo2max: sample.icu_vo2max, type: sample.type, sport_type: sample.sport_type, start_date: sample.start_date }));
+  }
+  console.log(`[eftp-history] total=${allActivities.length} filtered=${points.length}`);
   return points;
 }
 
