@@ -579,10 +579,10 @@ export default function AerobicEfficiencyTab() {
   const [zoneFilter, setZoneFilter] = useState<ZoneFilter>('all');
   const [selectedRide, setSelectedRide] = useState<ScatterPoint | null>(null);
 
-  // Fetch 1y of data once; window client-side so back/forward nav works instantly
+  // Fetch all data once; window client-side so back/forward nav works instantly
   const { data, loading, error } = useCachedFetch<ApiResponse>(
-    '/api/analytics/aerobic-efficiency?range=1y',
-    'cache-aerobic-1y',
+    '/api/analytics/aerobic-efficiency?range=all',
+    'cache-aerobic-all',
   );
 
   const allRides = data?.rides ?? [];

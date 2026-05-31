@@ -84,19 +84,17 @@ function evenSample<T>(arr: T[], n: number): T[] {
   return Array.from({ length: n }, (_, i) => arr[Math.round(i * step)]);
 }
 
-// eFTP is a step function — only keep points where value changes, cap at 8
+// eFTP: monthly max (highest FTP reading per month), capped at 8 points
 function reduceEftpPoints(points: EftpPoint[]): EftpPoint[] {
   if (points.length === 0) return [];
-  const deduped: EftpPoint[] = [points[0]];
-  for (let i = 1; i < points.length; i++) {
-    if (points[i].eftp !== deduped[deduped.length - 1].eftp) {
-      deduped.push(points[i]);
-    }
+  const byMonth = new Map<string, EftpPoint>();
+  for (const p of points) {
+    const month = p.date.slice(0, 7);
+    const existing = byMonth.get(month);
+    if (!existing || p.eftp > existing.eftp) byMonth.set(month, p);
   }
-  // Always include the last point so the current value shows on the right edge
-  const last = points[points.length - 1];
-  if (deduped[deduped.length - 1].date !== last.date) deduped.push(last);
-  return evenSample(deduped, MAX_CHART_POINTS);
+  const monthly = Array.from(byMonth.values()).sort((a, b) => a.date.localeCompare(b.date));
+  return evenSample(monthly, MAX_CHART_POINTS);
 }
 
 // VO2 varies per ride — monthly max then cap at 8
@@ -282,7 +280,7 @@ export default function FitnessTab() {
 
   const { data: eftpData, loading: eftpLoading } = useCachedFetch<EftpHistoryResponse>(
     '/api/analytics/eftp-history',
-    'cache-eftp-history-v6',
+    'cache-eftp-history-v7',
   );
 
   const [eftpPeriod, setEftpPeriod] = useState<ChartPeriod>('6m');
