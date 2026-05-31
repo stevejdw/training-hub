@@ -4,8 +4,46 @@ import { CYCLING_TYPES } from '@/lib/sport-types';
 
 export const runtime = 'nodejs';
 
-export async function GET() {
-  const profile = await getProfile();
+interface IcuActivity {
+  start_date_local?: string;
+  date?:             string;
+  icu_ftp?:          number | null;
+  icu_vo2max?:       number | null;
+  type?:             string;
+  sport_type?:       string;
+}
+
+async function fetchFromIntervals(athleteId: string, apiKey: string) {
+  const newest = new Date();
+  const oldest = new Date(newest);
+  oldest.setFullYear(oldest.getFullYear() - 2);
+
+  const fmt = (d: Date) => d.toISOString().split('T')[0];
+  const url = `https://intervals.icu/api/v1/athlete/${athleteId}/activities?oldest=${fmt(oldest)}&newest=${fmt(newest)}`;
+  const auth = Buffer.from(`API_KEY:${apiKey}`).toString('base64');
+
+  const res = await fetch(url, { headers: { Authorization: `Basic ${auth}` } });
+  if (!res.ok) throw new Error(`intervals.icu API ${res.status}`);
+
+  const activities = await res.json() as IcuActivity[];
+
+  return activities
+    .filter(a => {
+      const ftp = a.icu_ftp;
+      if (!ftp || ftp <= 0) return false;
+      const t = (a.type ?? a.sport_type ?? '').toLowerCase();
+      return t.includes('ride') || t.includes('cycling') || t.includes('virtual');
+    })
+    .map(a => ({
+      date:   (a.start_date_local ?? a.date ?? '').slice(0, 10),
+      eftp:   Math.round(a.icu_ftp!),
+      vo2max: a.icu_vo2max != null ? Math.round(a.icu_vo2max * 10) / 10 : null,
+    }))
+    .filter(p => p.date)
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+async function fetchFromStrava(weightKg: number | null) {
   const client = await pool.connect();
   try {
     const rows = await client.query(`
@@ -24,20 +62,33 @@ export async function GET() {
         AND normalized_power > 0
         AND start_date >= NOW() - INTERVAL '2 years'
       ORDER BY start_date ASC
-    `, [profile.weight_kg ?? null, CYCLING_TYPES]);
+    `, [weightKg ?? null, CYCLING_TYPES]);
 
-    return Response.json({
-      points: rows.rows.map(r => ({
-        date:   String(r.date),
-        eftp:   Number(r.eftp),
-        vo2max: r.vo2max != null ? Number(r.vo2max) : null,
-      })),
-      weight: profile.weight_kg ?? null,
-    });
-  } catch (err) {
-    console.error('[eftp-history GET]', err);
-    return Response.json({ points: [], weight: null, error: String(err) }, { status: 500 });
+    return rows.rows.map(r => ({
+      date:   String(r.date),
+      eftp:   Number(r.eftp),
+      vo2max: r.vo2max != null ? Number(r.vo2max) : null,
+    }));
   } finally {
     client.release();
   }
+}
+
+export async function GET() {
+  const profile   = await getProfile();
+  const athleteId = profile.intervals_athlete_id?.trim();
+  const apiKey    = profile.intervals_api_key?.trim();
+
+  try {
+    if (athleteId && apiKey) {
+      const points = await fetchFromIntervals(athleteId, apiKey);
+      return Response.json({ points, weight: profile.weight_kg ?? null, source: 'intervals' });
+    }
+  } catch (err) {
+    console.error('[eftp-history] intervals.icu fetch failed, falling back to Strava NP:', err);
+  }
+
+  // Fallback: estimate from Strava normalized power
+  const points = await fetchFromStrava(profile.weight_kg ?? null);
+  return Response.json({ points, weight: profile.weight_kg ?? null, source: 'strava' });
 }
