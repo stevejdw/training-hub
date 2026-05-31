@@ -7,7 +7,6 @@ export const runtime = 'nodejs';
 interface IcuActivity {
   start_date?: string;
   icu_ftp?:    number | null;
-  icu_vo2max?: number | null;
   type?:       string;
   sport_type?: string;
 }
@@ -30,15 +29,13 @@ async function fetchChunk(
   return Array.isArray(data) ? data : [];
 }
 
-async function fetchFromIntervals(athleteId: string, apiKey: string, weightKg: number | null) {
-  const auth    = Buffer.from(`API_KEY:${apiKey}`).toString('base64');
-  const endDate = new Date();
+async function fetchEftpFromIntervals(athleteId: string, apiKey: string) {
+  const auth      = Buffer.from(`API_KEY:${apiKey}`).toString('base64');
+  const endDate   = new Date();
   const startDate = new Date(endDate);
   startDate.setFullYear(startDate.getFullYear() - 2);
-
   const fmt = (d: Date) => d.toISOString().split('T')[0];
 
-  // Fetch year-by-year to avoid per-request result limits
   const allActivities: IcuActivity[] = [];
   let chunkStart = new Date(startDate);
   while (chunkStart <= endDate) {
@@ -46,58 +43,57 @@ async function fetchFromIntervals(athleteId: string, apiKey: string, weightKg: n
     chunkEnd.setFullYear(chunkEnd.getFullYear() + 1);
     chunkEnd.setDate(chunkEnd.getDate() - 1);
     if (chunkEnd > endDate) chunkEnd.setTime(endDate.getTime());
-
     const chunk = await fetchChunk(athleteId, auth, fmt(chunkStart), fmt(chunkEnd));
     allActivities.push(...chunk);
-
     chunkStart = new Date(chunkEnd);
     chunkStart.setDate(chunkStart.getDate() + 1);
   }
 
-  const points = allActivities
+  return allActivities
     .filter(a => {
-      const ftp = a.icu_ftp;
-      if (!ftp || ftp <= 0) return false;
-      // Only exclude clearly non-cycling types; empty/unknown type is allowed through
+      if (!a.icu_ftp || a.icu_ftp <= 0) return false;
       const t = (a.type ?? a.sport_type ?? '').toLowerCase();
       if (!t) return true;
       const nonCycling = ['run', 'swim', 'walk', 'hike', 'ski', 'row', 'yoga', 'weight'];
       return !nonCycling.some(x => t.includes(x));
     })
-    .map(a => {
-      const eftp = Math.round(a.icu_ftp!);
-      const vo2max = a.icu_vo2max != null
-        ? Math.round(a.icu_vo2max * 10) / 10
-        : (weightKg && weightKg > 0)
-          ? Math.round(((eftp / weightKg) * 10.8 + 7) * 10) / 10
-          : null;
-      return { date: (a.start_date ?? '').slice(0, 10), eftp, vo2max };
-    })
+    .map(a => ({
+      date: (a.start_date ?? '').slice(0, 10),
+      eftp: Math.round(a.icu_ftp!),
+    }))
     .filter(p => p.date)
     .sort((a, b) => a.date.localeCompare(b.date));
-
-  // Log first activity fields + ftp sample for debugging
-  if (allActivities.length > 0) {
-    const sample = allActivities[allActivities.length - 1]; // most recent
-    console.log('[eftp-history] sample activity fields:', Object.keys(sample).join(','));
-    console.log('[eftp-history] sample ftp/vo2:', JSON.stringify({ icu_ftp: sample.icu_ftp, icu_vo2max: sample.icu_vo2max, type: sample.type, sport_type: sample.sport_type, start_date: sample.start_date }));
-  }
-  console.log(`[eftp-history] total=${allActivities.length} filtered=${points.length}`);
-  return points;
 }
 
-async function fetchFromStrava(weightKg: number | null) {
+async function fetchEftpFromStrava() {
   const client = await pool.connect();
   try {
     const rows = await client.query(`
       SELECT
         TO_CHAR(start_date AT TIME ZONE 'Australia/Sydney', 'YYYY-MM-DD') AS date,
-        ROUND(normalized_power * 0.95)::int AS eftp,
-        CASE
-          WHEN $1::numeric IS NOT NULL AND $1::numeric > 0
-          THEN ROUND(((normalized_power * 0.95 / $1::numeric) * 10.8 + 7)::numeric, 1)
-          ELSE NULL
-        END AS vo2max
+        ROUND(normalized_power * 0.95)::int AS eftp
+      FROM activities
+      WHERE sport_type = ANY($1::text[])
+        AND moving_time >= 1200
+        AND normalized_power IS NOT NULL
+        AND normalized_power > 0
+        AND start_date >= NOW() - INTERVAL '2 years'
+      ORDER BY start_date ASC
+    `, [CYCLING_TYPES]);
+    return rows.rows.map(r => ({ date: String(r.date), eftp: Number(r.eftp) }));
+  } finally {
+    client.release();
+  }
+}
+
+// VO2 max always from Strava per-ride NP so it shows genuine variation
+async function fetchVo2FromStrava(weightKg: number) {
+  const client = await pool.connect();
+  try {
+    const rows = await client.query(`
+      SELECT
+        TO_CHAR(start_date AT TIME ZONE 'Australia/Sydney', 'YYYY-MM-DD') AS date,
+        ROUND(((normalized_power * 0.95 / $1::numeric) * 10.8 + 7)::numeric, 1) AS vo2max
       FROM activities
       WHERE sport_type = ANY($2::text[])
         AND moving_time >= 1200
@@ -105,13 +101,8 @@ async function fetchFromStrava(weightKg: number | null) {
         AND normalized_power > 0
         AND start_date >= NOW() - INTERVAL '2 years'
       ORDER BY start_date ASC
-    `, [weightKg ?? null, CYCLING_TYPES]);
-
-    return rows.rows.map(r => ({
-      date:   String(r.date),
-      eftp:   Number(r.eftp),
-      vo2max: r.vo2max != null ? Number(r.vo2max) : null,
-    }));
+    `, [weightKg, CYCLING_TYPES]);
+    return rows.rows.map(r => ({ date: String(r.date), vo2max: Number(r.vo2max) }));
   } finally {
     client.release();
   }
@@ -121,19 +112,27 @@ export async function GET() {
   const profile   = await getProfile();
   const athleteId = profile.intervals_athlete_id?.trim();
   const apiKey    = profile.intervals_api_key?.trim();
+  const weightKg  = profile.weight_kg ?? null;
 
+  // eFTP: prefer intervals.icu (their model), fall back to Strava NP×0.95
+  let eftpPoints: { date: string; eftp: number }[] = [];
+  let source = 'strava';
   if (athleteId && apiKey) {
     try {
-      const points = await fetchFromIntervals(athleteId, apiKey, profile.weight_kg ?? null);
-      if (points.length > 0) {
-        return Response.json({ points, weight: profile.weight_kg ?? null, source: 'intervals' });
-      }
-      console.warn('[eftp-history] intervals.icu returned 0 usable points, falling back to Strava NP');
+      const pts = await fetchEftpFromIntervals(athleteId, apiKey);
+      if (pts.length > 0) { eftpPoints = pts; source = 'intervals'; }
     } catch (err) {
-      console.error('[eftp-history] intervals.icu fetch failed, falling back to Strava NP:', err);
+      console.error('[eftp-history] intervals.icu failed:', err);
     }
   }
+  if (eftpPoints.length === 0) {
+    eftpPoints = await fetchEftpFromStrava();
+  }
 
-  const points = await fetchFromStrava(profile.weight_kg ?? null);
-  return Response.json({ points, weight: profile.weight_kg ?? null, source: 'strava' });
+  // VO2 max: always per-ride Strava NP so it shows genuine variation
+  const vo2Points = weightKg && weightKg > 0
+    ? await fetchVo2FromStrava(weightKg)
+    : [];
+
+  return Response.json({ eftpPoints, vo2Points, weight: weightKg, source });
 }

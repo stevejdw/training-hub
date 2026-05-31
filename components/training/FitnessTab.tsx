@@ -9,8 +9,9 @@ import {
 import { useCachedFetch } from '@/lib/use-cached-fetch';
 
 interface FitnessPoint { date: string; atl: number; ctl: number; tsb: number }
-interface EftpPoint { date: string; eftp: number; vo2max: number | null }
-interface EftpHistoryResponse { points: EftpPoint[]; weight: number | null }
+interface EftpPoint  { date: string; eftp: number }
+interface Vo2Point   { date: string; vo2max: number }
+interface EftpHistoryResponse { eftpPoints: EftpPoint[]; vo2Points: Vo2Point[]; weight: number | null }
 
 type EftpPeriod = '3m' | '6m' | '1y' | 'all';
 const EFTP_PERIODS: { key: EftpPeriod; label: string; days: number }[] = [
@@ -20,7 +21,7 @@ const EFTP_PERIODS: { key: EftpPeriod; label: string; days: number }[] = [
   { key: 'all', label: 'All', days: 9999 },
 ];
 
-function getEftpWindow(allPoints: EftpPoint[], period: EftpPeriod, offset: number): EftpPoint[] {
+function getWindow<T extends { date: string }>(allPoints: T[], period: EftpPeriod, offset: number): T[] {
   if (period === 'all' || allPoints.length === 0) return allPoints;
   const periodDays = EFTP_PERIODS.find(p => p.key === period)!.days;
   const endMs   = Date.now() - offset * periodDays * 86400000;
@@ -30,12 +31,22 @@ function getEftpWindow(allPoints: EftpPoint[], period: EftpPeriod, offset: numbe
   return allPoints.filter(p => p.date >= startDate && p.date <= endDate);
 }
 
-function aggregateMonthly(points: EftpPoint[]): EftpPoint[] {
+function aggregateMonthlyEftp(points: EftpPoint[]): EftpPoint[] {
   const byMonth = new Map<string, EftpPoint>();
   for (const p of points) {
-    const month = p.date.slice(0, 7); // "YYYY-MM"
+    const month = p.date.slice(0, 7);
     const existing = byMonth.get(month);
     if (!existing || p.eftp > existing.eftp) byMonth.set(month, p);
+  }
+  return Array.from(byMonth.values()).sort((a, b) => a.date.localeCompare(b.date));
+}
+
+function aggregateMonthlyVo2(points: Vo2Point[]): Vo2Point[] {
+  const byMonth = new Map<string, Vo2Point>();
+  for (const p of points) {
+    const month = p.date.slice(0, 7);
+    const existing = byMonth.get(month);
+    if (!existing || p.vo2max > existing.vo2max) byMonth.set(month, p);
   }
   return Array.from(byMonth.values()).sort((a, b) => a.date.localeCompare(b.date));
 }
@@ -210,21 +221,24 @@ export default function FitnessTab() {
 
   const { data: eftpData, loading: eftpLoading } = useCachedFetch<EftpHistoryResponse>(
     '/api/analytics/eftp-history',
-    'cache-eftp-history-v5',
+    'cache-eftp-history-v6',
   );
 
   const [eftpPeriod, setEftpPeriod] = useState<EftpPeriod>('6m');
   const [eftpOffset, setEftpOffset] = useState(0);
 
-  const allEftpPoints  = eftpData?.points ?? [];
-  const windowPoints   = getEftpWindow(allEftpPoints, eftpPeriod, eftpOffset);
-  const eftpPoints     = (eftpPeriod === '6m' || eftpPeriod === '1y') ? aggregateMonthly(windowPoints) : windowPoints;
-  const vo2Points      = eftpPoints.filter(p => p.vo2max != null);
+  const allEftpPoints = eftpData?.eftpPoints ?? [];
+  const allVo2Points  = eftpData?.vo2Points  ?? [];
 
-  const periodDays     = EFTP_PERIODS.find(p => p.key === eftpPeriod)!.days;
-  const canGoForward   = eftpOffset > 0;
-  const canGoBack      = eftpPeriod !== 'all' && allEftpPoints.length > 0 && (() => {
-    const startMs = Date.now() - (eftpOffset + 1) * periodDays * 86400000;
+  const windowEftp  = getWindow(allEftpPoints, eftpPeriod, eftpOffset);
+  const windowVo2   = getWindow(allVo2Points,  eftpPeriod, eftpOffset);
+  const eftpPoints  = (eftpPeriod === '6m' || eftpPeriod === '1y') ? aggregateMonthlyEftp(windowEftp) : windowEftp;
+  const vo2Points   = (eftpPeriod === '6m' || eftpPeriod === '1y') ? aggregateMonthlyVo2(windowVo2)   : windowVo2;
+
+  const periodDays   = EFTP_PERIODS.find(p => p.key === eftpPeriod)!.days;
+  const canGoForward = eftpOffset > 0;
+  const canGoBack    = eftpPeriod !== 'all' && allEftpPoints.length > 0 && (() => {
+    const startMs   = Date.now() - (eftpOffset + 1) * periodDays * 86400000;
     const startDate = new Date(startMs).toISOString().slice(0, 10);
     return allEftpPoints.some(p => p.date < startDate || p.date >= startDate);
   })();
@@ -422,7 +436,10 @@ export default function FitnessTab() {
                 tickLine={false}
                 interval="preserveStartEnd"
               />
-              <YAxis tick={{ fill: '#6b7280', fontSize: 10 }} axisLine={false} tickLine={false} width={36} domain={['auto', 'auto']} />
+              <YAxis
+                tick={{ fill: '#6b7280', fontSize: 10 }} axisLine={false} tickLine={false} width={36}
+                domain={[(min: number) => Math.round(min - 15), (max: number) => Math.round(max + 10)]}
+              />
               <Tooltip
                 contentStyle={{ background: '#111827', border: '1px solid #374151', borderRadius: 8, fontSize: 12 }}
                 labelFormatter={(s) => fmtDate(String(s))}
@@ -454,7 +471,10 @@ export default function FitnessTab() {
                   tickLine={false}
                   interval="preserveStartEnd"
                 />
-                <YAxis tick={{ fill: '#6b7280', fontSize: 10 }} axisLine={false} tickLine={false} width={36} domain={['auto', 'auto']} />
+                <YAxis
+                  tick={{ fill: '#6b7280', fontSize: 10 }} axisLine={false} tickLine={false} width={36}
+                  domain={[(min: number) => Math.round(min - 2), (max: number) => Math.round(max + 2)]}
+                />
                 <Tooltip
                   contentStyle={{ background: '#111827', border: '1px solid #374151', borderRadius: 8, fontSize: 12 }}
                   labelFormatter={(s) => fmtDate(String(s))}
@@ -464,7 +484,7 @@ export default function FitnessTab() {
               </LineChart>
             </ResponsiveContainer>
           )}
-          <p className="text-[10px] text-gray-600 mt-2">Estimated via Coggan formula: eFTP ÷ weight × 10.8 + 7</p>
+          <p className="text-[10px] text-gray-600 mt-2">Per-ride estimate via Coggan formula: NP × 0.95 ÷ weight × 10.8 + 7</p>
         </div>
       )}
 
