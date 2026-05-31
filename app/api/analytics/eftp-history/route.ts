@@ -5,29 +5,56 @@ import { CYCLING_TYPES } from '@/lib/sport-types';
 export const runtime = 'nodejs';
 
 interface IcuActivity {
-  start_date_local?: string;
-  date?:             string;
-  icu_ftp?:          number | null;
-  icu_vo2max?:       number | null;
-  type?:             string;
-  sport_type?:       string;
+  start_date?: string;
+  icu_ftp?:    number | null;
+  icu_vo2max?: number | null;
+  type?:       string;
+  sport_type?: string;
+}
+
+async function fetchChunk(
+  athleteId: string,
+  auth: string,
+  oldest: string,
+  newest: string,
+): Promise<IcuActivity[]> {
+  const url = new URL(`https://intervals.icu/api/v1/athlete/${athleteId}/activities`);
+  url.searchParams.set('oldest', oldest);
+  url.searchParams.set('newest', newest);
+  const res = await fetch(url.toString(), {
+    headers: { Authorization: `Basic ${auth}` },
+    signal: AbortSignal.timeout(20_000),
+  });
+  if (!res.ok) throw new Error(`intervals.icu API ${res.status}`);
+  const data = await res.json();
+  return Array.isArray(data) ? data : [];
 }
 
 async function fetchFromIntervals(athleteId: string, apiKey: string) {
-  const newest = new Date();
-  const oldest = new Date(newest);
-  oldest.setFullYear(oldest.getFullYear() - 2);
+  const auth    = Buffer.from(`API_KEY:${apiKey}`).toString('base64');
+  const endDate = new Date();
+  const startDate = new Date(endDate);
+  startDate.setFullYear(startDate.getFullYear() - 2);
 
   const fmt = (d: Date) => d.toISOString().split('T')[0];
-  const url = `https://intervals.icu/api/v1/athlete/${athleteId}/activities?oldest=${fmt(oldest)}&newest=${fmt(newest)}`;
-  const auth = Buffer.from(`API_KEY:${apiKey}`).toString('base64');
 
-  const res = await fetch(url, { headers: { Authorization: `Basic ${auth}` } });
-  if (!res.ok) throw new Error(`intervals.icu API ${res.status}`);
+  // Fetch year-by-year to avoid per-request result limits
+  const allActivities: IcuActivity[] = [];
+  let chunkStart = new Date(startDate);
+  while (chunkStart <= endDate) {
+    const chunkEnd = new Date(chunkStart);
+    chunkEnd.setFullYear(chunkEnd.getFullYear() + 1);
+    chunkEnd.setDate(chunkEnd.getDate() - 1);
+    if (chunkEnd > endDate) chunkEnd.setTime(endDate.getTime());
 
-  const activities = await res.json() as IcuActivity[];
+    const chunk = await fetchChunk(athleteId, auth, fmt(chunkStart), fmt(chunkEnd));
+    allActivities.push(...chunk);
 
-  return activities
+    chunkStart = new Date(chunkEnd);
+    chunkStart.setDate(chunkStart.getDate() + 1);
+  }
+
+  return allActivities
     .filter(a => {
       const ftp = a.icu_ftp;
       if (!ftp || ftp <= 0) return false;
@@ -35,7 +62,7 @@ async function fetchFromIntervals(athleteId: string, apiKey: string) {
       return t.includes('ride') || t.includes('cycling') || t.includes('virtual');
     })
     .map(a => ({
-      date:   (a.start_date_local ?? a.date ?? '').slice(0, 10),
+      date:   (a.start_date ?? '').slice(0, 10),
       eftp:   Math.round(a.icu_ftp!),
       vo2max: a.icu_vo2max != null ? Math.round(a.icu_vo2max * 10) / 10 : null,
     }))
@@ -88,7 +115,6 @@ export async function GET() {
     console.error('[eftp-history] intervals.icu fetch failed, falling back to Strava NP:', err);
   }
 
-  // Fallback: estimate from Strava normalized power
   const points = await fetchFromStrava(profile.weight_kg ?? null);
   return Response.json({ points, weight: profile.weight_kg ?? null, source: 'strava' });
 }
