@@ -638,6 +638,10 @@ export default function AerobicEfficiencyTab() {
     return null;
   }, [zoneFilter, zoneBounds]);
 
+  const avgEf = scatterData.length
+    ? scatterData.reduce((s, p) => s + p.y, 0) / scatterData.length
+    : null;
+
   const hvLowCount = allScatter.filter(p => p.hrv_low === true).length;
 
   return (
@@ -648,7 +652,7 @@ export default function AerobicEfficiencyTab() {
         <div className="bg-gray-800/60 rounded-xl p-3 text-center">
           <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Steady rides</p>
           <p className="text-2xl font-bold text-white">{scatterData.length}</p>
-          <p className="text-[10px] text-gray-500 mt-0.5">VI &lt; 1.10 · ≥90 min</p>
+          <p className="text-[10px] text-gray-500 mt-0.5">VI &lt; 1.10 · ≥60 min</p>
 
         </div>
 
@@ -660,13 +664,15 @@ export default function AerobicEfficiencyTab() {
           <p className="text-[10px] text-gray-500 mt-0.5">{avgDecoupling < 3 ? 'Good' : avgDecoupling < 5 ? 'OK' : 'Drift'}</p>
         </div>
         <div className="bg-gray-800/60 rounded-xl p-3 text-center">
-          <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">EF trend</p>
-          {trendPct !== null ? (
+          <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Avg EF</p>
+          {avgEf !== null ? (
             <>
-              <p className={`text-2xl font-bold ${trendPct >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                {trendPct >= 0 ? '+' : ''}{trendPct.toFixed(1)}%
-              </p>
-              <p className="text-[10px] text-gray-500 mt-0.5">{rangeLabel}</p>
+              <p className="text-2xl font-bold text-orange-400">{avgEf.toFixed(3)}</p>
+              {trendPct !== null && (
+                <p className={`text-[10px] mt-0.5 ${trendPct >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                  {trendPct >= 0 ? '↑' : '↓'}{Math.abs(trendPct).toFixed(1)}% trend
+                </p>
+              )}
             </>
           ) : (
             <p className="text-2xl font-bold text-gray-600">—</p>

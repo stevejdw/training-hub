@@ -18,7 +18,7 @@ const CYCLING = ['Ride', 'VirtualRide', 'GravelRide', 'MountainBikeRide'];
  * meaningful aerobic decoupling (cardiac drift), often a marker of fatigue
  * or insufficient base aerobic fitness.
  *
- * Rides shorter than 90 minutes are excluded to ensure meaningful decoupling data.
+ * Rides shorter than 60 minutes are excluded to ensure meaningful decoupling data.
  * Rides can be individually excluded by adding their ID to the excluded_rides array
  * in the athlete_profile.
  */
@@ -100,7 +100,7 @@ export async function GET(req: NextRequest) {
         AND a.average_watts    > 0
         AND a.average_heartrate > 60
         AND (a.normalized_power::float / a.average_watts) < 1.10
-        AND a.moving_time >= 5400  -- exclude rides shorter than 90 minutes
+        AND a.moving_time >= 3600  -- exclude rides shorter than 60 minutes
         AND s.watts IS NOT NULL
         AND s.hr    IS NOT NULL
         AND array_length(s.watts, 1) > 60
