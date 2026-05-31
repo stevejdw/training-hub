@@ -30,7 +30,7 @@ async function fetchChunk(
   return Array.isArray(data) ? data : [];
 }
 
-async function fetchFromIntervals(athleteId: string, apiKey: string) {
+async function fetchFromIntervals(athleteId: string, apiKey: string, weightKg: number | null) {
   const auth    = Buffer.from(`API_KEY:${apiKey}`).toString('base64');
   const endDate = new Date();
   const startDate = new Date(endDate);
@@ -64,11 +64,15 @@ async function fetchFromIntervals(athleteId: string, apiKey: string) {
       const nonCycling = ['run', 'swim', 'walk', 'hike', 'ski', 'row', 'yoga', 'weight'];
       return !nonCycling.some(x => t.includes(x));
     })
-    .map(a => ({
-      date:   (a.start_date ?? '').slice(0, 10),
-      eftp:   Math.round(a.icu_ftp!),
-      vo2max: a.icu_vo2max != null ? Math.round(a.icu_vo2max * 10) / 10 : null,
-    }))
+    .map(a => {
+      const eftp = Math.round(a.icu_ftp!);
+      const vo2max = a.icu_vo2max != null
+        ? Math.round(a.icu_vo2max * 10) / 10
+        : (weightKg && weightKg > 0)
+          ? Math.round(((eftp / weightKg) * 10.8 + 7) * 10) / 10
+          : null;
+      return { date: (a.start_date ?? '').slice(0, 10), eftp, vo2max };
+    })
     .filter(p => p.date)
     .sort((a, b) => a.date.localeCompare(b.date));
 
@@ -120,7 +124,7 @@ export async function GET() {
 
   if (athleteId && apiKey) {
     try {
-      const points = await fetchFromIntervals(athleteId, apiKey);
+      const points = await fetchFromIntervals(athleteId, apiKey, profile.weight_kg ?? null);
       if (points.length > 0) {
         return Response.json({ points, weight: profile.weight_kg ?? null, source: 'intervals' });
       }
