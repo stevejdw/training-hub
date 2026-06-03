@@ -7,10 +7,13 @@ import { useEffect, useState } from 'react';
 import {
   ALL_NAV_ITEMS,
   DEFAULT_MIDDLE,
+  DEFAULT_MIDDLE_DESKTOP,
   MAX_MIDDLE_MOBILE,
   NAV_EVENT,
+  NAV_EVENT_DESKTOP,
   NavItem,
   loadMiddle,
+  loadMiddleDesktop,
   moreMatchPrefixes,
 } from './nav-items';
 
@@ -33,6 +36,7 @@ export default function Nav() {
   const pathname = usePathname();
 
   const [middle, setMiddle] = useState<string[]>(DEFAULT_MIDDLE);
+  const [middleDesktop, setMiddleDesktop] = useState<string[]>(DEFAULT_MIDDLE_DESKTOP);
   const [appIcon, setAppIcon] = useState<string>('speed');
 
   useEffect(() => {
@@ -53,13 +57,24 @@ export default function Nav() {
     };
   }, []);
 
+  useEffect(() => {
+    setMiddleDesktop(loadMiddleDesktop());
+    const handler = () => setMiddleDesktop(loadMiddleDesktop());
+    window.addEventListener(NAV_EVENT_DESKTOP, handler);
+    window.addEventListener('storage', handler);
+    return () => {
+      window.removeEventListener(NAV_EVENT_DESKTOP, handler);
+      window.removeEventListener('storage', handler);
+    };
+  }, []);
+
   // Mobile: Home + first 3 middle + More (always)
   const mobileItems = buildItems(middle, MAX_MIDDLE_MOBILE);
   const mobileMore  = moreMatchPrefixes(middle.slice(0, MAX_MIDDLE_MOBILE));
 
   // Desktop: Home + ALL middle (up to 6) + More only if anything overflows.
-  // Up to 8 total slots (1 + 6 + 1).
-  const desktopMiddle = middle;
+  // Up to 8 total slots (1 + 6 + 1). Uses separate desktop config.
+  const desktopMiddle = middleDesktop;
   const desktopMidItems = desktopMiddle
     .map(k => ALL_NAV_ITEMS.find(i => i.key === k))
     .filter((i): i is NavItem => !!i && !i.pinned);
@@ -77,7 +92,7 @@ export default function Nav() {
     <>
       {/* ── Desktop: top horizontal nav ── */}
       <header className="hidden md:flex h-16 border-b border-gray-800 bg-gray-950 items-center flex-shrink-0">
-        <nav className="w-full max-w-5xl mx-auto px-8 flex gap-1 flex-wrap items-center">
+        <nav className="w-full px-6 flex gap-1 items-center">
           {/* Logo */}
           <Link href="/home" className="mr-2 flex-shrink-0">
             <Image src={`/app-icon-${appIcon}.png`} alt="Training Hub" width={36} height={36} className="rounded-lg" />

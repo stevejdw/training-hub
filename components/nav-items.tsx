@@ -109,8 +109,12 @@ export const ALL_NAV_ITEMS: NavItem[] = [
 export const STORAGE_KEY    = 'nav-bar-config';
 export const NAV_EVENT      = 'nav-config-changed';
 export const DEFAULT_MIDDLE = ['activities', 'performance', 'training'];
-/** Maximum number of middle slots a user can configure. Mobile shows the
- *  first MAX_MIDDLE_MOBILE; desktop shows all of them. */
+
+export const STORAGE_KEY_DESKTOP    = 'nav-bar-config-desktop';
+export const NAV_EVENT_DESKTOP      = 'nav-config-desktop-changed';
+export const DEFAULT_MIDDLE_DESKTOP = ['activities', 'performance', 'training', 'events', 'goals', 'chat'];
+
+/** Maximum number of middle slots a user can configure. */
 export const MAX_MIDDLE        = 6;
 export const MAX_MIDDLE_MOBILE = 3;
 
@@ -142,6 +146,34 @@ export function saveMiddle(middle: string[]) {
   } catch { /* ignore */ }
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent(NAV_EVENT, { detail: middle }));
+  }
+}
+
+/** Read the desktop-specific middle-slot keys from localStorage. */
+export function loadMiddleDesktop(): string[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_DESKTOP);
+    if (!raw) return DEFAULT_MIDDLE_DESKTOP;
+    const arr = JSON.parse(raw);
+    if (!Array.isArray(arr)) return DEFAULT_MIDDLE_DESKTOP;
+    const seen = new Set<string>();
+    const cleaned = (arr as unknown[])
+      .filter((k): k is string => typeof k === 'string' && middleKeys.has(k))
+      .filter(k => seen.has(k) ? false : (seen.add(k), true))
+      .slice(0, MAX_MIDDLE);
+    return cleaned.length > 0 ? cleaned : DEFAULT_MIDDLE_DESKTOP;
+  } catch {
+    return DEFAULT_MIDDLE_DESKTOP;
+  }
+}
+
+/** Persist the desktop middle slots and notify listeners in this tab. */
+export function saveMiddleDesktop(middle: string[]) {
+  try {
+    localStorage.setItem(STORAGE_KEY_DESKTOP, JSON.stringify(middle));
+  } catch { /* ignore */ }
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(NAV_EVENT_DESKTOP, { detail: middle }));
   }
 }
 

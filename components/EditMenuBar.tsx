@@ -5,30 +5,48 @@ import { useEffect, useState } from 'react';
 import {
   ALL_NAV_ITEMS,
   DEFAULT_MIDDLE,
+  DEFAULT_MIDDLE_DESKTOP,
   MAX_MIDDLE,
   MAX_MIDDLE_MOBILE,
   NavItem,
   loadMiddle,
+  loadMiddleDesktop,
   saveMiddle,
+  saveMiddleDesktop,
 } from './nav-items';
 
+type Tab = 'mobile' | 'desktop';
+
 export default function EditMenuBar() {
-  const [middle, setMiddle] = useState<string[]>(DEFAULT_MIDDLE);
+  const [tab, setTab] = useState<Tab>('mobile');
+
+  const [mobileMiddle, setMobileMiddle] = useState<string[]>(DEFAULT_MIDDLE);
+  const [desktopMiddle, setDesktopMiddle] = useState<string[]>(DEFAULT_MIDDLE_DESKTOP);
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    setMiddle(loadMiddle());
+    setMobileMiddle(loadMiddle());
+    setDesktopMiddle(loadMiddleDesktop());
     setHydrated(true);
   }, []);
 
-  // Persist on every change
   useEffect(() => {
     if (!hydrated) return;
-    saveMiddle(middle);
-  }, [middle, hydrated]);
+    saveMiddle(mobileMiddle);
+  }, [mobileMiddle, hydrated]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    saveMiddleDesktop(desktopMiddle);
+  }, [desktopMiddle, hydrated]);
 
   const first = ALL_NAV_ITEMS.find(i => i.pinned === 'first')!;
   const last  = ALL_NAV_ITEMS.find(i => i.pinned === 'last')!;
+
+  const middle = tab === 'mobile' ? mobileMiddle : desktopMiddle;
+  const setMiddle = tab === 'mobile' ? setMobileMiddle : setDesktopMiddle;
+  const defaultMiddle = tab === 'mobile' ? DEFAULT_MIDDLE : DEFAULT_MIDDLE_DESKTOP;
+
   const middleItems: NavItem[] = middle
     .map(k => ALL_NAV_ITEMS.find(i => i.key === k))
     .filter((i): i is NavItem => !!i && !i.pinned);
@@ -54,7 +72,7 @@ export default function EditMenuBar() {
   }
 
   function reset() {
-    setMiddle(DEFAULT_MIDDLE);
+    setMiddle(defaultMiddle);
   }
 
   const barFull = middle.length >= MAX_MIDDLE;
@@ -79,36 +97,67 @@ export default function EditMenuBar() {
         </div>
       </div>
 
+      {/* Tab switcher */}
+      <div className="flex-shrink-0 flex border-b border-gray-800 bg-gray-950">
+        <button
+          onClick={() => setTab('mobile')}
+          className={`flex-1 py-2.5 text-sm font-medium transition-colors ${
+            tab === 'mobile'
+              ? 'text-orange-400 border-b-2 border-orange-400'
+              : 'text-gray-500 hover:text-gray-300'
+          }`}
+        >
+          Mobile
+        </button>
+        <button
+          onClick={() => setTab('desktop')}
+          className={`flex-1 py-2.5 text-sm font-medium transition-colors ${
+            tab === 'desktop'
+              ? 'text-orange-400 border-b-2 border-orange-400'
+              : 'text-gray-500 hover:text-gray-300'
+          }`}
+        >
+          Desktop
+        </button>
+      </div>
+
       <div className="flex-1 overflow-y-auto scroll-touch">
       <div className="max-w-2xl md:max-w-5xl mx-auto p-4 md:p-8 space-y-5">
 
         <div>
-          <p className="text-sm text-gray-400">
-            Pick up to {MAX_MIDDLE} items. Mobile shows the first {MAX_MIDDLE_MOBILE} of them in
-            the bottom bar; desktop shows them all. Items not in the bar are still reachable
-            from More.
-          </p>
+          {tab === 'mobile' ? (
+            <p className="text-sm text-gray-400">
+              Pick up to {MAX_MIDDLE_MOBILE} items for the mobile bottom bar. Items not in the bar are reachable from More.
+            </p>
+          ) : (
+            <p className="text-sm text-gray-400">
+              Pick up to {MAX_MIDDLE} items for the desktop top nav. These settings are independent from mobile.
+            </p>
+          )}
         </div>
 
-        {/* Live previews */}
+        {/* Live preview */}
         <div className="space-y-3">
-          <div>
-            <p className="text-[10px] text-gray-500 uppercase tracking-wider px-1 mb-1.5">Mobile preview</p>
-            <BarPreview keys={[first.key, ...middle.slice(0, MAX_MIDDLE_MOBILE), last.key]} />
-          </div>
-          <div>
-            <p className="text-[10px] text-gray-500 uppercase tracking-wider px-1 mb-1.5">Desktop preview</p>
-            <BarPreview
-              keys={(() => {
-                const allMid = ALL_NAV_ITEMS.filter(i => !i.pinned).map(i => i.key);
-                const overflow = allMid.some(k => !middle.includes(k));
-                return overflow
-                  ? [first.key, ...middle, last.key]
-                  : [first.key, ...middle];
-              })()}
-              desktop
-            />
-          </div>
+          {tab === 'mobile' ? (
+            <div>
+              <p className="text-[10px] text-gray-500 uppercase tracking-wider px-1 mb-1.5">Mobile preview</p>
+              <BarPreview keys={[first.key, ...mobileMiddle.slice(0, MAX_MIDDLE_MOBILE), last.key]} />
+            </div>
+          ) : (
+            <div>
+              <p className="text-[10px] text-gray-500 uppercase tracking-wider px-1 mb-1.5">Desktop preview</p>
+              <BarPreview
+                keys={(() => {
+                  const allMid = ALL_NAV_ITEMS.filter(i => !i.pinned).map(i => i.key);
+                  const overflow = allMid.some(k => !desktopMiddle.includes(k));
+                  return overflow
+                    ? [first.key, ...desktopMiddle, last.key]
+                    : [first.key, ...desktopMiddle];
+                })()}
+                desktop
+              />
+            </div>
+          )}
         </div>
 
         {/* In-bar list */}
