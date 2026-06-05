@@ -12,7 +12,9 @@ on:
     # (60 API calls, under the 100/15-min ceiling so no mid-run sleeps).
     # Script stops itself once daily cap of 950 calls is reached; subsequent
     # runs that day exit fast.
-    - cron: '*/15 * * * *'
+    # Offset by 10 min from the sync (:00/:30) and full-streams (:05/:20/...) jobs
+    # so the scheduled workflows don't all hit Strava's token endpoint at once.
+    - cron: '10,25,40,55 * * * *'
 
 jobs:
   backfill:
