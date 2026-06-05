@@ -5,6 +5,7 @@ Safe to run multiple times - skips activities that already have a polyline.
 """
 import os
 import time
+import random
 import requests
 import psycopg2
 
@@ -14,18 +15,44 @@ STRAVA_REFRESH_TOKEN = os.environ["STRAVA_REFRESH_TOKEN"]
 DATABASE_URL = os.environ["DATABASE_URL"]
 
 def get_access_token():
-    r = requests.post("https://www.strava.com/oauth/token", data={
-        "client_id": STRAVA_CLIENT_ID,
-        "client_secret": STRAVA_CLIENT_SECRET,
-        "refresh_token": STRAVA_REFRESH_TOKEN,
-        "grant_type": "refresh_token"
-    })
-    if r.status_code != 200:
+    # Strava's edge (CloudFront) intermittently returns HTTP 403 "Request blocked"
+    # when several scheduled jobs hit the token endpoint at the same minute. That's
+    # transient, so retry with exponential backoff + jitter and only fail fast on a
+    # genuine auth error (401 = stale refresh token).
+    r = None
+    for attempt in range(5):
+        try:
+            r = requests.post("https://www.strava.com/oauth/token", data={
+                "client_id": STRAVA_CLIENT_ID,
+                "client_secret": STRAVA_CLIENT_SECRET,
+                "refresh_token": STRAVA_REFRESH_TOKEN,
+                "grant_type": "refresh_token"
+            }, timeout=30)
+        except requests.RequestException as e:
+            print(f"Token refresh network error (attempt {attempt + 1}/5): {e}")
+            time.sleep(2 ** attempt + random.uniform(0, 1))
+            continue
+        if r.status_code == 200:
+            break
+        if r.status_code == 401:
+            raise SystemExit(
+                f"Strava token refresh failed: HTTP 401 (unauthorized)\n"
+                f"Response body: {r.text[:500]}\n"
+                f"Likely cause: STRAVA_REFRESH_TOKEN GitHub secret is stale. "
+                f"Copy the current value from Vercel env vars and update the secret."
+            )
+        print(
+            f"Token refresh got HTTP {r.status_code} (attempt {attempt + 1}/5) — "
+            f"transient edge block/throttle, retrying..."
+        )
+        time.sleep(2 ** attempt + random.uniform(0, 1))
+    else:
+        code = r.status_code if r is not None else "no response"
+        body = r.text[:500] if r is not None else ""
         raise SystemExit(
-            f"Strava token refresh failed: HTTP {r.status_code}\n"
-            f"Response body: {r.text[:500]}\n"
-            f"Likely cause: STRAVA_REFRESH_TOKEN GitHub secret is stale. "
-            f"Copy the current value from Vercel env vars and update the secret."
+            f"Strava token refresh failed after 5 attempts: HTTP {code}\n{body}\n"
+            f"A 403 'Request blocked' page is Strava's CloudFront edge throttling "
+            f"concurrent jobs, not a stale token; it usually clears on the next run."
         )
     try:
         d = r.json()
