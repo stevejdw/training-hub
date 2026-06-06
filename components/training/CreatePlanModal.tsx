@@ -181,9 +181,9 @@ export default function CreatePlanModal({ onClose, onCreated }: Props) {
 
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 pb-[89px] md:pb-4 bg-black/60">
-      <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-md max-h-[calc(100vh-73px-2rem)] md:max-h-[90vh] flex flex-col">
-        <div className="p-6 overflow-y-auto flex-1 space-y-5">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 px-4 pt-[calc(1rem_+_env(safe-area-inset-top))] pb-[calc(89px_+_env(safe-area-inset-bottom))] md:pt-4 md:pb-4">
+      <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-md max-h-[calc(100vh_-_73px_-_2rem_-_env(safe-area-inset-top)_-_env(safe-area-inset-bottom))] md:max-h-[90vh] flex flex-col">
+        <div className="p-6 overflow-y-auto flex-1 min-h-0 space-y-5">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-white">Generate Training Plan</h2>
           <button onClick={onClose} disabled={busy} className="text-gray-500 hover:text-white transition-colors">
@@ -359,6 +359,8 @@ export default function CreatePlanModal({ onClose, onCreated }: Props) {
         </div>
         </div> {/* end scrollable content */}
 
+        {/* Pinned footer — always visible above the bottom nav / home indicator */}
+        <div className="px-6 pt-3 pb-6 space-y-3 border-t border-gray-800">
         {status === 'generating' && (
 
           <div className="space-y-2">
@@ -385,7 +387,7 @@ export default function CreatePlanModal({ onClose, onCreated }: Props) {
           <p className="text-sm text-red-400">{errorMsg}</p>
         )}
 
-        <div className="flex gap-2 pt-1">
+        <div className="flex gap-2">
           <button
             onClick={onClose}
             disabled={busy}
@@ -402,6 +404,7 @@ export default function CreatePlanModal({ onClose, onCreated }: Props) {
 
           </button>
         </div>
+        </div> {/* end pinned footer */}
       </div>
     </div>
   );

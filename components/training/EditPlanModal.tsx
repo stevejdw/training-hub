@@ -301,9 +301,9 @@ export default function EditPlanModal({ plan, onClose, onUpdated }: Props) {
 
   return (
 
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 pb-[89px] md:pb-4 bg-black/60">
-      <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-md max-h-[calc(100vh-73px-2rem)] md:max-h-[90vh] flex flex-col">
-      <div className="p-6 overflow-y-auto flex-1 space-y-5">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 px-4 pt-[calc(1rem_+_env(safe-area-inset-top))] pb-[calc(89px_+_env(safe-area-inset-bottom))] md:pt-4 md:pb-4">
+      <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-md max-h-[calc(100vh_-_73px_-_2rem_-_env(safe-area-inset-top)_-_env(safe-area-inset-bottom))] md:max-h-[90vh] flex flex-col">
+      <div className="p-6 overflow-y-auto flex-1 min-h-0 space-y-5">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-white">Edit Plan</h2>
           <button onClick={onClose} disabled={busy} className="text-gray-500 hover:text-white transition-colors">
