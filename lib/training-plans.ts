@@ -1,4 +1,8 @@
 import pool from '@/lib/db';
+import { PlanSummary } from '@/lib/plan-status';
+
+export type { PlanSummary } from '@/lib/plan-status';
+export { planStatus, pickActivePlan, isInFinalWeek } from '@/lib/plan-status';
 
 export interface TrainingSegment {
   type: 'warmup' | 'main' | 'cooldown' | 'interval';
@@ -59,12 +63,18 @@ export async function ensureTables() {
   }
 }
 
-export async function listPlans(): Promise<Omit<TrainingPlan, 'days'>[]> {
+export async function listPlans(): Promise<PlanSummary[]> {
   await ensureTables();
   const client = await pool.connect();
   try {
     const res = await client.query(
-      'SELECT id, name, goal, created_at FROM training_plans ORDER BY created_at DESC'
+      `SELECT p.id, p.name, p.goal, p.created_at,
+              MIN(d.date)::text AS start_date,
+              MAX(d.date)::text AS end_date
+       FROM training_plans p
+       LEFT JOIN training_days d ON d.plan_id = p.id
+       GROUP BY p.id, p.name, p.goal, p.created_at
+       ORDER BY p.created_at DESC`
     );
     return res.rows;
   } finally {

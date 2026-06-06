@@ -8,6 +8,10 @@ import { currentMonday, addDays } from '@/lib/timezone';
 interface Props {
   onClose: () => void;
   onCreated: (planId: number) => void;
+  initialName?: string;
+  initialGoal?: string;
+  initialNotes?: string;
+  initialStartDate?: string;
 }
 
 const DOW_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -28,15 +32,17 @@ interface DaySetting {
 }
 type DaySettingsMap = Record<number, DaySetting>;
 
-export default function CreatePlanModal({ onClose, onCreated }: Props) {
-  const [planName, setPlanName] = useState('');
-  const [goal, setGoal] = useState('');
-  const [notes, setNotes] = useState('');
+export default function CreatePlanModal({ onClose, onCreated, initialName, initialGoal, initialNotes, initialStartDate }: Props) {
+  const [planName, setPlanName] = useState(initialName ?? '');
+  const [goal, setGoal] = useState(initialGoal ?? '');
+  const [notes, setNotes] = useState(initialNotes ?? '');
   const [weeks, setWeeks] = useState(4);
-  const [planStartDate, setPlanStartDate] = useState('');
+  const [planStartDate, setPlanStartDate] = useState(initialStartDate ?? '');
 
-  // Fetch profile timezone and set initial start date
+  // Fetch profile timezone and set initial start date (unless one was provided,
+  // e.g. when chaining a new block onto the end of the current plan).
   useEffect(() => {
+    if (initialStartDate) return;
     fetch('/api/profile')
       .then(r => r.json())
       .then(p => {
@@ -44,7 +50,7 @@ export default function CreatePlanModal({ onClose, onCreated }: Props) {
         setPlanStartDate(currentMonday(tz));
       })
       .catch(() => setPlanStartDate(currentMonday('Australia/Sydney')));
-  }, []);
+  }, [initialStartDate]);
 
   const [trainingDays, setTrainingDays] = useState<number[]>([1, 2, 4, 5, 6]); // Tue/Wed/Fri/Sat/Sun
   const [daySettings, setDaySettings] = useState<DaySettingsMap>(() => {
