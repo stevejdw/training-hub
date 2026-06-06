@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 
 interface EnlargeableChartProps {
   /** Render the chart. `fullscreen` is true when shown in the fullscreen overlay,
@@ -20,6 +21,9 @@ interface EnlargeableChartProps {
  */
 export default function EnlargeableChart({ children, title, subtitle, className }: EnlargeableChartProps) {
   const [open, setOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => { setMounted(true); }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -49,9 +53,9 @@ export default function EnlargeableChart({ children, title, subtitle, className 
 
       {children(false)}
 
-      {open && (
+      {open && mounted && createPortal(
         <div
-          className="fixed inset-0 z-[100] flex flex-col bg-black/90 backdrop-blur-sm p-4 sm:p-6"
+          className="fixed inset-0 z-[2147483647] flex flex-col bg-gray-950 p-4 sm:p-6"
           onClick={() => setOpen(false)}
         >
           <div className="flex items-start justify-between gap-4 mb-3">
@@ -74,7 +78,8 @@ export default function EnlargeableChart({ children, title, subtitle, className 
           <div className="flex-1 min-h-0" onClick={e => e.stopPropagation()}>
             {children(true)}
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
