@@ -164,9 +164,7 @@ export default function TssRollingChart({ compact }: { compact?: boolean }) {
         {loading && points.length === 0 ? (
           <div className="h-24 animate-pulse bg-gray-800 rounded-lg" />
         ) : (
-          <EnlargeableChart title="Rolling TSS">
-            {(fs) => (
-            <ResponsiveContainer width="100%" height={fs ? '100%' : 100}>
+          <ResponsiveContainer width="100%" height={100}>
             <ComposedChart data={chartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }} barCategoryGap="20%">
               <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
               <XAxis dataKey="label" tick={{ fill: '#6b7280', fontSize: 8 }} axisLine={false} tickLine={false} />
@@ -178,8 +176,6 @@ export default function TssRollingChart({ compact }: { compact?: boolean }) {
                     isAnimationActive={false} />
             </ComposedChart>
           </ResponsiveContainer>
-            )}
-          </EnlargeableChart>
         )}
       </div>
     );
