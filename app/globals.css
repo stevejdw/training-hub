@@ -285,6 +285,20 @@ body {
 }
 
 
+/* Mobile bottom nav: clear the home indicator only when installed as a PWA.
+   viewport-fit=cover makes env(safe-area-inset-bottom) report a non-zero value
+   even in a normal browser tab, where there is no home indicator — applying it
+   there would add an empty bar below the nav. Scope it to standalone display. */
+.mobile-bottom-nav {
+  padding-bottom: 0;
+}
+
+@media (display-mode: standalone) {
+  .mobile-bottom-nav {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
 /* Smooth momentum scrolling on iOS for any scroll container */
 .scroll-touch {
   -webkit-overflow-scrolling: touch;

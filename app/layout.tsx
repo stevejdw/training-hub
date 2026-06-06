@@ -3,35 +3,27 @@ import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 import Nav from '@/components/Nav';
 import ThemeProvider from '@/components/ThemeProvider';
-import { getProfile } from '@/lib/profile';
 
 const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] });
 const geistMono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin'] });
 
-// Re-read the profile on every request so the apple-touch-icon reflects the
-// icon currently selected in Settings (mirrors app/manifest.ts).
-export const dynamic = 'force-dynamic';
-
-export async function generateMetadata(): Promise<Metadata> {
-  const profile = await getProfile().catch(() => null);
-  const icon = profile?.app_icon ?? 'speed';
-
-  return {
+export const metadata: Metadata = {
+  title: 'Training Hub',
+  description: 'Cycling training analytics and coaching',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black',
     title: 'Training Hub',
-    description: 'Cycling training analytics and coaching',
-    appleWebApp: {
-      capable: true,
-      statusBarStyle: 'black',
-      title: 'Training Hub',
-    },
-    // iOS "Add to Home Screen" uses the apple-touch-icon (it ignores the web
-    // app manifest icons). Point it at the user's selected icon so the home
-    // screen icon matches the Settings choice.
-    icons: {
-      apple: `/app-icon-${icon}.png`,
-    },
-  };
-}
+  },
+  // iOS "Add to Home Screen" uses the apple-touch-icon (it ignores the web app
+  // manifest icons). Point it at a lightweight route that resolves to the icon
+  // currently selected in Settings. Keeping the lookup in its own route — rather
+  // than in this layout's metadata — lets the rest of the app render statically
+  // instead of forcing a DB read on every page navigation.
+  icons: {
+    apple: '/apple-touch-icon',
+  },
+};
 
 export const viewport: Viewport = {
   width: 'device-width',

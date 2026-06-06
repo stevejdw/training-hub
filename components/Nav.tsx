@@ -117,10 +117,7 @@ export default function Nav() {
       </header>
 
       {/* ── Mobile: fixed bottom tab bar ── */}
-      <nav
-        className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-gray-950 border-t border-gray-800"
-        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
-      >
+      <nav className="mobile-bottom-nav md:hidden fixed bottom-0 left-0 right-0 z-50 bg-gray-950 border-t border-gray-800">
         <div className="flex h-[73px] pb-4">
           {mobileItems.map(({ key, href, label, icon, matchPrefixes }) => {
             const prefixes = key === 'more' ? mobileMore : matchPrefixes;
