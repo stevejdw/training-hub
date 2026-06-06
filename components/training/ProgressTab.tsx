@@ -244,7 +244,7 @@ export default function ProgressTab() {
         ) : chartData.length === 0 ? (
           <div className="h-48 flex items-center justify-center text-gray-600 text-sm">No data for this period</div>
         ) : (
-          <EnlargeableChart title={`Total ${m.label}`}>{(fs) => (
+          <EnlargeableChart title={`Total ${m.label}`} subtitle={dateRange}>{(fs) => (
           <ResponsiveContainer width="100%" height={fs ? '100%' : 200}>
             <AreaChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
               <defs>

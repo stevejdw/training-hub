@@ -210,7 +210,7 @@ export default function PowerProgressChart() {
       {chartData.length > 0 && (
         <div className="bg-gray-800/60 rounded-xl p-3">
           <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-3">Best power by week · last 26 weeks</p>
-          <EnlargeableChart title="Best power by week">
+          <EnlargeableChart title="Best power by week · last 26 weeks">
             {(fs) => (
             <ResponsiveContainer width="100%" height={fs ? '100%' : 200}>
             <LineChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>

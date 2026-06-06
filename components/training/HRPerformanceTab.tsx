@@ -206,7 +206,7 @@ export default function HRPerformanceTab() {
             No rides with both power and HR data
           </div>
         ) : (
-          <EnlargeableChart title="Aerobic Efficiency">
+          <EnlargeableChart title="Aerobic Efficiency" subtitle="Normalised Power ÷ Avg Heart Rate — higher = more watts per heartbeat">
             {(fs) => (
             <ResponsiveContainer width="100%" height={fs ? '100%' : 200}>
             <LineChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
@@ -248,7 +248,7 @@ export default function HRPerformanceTab() {
         <div className="bg-gray-900 rounded-xl border border-gray-800 p-4">
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">HR Zone Distribution</p>
           <p className="text-[11px] text-gray-600 mb-4">Minutes per week in each HR zone — Z2 base builds aerobic fitness</p>
-          <EnlargeableChart title="HR Zone Distribution">
+          <EnlargeableChart title="HR Zone Distribution" subtitle="Minutes per week in each HR zone — Z2 base builds aerobic fitness">
             {(fs) => (
             <ResponsiveContainer width="100%" height={fs ? '100%' : 220}>
             <BarChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }} barCategoryGap="20%">

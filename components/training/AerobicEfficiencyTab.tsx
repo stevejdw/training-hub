@@ -738,7 +738,7 @@ export default function AerobicEfficiencyTab() {
             No steady rides (VI &lt; 1.10) with power + HR in this range
           </div>
         ) : (
-          <EnlargeableChart title="Aerobic Efficiency (EF)">{(fs) => (
+          <EnlargeableChart title="Aerobic Efficiency (EF)" subtitle={'Efficiency Factor (NP ÷ avg HR) per steady ride. Higher = better aerobic fitness. Click a dot for ride detail.'}>{(fs) => (
           <ResponsiveContainer width="100%" height={fs ? '100%' : 280}>
             <ComposedChart margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />

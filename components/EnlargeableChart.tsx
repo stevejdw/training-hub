@@ -6,8 +6,10 @@ interface EnlargeableChartProps {
   /** Render the chart. `fullscreen` is true when shown in the fullscreen overlay,
    *  so the ResponsiveContainer height can switch to "100%". */
   children: (fullscreen: boolean) => ReactNode;
-  /** Optional title shown in the fullscreen overlay header. */
+  /** Title shown in the fullscreen overlay header (the chart's intro heading). */
   title?: string;
+  /** Optional secondary line shown under the title in the fullscreen overlay. */
+  subtitle?: string;
   /** Extra classes for the inline wrapper. */
   className?: string;
 }
@@ -16,7 +18,7 @@ interface EnlargeableChartProps {
  * Wraps a chart and adds a small "enlarge" icon to its top-right corner.
  * Clicking it shows the same chart in a full-screen overlay.
  */
-export default function EnlargeableChart({ children, title, className }: EnlargeableChartProps) {
+export default function EnlargeableChart({ children, title, subtitle, className }: EnlargeableChartProps) {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
@@ -52,13 +54,17 @@ export default function EnlargeableChart({ children, title, className }: Enlarge
           className="fixed inset-0 z-[100] flex flex-col bg-black/90 backdrop-blur-sm p-4 sm:p-6"
           onClick={() => setOpen(false)}
         >
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-sm font-semibold text-gray-200">{title ?? 'Chart'}</span>
+          <div className="flex items-start justify-between gap-4 mb-3">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-gray-200 truncate">{title ?? 'Chart'}</p>
+              {subtitle && <p className="text-xs text-gray-500 mt-0.5">{subtitle}</p>}
+            </div>
             <button
               type="button"
               onClick={() => setOpen(false)}
               aria-label="Close fullscreen"
-              className="p-1.5 rounded text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
+              title="Close"
+              className="shrink-0 flex items-center justify-center w-9 h-9 rounded-lg bg-gray-800 text-gray-300 hover:text-white hover:bg-gray-700 transition-colors"
             >
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />

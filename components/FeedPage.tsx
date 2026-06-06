@@ -235,7 +235,10 @@ function HomeProgressWidget({ wtd, mtd, ytd }: {
         {chartLoading ? (
           <div className="h-16 mx-2 animate-pulse bg-gray-700/30 rounded" />
         ) : (
-          <EnlargeableChart title="Progress">
+          <EnlargeableChart
+            title="Progress"
+            subtitle={priorTotal > 0 ? `${PRIOR_LABEL[period]} · ${fmtKm(priorTotal)}` : undefined}
+          >
             {(fs) => (
               <ResponsiveContainer width="100%" height={fs ? '100%' : 72}>
                 <LineChart data={chartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>

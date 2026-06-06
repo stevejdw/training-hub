@@ -9,7 +9,6 @@ import {
   XAxis, YAxis, Tooltip, CartesianGrid,
 } from 'recharts';
 import { SPORT_FILTER_LABELS, SportFilter, sportLabel } from '@/lib/sport-types';
-import EnlargeableChart from '@/components/EnlargeableChart';
 import ActivitiesList from './ActivitiesList';
 import FeedPage from './FeedPage';
 import ProfileEditor from './ProfileEditor';
@@ -286,9 +285,7 @@ function TrainingTab() {
         ) : chartData.length === 0 ? (
           <div className="h-48 flex items-center justify-center text-gray-600 text-sm">No data for this period</div>
         ) : (
-          <EnlargeableChart title={`${m.label} Progress`}>
-            {(fs) => (
-              <ResponsiveContainer width="100%" height={fs ? '100%' : 200}>
+          <ResponsiveContainer width="100%" height={200}>
                 <AreaChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
                   <defs>
                     <linearGradient id="dashProgressGrad" x1="0" y1="0" x2="0" y2="1">
@@ -341,8 +338,6 @@ function TrainingTab() {
                   />
                 </AreaChart>
               </ResponsiveContainer>
-            )}
-          </EnlargeableChart>
         )}
       </div>
 

@@ -251,7 +251,7 @@ export default function TssRollingChart({ compact }: { compact?: boolean }) {
       {loading && points.length === 0 ? (
         <div className="h-44 animate-pulse bg-gray-800 rounded-lg" />
       ) : (
-        <EnlargeableChart title="Rolling TSS">
+        <EnlargeableChart title="Rolling TSS" subtitle={modeLabel}>
           {(fs) => (
           <ResponsiveContainer width="100%" height={fs ? '100%' : 180}>
           <ComposedChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }} barCategoryGap="20%">

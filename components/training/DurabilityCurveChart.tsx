@@ -79,7 +79,7 @@ export default function DurabilityCurveChart() {
         </div>
       ) : (
         <>
-          <EnlargeableChart title="Durability Curve">
+          <EnlargeableChart title="Durability Curve" subtitle="Avg aerobic decoupling by ride duration — last 90 days">
             {(fs) => (
             <ResponsiveContainer width="100%" height={fs ? '100%' : 180}>
             <BarChart data={bucketData} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>

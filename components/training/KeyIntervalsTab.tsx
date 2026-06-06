@@ -126,7 +126,10 @@ function ExpandModal({ target, current, weekly, effectiveTarget, onClose }: Expa
         {/* Large chart */}
         {series.length >= 2 ? (
           <div className="h-52 md:h-64">
-            <EnlargeableChart title={formatLabel(target)}>
+            <EnlargeableChart
+              title={formatLabel(target)}
+              subtitle={`Target ${effectiveTarget}W${gap !== null ? ` · ${gap >= 0 ? '+' : ''}${gap}W vs target` : ''}`}
+            >
               {() => (
               <ResponsiveContainer width="100%" height="100%">
               <LineChart data={series} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
@@ -319,7 +322,7 @@ function IntervalCard({ target, current, weekly, effectiveTarget, onClick }: Int
 
       {series.length >= 2 && (
         <div className="h-8 md:h-12">
-          <EnlargeableChart title={formatLabel(target)}>
+          <EnlargeableChart title={formatLabel(target)} subtitle={`Target ${effectiveTarget}W`}>
             {() => (
             <ResponsiveContainer width="100%" height="100%">
             <LineChart data={series}>
