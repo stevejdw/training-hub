@@ -21,6 +21,11 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   themeColor: '#030712',
+  // Required for correct hit-testing in the installed iOS PWA: without
+  // viewport-fit=cover, landscape safe-area insets offset the rendered
+  // content from the touch layer, making the whole app unresponsive in
+  // landscape. With cover, content fills the screen and taps align.
+  viewportFit: 'cover',
 };
 
 const geistFonts = `${geistSans.variable} ${geistMono.variable}`;
