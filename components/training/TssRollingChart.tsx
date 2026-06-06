@@ -247,7 +247,48 @@ export default function TssRollingChart({ compact }: { compact?: boolean }) {
       {loading && points.length === 0 ? (
         <div className="h-44 animate-pulse bg-gray-800 rounded-lg" />
       ) : (
-        <EnlargeableChart title="Rolling TSS" subtitle={modeLabel}>
+        <EnlargeableChart title="Rolling TSS" subtitle={modeLabel} controls={
+          <div className="flex items-center gap-2">
+            <div className="flex gap-1">
+              {RANGE_OPTIONS.map(n => (
+                <button
+                  key={n}
+                  onClick={() => { setWeeks(n); setOffset(0); }}
+                  className={`px-2 py-1 rounded text-[10px] font-medium transition-colors ${
+                    weeks === n
+                      ? 'bg-orange-500/20 text-orange-400 border border-orange-500/50'
+                      : 'bg-gray-800 text-gray-500 hover:text-gray-300 border border-transparent'
+                  }`}
+                >
+                  {n}w
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setOffset(o => o + weeks)}
+                className="p-1.5 rounded text-gray-500 hover:text-white hover:bg-gray-800 transition-colors"
+                aria-label="Previous weeks"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+              <button
+                onClick={() => setOffset(o => Math.max(0, o - weeks))}
+                disabled={offset <= 0}
+                className={`p-1.5 rounded transition-colors ${
+                  offset <= 0 ? 'text-gray-700 cursor-not-allowed' : 'text-gray-500 hover:text-white hover:bg-gray-800'
+                }`}
+                aria-label="Next weeks"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        }>
           {(fs) => (
           <ResponsiveContainer width="100%" height={fs ? '100%' : 180}>
           <ComposedChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }} barCategoryGap="20%">

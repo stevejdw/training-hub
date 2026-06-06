@@ -244,7 +244,46 @@ export default function ProgressTab() {
         ) : chartData.length === 0 ? (
           <div className="h-48 flex items-center justify-center text-gray-600 text-sm">No data for this period</div>
         ) : (
-          <EnlargeableChart title={`Total ${m.label}`} subtitle={dateRange}>{(fs) => (
+          <EnlargeableChart title={`Total ${m.label}`} subtitle={dateRange} controls={
+            <div className="flex items-center gap-2">
+              <div className="flex bg-gray-800 rounded-lg p-0.5 gap-0.5">
+                {PERIODS.map(p => (
+                  <button
+                    key={p.key}
+                    onClick={() => { setPeriod(p.key); setOffset(0); }}
+                    className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                      period === p.key ? 'bg-orange-500 text-white' : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setOffset(o => o - 1)}
+                  className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
+                  aria-label="Previous period"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+                <button
+                  onClick={() => setOffset(o => Math.min(0, o + 1))}
+                  disabled={offset >= 0}
+                  className={`p-1.5 rounded-lg transition-colors ${
+                    offset >= 0 ? 'text-gray-700 cursor-not-allowed' : 'text-gray-400 hover:text-white hover:bg-gray-800'
+                  }`}
+                  aria-label="Next period"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          }>{(fs) => (
           <ResponsiveContainer width="100%" height={fs ? '100%' : 200}>
             <AreaChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
               <defs>

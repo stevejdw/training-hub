@@ -182,7 +182,32 @@ export function TssWeekChart() {
       {loading ? (
         <div className="h-40 animate-pulse bg-gray-800 rounded-lg" />
       ) : (
-        <EnlargeableChart title="Weekly TSS">{(fs) => (
+        <EnlargeableChart title="Weekly TSS" controls={
+          <div className="flex items-center gap-1.5 select-none">
+            <button
+              onClick={() => setOffset(o => o - 1)}
+              className="p-1 rounded bg-gray-800 text-gray-400 hover:text-white transition-colors"
+              aria-label="Previous week"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+            <span className="text-[10px] text-gray-300 font-medium tabular-nums text-center min-w-[5.5rem]">{weekLabel}</span>
+            <button
+              onClick={() => setOffset(o => Math.min(0, o + 1))}
+              disabled={offset >= 0}
+              className={`p-1 rounded bg-gray-800 transition-colors ${
+                offset >= 0 ? 'text-gray-600 cursor-not-allowed' : 'text-gray-400 hover:text-white'
+              }`}
+              aria-label="Next week"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          </div>
+        }>{(fs) => (
         <ResponsiveContainer width="100%" height={fs ? '100%' : 160}>
           <BarChart data={barData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }} barCategoryGap="25%">
             <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
@@ -377,7 +402,29 @@ export default function FitnessTab() {
         ) : chartData.length === 0 ? (
           <div className="h-64 flex items-center justify-center text-gray-500 text-sm">No TSS data found</div>
         ) : (
-          <EnlargeableChart title="ATL · CTL · Form (TSB)">{(fs) => (
+          <EnlargeableChart title="ATL · CTL · Form (TSB)" controls={
+            <div className="flex gap-1 flex-wrap justify-end">
+              {[
+                { d: 30,   label: '30d' },
+                { d: 90,   label: '90d' },
+                { d: 180,  label: '6m'  },
+                { d: 365,  label: '1y'  },
+                { d: -1,   label: 'All' },
+              ].map(({ d, label }) => (
+                <button
+                  key={d}
+                  onClick={() => setDays(d)}
+                  className={`px-2 py-1 rounded-md text-[10px] font-medium transition-colors ${
+                    days === d
+                      ? 'bg-orange-500/20 text-orange-400 border border-orange-500/50'
+                      : 'bg-gray-800 text-gray-400 hover:text-white'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          }>{(fs) => (
           <ResponsiveContainer width="100%" height={fs ? '100%' : 280}>
             <LineChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
@@ -444,7 +491,13 @@ export default function FitnessTab() {
         ) : !eftpPoints.length ? (
           <div className="h-48 flex items-center justify-center text-gray-500 text-sm">No data for this period</div>
         ) : (
-          <EnlargeableChart title="Estimated FTP (eFTP)">{(fs) => (
+          <EnlargeableChart title="Estimated FTP (eFTP)" controls={
+            <ChartNav
+              period={eftpPeriod} offset={eftpOffset}
+              hasBack={canGoBack(allEftpPoints, eftpPeriod, eftpOffset)}
+              setPeriod={setEftpPeriod} setOffset={setEftpOffset}
+            />
+          }>{(fs) => (
           <ResponsiveContainer width="100%" height={fs ? '100%' : 200}>
             <LineChart data={eftpPoints} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
@@ -477,7 +530,13 @@ export default function FitnessTab() {
           ) : !vo2Points.length ? (
             <div className="h-48 flex items-center justify-center text-gray-500 text-sm">No data for this period</div>
           ) : (
-            <EnlargeableChart title="VO₂ Max (estimated)">{(fs) => (
+            <EnlargeableChart title="VO₂ Max (estimated)" controls={
+              <ChartNav
+                period={vo2Period} offset={vo2Offset}
+                hasBack={canGoBack(allVo2Points, vo2Period, vo2Offset)}
+                setPeriod={setVo2Period} setOffset={setVo2Offset}
+              />
+            }>{(fs) => (
             <ResponsiveContainer width="100%" height={fs ? '100%' : 200}>
               <LineChart data={vo2Points} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />

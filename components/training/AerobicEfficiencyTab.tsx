@@ -738,7 +738,34 @@ export default function AerobicEfficiencyTab() {
             No steady rides (VI &lt; 1.10) with power + HR in this range
           </div>
         ) : (
-          <EnlargeableChart title="Aerobic Efficiency (EF)" subtitle={'Efficiency Factor (NP ÷ avg HR) per steady ride. Higher = better aerobic fitness. Click a dot for ride detail.'}>{(fs) => (
+          <EnlargeableChart title="Aerobic Efficiency (EF)" subtitle={'Efficiency Factor (NP ÷ avg HR) per steady ride. Higher = better aerobic fitness. Click a dot for ride detail.'} controls={
+            <div className="flex items-center gap-2">
+              <div className="flex gap-1.5">
+                {([
+                  { key: 'all', label: 'All zones' },
+                  { key: 'z2', label: 'Zone 2' },
+                  { key: 'z3', label: 'Zone 3' },
+                ] as { key: ZoneFilter; label: string }[]).map(z => (
+                  <button
+                    key={z.key}
+                    onClick={() => setZoneFilter(z.key)}
+                    className={`px-2.5 py-1 rounded-lg text-[10px] font-medium transition-colors ${
+                      zoneFilter === z.key
+                        ? 'bg-blue-500/20 text-blue-400 border border-blue-500/50'
+                        : 'bg-gray-800 text-gray-500 hover:text-gray-300'
+                    }`}
+                  >
+                    {z.label}
+                  </button>
+                ))}
+              </div>
+              <ChartNav
+                period={period} offset={offset}
+                hasBack={canGoBack(allRides, period, offset)}
+                setPeriod={setPeriod} setOffset={setOffset}
+              />
+            </div>
+          }>{(fs) => (
           <ResponsiveContainer width="100%" height={fs ? '100%' : 280}>
             <ComposedChart margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />

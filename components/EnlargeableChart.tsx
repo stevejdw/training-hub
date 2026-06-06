@@ -11,6 +11,8 @@ interface EnlargeableChartProps {
   title?: string;
   /** Optional secondary line shown under the title in the fullscreen overlay. */
   subtitle?: string;
+  /** Optional chart controls (e.g. period selector) shown in the fullscreen header. */
+  controls?: ReactNode;
   /** Extra classes for the inline wrapper. */
   className?: string;
 }
@@ -19,7 +21,7 @@ interface EnlargeableChartProps {
  * Wraps a chart and adds a small "enlarge" icon to its top-right corner.
  * Clicking it shows the same chart in a full-screen overlay.
  */
-export default function EnlargeableChart({ children, title, subtitle, className }: EnlargeableChartProps) {
+export default function EnlargeableChart({ children, title, subtitle, controls, className }: EnlargeableChartProps) {
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
 
@@ -55,25 +57,34 @@ export default function EnlargeableChart({ children, title, subtitle, className 
 
       {open && mounted && createPortal(
         <div
-          className="fixed inset-0 z-[2147483647] flex flex-col bg-gray-950 p-4 sm:p-6"
+          className="fixed inset-0 z-[2147483647] flex flex-col bg-gray-950"
+          style={{
+            paddingTop:    'max(1rem, env(safe-area-inset-top))',
+            paddingRight:  'max(1rem, env(safe-area-inset-right))',
+            paddingBottom: 'max(1rem, env(safe-area-inset-bottom))',
+            paddingLeft:   'max(1rem, env(safe-area-inset-left))',
+          }}
           onClick={() => setOpen(false)}
         >
-          <div className="flex items-start justify-between gap-4 mb-3">
+          <div className="flex items-start justify-between gap-3 mb-3" onClick={e => e.stopPropagation()}>
             <div className="min-w-0">
               <p className="text-sm font-semibold text-gray-200 truncate">{title ?? 'Chart'}</p>
               {subtitle && <p className="text-xs text-gray-500 mt-0.5">{subtitle}</p>}
             </div>
-            <button
-              type="button"
-              onClick={() => setOpen(false)}
-              aria-label="Close fullscreen"
-              title="Close"
-              className="shrink-0 flex items-center justify-center w-9 h-9 rounded-lg bg-gray-800 text-gray-300 hover:text-white hover:bg-gray-700 transition-colors"
-            >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+            <div className="flex items-center gap-2 flex-wrap justify-end">
+              {controls}
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                aria-label="Close fullscreen"
+                title="Close"
+                className="shrink-0 flex items-center justify-center w-10 h-10 rounded-lg bg-gray-800 text-gray-300 hover:text-white hover:bg-gray-700 active:bg-gray-600 transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
           </div>
           <div className="flex-1 min-h-0" onClick={e => e.stopPropagation()}>
             {children(true)}

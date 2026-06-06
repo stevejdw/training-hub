@@ -210,7 +210,25 @@ export default function PowerProgressChart() {
       {chartData.length > 0 && (
         <div className="bg-gray-800/60 rounded-xl p-3">
           <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-3">Best power by week · last 26 weeks</p>
-          <EnlargeableChart title="Best power by week · last 26 weeks">
+          <EnlargeableChart title="Best power by week · last 26 weeks" controls={
+            <div className="flex items-center gap-1 flex-wrap justify-end">
+              {data.targets.map(t => {
+                const isShown = visibleKeys.has(t.key);
+                return (
+                  <button
+                    key={t.key}
+                    onClick={() => toggleDuration(t.key)}
+                    className={`flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium border transition-colors ${
+                      isShown ? 'bg-gray-800 border-gray-600 text-gray-200' : 'bg-gray-900/60 border-gray-800 text-gray-500'
+                    }`}
+                  >
+                    <span className="w-2 h-2 rounded-full" style={{ background: t.color }} />
+                    {t.repeats ? `${t.repeats}×` : ''}{t.label}
+                  </button>
+                );
+              })}
+            </div>
+          }>
             {(fs) => (
             <ResponsiveContainer width="100%" height={fs ? '100%' : 200}>
             <LineChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>

@@ -306,7 +306,65 @@ export default function AerobicEfficiencyChart({ activityId, showCompare }: { ac
           <div className="h-48 flex items-center justify-center text-gray-500 text-sm">No stream data</div>
         ) : (
           <>
-            <EnlargeableChart title="Efficiency Graph">
+            <EnlargeableChart
+              title="Efficiency Graph"
+              controls={
+                <div className="flex items-center gap-3 flex-wrap justify-end">
+                  {/* Toggle buttons */}
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => setShowPower(p => !p)}
+                      className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors border ${
+                        showPower
+                          ? 'bg-orange-500/20 text-orange-400 border-orange-500/50'
+                          : 'bg-gray-800 text-gray-600 border-transparent'
+                      }`}
+                    >
+                      W
+                    </button>
+                    <button
+                      onClick={() => setShowHr(h => !h)}
+                      className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors border ${
+                        showHr
+                          ? 'bg-blue-500/20 text-blue-400 border-blue-500/50'
+                          : 'bg-gray-800 text-gray-600 border-transparent'
+                      }`}
+                    >
+                      ♥
+                    </button>
+                    <button
+                      onClick={() => setShowEf(e => !e)}
+                      className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors border ${
+                        showEf
+                          ? 'bg-white/10 text-white border-white/40'
+                          : 'bg-gray-800 text-gray-600 border-transparent'
+                      }`}
+                    >
+                      EF
+                    </button>
+                  </div>
+                  {/* Compare period selector — only shown in fitness screen */}
+                  {showCompare && (
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] text-gray-600">Compare vs:</span>
+                      {COMPARE_PERIODS.map(p => (
+                        <button
+                          key={p.key}
+                          onClick={() => setComparePeriod(prev => prev === p.key ? null : p.key)}
+                          className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors border ${
+                            comparePeriod === p.key
+                              ? 'bg-blue-500/20 text-blue-400 border-blue-500/50'
+                              : 'bg-gray-800 text-gray-500 hover:text-gray-300 border-transparent'
+                          }`}
+                        >
+                          {p.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              }
+            >
               {(fs) => (
             <ResponsiveContainer width="100%" height={fs ? '100%' : 220}>
               <LineChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
