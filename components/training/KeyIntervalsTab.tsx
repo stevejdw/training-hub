@@ -6,6 +6,7 @@ import {
   ReferenceLine, Tooltip, CartesianGrid,
 } from 'recharts';
 import { useCachedFetch } from '@/lib/use-cached-fetch';
+import EnlargeableChart from '@/components/EnlargeableChart';
 
 interface Target {
   key:          string;
@@ -125,7 +126,9 @@ function ExpandModal({ target, current, weekly, effectiveTarget, onClose }: Expa
         {/* Large chart */}
         {series.length >= 2 ? (
           <div className="h-52 md:h-64">
-            <ResponsiveContainer width="100%" height="100%">
+            <EnlargeableChart title={formatLabel(target)}>
+              {() => (
+              <ResponsiveContainer width="100%" height="100%">
               <LineChart data={series} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                 <CartesianGrid stroke="#1f2937" strokeDasharray="3 3" />
                 <XAxis
@@ -151,6 +154,8 @@ function ExpandModal({ target, current, weekly, effectiveTarget, onClose }: Expa
                 <Line type="monotone" dataKey="watts" stroke={target.color} strokeWidth={2.5} dot={{ r: 3, fill: target.color }} />
               </LineChart>
             </ResponsiveContainer>
+              )}
+            </EnlargeableChart>
           </div>
         ) : (
           <p className="text-sm text-gray-500 text-center py-8">Not enough data to chart yet.</p>
@@ -314,7 +319,9 @@ function IntervalCard({ target, current, weekly, effectiveTarget, onClick }: Int
 
       {series.length >= 2 && (
         <div className="h-8 md:h-12">
-          <ResponsiveContainer width="100%" height="100%">
+          <EnlargeableChart title={formatLabel(target)}>
+            {() => (
+            <ResponsiveContainer width="100%" height="100%">
             <LineChart data={series}>
               <YAxis hide domain={['dataMin - 10', 'dataMax + 10']} />
               <ReferenceLine y={effectiveTarget} stroke="#6b7280" strokeDasharray="3 3" />
@@ -326,6 +333,8 @@ function IntervalCard({ target, current, weekly, effectiveTarget, onClick }: Int
               <Line type="monotone" dataKey="watts" stroke={target.color} strokeWidth={2} dot={false} />
             </LineChart>
           </ResponsiveContainer>
+            )}
+          </EnlargeableChart>
         </div>
       )}
     </button>

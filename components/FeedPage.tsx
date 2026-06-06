@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { ResponsiveContainer, LineChart, Line } from 'recharts';
 import { sportLabel, sportColor } from '@/lib/sport-types';
+import EnlargeableChart from '@/components/EnlargeableChart';
 import { useCachedFetch } from '@/lib/use-cached-fetch';
 import TssRollingChart from './training/TssRollingChart';
 import { calendarDaysFromToday } from '@/lib/calendar-days';
@@ -234,12 +235,16 @@ function HomeProgressWidget({ wtd, mtd, ytd }: {
         {chartLoading ? (
           <div className="h-16 mx-2 animate-pulse bg-gray-700/30 rounded" />
         ) : (
-          <ResponsiveContainer width="100%" height={72}>
-            <LineChart data={chartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
-              <Line type="monotone" dataKey="prior"   stroke="#6b7280" strokeWidth={1.5} strokeDasharray="4 2" dot={false} connectNulls />
-              <Line type="monotone" dataKey="current" stroke="#f97316" strokeWidth={2}   dot={false} connectNulls={false} />
-            </LineChart>
-          </ResponsiveContainer>
+          <EnlargeableChart title="Progress">
+            {(fs) => (
+              <ResponsiveContainer width="100%" height={fs ? '100%' : 72}>
+                <LineChart data={chartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+                  <Line type="monotone" dataKey="prior"   stroke="#6b7280" strokeWidth={1.5} strokeDasharray="4 2" dot={false} connectNulls />
+                  <Line type="monotone" dataKey="current" stroke="#f97316" strokeWidth={2}   dot={false} connectNulls={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            )}
+          </EnlargeableChart>
         )}
       </div>
     </div>

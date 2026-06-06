@@ -13,6 +13,7 @@ import {
   mergeStarredIntoSegments,
 } from '@/lib/pacing';
 import PageHeader from '@/components/PageHeader';
+import EnlargeableChart from '@/components/EnlargeableChart';
 import { iconFor } from '@/components/nav-items';
 import { useProfileEdit, inputCls } from '@/lib/use-profile-edit';
 import Link from 'next/link';
@@ -743,45 +744,49 @@ export default function EventDetailPage({ eventId }: Props) {
           {route && chartData.length > 0 && (
             <section ref={elevationRef} className="bg-[#f5f7fa] border border-gray-200 rounded-2xl p-4 space-y-2">
               <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Elevation Profile</h2>
-              <ResponsiveContainer width="100%" height={160}>
-                <AreaChart data={chartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="elevGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%"  stopColor="#1d4ed8" stopOpacity={0.25} />
-                      <stop offset="95%" stopColor="#1d4ed8" stopOpacity={0.04} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#d1d5db" vertical={false} />
-                  <XAxis dataKey="km" type="number" domain={['dataMin','dataMax']} tick={{ fill:'#6b7280', fontSize:10 }} axisLine={false} tickLine={false} tickFormatter={v=>`${v}km`} interval="preserveStartEnd" />
-                  <YAxis tick={{ fill:'#6b7280', fontSize:10 }} axisLine={false} tickLine={false} width={36} tickFormatter={v=>`${v}m`} />
-                  <Tooltip content={({ active, payload }) => {
-                    if (!active || !payload?.length) return null;
-                    const km = payload[0].payload.km as number;
-                    const inC = climbs.find(c => km >= c.start_km && km <= c.end_km);
-                    return (
-                      <div className="bg-white border border-gray-200 rounded-lg px-2 py-1 text-xs shadow-sm">
-                        <p className="text-gray-500">{km} km{inC ? ` · ${inC.name}` : ''}</p>
-                        <p className="text-gray-900 font-semibold">{payload[0].value} m</p>
-                      </div>
-                    );
-                  }} />
-                  {climbs.map((c, i) => {
-                    const sel    = selectedClimb === i;
-                    const anySel = selectedClimb !== null;
-                    return (
-                      <ReferenceArea key={`c${i}-${sel}`}
-                        x1={c.start_km} x2={c.end_km}
-                        fill={sel ? '#f97316' : '#ef4444'}
-                        fillOpacity={sel ? 0.25 : anySel ? 0 : 0.1}
-                        stroke={sel ? '#f97316' : '#ef4444'}
-                        strokeOpacity={sel ? 0.9 : anySel ? 0 : 0.25}
-                        strokeWidth={sel ? 2 : 1}
-                      />
-                    );
-                  })}
-                  <Area type="monotone" dataKey="alt" stroke="#1d4ed8" strokeWidth={2} fill="url(#elevGrad)" dot={false} activeDot={{ r: 3, fill: '#1d4ed8' }} />
-                </AreaChart>
-              </ResponsiveContainer>
+              <EnlargeableChart title="Elevation Profile">
+                {(fs) => (
+                  <ResponsiveContainer width="100%" height={fs ? '100%' : 160}>
+                    <AreaChart data={chartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="elevGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%"  stopColor="#1d4ed8" stopOpacity={0.25} />
+                          <stop offset="95%" stopColor="#1d4ed8" stopOpacity={0.04} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#d1d5db" vertical={false} />
+                      <XAxis dataKey="km" type="number" domain={['dataMin','dataMax']} tick={{ fill:'#6b7280', fontSize:10 }} axisLine={false} tickLine={false} tickFormatter={v=>`${v}km`} interval="preserveStartEnd" />
+                      <YAxis tick={{ fill:'#6b7280', fontSize:10 }} axisLine={false} tickLine={false} width={36} tickFormatter={v=>`${v}m`} />
+                      <Tooltip content={({ active, payload }) => {
+                        if (!active || !payload?.length) return null;
+                        const km = payload[0].payload.km as number;
+                        const inC = climbs.find(c => km >= c.start_km && km <= c.end_km);
+                        return (
+                          <div className="bg-white border border-gray-200 rounded-lg px-2 py-1 text-xs shadow-sm">
+                            <p className="text-gray-500">{km} km{inC ? ` · ${inC.name}` : ''}</p>
+                            <p className="text-gray-900 font-semibold">{payload[0].value} m</p>
+                          </div>
+                        );
+                      }} />
+                      {climbs.map((c, i) => {
+                        const sel    = selectedClimb === i;
+                        const anySel = selectedClimb !== null;
+                        return (
+                          <ReferenceArea key={`c${i}-${sel}`}
+                            x1={c.start_km} x2={c.end_km}
+                            fill={sel ? '#f97316' : '#ef4444'}
+                            fillOpacity={sel ? 0.25 : anySel ? 0 : 0.1}
+                            stroke={sel ? '#f97316' : '#ef4444'}
+                            strokeOpacity={sel ? 0.9 : anySel ? 0 : 0.25}
+                            strokeWidth={sel ? 2 : 1}
+                          />
+                        );
+                      })}
+                      <Area type="monotone" dataKey="alt" stroke="#1d4ed8" strokeWidth={2} fill="url(#elevGrad)" dot={false} activeDot={{ r: 3, fill: '#1d4ed8' }} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                )}
+              </EnlargeableChart>
               {selectedClimb !== null && climbs[selectedClimb] && (
                 <p className="text-xs text-orange-500 text-center font-medium">
                   ▲ {climbs[selectedClimb].name} — {climbs[selectedClimb].start_km}–{climbs[selectedClimb].end_km} km

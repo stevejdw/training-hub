@@ -6,6 +6,7 @@ import {
   CartesianGrid, Tooltip, ReferenceArea, ResponsiveContainer,
 } from 'recharts';
 import { useCachedFetch } from '@/lib/use-cached-fetch';
+import EnlargeableChart from '@/components/EnlargeableChart';
 
 interface DataPoint {
   date:   string;
@@ -121,7 +122,9 @@ export default function ReadinessResponseWidget() {
 
         {/* pointer-events: none so clicks pass through to the Link wrapper */}
         <div style={{ pointerEvents: 'none' }}>
-          <ResponsiveContainer width="100%" height={160}>
+          <EnlargeableChart title="Readiness & Response">
+            {(fs) => (
+          <ResponsiveContainer width="100%" height={fs ? '100%' : 160}>
             <ComposedChart data={displayData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
               <XAxis
@@ -194,6 +197,8 @@ export default function ReadinessResponseWidget() {
               />
             </ComposedChart>
           </ResponsiveContainer>
+            )}
+          </EnlargeableChart>
         </div>
 
         <div className="mt-2">

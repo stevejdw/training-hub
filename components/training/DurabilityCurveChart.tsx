@@ -6,6 +6,7 @@ import {
   Cell, LabelList,
 } from 'recharts';
 import { useCachedFetch } from '@/lib/use-cached-fetch';
+import EnlargeableChart from '@/components/EnlargeableChart';
 
 interface Ride {
   moving_time: number;  // seconds
@@ -78,7 +79,9 @@ export default function DurabilityCurveChart() {
         </div>
       ) : (
         <>
-          <ResponsiveContainer width="100%" height={180}>
+          <EnlargeableChart title="Durability Curve">
+            {(fs) => (
+            <ResponsiveContainer width="100%" height={fs ? '100%' : 180}>
             <BarChart data={bucketData} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
               <XAxis
@@ -131,6 +134,8 @@ export default function DurabilityCurveChart() {
               </Bar>
             </BarChart>
           </ResponsiveContainer>
+            )}
+          </EnlargeableChart>
 
           {contextLabel && (
             <p className={`text-[11px] font-medium ${firstExceeds ? 'text-yellow-400' : 'text-green-400'}`}>

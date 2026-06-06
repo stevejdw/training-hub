@@ -7,6 +7,7 @@ import {
   ReferenceLine, ReferenceArea,
   ResponsiveContainer, Tooltip,
 } from 'recharts';
+import EnlargeableChart from '@/components/EnlargeableChart';
 
 interface AerobicData {
   name: string;
@@ -305,7 +306,9 @@ export default function AerobicEfficiencyChart({ activityId, showCompare }: { ac
           <div className="h-48 flex items-center justify-center text-gray-500 text-sm">No stream data</div>
         ) : (
           <>
-            <ResponsiveContainer width="100%" height={220}>
+            <EnlargeableChart title="Efficiency Graph">
+              {(fs) => (
+            <ResponsiveContainer width="100%" height={fs ? '100%' : 220}>
               <LineChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
                 <XAxis
@@ -460,6 +463,8 @@ export default function AerobicEfficiencyChart({ activityId, showCompare }: { ac
                 )}
               </LineChart>
             </ResponsiveContainer>
+              )}
+            </EnlargeableChart>
             <p className="text-[10px] text-gray-600 mt-2">
               {showPower && <><span className="text-orange-400">—</span> Power (W) ·</>}
               {showHr && <><span className="text-blue-400 ml-1.5">—</span> Heart rate (bpm) ·</>}

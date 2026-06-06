@@ -6,6 +6,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
 import { useCachedFetch } from '@/lib/use-cached-fetch';
+import EnlargeableChart from '@/components/EnlargeableChart';
 import type { ReadinessResponse, ReadinessPoint } from '@/app/api/analytics/readiness/route';
 
 type ChartPeriod = '3m' | '6m' | '1y';
@@ -182,7 +183,8 @@ export default function ReadinessTab() {
             </p>
           </div>
         ) : (
-          <ResponsiveContainer width="100%" height={260}>
+          <EnlargeableChart title="Daily HRV vs Normal Zone">{(fs) => (
+          <ResponsiveContainer width="100%" height={fs ? '100%' : 260}>
             <ComposedChart data={points} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
               <XAxis
@@ -273,6 +275,7 @@ export default function ReadinessTab() {
               />
             </ComposedChart>
           </ResponsiveContainer>
+          )}</EnlargeableChart>
         )}
       </div>
 

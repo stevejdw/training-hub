@@ -5,6 +5,7 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, ReferenceArea,
 } from 'recharts';
+import EnlargeableChart from '@/components/EnlargeableChart';
 import type { EventGoal, EventClimb, CachedRoute, PacingStrategy } from '@/lib/profile';
 import { detectClimbs, estimateTime, fmtTime, mergeStarredIntoSegments } from '@/lib/pacing';
 
@@ -241,7 +242,9 @@ export default function EventPacingModal({ event, riderWeightKg, onSave, onClose
           {route && chartData.length > 0 && (
             <div className="bg-gray-900 rounded-xl p-4 border border-gray-800">
               <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Elevation Profile</h3>
-              <ResponsiveContainer width="100%" height={160}>
+              <EnlargeableChart title="Elevation Profile">
+                {(fs) => (
+              <ResponsiveContainer width="100%" height={fs ? '100%' : 160}>
                 <AreaChart data={chartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
                   <defs>
                     <linearGradient id="elevGrad" x1="0" y1="0" x2="0" y2="1">
@@ -291,6 +294,8 @@ export default function EventPacingModal({ event, riderWeightKg, onSave, onClose
                   />
                 </AreaChart>
               </ResponsiveContainer>
+                )}
+              </EnlargeableChart>
             </div>
           )}
 

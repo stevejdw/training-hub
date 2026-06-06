@@ -6,6 +6,7 @@ import dynamic from 'next/dynamic';
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from 'recharts';
+import EnlargeableChart from '@/components/EnlargeableChart';
 
 const ActivityMap = dynamic(() => import('./ActivityMap'), { ssr: false });
 
@@ -345,7 +346,9 @@ export default function SegmentDetail({ id }: { id: string }) {
           <div>
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Elevation Profile</p>
             <div className="bg-gray-900 rounded-xl border border-gray-800 p-4">
-              <ResponsiveContainer width="100%" height={140}>
+              <EnlargeableChart title="Elevation Profile">
+                {(fs) => (
+              <ResponsiveContainer width="100%" height={fs ? '100%' : 140}>
                 <AreaChart data={elevData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
                   <defs>
                     <linearGradient id="elevGrad" x1="0" y1="0" x2="0" y2="1">
@@ -364,6 +367,8 @@ export default function SegmentDetail({ id }: { id: string }) {
                   <Area type="monotone" dataKey="alt" stroke="#f97316" strokeWidth={2} fill="url(#elevGrad)" dot={false} activeDot={{ r: 3, fill: '#f97316' }} />
                 </AreaChart>
               </ResponsiveContainer>
+                )}
+              </EnlargeableChart>
             </div>
           </div>
         )}

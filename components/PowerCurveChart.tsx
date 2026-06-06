@@ -11,6 +11,7 @@ import {
   ReferenceLine,
   Legend,
 } from 'recharts';
+import EnlargeableChart from '@/components/EnlargeableChart';
 
 interface DataPoint {
   label: string;
@@ -51,7 +52,9 @@ export default function PowerCurveChart({ data, compareData, compareLabel, ftp }
 
   return (
     <div className="bg-gray-800 rounded-xl p-4">
-      <ResponsiveContainer width="100%" height={240}>
+      <EnlargeableChart title="Power Curve">
+        {(fs) => (
+      <ResponsiveContainer width="100%" height={fs ? '100%' : 240}>
         <LineChart data={merged} margin={{ top: 10, right: 16, left: 0, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
           <XAxis
@@ -114,6 +117,8 @@ export default function PowerCurveChart({ data, compareData, compareLabel, ftp }
           />
         </LineChart>
       </ResponsiveContainer>
+        )}
+      </EnlargeableChart>
     </div>
   );
 }

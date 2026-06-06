@@ -5,6 +5,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, ReferenceLine,
 } from 'recharts';
+import EnlargeableChart from '@/components/EnlargeableChart';
 
 interface Target {
   key:          string;
@@ -209,7 +210,9 @@ export default function PowerProgressChart() {
       {chartData.length > 0 && (
         <div className="bg-gray-800/60 rounded-xl p-3">
           <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-3">Best power by week · last 26 weeks</p>
-          <ResponsiveContainer width="100%" height={200}>
+          <EnlargeableChart title="Best power by week">
+            {(fs) => (
+            <ResponsiveContainer width="100%" height={fs ? '100%' : 200}>
             <LineChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
               <XAxis
@@ -254,6 +257,8 @@ export default function PowerProgressChart() {
               ))}
             </LineChart>
           </ResponsiveContainer>
+            )}
+          </EnlargeableChart>
 
           <div className="flex items-center gap-4 flex-wrap mt-2">
             {data.targets.filter(t => visibleKeys.has(t.key)).map(t => (

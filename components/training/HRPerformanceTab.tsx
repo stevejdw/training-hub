@@ -6,6 +6,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Legend,
 } from 'recharts';
+import EnlargeableChart from '@/components/EnlargeableChart';
 
 interface ZoneDef { z: number; name: string; color: string; min: number; max: number | null }
 
@@ -205,7 +206,9 @@ export default function HRPerformanceTab() {
             No rides with both power and HR data
           </div>
         ) : (
-          <ResponsiveContainer width="100%" height={200}>
+          <EnlargeableChart title="Aerobic Efficiency">
+            {(fs) => (
+            <ResponsiveContainer width="100%" height={fs ? '100%' : 200}>
             <LineChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
               <XAxis
@@ -235,6 +238,8 @@ export default function HRPerformanceTab() {
               />
             </LineChart>
           </ResponsiveContainer>
+            )}
+          </EnlargeableChart>
         )}
       </div>
 
@@ -243,7 +248,9 @@ export default function HRPerformanceTab() {
         <div className="bg-gray-900 rounded-xl border border-gray-800 p-4">
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">HR Zone Distribution</p>
           <p className="text-[11px] text-gray-600 mb-4">Minutes per week in each HR zone — Z2 base builds aerobic fitness</p>
-          <ResponsiveContainer width="100%" height={220}>
+          <EnlargeableChart title="HR Zone Distribution">
+            {(fs) => (
+            <ResponsiveContainer width="100%" height={fs ? '100%' : 220}>
             <BarChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }} barCategoryGap="20%">
               <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
               <XAxis
@@ -267,7 +274,7 @@ export default function HRPerformanceTab() {
                   return <span style={{ color: '#9ca3af', fontSize: 10 }}>Z{value.slice(1)} {z?.name}</span>;
                 }}
               />
-              {data.zones.map(z => (
+              {data.zones?.map(z => (
                 <Bar
                   key={z.z}
                   dataKey={`z${z.z}_min`}
@@ -278,6 +285,8 @@ export default function HRPerformanceTab() {
               ))}
             </BarChart>
           </ResponsiveContainer>
+            )}
+          </EnlargeableChart>
 
           {/* Zone legend with boundaries */}
           <div className="grid grid-cols-5 gap-1.5 mt-3">

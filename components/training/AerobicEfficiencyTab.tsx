@@ -10,6 +10,7 @@ import {
   ReferenceArea,
 } from 'recharts';
 import { useCachedFetch } from '@/lib/use-cached-fetch';
+import EnlargeableChart from '@/components/EnlargeableChart';
 
 import ActivityMap from '@/components/ActivityMap';
 import Link from 'next/link';
@@ -388,7 +389,8 @@ function RideModal({ ride, onClose }: { ride: ScatterPoint; onClose: () => void 
             <div className="h-48 flex items-center justify-center text-gray-500 text-sm">No stream data</div>
           ) : (
             <div ref={chartContainerRef} className="relative select-none">
-            <ResponsiveContainer width="100%" height={200}>
+            <EnlargeableChart title="Efficiency Factor (EF) Over Ride">{(fs) => (
+            <ResponsiveContainer width="100%" height={fs ? '100%' : 200}>
               <LineChart
                 data={chartData}
                 margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
@@ -482,6 +484,7 @@ function RideModal({ ride, onClose }: { ride: ScatterPoint; onClose: () => void 
                 />
               </LineChart>
             </ResponsiveContainer>
+            )}</EnlargeableChart>
             </div>
           )}
           {/* Brush stats display */}
@@ -735,7 +738,8 @@ export default function AerobicEfficiencyTab() {
             No steady rides (VI &lt; 1.10) with power + HR in this range
           </div>
         ) : (
-          <ResponsiveContainer width="100%" height={280}>
+          <EnlargeableChart title="Aerobic Efficiency (EF)">{(fs) => (
+          <ResponsiveContainer width="100%" height={fs ? '100%' : 280}>
             <ComposedChart margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
               <XAxis
@@ -781,6 +785,7 @@ export default function AerobicEfficiencyTab() {
               )}
             </ComposedChart>
           </ResponsiveContainer>
+          )}</EnlargeableChart>
         )}
 
         <p className="text-[10px] text-gray-600 mt-2 leading-relaxed">

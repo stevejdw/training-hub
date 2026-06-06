@@ -9,6 +9,7 @@ import {
   XAxis, YAxis, Tooltip, CartesianGrid,
 } from 'recharts';
 import { SPORT_FILTER_LABELS, SportFilter, sportLabel } from '@/lib/sport-types';
+import EnlargeableChart from '@/components/EnlargeableChart';
 import ActivitiesList from './ActivitiesList';
 import FeedPage from './FeedPage';
 import ProfileEditor from './ProfileEditor';
@@ -285,59 +286,63 @@ function TrainingTab() {
         ) : chartData.length === 0 ? (
           <div className="h-48 flex items-center justify-center text-gray-600 text-sm">No data for this period</div>
         ) : (
-          <ResponsiveContainer width="100%" height={200}>
-            <AreaChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-              <defs>
-                <linearGradient id="dashProgressGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%"  stopColor="#f97316" stopOpacity={0.35} />
-                  <stop offset="95%" stopColor="#f97316" stopOpacity={0.04} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid stroke="#1f2937" strokeDasharray="3 3" vertical={false} />
-              <XAxis
-                dataKey="label"
-                tick={{ fill: '#6b7280', fontSize: 10 }}
-                axisLine={false}
-                tickLine={false}
-                interval="preserveStartEnd"
-                tickFormatter={formatXLabel}
-              />
-              <YAxis
-                tick={{ fill: '#6b7280', fontSize: 10 }}
-                axisLine={false}
-                tickLine={false}
-                width={36}
-                tickFormatter={v => m.fmt(Number(v))}
-              />
-              <Tooltip
-                contentStyle={{ background: '#111827', border: '1px solid #374151', borderRadius: 8, fontSize: 12 }}
-                labelStyle={{ color: '#9ca3af' }}
-                formatter={(v, name) => [
-                  `${m.fmt(Number(v))}${m.unit ? ' ' + m.unit : ''}`,
-                  name === 'current' ? 'This period' : 'Prior period',
-                ]}
-              />
-              <Line
-                type="monotone"
-                dataKey="prior"
-                stroke="#6b7280"
-                strokeWidth={1.5}
-                strokeDasharray="5 3"
-                dot={false}
-                connectNulls
-              />
-              <Area
-                type="monotone"
-                dataKey="current"
-                stroke="#f97316"
-                strokeWidth={2.5}
-                fill="url(#dashProgressGrad)"
-                dot={false}
-                activeDot={{ r: 5, fill: '#f97316' }}
-                connectNulls={false}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
+          <EnlargeableChart title={`${m.label} Progress`}>
+            {(fs) => (
+              <ResponsiveContainer width="100%" height={fs ? '100%' : 200}>
+                <AreaChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="dashProgressGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%"  stopColor="#f97316" stopOpacity={0.35} />
+                      <stop offset="95%" stopColor="#f97316" stopOpacity={0.04} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid stroke="#1f2937" strokeDasharray="3 3" vertical={false} />
+                  <XAxis
+                    dataKey="label"
+                    tick={{ fill: '#6b7280', fontSize: 10 }}
+                    axisLine={false}
+                    tickLine={false}
+                    interval="preserveStartEnd"
+                    tickFormatter={formatXLabel}
+                  />
+                  <YAxis
+                    tick={{ fill: '#6b7280', fontSize: 10 }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={36}
+                    tickFormatter={v => m.fmt(Number(v))}
+                  />
+                  <Tooltip
+                    contentStyle={{ background: '#111827', border: '1px solid #374151', borderRadius: 8, fontSize: 12 }}
+                    labelStyle={{ color: '#9ca3af' }}
+                    formatter={(v, name) => [
+                      `${m.fmt(Number(v))}${m.unit ? ' ' + m.unit : ''}`,
+                      name === 'current' ? 'This period' : 'Prior period',
+                    ]}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="prior"
+                    stroke="#6b7280"
+                    strokeWidth={1.5}
+                    strokeDasharray="5 3"
+                    dot={false}
+                    connectNulls
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="current"
+                    stroke="#f97316"
+                    strokeWidth={2.5}
+                    fill="url(#dashProgressGrad)"
+                    dot={false}
+                    activeDot={{ r: 5, fill: '#f97316' }}
+                    connectNulls={false}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
+          </EnlargeableChart>
         )}
       </div>
 

@@ -7,6 +7,7 @@ import {
   ReferenceLine, Legend, Tooltip, ResponsiveContainer,
 } from 'recharts';
 import { useCachedFetch } from '@/lib/use-cached-fetch';
+import EnlargeableChart from '@/components/EnlargeableChart';
 
 interface FitnessPoint { date: string; atl: number; ctl: number; tsb: number }
 interface EftpPoint  { date: string; eftp: number }
@@ -181,7 +182,8 @@ export function TssWeekChart() {
       {loading ? (
         <div className="h-40 animate-pulse bg-gray-800 rounded-lg" />
       ) : (
-        <ResponsiveContainer width="100%" height={160}>
+        <EnlargeableChart title="Weekly TSS">{(fs) => (
+        <ResponsiveContainer width="100%" height={fs ? '100%' : 160}>
           <BarChart data={barData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }} barCategoryGap="25%">
             <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
             <XAxis dataKey="label" tick={{ fill: '#6b7280', fontSize: 10 }} axisLine={false} tickLine={false} />
@@ -201,6 +203,7 @@ export function TssWeekChart() {
             <Bar dataKey="current" fill="#f97316" name="current" radius={[3,3,0,0]} />
           </BarChart>
         </ResponsiveContainer>
+        )}</EnlargeableChart>
       )}
 
       {/* Week navigation — below the chart, arrows on sides with date range between */}
@@ -374,7 +377,8 @@ export default function FitnessTab() {
         ) : chartData.length === 0 ? (
           <div className="h-64 flex items-center justify-center text-gray-500 text-sm">No TSS data found</div>
         ) : (
-          <ResponsiveContainer width="100%" height={280}>
+          <EnlargeableChart title="ATL · CTL · Form (TSB)">{(fs) => (
+          <ResponsiveContainer width="100%" height={fs ? '100%' : 280}>
             <LineChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
               <XAxis
@@ -414,6 +418,7 @@ export default function FitnessTab() {
               <Line type="monotone" dataKey="tsb" stroke="#34d399" strokeWidth={1.5} dot={false} strokeDasharray="4 2" />
             </LineChart>
           </ResponsiveContainer>
+          )}</EnlargeableChart>
         )}
       </div>
 
@@ -439,7 +444,8 @@ export default function FitnessTab() {
         ) : !eftpPoints.length ? (
           <div className="h-48 flex items-center justify-center text-gray-500 text-sm">No data for this period</div>
         ) : (
-          <ResponsiveContainer width="100%" height={200}>
+          <EnlargeableChart title="Estimated FTP (eFTP)">{(fs) => (
+          <ResponsiveContainer width="100%" height={fs ? '100%' : 200}>
             <LineChart data={eftpPoints} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
               <XAxis dataKey="date" tickFormatter={s => fmtTick(s, eftpPeriod)}
@@ -451,6 +457,7 @@ export default function FitnessTab() {
               <Line type="monotone" dataKey="eftp" stroke="#f97316" strokeWidth={2} dot={{ fill: '#f97316', r: 3 }} activeDot={{ r: 5 }} connectNulls />
             </LineChart>
           </ResponsiveContainer>
+          )}</EnlargeableChart>
         )}
       </div>
 
@@ -470,7 +477,8 @@ export default function FitnessTab() {
           ) : !vo2Points.length ? (
             <div className="h-48 flex items-center justify-center text-gray-500 text-sm">No data for this period</div>
           ) : (
-            <ResponsiveContainer width="100%" height={200}>
+            <EnlargeableChart title="VO₂ Max (estimated)">{(fs) => (
+            <ResponsiveContainer width="100%" height={fs ? '100%' : 200}>
               <LineChart data={vo2Points} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
                 <XAxis dataKey="date" tickFormatter={s => fmtTick(s, vo2Period)}
@@ -482,6 +490,7 @@ export default function FitnessTab() {
                 <Line type="monotone" dataKey="vo2max" stroke="#2dd4bf" strokeWidth={2} dot={{ fill: '#2dd4bf', r: 3 }} activeDot={{ r: 5 }} connectNulls />
               </LineChart>
             </ResponsiveContainer>
+            )}</EnlargeableChart>
           )}
           <p className="text-[10px] text-gray-600 mt-2">Per-ride estimate via Coggan formula: NP × 0.95 ÷ weight × 10.8 + 7</p>
         </div>

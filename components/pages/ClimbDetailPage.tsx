@@ -8,6 +8,7 @@ import {
 } from 'recharts';
 import { useProfileEdit, inputCls } from '@/lib/use-profile-edit';
 import PageHeader from '@/components/PageHeader';
+import EnlargeableChart from '@/components/EnlargeableChart';
 import { iconFor } from '@/components/nav-items';
 import { estimateTime, fmtTime, speedForPower, powerForSpeed } from '@/lib/pacing';
 import Link from 'next/link';
@@ -211,34 +212,38 @@ export default function ClimbDetailPage({ eventId, climbIdx }: Props) {
           {chartData.length > 0 && (
             <section className="bg-gray-900 border border-gray-800 rounded-2xl p-4">
               <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Elevation Profile</h2>
-              <ResponsiveContainer width="100%" height={180}>
-                <AreaChart data={chartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="climbGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%"  stopColor="#f97316" stopOpacity={0.5} />
-                      <stop offset="95%" stopColor="#f97316" stopOpacity={0.05} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
-                  <XAxis dataKey="km" tick={{ fill: '#6b7280', fontSize: 10 }} axisLine={false} tickLine={false}
-                    tickFormatter={v => `${v}km`} interval="preserveStartEnd" />
-                  <YAxis domain={[domainMin, altMax + 20]} tick={{ fill: '#6b7280', fontSize: 10 }}
-                    axisLine={false} tickLine={false} width={40} tickFormatter={v => `${v}m`} />
-                  <ReferenceLine y={altMin} stroke="#374151" strokeDasharray="3 3"
-                    label={{ value: `${altMin}m`, fill: '#6b7280', fontSize: 9, position: 'insideBottomLeft' }} />
-                  <Tooltip content={({ active, payload }) => {
-                    if (!active || !payload?.length) return null;
-                    return (
-                      <div className="bg-gray-900 border border-gray-700 rounded-lg px-2 py-1 text-xs">
-                        <p className="text-gray-400">{payload[0].payload.km} km in</p>
-                        <p className="text-white font-semibold">{payload[0].value} m</p>
-                      </div>
-                    );
-                  }} />
-                  <Area type="monotone" dataKey="alt" stroke="#f97316" strokeWidth={2}
-                    fill="url(#climbGrad)" dot={false} activeDot={{ r: 3 }} />
-                </AreaChart>
-              </ResponsiveContainer>
+              <EnlargeableChart title={`${climb.name} — Elevation Profile`}>
+                {(fs) => (
+                  <ResponsiveContainer width="100%" height={fs ? '100%' : 180}>
+                    <AreaChart data={chartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="climbGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%"  stopColor="#f97316" stopOpacity={0.5} />
+                          <stop offset="95%" stopColor="#f97316" stopOpacity={0.05} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
+                      <XAxis dataKey="km" tick={{ fill: '#6b7280', fontSize: 10 }} axisLine={false} tickLine={false}
+                        tickFormatter={v => `${v}km`} interval="preserveStartEnd" />
+                      <YAxis domain={[domainMin, altMax + 20]} tick={{ fill: '#6b7280', fontSize: 10 }}
+                        axisLine={false} tickLine={false} width={40} tickFormatter={v => `${v}m`} />
+                      <ReferenceLine y={altMin} stroke="#374151" strokeDasharray="3 3"
+                        label={{ value: `${altMin}m`, fill: '#6b7280', fontSize: 9, position: 'insideBottomLeft' }} />
+                      <Tooltip content={({ active, payload }) => {
+                        if (!active || !payload?.length) return null;
+                        return (
+                          <div className="bg-gray-900 border border-gray-700 rounded-lg px-2 py-1 text-xs">
+                            <p className="text-gray-400">{payload[0].payload.km} km in</p>
+                            <p className="text-white font-semibold">{payload[0].value} m</p>
+                          </div>
+                        );
+                      }} />
+                      <Area type="monotone" dataKey="alt" stroke="#f97316" strokeWidth={2}
+                        fill="url(#climbGrad)" dot={false} activeDot={{ r: 3 }} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                )}
+              </EnlargeableChart>
             </section>
           )}
 

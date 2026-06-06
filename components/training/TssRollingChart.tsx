@@ -6,6 +6,7 @@ import {
   CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
 
+import EnlargeableChart from '@/components/EnlargeableChart';
 import { useCachedFetch } from '@/lib/use-cached-fetch';
 import type { TssSummaryResponse, TssWeekPoint, TssDayPoint } from '@/app/api/training/tss-summary/route';
 import type { TssPlanConfig, AthleteProfile } from '@/lib/profile';
@@ -163,7 +164,9 @@ export default function TssRollingChart({ compact }: { compact?: boolean }) {
         {loading && points.length === 0 ? (
           <div className="h-24 animate-pulse bg-gray-800 rounded-lg" />
         ) : (
-          <ResponsiveContainer width="100%" height={100}>
+          <EnlargeableChart title="Rolling TSS">
+            {(fs) => (
+            <ResponsiveContainer width="100%" height={fs ? '100%' : 100}>
             <ComposedChart data={chartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }} barCategoryGap="20%">
               <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
               <XAxis dataKey="label" tick={{ fill: '#6b7280', fontSize: 8 }} axisLine={false} tickLine={false} />
@@ -175,6 +178,8 @@ export default function TssRollingChart({ compact }: { compact?: boolean }) {
                     isAnimationActive={false} />
             </ComposedChart>
           </ResponsiveContainer>
+            )}
+          </EnlargeableChart>
         )}
       </div>
     );
@@ -246,7 +251,9 @@ export default function TssRollingChart({ compact }: { compact?: boolean }) {
       {loading && points.length === 0 ? (
         <div className="h-44 animate-pulse bg-gray-800 rounded-lg" />
       ) : (
-        <ResponsiveContainer width="100%" height={180}>
+        <EnlargeableChart title="Rolling TSS">
+          {(fs) => (
+          <ResponsiveContainer width="100%" height={fs ? '100%' : 180}>
           <ComposedChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }} barCategoryGap="20%">
             <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
             <XAxis dataKey="label" tick={{ fill: '#6b7280', fontSize: 10 }} axisLine={false} tickLine={false} />
@@ -275,6 +282,8 @@ export default function TssRollingChart({ compact }: { compact?: boolean }) {
           </ComposedChart>
 
         </ResponsiveContainer>
+          )}
+        </EnlargeableChart>
       )}
 
       {/* Week navigation — below the chart, arrows on sides with date range between */}
