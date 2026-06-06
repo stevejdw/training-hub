@@ -1,7 +1,6 @@
 'use client';
 
-import { useEffect, useState, type ReactNode } from 'react';
-import { createPortal } from 'react-dom';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 
 interface EnlargeableChartProps {
   /** Render the chart. `fullscreen` is true when shown in the fullscreen overlay,
@@ -19,24 +18,21 @@ interface EnlargeableChartProps {
 
 /**
  * Wraps a chart and adds a small "enlarge" icon to its top-right corner.
- * Clicking it shows the same chart in a full-screen overlay.
+ * Clicking it shows the same chart full-screen.
+ *
+ * The overlay uses a native <dialog> shown with showModal(), so it renders in
+ * the browser's top layer — above every stacking context and reliably
+ * interactive in any orientation (portrait and landscape).
  */
 export default function EnlargeableChart({ children, title, subtitle, controls, className }: EnlargeableChartProps) {
   const [open, setOpen] = useState(false);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => { setMounted(true); }, []);
+  const dialogRef = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
-    if (!open) return;
-    const orig = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
-    window.addEventListener('keydown', onKey);
-    return () => {
-      document.body.style.overflow = orig;
-      window.removeEventListener('keydown', onKey);
-    };
+    const dlg = dialogRef.current;
+    if (!dlg) return;
+    if (open && !dlg.open) dlg.showModal();
+    else if (!open && dlg.open) dlg.close();
   }, [open]);
 
   return (
@@ -55,44 +51,48 @@ export default function EnlargeableChart({ children, title, subtitle, controls, 
 
       {children(false)}
 
-      {open && mounted && createPortal(
-        <div
-          className="fixed inset-0 z-[2147483647] flex flex-col bg-gray-950"
-          style={{
-            paddingTop:    'max(1rem, env(safe-area-inset-top))',
-            paddingRight:  'max(1rem, env(safe-area-inset-right))',
-            paddingBottom: 'max(1rem, env(safe-area-inset-bottom))',
-            paddingLeft:   'max(1rem, env(safe-area-inset-left))',
-          }}
-        >
-          {/* Header sits above the chart in its own stacking layer so its
-              controls/close button stay tappable in any orientation. */}
-          <div className="relative z-10 shrink-0 flex items-start justify-between gap-3 mb-3">
-            <div className="min-w-0">
-              <p className="text-sm font-semibold text-gray-200 truncate">{title ?? 'Chart'}</p>
-              {subtitle && <p className="text-xs text-gray-500 mt-0.5">{subtitle}</p>}
+      <dialog
+        ref={dialogRef}
+        onClose={() => setOpen(false)}
+        onCancel={() => setOpen(false)}
+        className="m-0 p-0 max-w-none max-h-none w-screen h-screen bg-gray-950 text-gray-200 backdrop:bg-black/80 overflow-hidden"
+      >
+        {open && (
+          <div
+            className="flex h-full w-full flex-col"
+            style={{
+              paddingTop:    'max(1rem, env(safe-area-inset-top))',
+              paddingRight:  'max(1rem, env(safe-area-inset-right))',
+              paddingBottom: 'max(1rem, env(safe-area-inset-bottom))',
+              paddingLeft:   'max(1rem, env(safe-area-inset-left))',
+            }}
+          >
+            <div className="shrink-0 flex items-start justify-between gap-3 mb-3">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-gray-200 truncate">{title ?? 'Chart'}</p>
+                {subtitle && <p className="text-xs text-gray-500 mt-0.5">{subtitle}</p>}
+              </div>
+              <div className="flex items-center gap-2 flex-wrap justify-end">
+                {controls}
+                <button
+                  type="button"
+                  onClick={() => setOpen(false)}
+                  aria-label="Close fullscreen"
+                  title="Close"
+                  className="shrink-0 flex items-center justify-center w-10 h-10 rounded-lg bg-gray-800 text-gray-300 hover:text-white hover:bg-gray-700 active:bg-gray-600 transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
             </div>
-            <div className="flex items-center gap-2 flex-wrap justify-end">
-              {controls}
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                aria-label="Close fullscreen"
-                title="Close"
-                className="shrink-0 flex items-center justify-center w-10 h-10 rounded-lg bg-gray-800 text-gray-300 hover:text-white hover:bg-gray-700 active:bg-gray-600 transition-colors"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
+            <div className="flex-1 min-h-0 overflow-hidden">
+              {children(true)}
             </div>
           </div>
-          <div className="relative z-0 flex-1 min-h-0 overflow-hidden">
-            {children(true)}
-          </div>
-        </div>,
-        document.body,
-      )}
+        )}
+      </dialog>
     </div>
   );
 }
