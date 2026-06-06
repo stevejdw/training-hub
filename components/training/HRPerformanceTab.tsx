@@ -97,8 +97,10 @@ export default function HRPerformanceTab() {
       const s = localStorage.getItem(cacheKey);
       if (s) cachedData = JSON.parse(s);
     } catch {}
-    setData(cachedData);
-    setLoading(!cachedData);
+    // Stale-while-revalidate: keep showing existing data while the new range
+    // loads so changing weeks doesn't tear down an open fullscreen chart.
+    if (cachedData) { setData(cachedData); setLoading(false); }
+    else setData(cur => { setLoading(cur == null); return cur; });
     setError(null);
 
     fetch(`/api/analytics/hr-performance?weeks=${weeks}`)

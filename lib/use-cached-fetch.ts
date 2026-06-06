@@ -25,28 +25,33 @@ export function useCachedFetch<T>(
   const [error, setError] = useState<string | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const fetchIdRef = useRef(0);
+  // Mirror of `data` so doFetch can decide whether to show a loading state
+  // without resetting what's already on screen (stale-while-revalidate).
+  const dataRef = useRef<T | null>(null);
 
   const doFetch = useCallback(() => {
     const id = ++fetchIdRef.current;
-
-    // Reset state immediately so old data doesn't ghost
-    setData(null);
-    setLoading(true);
     setError(null);
 
     // Try to restore from cache instantly for a snappy feel
+    let freshFromCache = false;
     try {
       const entry = localStorage.getItem(cacheKey);
       if (entry) {
         const parsed = JSON.parse(entry) as { cachedAt: number; payload: T };
         if (parsed?.payload) {
+          dataRef.current = parsed.payload;
           setData(parsed.payload);
-          if (Date.now() - parsed.cachedAt <= ttlMs) {
-            setLoading(false);
-          }
+          freshFromCache = Date.now() - parsed.cachedAt <= ttlMs;
         }
       }
     } catch { /* ignore */ }
+
+    // Only show the loading state when there is nothing to display yet.
+    // Keeping previously-rendered data on screen while revalidating avoids a
+    // skeleton flash and, crucially, keeps the chart mounted when params
+    // change (so an open fullscreen chart doesn't get torn down).
+    setLoading(!freshFromCache && dataRef.current == null);
 
     fetch(url)
       .then(async r => {
@@ -56,6 +61,7 @@ export function useCachedFetch<T>(
       })
       .then((d: T) => {
         if (id !== fetchIdRef.current) return; // stale
+        dataRef.current = d;
         setData(d);
         setError(null);
         // Cache with timestamp so we can enforce TTL on next mount

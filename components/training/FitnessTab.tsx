@@ -288,11 +288,16 @@ export default function FitnessTab() {
   useEffect(() => {
 
     const cacheKey = FITNESS_CACHE_KEY(days);
+    // Stale-while-revalidate: keep showing existing data while the new window
+    // loads, so changing range doesn't tear down an open fullscreen chart.
+    // Only show the skeleton when there's nothing to display yet.
     try {
       const s = localStorage.getItem(cacheKey);
       if (s) { setData(JSON.parse(s)); setLoading(false); }
-      else setLoading(true);
-    } catch { setLoading(true); }
+      else setData(cur => { setLoading(cur.length === 0); return cur; });
+    } catch {
+      setData(cur => { setLoading(cur.length === 0); return cur; });
+    }
 
     const param = days < 0 ? 'all' : String(days);
     fetch(`/api/analytics/fitness?days=${param}`)
