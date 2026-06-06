@@ -1,22 +1,29 @@
 import pool from '@/lib/db';
-import { listPlans, getPlan } from '@/lib/training-plans';
+import { listPlans, getPlan, pickActivePlan } from '@/lib/training-plans';
+import { getProfile } from '@/lib/profile';
+import { todayInTimezone } from '@/lib/timezone';
 
 export const runtime = 'nodejs';
 
 /**
  * Returns the plans list + full active plan content + activities in one shot,
  * eliminating the 3-step waterfall on the Training page.
+ *
+ * The "active" plan is chosen by date range (see pickActivePlan), not simply
+ * the most recently created one — so a second plan scheduled to start after
+ * the current block finishes only becomes active once its dates arrive.
  */
 export async function GET() {
   try {
-    // Step 1: get plans list (fast — metadata only)
-    const plans = await listPlans();
+    // Step 1: get plans list (with date ranges) + profile timezone in parallel
+    const [plans, profile] = await Promise.all([listPlans(), getProfile()]);
 
     if (plans.length === 0) {
       return Response.json({ plans: [], plan: null, activities: [] });
     }
 
-    const activePlan = plans[0];
+    const today = todayInTimezone(profile.timezone || 'Australia/Sydney');
+    const activePlan = pickActivePlan(plans, today) ?? plans[0];
 
     // Step 2: fetch plan content + activities in parallel
     const [plan, activities] = await Promise.all([
@@ -54,7 +61,7 @@ export async function GET() {
       })(),
     ]);
 
-    return Response.json({ plans, plan, activities });
+    return Response.json({ plans, plan, activities, today, activePlanId: activePlan.id });
   } catch (err) {
     console.error('Active plan error:', err);
     return Response.json({ error: String(err) }, { status: 500 });

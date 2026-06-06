@@ -1,5 +1,5 @@
 import pool from '@/lib/db';
-import { listPlans, getPlan } from '@/lib/training-plans';
+import { listPlans, getPlan, pickActivePlan } from '@/lib/training-plans';
 
 export const runtime = 'nodejs';
 
@@ -26,8 +26,9 @@ export async function GET() {
 
     let nextDay = null;
     if (plansMeta.length > 0) {
-      const plan = await getPlan(plansMeta[0].id);
       const today = todaySydney();
+      const active = pickActivePlan(plansMeta, today) ?? plansMeta[0];
+      const plan = await getPlan(active.id);
       nextDay = plan?.days.find(d => d.date >= today && d.type !== 'rest') ?? null;
     }
 

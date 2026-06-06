@@ -4,17 +4,29 @@ import { useEffect, useState } from 'react';
 import CreatePlanModal from './CreatePlanModal';
 import EditPlanModal from './EditPlanModal';
 import { TrainingPlan } from '@/lib/training-plans';
+import { PlanSummary, PlanStatus, planStatus, pickActivePlan } from '@/lib/plan-status';
+import { todayInTimezone } from '@/lib/timezone';
 
-interface PlanMeta {
-  id: number;
-  name: string;
-  goal: string;
-  created_at: string;
-}
+type PlanMeta = PlanSummary;
 
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' });
 }
+
+function fmtRange(start: string | null, end: string | null) {
+  if (!start || !end) return null;
+  const opts: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short' };
+  const s = new Date(start + 'T00:00:00Z').toLocaleDateString('en-AU', { ...opts, timeZone: 'UTC' });
+  const e = new Date(end + 'T00:00:00Z').toLocaleDateString('en-AU', { ...opts, year: 'numeric', timeZone: 'UTC' });
+  return `${s} – ${e}`;
+}
+
+const STATUS_BADGE: Record<PlanStatus, { label: string; cls: string } | null> = {
+  active:    { label: 'Active',    cls: 'bg-orange-500/20 text-orange-400 border-orange-500/30' },
+  upcoming:  { label: 'Upcoming',  cls: 'bg-blue-500/20 text-blue-400 border-blue-500/30' },
+  completed: { label: 'Completed', cls: 'bg-gray-700/40 text-gray-400 border-gray-600/40' },
+  empty:     null,
+};
 
 export default function TrainingPlansSettings() {
   const [plans, setPlans]         = useState<PlanMeta[]>([]);
@@ -62,6 +74,9 @@ export default function TrainingPlansSettings() {
     fetchPlans();
   }
 
+  const today = todayInTimezone('Australia/Sydney');
+  const activeId = pickActivePlan(plans, today)?.id ?? null;
+
   return (
     <div className="bg-gray-900 rounded-xl p-5 space-y-4 border border-gray-800">
       <div className="flex items-center justify-between">
@@ -89,25 +104,30 @@ export default function TrainingPlansSettings() {
 
       {plans.length > 0 && (
         <div className="space-y-2">
-          {plans.map((plan, i) => (
+          {plans.map((plan) => {
+            const isActive = plan.id === activeId;
+            const status = planStatus(plan, today);
+            const badge = isActive ? STATUS_BADGE.active : STATUS_BADGE[status];
+            const range = fmtRange(plan.start_date, plan.end_date);
+            return (
             <div
               key={plan.id}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl border ${
-                i === 0 ? 'border-orange-500/30 bg-orange-500/5' : 'border-gray-800 bg-gray-800/40'
+                isActive ? 'border-orange-500/30 bg-orange-500/5' : 'border-gray-800 bg-gray-800/40'
               }`}
             >
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <p className="text-sm font-medium text-white truncate">{plan.name}</p>
-                  {i === 0 && (
-                    <span className="flex-shrink-0 text-[10px] bg-orange-500/20 text-orange-400 border border-orange-500/30 rounded px-1.5 py-0.5 font-medium">
-                      Active
+                  {badge && (
+                    <span className={`flex-shrink-0 text-[10px] border rounded px-1.5 py-0.5 font-medium ${badge.cls}`}>
+                      {badge.label}
                     </span>
                   )}
                 </div>
                 <p className="text-xs text-gray-500 mt-0.5">
                   {plan.goal && <span className="text-gray-400">{plan.goal} · </span>}
-                  Created {fmtDate(plan.created_at)}
+                  {range ?? `Created ${fmtDate(plan.created_at)}`}
                 </p>
               </div>
 
@@ -128,11 +148,12 @@ export default function TrainingPlansSettings() {
                 </button>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
-      <p className="text-xs text-gray-600">The most recently created plan is shown as Active on the Training tab.</p>
+      <p className="text-xs text-gray-600">Plans activate automatically by date: the block covering today is shown as Active on the Training tab, and a plan scheduled to start later stays Upcoming until its dates arrive.</p>
 
       {showCreate && (
         <CreatePlanModal

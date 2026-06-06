@@ -6,9 +6,12 @@ import BlockView from '@/components/training/BlockView';
 import DayView from '@/components/training/DayView';
 import EditPlanModal from '@/components/training/EditPlanModal';
 import CreatePlanModal from '@/components/training/CreatePlanModal';
+import NextBlockPrompt from '@/components/training/NextBlockPrompt';
 import ErrorBoundary from '@/components/training/ErrorBoundary';
+import { isInFinalWeek } from '@/lib/plan-status';
+import { todayInTimezone } from '@/lib/timezone';
 
-interface PlanMeta { id: number; name: string; goal: string; created_at: string }
+interface PlanMeta { id: number; name: string; goal: string; created_at: string; start_date: string | null; end_date: string | null }
 
 interface ActivitySummary {
   id: number; name: string; date: string; tss: number;
@@ -32,15 +35,20 @@ export default function TrainingPlanTab() {
   const [loadingPlan, setLoadingPlan]   = useState(true);
   const [editingPlan, setEditingPlan]   = useState(false);
   const [creatingPlan, setCreatingPlan] = useState(false);
+  const [today, setToday]               = useState<string>(() => todayInTimezone('Australia/Sydney'));
+  const [plans, setPlans]               = useState<PlanMeta[]>([]);
+  const [nextBlockPrefill, setNextBlockPrefill] = useState<{ goal: string; notes: string; startDate?: string } | null>(null);
 
   const fetchActivePlan = useCallback(() => {
     setLoadingPlan(true);
     return fetch('/api/training/plans/active')
       .then(r => r.json())
-      .then((data: { plans: PlanMeta[]; plan: TrainingPlan | null; activities: ActivitySummary[] }) => {
+      .then((data: { plans: PlanMeta[]; plan: TrainingPlan | null; activities: ActivitySummary[]; today?: string }) => {
         if (data.plan) { setPlan(data.plan); setActivePlanId(data.plan.id); }
         else           { setPlan(null);      setActivePlanId(null); }
         if (data.activities) setActivities(data.activities);
+        if (data.plans) setPlans(data.plans);
+        if (data.today) setToday(data.today);
       })
       .catch(console.error)
       .finally(() => setLoadingPlan(false));
@@ -126,6 +134,28 @@ export default function TrainingPlanTab() {
         </div>
       )}
 
+      {/* Final-week prompt: suggest building the next block */}
+      {!loadingPlan && plan && view.type === 'block' && plan.days.length > 0 && (() => {
+        const planSummary = {
+          id: plan.id, name: plan.name, goal: plan.goal, created_at: plan.created_at,
+          start_date: plan.days[0].date,
+          end_date: plan.days[plan.days.length - 1].date,
+        };
+        if (!isInFinalWeek(planSummary, today)) return null;
+        // Don't nag if a successor block is already scheduled to start later.
+        const hasSuccessor = plans.some(
+          p => p.id !== plan.id && p.start_date && p.start_date > planSummary.end_date!,
+        );
+        if (hasSuccessor) return null;
+        return (
+          <NextBlockPrompt
+            planId={plan.id}
+            ended={today > planSummary.end_date!}
+            onGenerate={prefill => setNextBlockPrefill(prefill)}
+          />
+        );
+      })()}
+
       {!loadingPlan && plan && (
         <>
           {view.type === 'block' && (
@@ -161,6 +191,16 @@ export default function TrainingPlanTab() {
         <CreatePlanModal
           onClose={() => setCreatingPlan(false)}
           onCreated={() => { setCreatingPlan(false); fetchActivePlan(); }}
+        />
+      )}
+
+      {nextBlockPrefill && (
+        <CreatePlanModal
+          initialGoal={nextBlockPrefill.goal}
+          initialNotes={nextBlockPrefill.notes}
+          initialStartDate={nextBlockPrefill.startDate}
+          onClose={() => setNextBlockPrefill(null)}
+          onCreated={() => { setNextBlockPrefill(null); fetchActivePlan(); }}
         />
       )}
     </div>
