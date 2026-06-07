@@ -91,9 +91,37 @@ def fetch_page(token, page):
         time.sleep(910)
     return r.json()
 
+def connect_db():
+    """Open a Neon connection, retrying transient outages.
+
+    Neon is serverless and can be briefly unreachable (cold start / network
+    blip). connect_timeout bounds each attempt; if the DB stays unreachable we
+    skip this run (exit 0) rather than failing the job and emailing."""
+    last_err = None
+    for attempt in range(5):
+        try:
+            return psycopg2.connect(
+                DATABASE_URL,
+                connect_timeout=15,
+                keepalives=1,
+                keepalives_idle=30,
+                keepalives_interval=10,
+                keepalives_count=5,
+            )
+        except psycopg2.OperationalError as e:
+            last_err = e
+            print(f"DB connect failed (attempt {attempt + 1}/5): {e}")
+            time.sleep(2 ** attempt + random.uniform(0, 1))
+    print(
+        f"Database unreachable after 5 attempts: {last_err}\n"
+        "Skipping this run; the next scheduled run will catch up.",
+        flush=True,
+    )
+    raise SystemExit(0)
+
 def backfill():
     token = get_access_token()
-    conn = psycopg2.connect(DATABASE_URL)
+    conn = connect_db()
     cur = conn.cursor()
 
     # Count how many need backfilling

@@ -35,13 +35,30 @@ STREAM_MAX_POINTS    = 5000
 # ── DB helpers ───────────────────────────────────────────────────────────────
 
 def connect_db():
-    return psycopg2.connect(
-        DATABASE_URL,
-        keepalives=1,
-        keepalives_idle=30,
-        keepalives_interval=10,
-        keepalives_count=5,
+    last_err = None
+    for attempt in range(5):
+        try:
+            return psycopg2.connect(
+                DATABASE_URL,
+                connect_timeout=15,
+                keepalives=1,
+                keepalives_idle=30,
+                keepalives_interval=10,
+                keepalives_count=5,
+            )
+        except psycopg2.OperationalError as e:
+            last_err = e
+            print(f"DB connect failed (attempt {attempt + 1}/5): {e}")
+            time.sleep(2 ** attempt + random.uniform(0, 1))
+    # Neon (serverless) can be briefly unreachable (cold start / network blip).
+    # A transient DB outage on a frequent cron isn't actionable, so skip this
+    # run (exit 0) instead of failing the job and sending a failure email.
+    print(
+        f"Database unreachable after 5 attempts: {last_err}\n"
+        "Skipping this run; the next scheduled run will catch up.",
+        flush=True,
     )
+    raise SystemExit(0)
 
 _db = {"conn": None, "cur": None}
 
