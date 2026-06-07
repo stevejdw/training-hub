@@ -88,11 +88,17 @@ def get_access_token():
     else:
         code = r.status_code if r is not None else "no response"
         body = r.text[:500] if r is not None else ""
-        raise SystemExit(
+        # A transient 403/5xx/network block on a frequent cron is not actionable:
+        # the next scheduled run catches up. Exit 0 so it doesn't fail the job and
+        # spam failure emails. A genuinely stale token (401) already exited above.
+        print(
             f"Strava token refresh failed after 5 attempts: HTTP {code}\n{body}\n"
             f"A 403 'Request blocked' page is Strava's CloudFront edge throttling "
-            f"concurrent jobs, not a stale token; it usually clears on the next run."
+            f"concurrent jobs, not a stale token. Skipping this run; the next "
+            f"scheduled run will catch up.",
+            flush=True,
         )
+        raise SystemExit(0)
     try:
         d = r.json()
     except ValueError:
