@@ -26,34 +26,48 @@ export default function PerformancePage() {
   const initialTab: Tab = sp.get('tab') === 'power' ? 'power' : 'fitness';
   const [tab, setTab] = useState<Tab>(initialTab);
 
-  return (
-    <div className="h-full flex flex-col">
-      <SubTabBar
-        tabs={[
-          { key: 'fitness', label: 'Fitness' },
-          { key: 'power',   label: 'Power'   },
-        ]}
-        active={tab}
-        onSelect={setTab}
-      />
+  const tabs = [
+    { key: 'fitness' as const, label: 'Fitness' },
+    { key: 'power'   as const, label: 'Power'   },
+  ];
 
+  return (
+    <div className="h-full flex flex-col md:flex-row">
+      {/* Mobile: horizontal tab bar */}
+      <div className="md:hidden">
+        <SubTabBar tabs={tabs} active={tab} onSelect={setTab} />
+      </div>
+
+      {/* Desktop: left sidebar */}
+      <nav className="hidden md:flex flex-col w-44 border-r border-gray-800 py-6 px-3 flex-shrink-0 gap-1">
+        {tabs.map(({ key, label }) => (
+          <button
+            key={key}
+            onClick={() => setTab(key)}
+            className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+              tab === key
+                ? 'bg-orange-500 text-white'
+                : 'text-gray-400 hover:text-white hover:bg-gray-800'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </nav>
+
+      {/* Scrollable content */}
       <div className="flex-1 overflow-y-auto scroll-touch">
         <div className="max-w-2xl md:max-w-5xl xl:max-w-7xl mx-auto px-4 py-4 md:px-8 md:py-8 space-y-8">
           {tab === 'fitness' && (
             <>
-              {/* ── Fitness Performance ─────────────────────── */}
               <section>
                 <SectionHeading title="Fitness Performance" subtitle="ATL · CTL · TSB" />
                 <FitnessTab />
               </section>
-
-              {/* ── Aerobic Efficiency ──────────────────────── */}
               <section className="pt-2 border-t border-gray-800/60">
                 <SectionHeading title="Aerobic Efficiency" subtitle="Power vs HR drift on steady rides" />
                 <AerobicEfficiencyTab />
               </section>
-
-              {/* ── Readiness ───────────────────────────────── */}
               <section className="pt-2 border-t border-gray-800/60">
                 <SectionHeading title="Readiness" subtitle="HRV vs Normal Zone" />
                 <ReadinessTab />

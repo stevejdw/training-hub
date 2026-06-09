@@ -8,7 +8,9 @@ export const metadata = { title: 'Training | Training Hub' };
 export default function TrainingRoute() {
   return (
     <div className="h-full flex flex-col">
-      <PageHeader icon={iconFor('training')} title="Training" />
+      <div className="md:hidden">
+        <PageHeader icon={iconFor('training')} title="Training" />
+      </div>
       <div className="flex-1 min-h-0">
         <Suspense>
           <TrainingPage />
