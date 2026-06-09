@@ -451,7 +451,7 @@ export default function EventPacingPage({ eventId }: Props) {
       </div>
 
       <div className="flex-1 overflow-y-auto scroll-touch">
-        <div className="max-w-2xl md:max-w-5xl mx-auto px-4 py-4 md:px-8 md:py-6 space-y-4">
+        <div className="max-w-2xl md:max-w-5xl xl:max-w-7xl mx-auto px-4 py-4 md:px-8 md:py-6 space-y-4">
 
           {!route && (
             <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 text-center">

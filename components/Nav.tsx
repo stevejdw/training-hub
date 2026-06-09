@@ -7,13 +7,10 @@ import { useEffect, useState } from 'react';
 import {
   ALL_NAV_ITEMS,
   DEFAULT_MIDDLE,
-  DEFAULT_MIDDLE_DESKTOP,
   MAX_MIDDLE_MOBILE,
   NAV_EVENT,
-  NAV_EVENT_DESKTOP,
   NavItem,
   loadMiddle,
-  loadMiddleDesktop,
   moreMatchPrefixes,
 } from './nav-items';
 
@@ -36,7 +33,6 @@ export default function Nav() {
   const pathname = usePathname();
 
   const [middle, setMiddle] = useState<string[]>(DEFAULT_MIDDLE);
-  const [middleDesktop, setMiddleDesktop] = useState<string[]>(DEFAULT_MIDDLE_DESKTOP);
   const [appIcon, setAppIcon] = useState<string>('speed');
 
   useEffect(() => {
@@ -57,49 +53,27 @@ export default function Nav() {
     };
   }, []);
 
-  useEffect(() => {
-    setMiddleDesktop(loadMiddleDesktop());
-    const handler = () => setMiddleDesktop(loadMiddleDesktop());
-    window.addEventListener(NAV_EVENT_DESKTOP, handler);
-    window.addEventListener('storage', handler);
-    return () => {
-      window.removeEventListener(NAV_EVENT_DESKTOP, handler);
-      window.removeEventListener('storage', handler);
-    };
-  }, []);
-
   // Mobile: Home + first 3 middle + More (always)
   const mobileItems = buildItems(middle, MAX_MIDDLE_MOBILE);
   const mobileMore  = moreMatchPrefixes(middle.slice(0, MAX_MIDDLE_MOBILE));
 
-  // Desktop: Home + ALL middle (up to 6) + More only if anything overflows.
-  // Up to 8 total slots (1 + 6 + 1). Uses separate desktop config.
-  const desktopMiddle = middleDesktop;
-  const desktopMidItems = desktopMiddle
-    .map(k => ALL_NAV_ITEMS.find(i => i.key === k))
-    .filter((i): i is NavItem => !!i && !i.pinned);
-  const first = ALL_NAV_ITEMS.find(i => i.pinned === 'first')!;
-  const last  = ALL_NAV_ITEMS.find(i => i.pinned === 'last')!;
-  const desktopMorePrefixes = moreMatchPrefixes(desktopMiddle);
-  // Hide More on desktop if every routable non-pinned item is already in the bar
-  const allMiddleKeys = ALL_NAV_ITEMS.filter(i => !i.pinned).map(i => i.key);
-  const overflowExists = allMiddleKeys.some(k => !desktopMiddle.includes(k));
-  const desktopItems: NavItem[] = overflowExists
-    ? [first, ...desktopMidItems, last]
-    : [first, ...desktopMidItems];
+  // Desktop: all items except 'more' and 'settings' (settings is the right icon)
+  const desktopCenterItems = ALL_NAV_ITEMS.filter(i => i.key !== 'more' && i.key !== 'settings');
+  const settingsItem = ALL_NAV_ITEMS.find(i => i.key === 'settings')!;
 
   return (
     <>
       {/* ── Desktop: top horizontal nav ── */}
-      <header className="hidden md:flex h-16 border-b border-gray-800 bg-gray-950 items-center flex-shrink-0">
-        <nav className="w-full px-6 flex gap-1 items-center">
-          {/* Logo */}
-          <Link href="/home" className="mr-2 flex-shrink-0">
-            <Image src={`/app-icon-${appIcon}.png`} alt="Training Hub" width={36} height={36} className="rounded-lg" />
-          </Link>
-          {desktopItems.map(({ key, href, label, icon, matchPrefixes }) => {
-            const prefixes = key === 'more' ? desktopMorePrefixes : matchPrefixes;
-            const active = isActive(prefixes, pathname);
+      <header className="hidden md:flex h-16 border-b border-gray-800 bg-gray-950 items-center flex-shrink-0 relative">
+        {/* Logo — pinned left */}
+        <Link href="/home" className="absolute left-6 flex-shrink-0">
+          <Image src={`/app-icon-${appIcon}.png`} alt="Training Hub" width={36} height={36} className="rounded-lg" />
+        </Link>
+
+        {/* Centred nav items */}
+        <nav className="flex gap-1 items-center mx-auto">
+          {desktopCenterItems.map(({ key, href, label, icon, matchPrefixes }) => {
+            const active = isActive(matchPrefixes, pathname);
             return (
               <Link
                 key={key}
@@ -114,6 +88,16 @@ export default function Nav() {
             );
           })}
         </nav>
+
+        {/* Settings icon — pinned right */}
+        <Link
+          href="/settings"
+          className={`absolute right-6 p-2 rounded-lg transition-colors ${
+            isActive(['/settings'], pathname) ? 'text-orange-500' : 'text-gray-400 hover:text-white hover:bg-gray-800'
+          }`}
+        >
+          {settingsItem.icon}
+        </Link>
       </header>
 
       {/* ── Mobile: fixed bottom tab bar ── */}

@@ -80,7 +80,7 @@ export default function FitnessPage() {
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto scroll-touch min-w-0">
-        <div className="max-w-2xl md:max-w-5xl mx-auto px-4 py-4 md:px-8 md:py-8 space-y-4">
+        <div className="max-w-2xl md:max-w-5xl xl:max-w-7xl mx-auto px-4 py-4 md:px-8 md:py-8 space-y-4">
           {tab === 'summary'     && <FitnessTab />}
           {tab === 'performance' && <PowerProgressChart />}
           {tab === 'hr'          && <HRPerformanceTab />}

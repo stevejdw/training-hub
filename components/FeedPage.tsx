@@ -399,7 +399,7 @@ export default function FeedPage() {
   if (loading && !data) {
     return (
       <div className="h-full overflow-y-auto scroll-touch">
-        <div className="max-w-2xl md:max-w-5xl mx-auto px-4 py-4 md:px-8 md:py-8 space-y-4">
+        <div className="max-w-2xl md:max-w-5xl xl:max-w-7xl mx-auto px-4 py-4 md:px-8 md:py-8 space-y-4">
           <div className="h-28 bg-gray-800 rounded-2xl animate-pulse" />
           <div className="h-16 bg-gray-800 rounded-2xl animate-pulse" />
           <div className="h-20 bg-gray-800 rounded-2xl animate-pulse" />
@@ -432,7 +432,7 @@ export default function FeedPage() {
 
   return (
     <div className="h-full overflow-y-auto scroll-touch">
-      <div className="max-w-2xl md:max-w-5xl mx-auto px-4 py-4 md:px-8 md:py-8 space-y-3 pb-8">
+      <div className="max-w-2xl md:max-w-5xl xl:max-w-7xl mx-auto px-4 py-4 md:px-8 md:py-8 space-y-3 pb-8">
 
         {/* ── MOBILE LAYOUT ── */}
         <div className="block md:hidden space-y-3">

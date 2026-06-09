@@ -274,7 +274,7 @@ export default function ActivitiesList() {
   const total = data?.total ?? 0;
 
   return (
-    <div className="h-full flex flex-col md:max-w-5xl md:mx-auto md:w-full">
+    <div className="h-full flex flex-col md:max-w-5xl xl:max-w-7xl md:mx-auto md:w-full">
 
       {/* Top bar */}
       <div className="border-b border-gray-800 px-3 py-2.5 flex-shrink-0 space-y-2">

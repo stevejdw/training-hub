@@ -212,7 +212,7 @@ export default function SegmentDetail({ id }: { id: string }) {
 
   if (segLoad) {
     return (
-      <div className="max-w-2xl md:max-w-5xl mx-auto px-4 py-8 space-y-4">
+      <div className="max-w-2xl md:max-w-5xl xl:max-w-7xl mx-auto px-4 py-8 space-y-4">
         {[1, 2, 3].map(i => <div key={i} className="bg-gray-800 rounded-xl h-24 animate-pulse" />)}
       </div>
     );
@@ -220,7 +220,7 @@ export default function SegmentDetail({ id }: { id: string }) {
 
   if (error || !segment) {
     return (
-      <div className="max-w-2xl md:max-w-5xl mx-auto px-4 py-8 text-center text-gray-400">
+      <div className="max-w-2xl md:max-w-5xl xl:max-w-7xl mx-auto px-4 py-8 text-center text-gray-400">
         Segment not found.{' '}
         <Link href="/activities" className="text-orange-400 hover:underline">Back</Link>
       </div>
@@ -252,7 +252,7 @@ export default function SegmentDetail({ id }: { id: string }) {
 
   return (
     <div className="h-full overflow-y-auto scroll-touch">
-      <div className="max-w-2xl md:max-w-5xl mx-auto px-4 py-6 space-y-6">
+      <div className="max-w-2xl md:max-w-5xl xl:max-w-7xl mx-auto px-4 py-6 space-y-6">
 
         {/* Back */}
         <Link href="/activities" className="text-sm text-gray-500 hover:text-orange-400 transition-colors">
