@@ -23,7 +23,7 @@ export default function PageHeader({
   }, []);
 
   return (
-    <div className="flex-shrink-0 relative flex items-center justify-center px-4 md:px-8 py-3 md:py-4 border-b border-gray-800 bg-gray-950">
+    <div className="flex-shrink-0 relative flex items-center justify-center md:justify-start px-4 md:px-8 py-3 md:py-4 border-b border-gray-800 md:border-b-0 bg-gray-950">
       {/* Logo pinned left — mobile only (desktop uses Nav header) */}
       <div className="absolute left-4 md:hidden">
         <Image src={`/app-icon-${appIcon}.png`} alt="Training Hub" width={30} height={30} className="rounded-md" />
