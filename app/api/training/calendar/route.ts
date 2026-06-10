@@ -77,20 +77,22 @@ export async function GET(req: NextRequest) {
         ORDER BY start_date
       `, [tz, fromDate, toDate, CYCLING_TYPES]);
 
-      // Fetch training plan days in range (most recent plan)
+      // Fetch training plan days in range — for each date, use the most recently
+      // created plan that covers that date (so old sessions remain matched after
+      // a new plan is created for future dates).
       const planRes = await client.query<{
         date: string; title: string; type: string; tss_target: number | null;
       }>(`
-        SELECT
-          date::text,
-          title,
-          type,
-          tss_target
-        FROM training_days
-        WHERE date >= $1
-          AND date <= $2
-          AND plan_id = (SELECT id FROM training_plans ORDER BY created_at DESC LIMIT 1)
-        ORDER BY date
+        SELECT DISTINCT ON (td.date)
+          td.date::text,
+          td.title,
+          td.type,
+          td.tss_target
+        FROM training_days td
+        JOIN training_plans tp ON td.plan_id = tp.id
+        WHERE td.date >= $1
+          AND td.date <= $2
+        ORDER BY td.date, tp.created_at DESC
       `, [fromDate, toDate]);
 
       // Index by date for fast lookup

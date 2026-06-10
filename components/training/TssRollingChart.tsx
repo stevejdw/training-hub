@@ -185,7 +185,7 @@ export default function TssRollingChart({ compact }: { compact?: boolean }) {
   const firstLabel = points.length > 0 ? fmtWeekLabel(points[0].week_start) : '';
   const lastLabel  = points.length > 0 ? fmtWeekLabel(points[points.length - 1].week_start) : '';
   const rangeLabel = isDayView && days && days.length > 0
-    ? `${days[0].date} – ${days[days.length - 1].date}`
+    ? `${fmtWeekLabel(days[0].date)} – ${fmtWeekLabel(days[days.length - 1].date)}`
     : firstLabel && lastLabel ? `${firstLabel} – ${lastLabel}` : '';
 
   return (
