@@ -1,9 +1,8 @@
 import pool from '@/lib/db';
 import { getProfile, type TssPlanConfig } from '@/lib/profile';
+import { CYCLING_TYPES } from '@/lib/sport-types';
 
 export const runtime = 'nodejs';
-
-const CYCLING_TYPES = ['Ride', 'VirtualRide', 'GravelRide', 'EBikeRide', 'MountainBikeRide'];
 
 /** Moving time above this in a recovery week triggers a duration warning (2.5 h). */
 export const RECOVERY_WEEK_LONG_RIDE_SEC = Math.round(2.5 * 3600);
@@ -15,15 +14,19 @@ export interface TssWeekPoint {
   target_tss:    number;
   is_recovery:   boolean;
   target_source: 'plan' | 'formula' | 'none';
+  distance_m:    number;   // total distance for the week (metres)
+  moving_time_s: number;   // total moving time for the week (seconds)
   /** True when this week is a formula recovery week but a single ride exceeded RECOVERY_WEEK_LONG_RIDE_SEC. */
   high_duration_recovery_warning: boolean;
 }
 
 export interface TssDayPoint {
-  date:        string; // YYYY-MM-DD
-  day_label:   string; // Mon, Tue, etc.
-  actual_tss:  number;
-  target_tss:  number;
+  date:          string; // YYYY-MM-DD
+  day_label:     string; // Mon, Tue, etc.
+  actual_tss:    number;
+  target_tss:    number;
+  distance_m:    number;  // total distance for the day (metres)
+  moving_time_s: number;  // total moving time for the day (seconds)
 }
 
 export interface TssSummaryResponse {
@@ -83,6 +86,14 @@ export async function GET(req: Request) {
   const offset = Math.max(0, Number(searchParams.get('offset') ?? '0'));
   const granularity = searchParams.get('granularity') ?? 'week';
 
+  // Ride-type filter: comma-separated sport_type values. Unknown values are
+  // dropped; an empty/absent param falls back to all cycling types.
+  const typesParam = searchParams.get('types');
+  const requestedTypes = typesParam
+    ? typesParam.split(',').map(s => s.trim()).filter(t => CYCLING_TYPES.includes(t))
+    : [];
+  const types = requestedTypes.length > 0 ? requestedTypes : CYCLING_TYPES;
+
   const profile = await getProfile();
   const cfg = profile.tss_plan ?? null;
 
@@ -114,17 +125,25 @@ export async function GET(req: Request) {
   try {
     // Actual TSS per day — fetch from extended start (includes 4 weeks before display range for rolling avg)
     // Uses COALESCE(tss, hrss, 0) to include HR-based TSS for non-power activities.
-    const actualRes = await client.query<{ d: string; tss: string }>(`
+    const actualRes = await client.query<{ d: string; tss: string; distance: string; moving_time: string }>(`
       SELECT (start_date AT TIME ZONE $1)::date::text AS d,
-             SUM(COALESCE(tss, hrss, 0))::float AS tss
+             SUM(COALESCE(tss, hrss, 0))::float AS tss,
+             SUM(COALESCE(distance, 0))::float    AS distance,
+             SUM(COALESCE(moving_time, 0))::float AS moving_time
       FROM activities
       WHERE sport_type = ANY($4::text[])
         AND (start_date AT TIME ZONE $1)::date BETWEEN $2 AND $3
       GROUP BY 1
-    `, [profile.timezone || 'Australia/Sydney', extStartDateStr, endDateStr, CYCLING_TYPES]);
+    `, [profile.timezone || 'Australia/Sydney', extStartDateStr, endDateStr, types]);
 
-    const tssByDate = new Map<string, number>();
-    for (const r of actualRes.rows) tssByDate.set(r.d, Number(r.tss));
+    const tssByDate  = new Map<string, number>();
+    const distByDate = new Map<string, number>();
+    const movByDate  = new Map<string, number>();
+    for (const r of actualRes.rows) {
+      tssByDate.set(r.d, Number(r.tss));
+      distByDate.set(r.d, Number(r.distance));
+      movByDate.set(r.d, Number(r.moving_time));
+    }
 
     // Build actual TSS per week-start for all weeks in extended range (for rolling avg)
     const actualByWeekStart = new Map<string, number>();
@@ -149,7 +168,7 @@ export async function GET(req: Request) {
       WHERE sport_type = ANY($4::text[])
         AND moving_time IS NOT NULL
         AND (start_date AT TIME ZONE $1)::date BETWEEN $2 AND $3
-    `, [profile.timezone || 'Australia/Sydney', startDateStr, endDateStr, CYCLING_TYPES]);
+    `, [profile.timezone || 'Australia/Sydney', startDateStr, endDateStr, types]);
 
     const maxMovingByWeekStart = new Map<string, number>();
     for (const row of ridesRes.rows) {
@@ -178,12 +197,16 @@ export async function GET(req: Request) {
 
     // Build week summaries
     const weekPoints: TssWeekPoint[] = ranges.map(({ start, end }) => {
-      let actual_tss = 0;
-      let plan_tss   = 0;
+      let actual_tss    = 0;
+      let plan_tss      = 0;
+      let distance_m    = 0;
+      let moving_time_s = 0;
       const cur = new Date(start);
       while (cur <= end) {
         const k = fmtDate(cur);
-        actual_tss += tssByDate.get(k) ?? 0;
+        actual_tss    += tssByDate.get(k) ?? 0;
+        distance_m    += distByDate.get(k) ?? 0;
+        moving_time_s += movByDate.get(k) ?? 0;
         if (planByDate) plan_tss += planByDate.get(k) ?? 0;
         cur.setUTCDate(cur.getUTCDate() + 1);
       }
@@ -234,6 +257,8 @@ export async function GET(req: Request) {
         target_tss,
         is_recovery,
         target_source,
+        distance_m:    Math.round(distance_m),
+        moving_time_s: Math.round(moving_time_s),
         high_duration_recovery_warning,
       };
     });
@@ -251,10 +276,12 @@ export async function GET(req: Request) {
       while (cur <= end) {
         const k = fmtDate(cur);
         days.push({
-          date:       k,
-          day_label:  DAY_LABELS[di % 7],
-          actual_tss: Math.round(tssByDate.get(k) ?? 0),
-          target_tss: dayTssTargets ? Math.round(dayTssTargets.get(k) ?? 0) : 0,
+          date:          k,
+          day_label:     DAY_LABELS[di % 7],
+          actual_tss:    Math.round(tssByDate.get(k) ?? 0),
+          target_tss:    dayTssTargets ? Math.round(dayTssTargets.get(k) ?? 0) : 0,
+          distance_m:    Math.round(distByDate.get(k) ?? 0),
+          moving_time_s: Math.round(movByDate.get(k) ?? 0),
         });
         cur.setUTCDate(cur.getUTCDate() + 1);
         di++;
