@@ -8,10 +8,24 @@ import {
 
 import EnlargeableChart from '@/components/EnlargeableChart';
 import { useCachedFetch } from '@/lib/use-cached-fetch';
+import { SPORT_FILTERS, type SportFilter } from '@/lib/sport-types';
 import type { TssSummaryResponse, TssWeekPoint, TssDayPoint } from '@/app/api/training/tss-summary/route';
 import type { TssPlanConfig, AthleteProfile } from '@/lib/profile';
 
 const RANGE_OPTIONS = [1, 4, 8, 12];
+
+// Ride-type filter groups (all selected by default). Excludes the catch-all "All".
+const RIDE_TYPE_FILTERS: SportFilter[] = ['Ride', 'Gravel', 'MTB', 'eMTB'];
+
+function fmtKm(metres: number): string {
+  return `${(metres / 1000).toFixed(1)} km`;
+}
+
+function fmtDuration(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.round((seconds % 3600) / 60);
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+}
 
 function fmtWeekLabel(weekStart: string): string {
   const M = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -42,12 +56,20 @@ function CustomTooltip({ active, payload, label }: any) {
   const p = payload[0]?.payload as ChartPoint;
   // Day view (has date property)
   if (p.date) {
+    // Format the heading as "Sat 2" — weekday label + day-of-month.
+    const dayOfMonth = Number(p.date.slice(8, 10));
     return (
       <div className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-xs shadow-lg space-y-0.5">
-        <p className="text-gray-400">{label} {p.date}</p>
+        <p className="text-gray-400">{label} {dayOfMonth}</p>
         <p className="text-orange-400">{p.actual_tss} TSS <span className="text-gray-500 font-normal">actual</span></p>
         {p.target_tss > 0 && (
           <p className="text-blue-400">{p.target_tss} TSS <span className="text-gray-500 font-normal">target</span></p>
+        )}
+        {(p.distance_m ?? 0) > 0 && (
+          <p className="text-gray-300">{fmtKm(p.distance_m!)} <span className="text-gray-500 font-normal">distance</span></p>
+        )}
+        {(p.moving_time_s ?? 0) > 0 && (
+          <p className="text-gray-300">{fmtDuration(p.moving_time_s!)} <span className="text-gray-500 font-normal">time</span></p>
         )}
       </div>
     );
@@ -62,6 +84,12 @@ function CustomTooltip({ active, payload, label }: any) {
           {p.target_tss} TSS <span className="text-gray-500 font-normal">target</span>
           {p.is_recovery && <span className="ml-1 text-green-400">· recovery</span>}
         </p>
+      )}
+      {(p.distance_m ?? 0) > 0 && (
+        <p className="text-gray-300">{fmtKm(p.distance_m!)} <span className="text-gray-500 font-normal">distance</span></p>
+      )}
+      {(p.moving_time_s ?? 0) > 0 && (
+        <p className="text-gray-300">{fmtDuration(p.moving_time_s!)} <span className="text-gray-500 font-normal">time</span></p>
       )}
       {p.target_source === 'plan' && <p className="text-[10px] text-gray-600">from training plan</p>}
       {p.target_source === 'formula' && <p className="text-[10px] text-gray-600">from formula</p>}
@@ -80,6 +108,8 @@ type ChartPoint = {
   label: string;
   actual_tss: number;
   target_tss: number;
+  distance_m?: number;
+  moving_time_s?: number;
   // day-specific (optional)
   date?: string;
   day_label?: string;
@@ -96,12 +126,30 @@ export default function TssRollingChart({ compact }: { compact?: boolean }) {
   const [offset,       setOffset]       = useState(0);   // weeks to scroll back
   const [editing,      setEditing]      = useState(false);
   const [refreshKey,   setRefreshKey]   = useState(0);
+  // Ride-type filter — all groups selected by default.
+  const [rideTypes,    setRideTypes]    = useState<SportFilter[]>(RIDE_TYPE_FILTERS);
 
   const isDayView = weeks === 1;
 
+  const allTypesSelected = rideTypes.length === RIDE_TYPE_FILTERS.length;
+  // Expand the selected filter groups to Strava sport_type values. When every
+  // group is selected we omit the param entirely so the API returns all rides.
+  const typesParam = allTypesSelected
+    ? ''
+    : Array.from(new Set(rideTypes.flatMap(f => SPORT_FILTERS[f]))).join(',');
+
+  function toggleRideType(f: SportFilter) {
+    setRideTypes(prev =>
+      prev.includes(f)
+        // Never allow deselecting the last remaining group.
+        ? (prev.length > 1 ? prev.filter(x => x !== f) : prev)
+        : [...prev, f],
+    );
+  }
+
   const { data, loading } = useCachedFetch<TssSummaryResponse>(
-    `/api/training/tss-summary?weeks=${weeks}&offset=${offset}&granularity=${isDayView ? 'day' : 'week'}&_=${refreshKey}`,
-    `cache-tss-summary-${weeks}-${offset}-${refreshKey}`,
+    `/api/training/tss-summary?weeks=${weeks}&offset=${offset}&granularity=${isDayView ? 'day' : 'week'}${typesParam ? `&types=${encodeURIComponent(typesParam)}` : ''}&_=${refreshKey}`,
+    `cache-tss-summary-${weeks}-${offset}-${typesParam}-${refreshKey}`,
   );
 
   const points = data?.weeks ?? [];
@@ -241,6 +289,28 @@ export default function TssRollingChart({ compact }: { compact?: boolean }) {
             'text-red-400'
           }`}>{onTrack != null ? `${onTrack}%` : '—'}</p>
         </div>
+      </div>
+
+      {/* Ride-type filter */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="text-[10px] text-gray-500 uppercase tracking-wider mr-0.5">Rides</span>
+        {RIDE_TYPE_FILTERS.map(f => {
+          const active = rideTypes.includes(f);
+          return (
+            <button
+              key={f}
+              onClick={() => toggleRideType(f)}
+              aria-pressed={active}
+              className={`px-2 py-0.5 rounded-full text-[10px] font-medium transition-colors ${
+                active
+                  ? 'bg-orange-500/20 text-orange-400 border border-orange-500/50'
+                  : 'bg-gray-800 text-gray-500 hover:text-gray-300 border border-transparent'
+              }`}
+            >
+              {f}
+            </button>
+          );
+        })}
       </div>
 
       {/* Chart */}
