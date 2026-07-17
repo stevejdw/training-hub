@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Training Hub</title>
+    <style>
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #030712;
+        color: #f9fafb;
+        font-family: -apple-system, system-ui, sans-serif;
+        text-align: center;
+      }
+      .card { padding: 2rem; }
+      h1 { font-size: 1.25rem; margin: 0 0 0.5rem; }
+      p { color: #9ca3af; font-size: 0.9rem; margin: 0 0 1.5rem; }
+      button {
+        background: #f97316;
+        color: #030712;
+        border: none;
+        border-radius: 9999px;
+        padding: 0.75rem 2rem;
+        font-size: 1rem;
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>You&rsquo;re offline</h1>
+      <p>Training Hub needs an internet connection.</p>
+      <button onclick="window.location.href='https://training-hub-gamma.vercel.app/feed'">
+        Try again
+      </button>
+    </div>
+  </body>
+</html>
