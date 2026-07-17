@@ -23,20 +23,35 @@ export default function NativeShell() {
   const [native, setNative] = useState(false);
   const [locked, setLocked] = useState(false);
   const [authFailed, setAuthFailed] = useState(false);
-  // Face ID's system prompt fires appStateChange events; this guard stops
-  // those from re-locking or re-triggering auth mid-prompt.
+  // Face ID's system prompt itself fires appStateChange events (inactive
+  // while the prompt shows, active when it dismisses). These refs mirror
+  // state so the listener — registered once — can tell a genuine
+  // background/foreground transition from the prompt's own lifecycle;
+  // without them every unlock re-triggered the prompt in a loop.
   const authenticatingRef = useRef(false);
+  const lockedRef = useRef(false);
+  const authFailedRef = useRef(false);
+
+  const setLockedState = useCallback((value: boolean) => {
+    lockedRef.current = value;
+    setLocked(value);
+  }, []);
+
+  const setAuthFailedState = useCallback((value: boolean) => {
+    authFailedRef.current = value;
+    setAuthFailed(value);
+  }, []);
 
   const authenticate = useCallback(async () => {
     if (authenticatingRef.current) return;
     authenticatingRef.current = true;
-    setAuthFailed(false);
+    setAuthFailedState(false);
     try {
       const { BiometricAuth } = await import('@aparajita/capacitor-biometric-auth');
       const { isAvailable } = await BiometricAuth.checkBiometry();
       if (!isAvailable) {
         // No biometrics and no passcode enrolled — don't brick the app.
-        setLocked(false);
+        setLockedState(false);
         return;
       }
       await BiometricAuth.authenticate({
@@ -45,18 +60,18 @@ export default function NativeShell() {
         iosFallbackTitle: 'Use passcode',
         cancelTitle: 'Cancel',
       });
-      setLocked(false);
+      setLockedState(false);
     } catch {
-      setAuthFailed(true);
+      setAuthFailedState(true);
     } finally {
       authenticatingRef.current = false;
     }
-  }, []);
+  }, [setLockedState, setAuthFailedState]);
 
   useEffect(() => {
     if (!isNative()) return;
     setNative(true);
-    setLocked(true);
+    setLockedState(true);
 
     let removeListener: (() => void) | undefined;
 
@@ -70,11 +85,16 @@ export default function NativeShell() {
 
       const { App } = await import('@capacitor/app');
       const handle = await App.addListener('appStateChange', ({ isActive }) => {
+        // Ignore the transitions caused by the Face ID prompt itself.
         if (authenticatingRef.current) return;
         if (!isActive) {
-          setLocked(true);
-          setAuthFailed(false);
-        } else {
+          setLockedState(true);
+          setAuthFailedState(false);
+        } else if (lockedRef.current && !authFailedRef.current) {
+          // Re-prompt only when still locked from a real backgrounding.
+          // After a cancelled/failed attempt (authFailed), wait for the
+          // user to tap the unlock button instead of re-prompting — the
+          // prompt's own dismissal also lands here and would loop.
           void authenticate();
         }
       });
@@ -84,7 +104,7 @@ export default function NativeShell() {
     })();
 
     return () => removeListener?.();
-  }, [authenticate]);
+  }, [authenticate, setLockedState, setAuthFailedState]);
 
   if (!native || !locked) return null;
 
