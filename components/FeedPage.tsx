@@ -12,7 +12,7 @@ import { calendarDaysFromToday } from '@/lib/calendar-days';
 
 const ActivityMap = dynamic(() => import('./ActivityMap'), { ssr: false });
 
-interface RecentRide {
+export interface RecentRide {
   id: number;
   name: string;
   sport_type: string;
@@ -49,7 +49,7 @@ interface NextSession {
   description: string | null;
 }
 
-interface FeedData {
+export interface FeedData {
   recentRides: RecentRide[];
   nextEvent: { id: string; name: string; date: string; goal: string; daysAway: number } | null;
   nextSession: NextSession | null;
