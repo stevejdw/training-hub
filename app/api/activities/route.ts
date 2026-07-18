@@ -18,6 +18,7 @@ export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams;
 
   const filtersParam      = sp.get('filters') ?? sp.get('filter') ?? 'All';
+  const q                 = (sp.get('q') ?? '').trim();
   const gearParam         = sp.get('gear') ?? '';
   const powerMeterParam   = sp.get('powerMeter') ?? '';
   const from              = sp.get('from');       // ISO date
@@ -48,6 +49,9 @@ export async function GET(req: NextRequest) {
     // Always cycling only
     conditions.push(`a.sport_type = ANY($${p++}::text[])`);
     queryParams.push(types.length > 0 ? types : CYCLING_TYPES);
+
+    // Free-text name search (command palette)
+    if (q) { conditions.push(`a.name ILIKE $${p++}`); queryParams.push(`%${q}%`); }
 
     // Date filters
     if (from)    { conditions.push(`(a.start_date AT TIME ZONE 'Australia/Sydney')::date >= $${p++}`); queryParams.push(from); }

@@ -4,6 +4,7 @@ import './globals.css';
 import Nav from '@/components/Nav';
 import ThemeProvider from '@/components/ThemeProvider';
 import NativeShell from '@/components/NativeShell';
+import CommandPalette from '@/components/desktop/CommandPalette';
 
 const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] });
 const geistMono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin'] });
@@ -51,6 +52,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <NativeShell />
         {/* Top nav — desktop only */}
         <Nav />
+        {/* ⌘K command palette (desktop only) */}
+        <CommandPalette />
         {/* Main content fills remaining space */}
         <main className="content-area flex-1 overflow-hidden">
           {children}

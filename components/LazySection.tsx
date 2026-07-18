@@ -16,13 +16,13 @@ export default function LazySection({
   placeholderHeight?: number;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  // Render immediately when IntersectionObserver isn't available.
-  const [visible, setVisible] = useState(
-    () => typeof IntersectionObserver === 'undefined',
-  );
+  // Starts hidden on server AND client so hydration matches; the effect
+  // below reveals immediately when IntersectionObserver isn't available.
+  const [visible, setVisible] = useState(false);
 
   useEffect(() => {
     if (visible) return;
+    if (typeof IntersectionObserver === 'undefined') { setVisible(true); return; }
     const el = ref.current;
     if (!el) return;
     const io = new IntersectionObserver(
