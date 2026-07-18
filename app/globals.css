@@ -7,6 +7,7 @@
   --foreground: #f9fafb;
   --top-nav-h: 64px;
   --bottom-nav-h: 56px;
+  --desktop-sidebar-w: 232px;
 }
 
 /* ── Ocean Light theme ── */
@@ -281,6 +282,23 @@ body {
     bottom: 56px;
     height: auto;
     overflow: hidden;
+  }
+}
+
+/* ── Desktop shell (lg+): fixed left sidebar replaces the top header ── */
+.desktop-sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: var(--desktop-sidebar-w);
+  z-index: 40;
+}
+
+@media (min-width: 1024px) {
+  .content-area {
+    height: 100%; /* no top header at lg+ */
+    margin-left: var(--desktop-sidebar-w);
   }
 }
 
