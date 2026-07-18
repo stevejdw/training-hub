@@ -125,7 +125,15 @@ const DEFAULTS: AthleteProfile = {
   bike_weight_kg: null,
 };
 
+// Module-level flag — the table exists after first contact, so warm
+// instances skip the DDL round-trip entirely (same pattern as
+// ensureBestPowerTableForRead in lib/best-power.ts). DDL statements each
+// cost a lock + implicit commit, and getProfile() runs on nearly every
+// API request.
+let _tableReady = false;
+
 async function ensureTable(client: PoolClient) {
+  if (_tableReady) return;
   await client.query(`
     CREATE TABLE IF NOT EXISTS athlete_profile (
       id      INTEGER PRIMARY KEY DEFAULT 1,
@@ -133,6 +141,7 @@ async function ensureTable(client: PoolClient) {
       updated_at TIMESTAMPTZ DEFAULT NOW()
     )
   `);
+  _tableReady = true;
 }
 
 export async function getProfile(): Promise<AthleteProfile> {

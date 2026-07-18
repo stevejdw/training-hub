@@ -41,7 +41,6 @@ export async function GET(req: NextRequest) {
 
   const client = await pool.connect();
   try {
-    await client.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS power_meter TEXT`);
     const conditions: string[] = [];
     const queryParams: unknown[] = [];
     let p = 1;

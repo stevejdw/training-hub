@@ -14,33 +14,34 @@ const PR_DURATIONS = [
   { label: '20 min', seconds: 1200 },
 ];
 
-function rollingBest(arr: number[], w: number): number {
-  if (!arr?.length || arr.length < w) return 0;
-  let sum = 0;
-  for (let i = 0; i < w; i++) sum += arr[i] ?? 0;
-  let best = sum;
-  for (let i = w; i < arr.length; i++) {
-    sum += (arr[i] ?? 0) - (arr[i - w] ?? 0);
-    if (sum > best) best = sum;
-  }
-  return Math.round(best / w);
-}
-
-/** Read all-time best power for each PR duration from the pre-computed best_power_efforts table. */
-async function allTimeBests(client: import('pg').PoolClient): Promise<Map<number, number>> {
+/**
+ * Read this ride's best power and the all-time best (excluding this ride)
+ * for each PR duration, from the pre-computed best_power_efforts table.
+ * One round trip replaces fetching the full watts stream and computing
+ * rolling bests at request time.
+ */
+async function powerBests(
+  client: import('pg').PoolClient,
+  activityId: number,
+): Promise<Map<number, { ride: number; prev: number | null }>> {
   const secondsList = PR_DURATIONS.map(d => d.seconds);
   const res = await client.query(`
-    SELECT seconds, MAX(best_watts)::int AS best_watts
+    SELECT seconds,
+           MAX(best_watts) FILTER (WHERE activity_id =  $1)::int AS ride_watts,
+           MAX(best_watts) FILTER (WHERE activity_id != $1)::int AS prev_watts
     FROM best_power_efforts
-    WHERE sport_type = ANY($1::text[])
-      AND seconds = ANY($2::int[])
+    WHERE sport_type = ANY($2::text[])
+      AND seconds = ANY($3::int[])
     GROUP BY seconds
-  `, [CYCLING_TYPES, secondsList]);
+  `, [activityId, CYCLING_TYPES, secondsList]);
 
-  const map = new Map<number, number>();
+  const map = new Map<number, { ride: number; prev: number | null }>();
   for (const row of res.rows) {
-    const val = Number(row.best_watts);
-    if (Number.isFinite(val) && val > 0) map.set(Number(row.seconds), val);
+    const ride = Number(row.ride_watts);
+    const prev = Number(row.prev_watts);
+    if (Number.isFinite(ride) && ride > 0) {
+      map.set(Number(row.seconds), { ride, prev: Number.isFinite(prev) && prev > 0 ? prev : null });
+    }
   }
   return map;
 }
@@ -52,8 +53,23 @@ export async function GET() {
   const profile = await getProfile();
   const client = await pool.connect();
   try {
-    // Parallel: recent rides, daily TSS (for fitness), WTD stats
-    const [ridesRes, dailyTssRes] = await Promise.all([
+    const tz = profile.timezone || 'Australia/Sydney';
+
+    const statsQuery = (truncUnit: string) => client.query(`
+      SELECT
+        COUNT(*)                                   AS rides,
+        ROUND(COALESCE(SUM(distance)/1000, 0)::numeric, 1) AS km,
+        ROUND(COALESCE(SUM(moving_time)/3600.0, 0)::numeric, 1) AS hours,
+        COALESCE(SUM(COALESCE(tss, hrss, 0)), 0)::int AS tss,
+        ROUND(COALESCE(SUM(total_elevation_gain), 0)::numeric) AS elevation
+      FROM activities
+      WHERE sport_type NOT ILIKE '%walk%'
+        AND start_date >= date_trunc($2, NOW() AT TIME ZONE $1) AT TIME ZONE $1
+    `, [tz, truncUnit]);
+
+    // All of these are independent — one parallel wave instead of three
+    // sequential ones (each wave is a full round trip to the database).
+    const [ridesRes, dailyTssRes, nextSessionRes, wtdRes, mtdRes, ytdRes] = await Promise.all([
       client.query(`
         SELECT id, name, sport_type, start_date, distance, moving_time,
                average_watts, normalized_power, average_heartrate, tss,
@@ -65,54 +81,37 @@ export async function GET() {
         LIMIT 50
       `),
       client.query(`
-        SELECT TO_CHAR(start_date AT TIME ZONE 'Australia/Sydney','YYYY-MM-DD') AS date,
+        SELECT TO_CHAR(start_date AT TIME ZONE $1,'YYYY-MM-DD') AS date,
                 SUM(COALESCE(tss, hrss, 0)) AS tss
         FROM activities
         GROUP BY 1 ORDER BY 1
-      `),
-    ]);
-
-    const tz = profile.timezone || 'Australia/Sydney';
-
-    // Next non-rest training day from the active plan.
-    // Skip today if a cycling activity was already logged today.
-    const nextSessionRes = await client.query(`
-      SELECT d.id, d.date::text AS date, d.title, d.type, d.duration_min, d.tss_target, d.description
-      FROM training_days d
-      JOIN training_plans p ON p.id = d.plan_id
-      WHERE p.id = (SELECT id FROM training_plans ORDER BY created_at DESC LIMIT 1)
-        AND d.date >= (NOW() AT TIME ZONE '${tz}')::date
-        AND d.type != 'rest'
-        AND NOT (
-          d.date = (NOW() AT TIME ZONE '${tz}')::date
-          AND EXISTS (
-            SELECT 1 FROM activities
-            WHERE (start_date AT TIME ZONE '${tz}')::date = (NOW() AT TIME ZONE '${tz}')::date
-              AND sport_type = ANY(ARRAY['Ride','GravelRide','EMountainBikeRide','MountainBikeRide',
-                                         'EBikeRide','VirtualRide','Workout'])
+      `, [tz]),
+      // Next non-rest training day from the active plan.
+      // Skip today if a cycling activity was already logged today.
+      client.query(`
+        SELECT d.id, d.date::text AS date, d.title, d.type, d.duration_min, d.tss_target, d.description
+        FROM training_days d
+        JOIN training_plans p ON p.id = d.plan_id
+        WHERE p.id = (SELECT id FROM training_plans ORDER BY created_at DESC LIMIT 1)
+          AND d.date >= (NOW() AT TIME ZONE $1)::date
+          AND d.type != 'rest'
+          AND NOT (
+            d.date = (NOW() AT TIME ZONE $1)::date
+            AND EXISTS (
+              SELECT 1 FROM activities
+              WHERE (start_date AT TIME ZONE $1)::date = (NOW() AT TIME ZONE $1)::date
+                AND sport_type = ANY(ARRAY['Ride','GravelRide','EMountainBikeRide','MountainBikeRide',
+                                           'EBikeRide','VirtualRide','Workout'])
+            )
           )
-        )
-      ORDER BY d.date
-      LIMIT 1
-    `);
-    const nextSession = nextSessionRes.rows[0] ?? null;
-
-    const statsQuery = (truncUnit: string) => client.query(`
-      SELECT
-        COUNT(*)                                   AS rides,
-        ROUND(COALESCE(SUM(distance)/1000, 0)::numeric, 1) AS km,
-        ROUND(COALESCE(SUM(moving_time)/3600.0, 0)::numeric, 1) AS hours,
-        COALESCE(SUM(COALESCE(tss, hrss, 0)), 0)::int AS tss,
-        ROUND(COALESCE(SUM(total_elevation_gain), 0)::numeric) AS elevation
-      FROM activities
-      WHERE sport_type NOT ILIKE '%walk%'
-        AND start_date >= date_trunc('${truncUnit}', NOW() AT TIME ZONE '${tz}') AT TIME ZONE '${tz}'
-    `);
-    const [wtdRes, mtdRes, ytdRes] = await Promise.all([
+        ORDER BY d.date
+        LIMIT 1
+      `, [tz]),
       statsQuery('week'),
       statsQuery('month'),
       statsQuery('year'),
     ]);
+    const nextSession = nextSessionRes.rows[0] ?? null;
 
     const dailyTss = dailyTssRes.rows.map(r => ({ date: String(r.date), tss: Number(r.tss) }));
     const fitness = calculateFitness(dailyTss);
@@ -133,37 +132,28 @@ export async function GET() {
     const CYCLING = ['Ride','VirtualRide','GravelRide','MountainBikeRide','EBikeRide','EMountainBikeRide'];
     const lastCyclingRide = ridesRes.rows.find(r => CYCLING.includes(r.sport_type));
 
-    let powerHighlights: {
+    const powerHighlights: {
       label: string; seconds: number; watts: number;
       prevBest: number | null; isNew: boolean;
     }[] = [];
 
     if (lastCyclingRide) {
-      const streamRes = await client.query(
-        `SELECT watts FROM activity_streams WHERE activity_id = $1`,
-        [lastCyclingRide.id]
-      );
+      // Pre-computed per-activity bests — replaces fetching the full watts
+      // stream and running rolling-window maxima at request time.
+      const bests = await powerBests(client, Number(lastCyclingRide.id));
 
-      if (streamRes.rows[0]?.watts) {
-        const wattsArr: number[] = streamRes.rows[0].watts;
+      for (const dur of PR_DURATIONS) {
+        const entry = bests.get(dur.seconds);
+        if (!entry) continue;
 
-        // Compute true all-time bests from all historical stream data
-        const allTime = await allTimeBests(client);
-
-        for (const dur of PR_DURATIONS) {
-          const best = rollingBest(wattsArr, dur.seconds);
-          if (!best) continue;
-          const prev = allTime.get(dur.seconds) ?? null;
-
-          powerHighlights.push({
-            label: dur.label,
-            seconds: dur.seconds,
-            watts: best,
-            prevBest: prev,
-            // isNew = this ride's effort beats the all-time best
-            isNew: prev !== null && best > prev,
-          });
-        }
+        powerHighlights.push({
+          label: dur.label,
+          seconds: dur.seconds,
+          watts: entry.ride,
+          prevBest: entry.prev,
+          // isNew = this ride's effort beats the best of all OTHER rides
+          isNew: entry.prev !== null && entry.ride > entry.prev,
+        });
       }
     }
 

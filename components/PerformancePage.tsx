@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import SubTabBar from './SubTabBar';
+import LazySection from './LazySection';
 import FitnessTab from './training/FitnessTab';
 import AerobicEfficiencyTab from './training/AerobicEfficiencyTab';
 import ReadinessTab from './training/ReadinessTab';
@@ -66,11 +67,15 @@ export default function PerformancePage() {
               </section>
               <section className="pt-2 border-t border-gray-800/60">
                 <SectionHeading title="Aerobic Efficiency" subtitle="Power vs HR drift on steady rides" />
-                <AerobicEfficiencyTab />
+                <LazySection>
+                  <AerobicEfficiencyTab />
+                </LazySection>
               </section>
               <section className="pt-2 border-t border-gray-800/60">
                 <SectionHeading title="Readiness" subtitle="HRV vs Normal Zone" />
-                <ReadinessTab />
+                <LazySection>
+                  <ReadinessTab />
+                </LazySection>
               </section>
             </>
           )}
@@ -83,11 +88,15 @@ export default function PerformancePage() {
               </section>
               <section className="pt-2 border-t border-gray-800/60">
                 <SectionHeading title="Power Curve" subtitle="Best power by duration" />
-                <PowerCurveWidget />
+                <LazySection>
+                  <PowerCurveWidget />
+                </LazySection>
               </section>
               <section className="pt-2 border-t border-gray-800/60">
                 <SectionHeading title="Best Efforts" />
-                <DashboardBestPower />
+                <LazySection>
+                  <DashboardBestPower />
+                </LazySection>
               </section>
             </>
           )}

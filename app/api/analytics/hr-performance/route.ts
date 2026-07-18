@@ -25,7 +25,7 @@ export async function GET(req: Request) {
       // Aerobic efficiency (NP or avg watts / avg HR) from activities table — lightweight
       const effRes = await client.query(`
         SELECT
-          date_trunc('week', (start_date AT TIME ZONE '${tz}'))::date::text AS week_start,
+          date_trunc('week', (start_date AT TIME ZONE $3))::date::text AS week_start,
           ROUND(AVG(
             CASE
               WHEN average_heartrate > 60 AND (normalized_power IS NOT NULL OR average_watts IS NOT NULL)
@@ -40,7 +40,7 @@ export async function GET(req: Request) {
           AND average_heartrate IS NOT NULL
         GROUP BY week_start
         ORDER BY week_start
-      `, [CYCLING, weeks]);
+      `, [CYCLING, weeks, tz]);
 
       let zoneWeekly: Record<string, unknown>[] = [];
 
@@ -51,7 +51,7 @@ export async function GET(req: Request) {
 
         const zoneRes = await client.query(`
           SELECT
-            date_trunc('week', (a.start_date AT TIME ZONE '${tz}'))::date::text AS week_start,
+            date_trunc('week', (a.start_date AT TIME ZONE $3))::date::text AS week_start,
             COUNT(*) FILTER (WHERE h.val > 30 AND h.val <= ${b[0]}) AS z1,
             COUNT(*) FILTER (WHERE h.val > ${b[0]} AND h.val <= ${b[1]}) AS z2,
             COUNT(*) FILTER (WHERE h.val > ${b[1]} AND h.val <= ${b[2]}) AS z3,
@@ -66,7 +66,7 @@ export async function GET(req: Request) {
             AND s.hr IS NOT NULL
           GROUP BY week_start
           ORDER BY week_start
-        `, [CYCLING, weeks]);
+        `, [CYCLING, weeks, tz]);
 
         zoneWeekly = zoneRes.rows.map(r => ({
           week_start: r.week_start,

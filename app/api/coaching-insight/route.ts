@@ -8,6 +8,10 @@ export const maxDuration = 30;
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
+// The cache table exists after first contact — skip the DDL round-trip on
+// warm instances (each DDL statement costs a lock + implicit commit).
+let _cacheTableReady = false;
+
 /**
  * GET /api/coaching-insight
  *
@@ -18,15 +22,17 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 export async function GET() {
   const client = await pool.connect();
   try {
-    // Ensure cache table exists
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS coaching_cache (
-        key             TEXT PRIMARY KEY,
-        content         TEXT NOT NULL,
-        last_activity_id BIGINT,
-        generated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      )
-    `);
+    if (!_cacheTableReady) {
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS coaching_cache (
+          key             TEXT PRIMARY KEY,
+          content         TEXT NOT NULL,
+          last_activity_id BIGINT,
+          generated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `);
+      _cacheTableReady = true;
+    }
 
     // Latest activity ID — used as a cheap "did anything change?" signal
     const latestRes = await client.query(

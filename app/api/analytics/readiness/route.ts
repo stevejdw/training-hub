@@ -1,3 +1,4 @@
+import { after } from 'next/server';
 import pool from '@/lib/db';
 import { getProfile } from '@/lib/profile';
 
@@ -64,25 +65,15 @@ async function autoSyncWellness(): Promise<void> {
     const wellnessRows = await resFetch.json() as Record<string, unknown>[];
     if (!Array.isArray(wellnessRows) || wellnessRows.length === 0) return;
 
+    // Single multi-row upsert instead of one round-trip per day.
+    const values: unknown[] = [];
+    const tuples: string[] = [];
+    let p = 1;
     for (const row of wellnessRows) {
       const date = row.id as string;
       if (!date) continue;
-
-      await client.query(`
-        INSERT INTO daily_wellness
-          (date, hrv_rmssd, hrv_sdnn, resting_hr, sleep_score, readiness_score, sleep_secs, icu_tss, source, synced_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'intervals', NOW())
-        ON CONFLICT (date) DO UPDATE SET
-          hrv_rmssd       = EXCLUDED.hrv_rmssd,
-          hrv_sdnn        = EXCLUDED.hrv_sdnn,
-          resting_hr      = EXCLUDED.resting_hr,
-          sleep_score     = EXCLUDED.sleep_score,
-          readiness_score = EXCLUDED.readiness_score,
-          sleep_secs      = EXCLUDED.sleep_secs,
-          icu_tss         = EXCLUDED.icu_tss,
-          source          = EXCLUDED.source,
-          synced_at       = NOW()
-      `, [
+      tuples.push(`($${p++}, $${p++}, $${p++}, $${p++}, $${p++}, $${p++}, $${p++}, $${p++}, 'intervals', NOW())`);
+      values.push(
         date,
         toFloatOrNull(row.hrv_rmssd  ?? row.hrvRMSSD  ?? row.hrv),
         toFloatOrNull(row.hrv_sdnn   ?? row.hrvSDNN),
@@ -91,8 +82,25 @@ async function autoSyncWellness(): Promise<void> {
         toIntOrNull(row.readiness    ?? row.readinessScore ?? row.score ?? row.readiness_score),
         toIntOrNull(row.sleepSecs    ?? row.sleep_secs),
         toFloatOrNull(row.icu_tss    ?? row.icuTSS),
-      ]);
+      );
     }
+    if (tuples.length === 0) return;
+
+    await client.query(`
+      INSERT INTO daily_wellness
+        (date, hrv_rmssd, hrv_sdnn, resting_hr, sleep_score, readiness_score, sleep_secs, icu_tss, source, synced_at)
+      VALUES ${tuples.join(', ')}
+      ON CONFLICT (date) DO UPDATE SET
+        hrv_rmssd       = EXCLUDED.hrv_rmssd,
+        hrv_sdnn        = EXCLUDED.hrv_sdnn,
+        resting_hr      = EXCLUDED.resting_hr,
+        sleep_score     = EXCLUDED.sleep_score,
+        readiness_score = EXCLUDED.readiness_score,
+        sleep_secs      = EXCLUDED.sleep_secs,
+        icu_tss         = EXCLUDED.icu_tss,
+        source          = EXCLUDED.source,
+        synced_at       = NOW()
+    `, values);
   } catch (err) {
     console.warn('[readiness autoSync] error', err);
   } finally {
@@ -110,9 +118,10 @@ async function autoSyncWellness(): Promise<void> {
  * user selects a short display window.
  */
 export async function GET(req: Request) {
-  // Auto-sync wellness data if stale before querying — so the current request
-  // sees freshly synced data rather than stale cached rows.
-  await autoSyncWellness();
+  // Auto-sync wellness data if stale — but AFTER the response is sent, so the
+  // chart never blocks on the external intervals.icu call. The client's
+  // stale-while-revalidate refetch picks up the fresh rows on its next pass.
+  after(() => autoSyncWellness());
 
   const { searchParams } = new URL(req.url);
   const displayDays = Math.min(365, Math.max(7, Number(searchParams.get('days') ?? '30')));

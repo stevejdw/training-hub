@@ -15,7 +15,6 @@ export async function PATCH(
 
   const client = await pool.connect();
   try {
-    await client.query(`ALTER TABLE gear ADD COLUMN IF NOT EXISTS power_meter TEXT`);
     const sets: string[] = [];
     const vals: unknown[] = [];
     let p = 1;

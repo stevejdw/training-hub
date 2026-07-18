@@ -73,6 +73,12 @@ export default function NativeShell() {
     setNative(true);
     setLockedState(true);
 
+    // Tag the document so CSS can offset content below the status bar.
+    // The Capacitor webview draws under the notch (contentInset: 'never'),
+    // and unlike an installed PWA it doesn't report display-mode:standalone,
+    // so safe-area CSS needs its own hook.
+    document.documentElement.classList.add('native-app');
+
     let removeListener: (() => void) | undefined;
 
     (async () => {

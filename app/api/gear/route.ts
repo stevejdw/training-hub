@@ -7,7 +7,6 @@ export const runtime = 'nodejs';
 export async function GET() {
   const client = await pool.connect();
   try {
-    await client.query(`ALTER TABLE gear ADD COLUMN IF NOT EXISTS power_meter TEXT`);
     const res = await client.query(`
       SELECT g.id, g.name, g.nickname, g.retired, g.power_meter,
              COUNT(a.id)::int AS activity_count

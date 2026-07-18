@@ -29,12 +29,13 @@ export function useCachedFetch<T>(
   // without resetting what's already on screen (stale-while-revalidate).
   const dataRef = useRef<T | null>(null);
 
-  const doFetch = useCallback(() => {
+  const doFetch = useCallback((opts?: { skipIfFresherThanMs?: number }) => {
     const id = ++fetchIdRef.current;
     setError(null);
 
     // Try to restore from cache instantly for a snappy feel
     let freshFromCache = false;
+    let cachedAt = 0;
     try {
       const entry = localStorage.getItem(cacheKey);
       if (entry) {
@@ -42,10 +43,21 @@ export function useCachedFetch<T>(
         if (parsed?.payload) {
           dataRef.current = parsed.payload;
           setData(parsed.payload);
-          freshFromCache = Date.now() - parsed.cachedAt <= ttlMs;
+          cachedAt = parsed.cachedAt ?? 0;
+          freshFromCache = Date.now() - cachedAt <= ttlMs;
         }
       }
     } catch { /* ignore */ }
+
+    // Optionally skip the network entirely when the cache is very recent —
+    // e.g. on tab-visibility changes, so returning to the app moments later
+    // doesn't refire every mounted chart's API call.
+    if (opts?.skipIfFresherThanMs
+        && dataRef.current != null
+        && Date.now() - cachedAt <= opts.skipIfFresherThanMs) {
+      setLoading(false);
+      return;
+    }
 
     // Only show the loading state when there is nothing to display yet.
     // Keeping previously-rendered data on screen while revalidating avoids a
@@ -84,9 +96,13 @@ export function useCachedFetch<T>(
     // without requiring a page reload.
     intervalRef.current = setInterval(doFetch, 30 * 60 * 1000);
 
-    // Re-fetch when the tab regains visibility (user switches back)
+    // Re-fetch when the tab regains visibility (user switches back) — but
+    // only when the cached copy is older than 5 minutes, so quickly
+    // foregrounding the app doesn't refire every mounted chart's API call.
     const onVisible = () => {
-      if (document.visibilityState === 'visible') doFetch();
+      if (document.visibilityState === 'visible') {
+        doFetch({ skipIfFresherThanMs: 5 * 60 * 1000 });
+      }
     };
     document.addEventListener('visibilitychange', onVisible);
 

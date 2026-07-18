@@ -299,6 +299,34 @@ body {
   }
 }
 
+/* ── Capacitor iOS shell (html.native-app, set by NativeShell) ──
+   The webview draws edge-to-edge under the status bar, so page content
+   (e.g. the "← Activities" breadcrumb) was hidden behind the clock.
+   Shift the mobile content area below the top inset and paint a solid
+   theme-coloured bar behind the status bar so scrolling content passes
+   under it cleanly. The Capacitor webview doesn't report
+   display-mode:standalone, so the bottom nav inset is applied here too. */
+html.native-app body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: env(safe-area-inset-top);
+  background: var(--background);
+  z-index: 60;
+}
+
+@media (max-width: 767px) {
+  html.native-app .content-area {
+    top: env(safe-area-inset-top);
+  }
+}
+
+html.native-app .mobile-bottom-nav {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
 /* Smooth momentum scrolling on iOS for any scroll container */
 .scroll-touch {
   -webkit-overflow-scrolling: touch;

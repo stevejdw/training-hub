@@ -94,7 +94,7 @@ export async function GET(req: NextRequest) {
     const [weeklyRes, currentRes] = await Promise.all([
       pool.query(`
         SELECT
-          date_trunc('week', (start_date AT TIME ZONE '${tz}'))::date::text AS week_start,
+          date_trunc('week', (start_date AT TIME ZONE $3))::date::text AS week_start,
           seconds,
           MAX(best_watts) AS best_watts
         FROM best_power_efforts
@@ -103,7 +103,7 @@ export async function GET(req: NextRequest) {
           AND seconds = ANY($2::int[])
         GROUP BY week_start, seconds
         ORDER BY week_start, seconds
-      `, [CYCLING_TYPES, secondsList]),
+      `, [CYCLING_TYPES, secondsList, tz]),
       pool.query(`
         SELECT seconds, MAX(best_watts) AS best_watts
         FROM best_power_efforts

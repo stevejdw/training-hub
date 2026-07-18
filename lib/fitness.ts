@@ -65,8 +65,11 @@ function todayAest(): string {
 function buildFullTimeline(sorted: DailyTSS[]): DailyTSS[] {
   if (sorted.length === 0) return [];
   const result: DailyTSS[] = [];
-  const cursor = new Date(sorted[0].date);
-  const end    = new Date(todayAest() + 'T00:00:00');
+  // Iterate purely in UTC: dates here are calendar-day strings, so mixing
+  // local-time setDate() with UTC toISOString() could skip or duplicate a
+  // day when the server timezone crosses a DST transition.
+  const cursor = new Date(sorted[0].date + 'T00:00:00Z');
+  const end    = new Date(todayAest() + 'T00:00:00Z');
   let i = 0;
 
   while (cursor <= end) {
@@ -77,7 +80,7 @@ function buildFullTimeline(sorted: DailyTSS[]): DailyTSS[] {
     } else {
       result.push({ date: key, tss: 0 });
     }
-    cursor.setDate(cursor.getDate() + 1);
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
   }
   return result;
 }
@@ -149,8 +152,8 @@ export function calculateFitnessHistory(
   const { dates, ctls, atls, tsbs } = computeEma(timeline);
 
   // Use AEST date for cutoff to stay aligned with timeline dates
-  const cutoffAest = new Date(todayAest() + 'T00:00:00');
-  cutoffAest.setDate(cutoffAest.getDate() - daysBack);
+  const cutoffAest = new Date(todayAest() + 'T00:00:00Z');
+  cutoffAest.setUTCDate(cutoffAest.getUTCDate() - daysBack);
   const cutoffStr = cutoffAest.toISOString().slice(0, 10);
 
 
