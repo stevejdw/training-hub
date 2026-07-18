@@ -7,6 +7,8 @@ import { sportLabel, sportColor } from '@/lib/sport-types';
 import ZoneDistribution from './ZoneDistribution';
 import PowerCurveChart from './PowerCurveChart';
 import AerobicEfficiencyChart from './AerobicEfficiencyChart';
+import StreamCharts from './desktop/StreamCharts';
+import { useIsDesktop } from './desktop/useIsDesktop';
 
 const COMPARE_PERIODS = [
   { key: '30d', label: '30d' },
@@ -149,6 +151,8 @@ export default function ActivityDetail({ id }: { id: string }) {
   const [lapSort, setLapSort] = useState<{ key: LapSortKey; dir: 'asc' | 'desc' }>({ key: 'index', dir: 'asc' });
   const [editingName, setEditingName] = useState(false);
   const [nameDraft,   setNameDraft]   = useState('');
+  const [hoverPoint,  setHoverPoint]  = useState<[number, number] | null>(null);
+  const isDesktop = useIsDesktop();
 
   async function saveName() {
     if (!activity) return;
@@ -251,16 +255,13 @@ export default function ActivityDetail({ id }: { id: string }) {
     { key: 'segments',  label: `Segments${segments.length ? ` (${segments.length})` : ''}` },
   ];
 
-  return (
-    <div className="h-full overflow-y-auto scroll-touch">
-      <div className="max-w-2xl md:max-w-5xl xl:max-w-7xl mx-auto px-4 py-6 space-y-5">
+  const backLink = (
+    <Link href="/activities" className="text-sm text-gray-500 hover:text-orange-400 transition-colors">
+      ← Activities
+    </Link>
+  );
 
-        <Link href="/activities" className="text-sm text-gray-500 hover:text-orange-400 transition-colors">
-          ← Activities
-        </Link>
-
-        {/* Header + Map */}
-        <div className="flex gap-4 items-start">
+  const headerInner = (
           <div className="flex-1 min-w-0">
             {/* Sport badge + date + gear */}
             <div className="flex items-center gap-2 mb-2 flex-wrap">
@@ -353,19 +354,9 @@ export default function ActivityDetail({ id }: { id: string }) {
               )}
             </div>
           </div>
+  );
 
-          {/* Desktop map (side-by-side with stats) */}
-          {activity.summary_polyline ? (
-            <div className="w-[42%] flex-shrink-0 hidden sm:block">
-              <ActivityMap
-                polyline={activity.summary_polyline}
-                className="w-full h-48 rounded-xl overflow-hidden bg-gray-800"
-              />
-            </div>
-          ) : null}
-        </div>
-
-        {/* Get Coach feedback — between top stats and the map */}
+  const coachLink = (
         <Link
           href={`/chat?prompt=${encodeURIComponent(`Coach feedback on "${activity.name}" (id ${id}).`)}`}
           className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl bg-orange-500/15 hover:bg-orange-500/25 text-orange-400 text-sm font-semibold transition-colors border border-orange-500/30"
@@ -375,18 +366,9 @@ export default function ActivityDetail({ id }: { id: string }) {
           </svg>
           Get Coach feedback
         </Link>
+  );
 
-        {/* Mobile map (full width below the button) */}
-        {activity.summary_polyline && (
-          <div className="sm:hidden">
-            <ActivityMap
-              polyline={activity.summary_polyline}
-              className="w-full h-48 rounded-xl overflow-hidden bg-gray-800"
-            />
-          </div>
-        )}
-
-        {/* Tabs */}
+  const tabsNav = (
         <div className="border-b border-gray-800">
           <div className="flex items-center gap-0">
             {TABS.map(t => (
@@ -404,7 +386,10 @@ export default function ActivityDetail({ id }: { id: string }) {
             ))}
           </div>
         </div>
+  );
 
+  const tabPanels = (
+    <>
         {/* Tab: Stats */}
         {tab === 'stats' && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8">
@@ -844,6 +829,80 @@ export default function ActivityDetail({ id }: { id: string }) {
             )}
           </div>
         )}
+    </>
+  );
+
+  // ── Desktop (lg+): two-column analysis workbench ──
+  if (isDesktop) {
+    return (
+      <div className="h-full overflow-hidden">
+        <div className="h-full grid grid-cols-12 gap-6 px-6 py-4">
+          {/* Left: header, stats, stream charts */}
+          <div className="col-span-7 h-full min-h-0 overflow-y-auto scroll-touch space-y-5 pr-1">
+            {backLink}
+            <div className="flex gap-4 items-start">{headerInner}</div>
+            {coachLink}
+            <StreamCharts activityId={id} onHover={setHoverPoint} />
+          </div>
+
+          {/* Right: sticky map + tab content */}
+          <div className="col-span-5 h-full min-h-0 flex flex-col gap-4">
+            {activity.summary_polyline && (
+              <div className="flex-shrink-0">
+                <ActivityMap
+                  polyline={activity.summary_polyline}
+                  className="w-full h-64 rounded-xl overflow-hidden bg-gray-800"
+                  hoverPoint={hoverPoint}
+                />
+              </div>
+            )}
+            <div className="flex-1 min-h-0 overflow-y-auto scroll-touch space-y-5">
+              {tabsNav}
+              {tabPanels}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Mobile / tablet: original single-column layout ──
+  return (
+    <div className="h-full overflow-y-auto scroll-touch">
+      <div className="max-w-2xl md:max-w-5xl xl:max-w-7xl mx-auto px-4 py-6 space-y-5">
+
+        {backLink}
+
+        {/* Header + Map */}
+        <div className="flex gap-4 items-start">
+          {headerInner}
+
+          {/* Desktop map (side-by-side with stats) */}
+          {activity.summary_polyline ? (
+            <div className="w-[42%] flex-shrink-0 hidden sm:block">
+              <ActivityMap
+                polyline={activity.summary_polyline}
+                className="w-full h-48 rounded-xl overflow-hidden bg-gray-800"
+              />
+            </div>
+          ) : null}
+        </div>
+
+        {/* Get Coach feedback — between top stats and the map */}
+        {coachLink}
+
+        {/* Mobile map (full width below the button) */}
+        {activity.summary_polyline && (
+          <div className="sm:hidden">
+            <ActivityMap
+              polyline={activity.summary_polyline}
+              className="w-full h-48 rounded-xl overflow-hidden bg-gray-800"
+            />
+          </div>
+        )}
+
+        {tabsNav}
+        {tabPanels}
 
       </div>
     </div>

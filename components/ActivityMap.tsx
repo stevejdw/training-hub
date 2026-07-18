@@ -6,11 +6,15 @@ interface Props {
   polyline: string;
   className?: string;
   thumbnail?: boolean;
+  /** [lat, lng] to highlight with a marker (chart hover-sync); null hides it. */
+  hoverPoint?: [number, number] | null;
 }
 
-export default function ActivityMap({ polyline, className, thumbnail }: Props) {
+export default function ActivityMap({ polyline, className, thumbnail, hoverPoint }: Props) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<unknown>(null);
+  const hoverMarkerRef = useRef<unknown>(null);
+  const leafletRef = useRef<typeof import('leaflet') | null>(null);
 
   useEffect(() => {
     if (!mapRef.current || mapInstanceRef.current) return;
@@ -19,6 +23,7 @@ export default function ActivityMap({ polyline, className, thumbnail }: Props) {
 
     async function init() {
       const L = (await import('leaflet')).default;
+      leafletRef.current = L;
       await import('leaflet/dist/leaflet.css');
       const polylineDecode = (await import('polyline')).default;
 
@@ -71,12 +76,47 @@ export default function ActivityMap({ polyline, className, thumbnail }: Props) {
 
     return () => {
       cancelled = true;
+      hoverMarkerRef.current = null;
       if (mapInstanceRef.current) {
         (mapInstanceRef.current as { remove: () => void }).remove();
         mapInstanceRef.current = null;
       }
     };
   }, [polyline]);
+
+  // Keep tiles valid when the container resizes (desktop split panes).
+  useEffect(() => {
+    const el = mapRef.current;
+    if (!el) return;
+    const obs = new ResizeObserver(() => {
+      (mapInstanceRef.current as { invalidateSize?: () => void } | null)?.invalidateSize?.();
+    });
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+
+  // Hover-sync marker, managed imperatively so the map never re-inits.
+  useEffect(() => {
+    const map = mapInstanceRef.current as import('leaflet').Map | null;
+    const L = leafletRef.current;
+    if (!map || !L) return;
+
+    if (hoverPoint) {
+      let marker = hoverMarkerRef.current as import('leaflet').CircleMarker | null;
+      if (!marker) {
+        marker = L.circleMarker(hoverPoint, {
+          radius: 7, color: '#ffffff', fillColor: '#f97316', fillOpacity: 1, weight: 2,
+        }).addTo(map);
+        hoverMarkerRef.current = marker;
+      } else {
+        marker.setLatLng(hoverPoint);
+        if (!map.hasLayer(marker)) marker.addTo(map);
+      }
+    } else if (hoverMarkerRef.current) {
+      const marker = hoverMarkerRef.current as import('leaflet').CircleMarker;
+      if (map.hasLayer(marker)) map.removeLayer(marker);
+    }
+  }, [hoverPoint]);
 
   return (
     <div ref={mapRef} className={className ?? 'w-full h-72 rounded-xl overflow-hidden bg-gray-800'} />
