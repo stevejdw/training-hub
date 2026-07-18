@@ -1,5 +1,6 @@
 import pool from '@/lib/db';
 import { getProfile, effectiveFtp } from '@/lib/profile';
+import { ensureBestPowerTableForRead } from '@/lib/best-power';
 import { NextRequest } from 'next/server';
 
 export const runtime = 'nodejs';
@@ -56,7 +57,7 @@ function periodToClause(period: string): string {
     '6m':  '180 days',
     '1y':  '365 days',
   };
-  if (intervals[period]) return `AND a.start_date >= NOW() - INTERVAL '${intervals[period]}'`;
+  if (intervals[period]) return `AND bpe.start_date >= NOW() - INTERVAL '${intervals[period]}'`;
   return '';
 }
 
@@ -82,31 +83,28 @@ export async function GET(
       return Response.json({ activity: activityCurve, comparison: null, ftp });
     }
 
+    // Comparison curve from precomputed best_power_efforts — a few dozen
+    // scalar rows instead of raw watts arrays for every ride in the period.
+    await ensureBestPowerTableForRead();
     const clause = periodToClause(compare);
-    const compRes = await client.query(`
-      SELECT s.watts
-      FROM activities a
-      JOIN activity_streams s ON s.activity_id = a.id
-      WHERE a.sport_type = ANY($1::text[])
-        AND s.watts IS NOT NULL
-        AND a.id != $2
+    const compRes = await client.query<{ seconds: number; power: string }>(`
+      SELECT bpe.seconds, MAX(bpe.best_watts) AS power
+      FROM best_power_efforts bpe
+      WHERE bpe.sport_type = ANY($1::text[])
+        AND bpe.activity_id != $2
+        AND bpe.best_watts IS NOT NULL
         ${clause}
-      ORDER BY a.start_date DESC
-      LIMIT 60
+      GROUP BY bpe.seconds
     `, [CYCLING_SPORTS, id]);
 
-    const bestByLabel: Record<string, number> = {};
+    const bestBySeconds = new Map<number, number>();
     for (const row of compRes.rows) {
-      for (const { label, power } of computeCurve(row.watts)) {
-        if (!bestByLabel[label] || power > bestByLabel[label]) {
-          bestByLabel[label] = power;
-        }
-      }
+      bestBySeconds.set(Number(row.seconds), Math.round(Number(row.power)));
     }
 
     const comparison = DURATIONS
-      .filter(d => bestByLabel[d.label] != null)
-      .map(d => ({ label: d.label, power: bestByLabel[d.label] }));
+      .filter(d => (bestBySeconds.get(d.s) ?? 0) > 0)
+      .map(d => ({ label: d.label, power: bestBySeconds.get(d.s)! }));
 
     return Response.json({ activity: activityCurve, comparison: comparison.length ? comparison : null, ftp });
   } catch (err) {

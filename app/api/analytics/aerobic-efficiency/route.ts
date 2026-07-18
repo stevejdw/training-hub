@@ -81,6 +81,9 @@ export async function GET(req: NextRequest) {
       paramIdx++;
     }
 
+    // Half-ride power/HR averages are computed inside Postgres so only a few
+    // scalar columns per ride cross the wire — never the raw watts/hr arrays
+    // (which cost ~100-200KB of egress per ride).
     const sql = `
       SELECT
         a.id,
@@ -91,10 +94,21 @@ export async function GET(req: NextRequest) {
         a.average_heartrate,
         a.moving_time,
         a.summary_polyline,
-        s.watts,
-        s.hr
+        halves.pw1, halves.hr1, halves.pw2, halves.hr2
       FROM activities a
       JOIN activity_streams s ON s.activity_id = a.id
+      CROSS JOIN LATERAL (
+        SELECT LEAST(array_length(s.watts, 1), array_length(s.hr, 1)) AS n
+      ) dims
+      CROSS JOIN LATERAL (
+        SELECT
+          COALESCE(AVG(t.wv) FILTER (WHERE t.ord <= dims.n / 2), 0) AS pw1,
+          COALESCE(AVG(t.hv) FILTER (WHERE t.ord <= dims.n / 2), 0) AS hr1,
+          COALESCE(AVG(t.wv) FILTER (WHERE t.ord >  dims.n / 2 AND t.ord <= dims.n), 0) AS pw2,
+          COALESCE(AVG(t.hv) FILTER (WHERE t.ord >  dims.n / 2 AND t.ord <= dims.n), 0) AS hr2
+        FROM unnest(s.watts, s.hr) WITH ORDINALITY AS t(wv, hv, ord)
+        WHERE t.wv IS NOT NULL AND t.hv IS NOT NULL AND t.hv > 30
+      ) halves
       WHERE a.sport_type = ANY($1::text[])
         AND a.normalized_power IS NOT NULL
         AND a.average_watts    > 0
@@ -115,27 +129,8 @@ export async function GET(req: NextRequest) {
 
 
     const rides = res.rows.map(r => {
-      const watts = (r.watts ?? []) as (number | null)[];
-      const hr    = (r.hr    ?? []) as (number | null)[];
-      const n     = Math.min(watts.length, hr.length);
-      const half  = Math.floor(n / 2);
-
-      function avgs(start: number, end: number) {
-        let pw = 0, h = 0, c = 0;
-        for (let i = start; i < end; i++) {
-          const wv = watts[i];
-          const hv = hr[i];
-          if (hv != null && hv > 30 && wv != null) {
-            pw += wv;
-            h  += hv;
-            c++;
-          }
-        }
-        return c > 0 ? { pw: pw / c, hr: h / c } : { pw: 0, hr: 0 };
-      }
-
-      const a1 = avgs(0, half);
-      const a2 = avgs(half, n);
+      const a1 = { pw: Number(r.pw1), hr: Number(r.hr1) };
+      const a2 = { pw: Number(r.pw2), hr: Number(r.hr2) };
       const ef1 = a1.hr > 0 ? a1.pw / a1.hr : 0;
       const ef2 = a2.hr > 0 ? a2.pw / a2.hr : 0;
       const decoupling = ef1 > 0 ? ((ef1 - ef2) / ef1) * 100 : 0;
