@@ -16,3 +16,11 @@ if ! command -v npm >/dev/null 2>&1; then
 fi
 
 npm ci
+
+# Regenerate the native Capacitor resources that the Xcode project bundles but
+# that are gitignored (generated artifacts): ios/App/App/{config.xml,
+# capacitor.config.json,public}. Without this they're absent in a fresh Xcode
+# Cloud checkout and the Archive step fails with "no such file". `cap sync` also
+# rewrites CapApp-SPM/Package.swift to match the installed plugin versions, so
+# it must run before Xcode resolves Swift packages.
+npx cap sync ios
