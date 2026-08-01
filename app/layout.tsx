@@ -17,13 +17,14 @@ export const metadata: Metadata = {
     statusBarStyle: 'black',
     title: 'Training Hub',
   },
-  // iOS "Add to Home Screen" uses the apple-touch-icon (it ignores the web app
-  // manifest icons). Point it at a lightweight route that resolves to the icon
-  // currently selected in Settings. Keeping the lookup in its own route — rather
-  // than in this layout's metadata — lets the rest of the app render statically
-  // instead of forcing a DB read on every page navigation.
+  // iOS/macOS "Add to Home Screen"/"Add to Dock" use the apple-touch-icon (they
+  // ignore the web app manifest icons). Point it at a lightweight route that
+  // resolves to the icon currently selected in Settings. Keeping the lookup in
+  // its own route — rather than in this layout's metadata — lets the rest of
+  // the app render statically instead of forcing a DB read on every page
+  // navigation.
   icons: {
-    apple: '/apple-touch-icon',
+    apple: '/apple-touch-icon.png',
   },
 };
 
