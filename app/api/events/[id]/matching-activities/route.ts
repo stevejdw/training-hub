@@ -1,3 +1,4 @@
+import type { PoolClient } from 'pg';
 import pool from '@/lib/db';
 import { getProfile, saveProfile } from '@/lib/profile';
 
@@ -17,25 +18,72 @@ function haversineM(a: [number, number], b: [number, number]): number {
   return R * 2 * Math.atan2(Math.sqrt(aa), Math.sqrt(1 - aa));
 }
 
-function sharesGpsCorridor(
-  routeLatLng: [number, number][],
-  actLatLng: [number, number][],
-): boolean {
+/** The route sample points the corridor test measures against. */
+function routeSamplePoints(routeLatLng: [number, number][]): [number, number][] {
   const nSamples = 10;
   const step = Math.max(1, Math.floor(routeLatLng.length / (nSamples + 1)));
-  let hits = 0;
+  const pts: [number, number][] = [];
   for (let s = 0; s < nSamples; s++) {
     const rPt = routeLatLng[step * (s + 1)];
-    if (!rPt) continue;
-    let minDist = Infinity;
-    // Scan ALL activity points to find closest match
-    for (let i = 0; i < actLatLng.length; i++) {
-      const d = haversineM(rPt, actLatLng[i]);
-      if (d < minDist) minDist = d;
-    }
-    if (minDist <= 500) hits++;
+    if (rPt) pts.push(rPt);
   }
-  return hits >= 3;
+  return pts;
+}
+
+/**
+ * Corridor test for every candidate at once, evaluated in Postgres.
+ *
+ * Previously this ran one `SELECT latlng` per candidate inside a loop — up to
+ * 30 sequential queries each shipping a full coordinate array (~120 KB), the
+ * single largest read in the app. The distances are now computed where the data
+ * already lives, so only one hit-count per activity comes back.
+ *
+ * The bounding-box predicate is an optimisation, not a change in behaviour:
+ * 0.01° of latitude is ~1.1 km, so every point within the 500 m threshold is
+ * inside the box, and points outside it can never be the minimum that decides
+ * the comparison.
+ */
+async function corridorHits(
+  client: PoolClient,
+  activityIds: number[],
+  samples: [number, number][],
+): Promise<Map<number, number>> {
+  const res = await client.query<{ activity_id: string; hits: string }>(
+    `WITH pts AS (
+       SELECT s.activity_id, s.latlng[g][1] AS lat, s.latlng[g][2] AS lng
+         FROM activity_streams s,
+              generate_subscripts(s.latlng, 1) AS g
+        WHERE s.activity_id = ANY($1::bigint[])
+          AND s.latlng IS NOT NULL
+          AND COALESCE(array_length(s.latlng, 1), 0) >= 10
+     ),
+     samp AS (
+       SELECT ord, lat, lng
+         FROM unnest($2::float8[], $3::float8[]) WITH ORDINALITY AS t(lat, lng, ord)
+     ),
+     nearest AS (
+       SELECT p.activity_id, sa.ord,
+              MIN(6371000 * 2 * atan2(sqrt(x.aa), sqrt(1 - x.aa))) AS dist
+         FROM pts p
+         JOIN samp sa
+           ON abs(p.lat - sa.lat) < 0.01
+          AND abs(p.lng - sa.lng) < 0.02
+         CROSS JOIN LATERAL (
+           SELECT power(sin(radians(p.lat - sa.lat) / 2), 2)
+                + cos(radians(sa.lat)) * cos(radians(p.lat))
+                * power(sin(radians(p.lng - sa.lng) / 2), 2) AS aa
+         ) x
+        GROUP BY p.activity_id, sa.ord
+     )
+     SELECT activity_id, COUNT(*) FILTER (WHERE dist <= 500) AS hits
+       FROM nearest
+      GROUP BY activity_id`,
+    [activityIds, samples.map(p => p[0]), samples.map(p => p[1])],
+  );
+
+  const out = new Map<number, number>();
+  for (const row of res.rows) out.set(Number(row.activity_id), Number(row.hits));
+  return out;
 }
 
 export async function GET(
@@ -81,18 +129,7 @@ export async function GET(
       return Response.json({ activities: [], linked_ids: event.linked_activity_ids ?? [] });
     }
 
-    // Debug: check if candidates have latlng data
     const candidateIds = candidates.rows.map(r => Number(r.id));
-    const latlngCheck = await client.query<{ activity_id: number; ll_len: number | null }>(`
-      SELECT s.activity_id, array_length(s.latlng, 1) AS ll_len
-      FROM activity_streams s
-      WHERE s.activity_id = ANY($1)
-    `, [candidateIds]);
-
-    const llMap: Record<number, number> = {};
-    for (const row of latlngCheck.rows) {
-      llMap[row.activity_id] = row.ll_len ?? 0;
-    }
 
     // Step 2: filter by GPS corridor when route has latlng data
     const activities: Array<{
@@ -106,37 +143,16 @@ export async function GET(
       normalized_power: number | null;
     }> = [];
 
+    const useCorridor = Boolean(routeLatLng && routeLatLng.length >= 10);
+    const hitsByActivity = useCorridor
+      ? await corridorHits(client, candidateIds, routeSamplePoints(routeLatLng!))
+      : new Map<number, number>();
+
     for (const r of candidates.rows) {
       const activityId = Number(r.id);
-      let accept = true;
-
-      if (routeLatLng && routeLatLng.length >= 10) {
-        // Fetch activity latlng stream to check GPS overlap
-        const llRes = await client.query<{ latlng: unknown }>(
-          `SELECT latlng FROM activity_streams WHERE activity_id = $1 AND latlng IS NOT NULL`,
-          [activityId],
-        );
-        const actLlRaw = llRes.rows[0]?.latlng;
-        let actLatLng: [number, number][] | undefined;
-        if (actLlRaw != null && Array.isArray(actLlRaw) && actLlRaw.length >= 10) {
-          actLatLng = [];
-          for (const item of actLlRaw) {
-            if (Array.isArray(item) && item.length >= 2) {
-              const lat = Number(item[0]);
-              const lng = Number(item[1]);
-              if (Number.isFinite(lat) && Number.isFinite(lng)) {
-                actLatLng.push([lat, lng]);
-              }
-            }
-          }
-        }
-        if (actLatLng && actLatLng.length >= 10) {
-          accept = sharesGpsCorridor(routeLatLng, actLatLng);
-        } else {
-          console.log(`ACTIVITY ${activityId}: no latlng data on activity stream, raw=${typeof actLlRaw} isArr=${Array.isArray(actLlRaw)} len=${Array.isArray(actLlRaw) ? actLlRaw.length : '?'}`);
-          accept = false;
-        }
-      }
+      // An activity with no usable coordinates has no hits and is rejected,
+      // matching the previous behaviour.
+      const accept = useCorridor ? (hitsByActivity.get(activityId) ?? 0) >= 3 : true;
 
       if (accept) {
         activities.push({

@@ -15,7 +15,9 @@ const DURATIONS = [
   { label: '20m', s: 1200  },
   { label: '30m', s: 1800  },
   { label: '60m', s: 3600  },
-  { label: '75m', s: 4500  },
+  // No 75m point: it is not a tracked best_power_efforts interval, so neither
+  // the activity curve nor the comparison curve can source it without pulling
+  // the raw watts array back out of the database.
   { label: '90m', s: 5400  },
   { label: '2h',  s: 7200  },
   { label: '3h',  s: 10800 },
@@ -70,13 +72,47 @@ export async function GET(
 
   const client = await pool.connect();
   try {
-    const [streamRes, profile] = await Promise.all([
-      client.query('SELECT watts FROM activity_streams WHERE activity_id = $1', [id]),
+    await ensureBestPowerTableForRead();
+
+    // The activity's own curve comes from the precomputed per-activity bests.
+    // computeBestPower() and rollingMax() maximise the same window sum before
+    // rounding, so these are the identical numbers the stream would produce —
+    // for ~1 KB of scalars instead of the full 1 Hz watts array.
+    const [effortRes, profile] = await Promise.all([
+      client.query<{ seconds: number; best_watts: string | null }>(
+        // No best_watts filter: a row with NULL best_watts is the marker that
+        // this activity has been processed and simply has no usable power, and
+        // must still count as warmed so we do not fall back to the stream.
+        `SELECT seconds, best_watts
+           FROM best_power_efforts
+          WHERE activity_id = $1`,
+        [id],
+      ),
       getProfile(),
     ]);
 
-    const watts: number[] | null = streamRes.rows[0]?.watts ?? null;
-    const activityCurve = watts ? computeCurve(watts) : [];
+    let activityCurve: { label: string; power: number }[];
+    if (effortRes.rows.length > 0) {
+      const bySeconds = new Map<number, number>();
+      for (const row of effortRes.rows) {
+        if (row.best_watts == null) continue;
+        bySeconds.set(Number(row.seconds), Math.round(Number(row.best_watts)));
+      }
+      activityCurve = DURATIONS
+        .filter(d => (bySeconds.get(d.s) ?? 0) > 0)
+        .map(d => ({ label: d.label, power: bySeconds.get(d.s)! }));
+    } else {
+      // Not warmed into best_power_efforts yet (freshly synced, or a ride whose
+      // power stream yields no non-null bests). Fall back to the stream so the
+      // curve is still correct rather than empty.
+      const streamRes = await client.query(
+        'SELECT watts FROM activity_streams WHERE activity_id = $1',
+        [id],
+      );
+      const watts: number[] | null = streamRes.rows[0]?.watts ?? null;
+      activityCurve = watts ? computeCurve(watts) : [];
+    }
+
     const ftp = effectiveFtp(profile);
 
     if (compare === 'none') {
@@ -85,7 +121,6 @@ export async function GET(
 
     // Comparison curve from precomputed best_power_efforts — a few dozen
     // scalar rows instead of raw watts arrays for every ride in the period.
-    await ensureBestPowerTableForRead();
     const clause = periodToClause(compare);
     const compRes = await client.query<{ seconds: number; power: string }>(`
       SELECT bpe.seconds, MAX(bpe.best_watts) AS power

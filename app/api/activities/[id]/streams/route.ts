@@ -18,6 +18,20 @@ export async function GET(
 
   const client = await pool.connect();
   try {
+    // Callers treat a missing time_s as "not synced yet" and discard the whole
+    // payload before triggering a backfill, so check for it before reading the
+    // arrays — otherwise every view of an unsynced activity ships ~300 KB out
+    // of the database purely to throw it away.
+    const ready = await client.query<{ has_time: boolean }>(
+      `SELECT COALESCE(array_length(time_s, 1), 0) > 0 AS has_time
+         FROM activity_streams WHERE activity_id = $1`,
+      [activityId]
+    );
+
+    if (ready.rows.length === 0 || !ready.rows[0].has_time) {
+      return Response.json({ streams: null });
+    }
+
     const res = await client.query(
       `SELECT watts, hr, altitude_m, distance_km, latlng, time_s
        FROM activity_streams WHERE activity_id = $1`,

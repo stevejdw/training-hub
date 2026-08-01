@@ -242,6 +242,16 @@ export async function warmMissingActivities(
             start_date = COALESCE(best_power_efforts.start_date, EXCLUDED.start_date),
             sport_type = COALESCE(best_power_efforts.sport_type, EXCLUDED.sport_type)
         `, valueParams);
+      } else {
+        // Nothing insertable — the watts array is non-empty but holds no usable
+        // power (all nulls or zeros). Without a marker row this activity still
+        // matches the NOT EXISTS above, so every later run would re-read its
+        // full watts array forever. Record the null result so it settles.
+        await client.query(`
+          INSERT INTO best_power_efforts (activity_id, seconds, best_watts, start_date, sport_type)
+          VALUES ($1, $2, NULL, $3::timestamptz, $4)
+          ON CONFLICT (activity_id, seconds) DO NOTHING
+        `, [id, BEST_POWER_INTERVALS[0].seconds, meta?.start_date ?? null, meta?.sport_type ?? null]);
       }
       processed++;
     }
