@@ -144,13 +144,50 @@ async function ensureTable(client: PoolClient) {
   _tableReady = true;
 }
 
+// The `data` blob is ~70 KB on the wire — almost all of it event route
+// geometry (downsampled distance/altitude/latlng arrays stored inline). Because
+// getProfile() runs on nearly every request, re-reading it each time made this
+// query the single largest source of Neon egress. We cache it per warm instance
+// and validate against `updated_at` (a ~30-byte read) so the 70 KB payload only
+// leaves the database when the profile actually changed. See lib/db-metrics.ts.
+const PROFILE_TTL_MS = 10_000;
+let _cache: { data: Partial<AthleteProfile>; updatedAt: string; checkedAt: number } | null = null;
+
 export async function getProfile(): Promise<AthleteProfile> {
+  // Fast path: within the TTL, skip the DB entirely (collapses the many
+  // getProfile() calls a single page load fans out across API routes).
+  if (_cache && Date.now() - _cache.checkedAt < PROFILE_TTL_MS) {
+    return { ...DEFAULTS, ..._cache.data };
+  }
+
   const client = await pool.connect();
   try {
     await ensureTable(client);
-    const res = await client.query(`SELECT data FROM athlete_profile WHERE id = 1`);
-    if (res.rows.length === 0) return DEFAULTS;
-    return { ...DEFAULTS, ...res.rows[0].data };
+
+    // Cheap freshness probe before the expensive blob read.
+    const meta = await client.query<{ updated_at: Date | null }>(
+      `SELECT updated_at FROM athlete_profile WHERE id = 1`
+    );
+    if (meta.rows.length === 0) {
+      _cache = null;
+      return DEFAULTS;
+    }
+    const updatedAt = meta.rows[0].updated_at
+      ? new Date(meta.rows[0].updated_at).toISOString()
+      : '';
+
+    // Unchanged since we last read it — serve the cached blob, no 70 KB egress.
+    if (updatedAt && _cache && _cache.updatedAt === updatedAt) {
+      _cache.checkedAt = Date.now();
+      return { ...DEFAULTS, ..._cache.data };
+    }
+
+    const res = await client.query<{ data: Partial<AthleteProfile> }>(
+      `SELECT data FROM athlete_profile WHERE id = 1`
+    );
+    const data = res.rows[0]?.data ?? {};
+    _cache = { data, updatedAt, checkedAt: Date.now() };
+    return { ...DEFAULTS, ...data };
   } finally {
     client.release();
   }
@@ -160,11 +197,18 @@ export async function saveProfile(profile: AthleteProfile): Promise<void> {
   const client = await pool.connect();
   try {
     await ensureTable(client);
-    await client.query(`
+    const res = await client.query<{ updated_at: Date }>(`
       INSERT INTO athlete_profile (id, data, updated_at)
       VALUES (1, $1::jsonb, NOW())
       ON CONFLICT (id) DO UPDATE SET data = $1::jsonb, updated_at = NOW()
+      RETURNING updated_at
     `, [JSON.stringify(profile)]);
+    // Prime this instance's cache and advance updated_at so other instances see
+    // the change on their next probe and pull the new blob exactly once.
+    const updatedAt = res.rows[0]?.updated_at
+      ? new Date(res.rows[0].updated_at).toISOString()
+      : '';
+    _cache = { data: profile, updatedAt, checkedAt: Date.now() };
   } finally {
     client.release();
   }
