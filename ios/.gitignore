@@ -1,13 +1,14 @@
 App/build
 App/Pods
 App/output
-App/App/public
 DerivedData
 xcuserdata
 
 # Cordova plugins for Capacitor
 capacitor-cordova-ios-plugins
 
-# Generated Config files
-App/App/capacitor.config.json
-App/App/config.xml
+# Note: App/App/{public,capacitor.config.json,config.xml} are Capacitor-
+# generated but committed on purpose — the Xcode project bundles them as Copy
+# Bundle Resources, and Xcode Cloud has no reliable `cap sync` step to
+# regenerate them. Re-run `npx cap sync ios` and commit if capacitor.config.ts
+# changes.

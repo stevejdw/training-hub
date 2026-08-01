@@ -1,0 +1,27 @@
+{
+	"appId": "au.com.dewit.traininghub",
+	"appName": "Training Hub",
+	"webDir": "capacitor/www",
+	"server": {
+		"url": "https://training-hub-gamma.vercel.app",
+		"errorPath": "error.html"
+	},
+	"ios": {
+		"contentInset": "never",
+		"backgroundColor": "#030712"
+	},
+	"plugins": {
+		"SplashScreen": {
+			"launchShowDuration": 1500,
+			"launchAutoHide": true,
+			"backgroundColor": "#030712",
+			"showSpinner": false
+		}
+	},
+	"packageClassList": [
+		"BiometricAuthNative",
+		"AppPlugin",
+		"SplashScreenPlugin",
+		"StatusBarPlugin"
+	]
+}
