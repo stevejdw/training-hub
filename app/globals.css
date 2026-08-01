@@ -315,6 +315,11 @@ body {
   .mobile-bottom-nav {
     padding-bottom: env(safe-area-inset-bottom);
   }
+  /* The safe-area inset already clears the home indicator; the inner
+     div's pb-4 would stack on top of it and leave a large empty gap. */
+  .mobile-bottom-nav-inner {
+    padding-bottom: 0;
+  }
 }
 
 /* ── Capacitor iOS shell (html.native-app, set by NativeShell) ──
@@ -343,6 +348,12 @@ html.native-app body::before {
 
 html.native-app .mobile-bottom-nav {
   padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Same reasoning as the standalone-PWA case above: don't stack the
+   inner div's pb-4 on top of the safe-area inset. */
+html.native-app .mobile-bottom-nav-inner {
+  padding-bottom: 0;
 }
 
 /* Smooth momentum scrolling on iOS for any scroll container */

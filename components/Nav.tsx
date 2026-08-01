@@ -106,7 +106,7 @@ export default function Nav() {
 
       {/* ── Mobile: fixed bottom tab bar ── */}
       <nav className="mobile-bottom-nav md:hidden fixed bottom-0 left-0 right-0 z-50 bg-gray-950 border-t border-gray-800">
-        <div className="flex h-[73px] pb-4">
+        <div className="mobile-bottom-nav-inner flex h-[73px] pb-4">
           {mobileItems.map(({ key, href, label, icon, matchPrefixes }) => {
             const prefixes = key === 'more' ? mobileMore : matchPrefixes;
             const active = isActive(prefixes, pathname);
