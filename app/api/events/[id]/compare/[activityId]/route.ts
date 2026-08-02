@@ -1,6 +1,6 @@
 import pool from '@/lib/db';
 
-import { getProfile, effectiveFtp } from '@/lib/profile';
+import { getProfileFull, effectiveFtp } from '@/lib/profile';
 import {
   buildPacingSegments,
   matchPacingSegmentToActivityStream,
@@ -61,7 +61,7 @@ export async function GET(
   const { id: eventId, activityId } = await params;
   const url = new URL(req.url);
 
-  const profile = await getProfile();
+  const profile = await getProfileFull(); // needs event.route geometry
   const event   = profile.events.find(e => (e.id ?? '') === eventId);
   if (!event || !event.route) {
     return Response.json({ error: 'Event or route not found' }, { status: 404 });

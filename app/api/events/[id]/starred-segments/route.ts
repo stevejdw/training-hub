@@ -1,5 +1,5 @@
 import pool from '@/lib/db';
-import { getProfile } from '@/lib/profile';
+import { getProfileFull } from '@/lib/profile';
 import { findNearestRouteKmWithDist } from '@/lib/pacing';
 
 export const runtime = 'nodejs';
@@ -21,7 +21,7 @@ export async function GET(
 ) {
   const { id: eventId } = await params;
 
-  const profile = await getProfile();
+  const profile = await getProfileFull(); // needs event.route geometry
   const event   = profile.events.find(e => (e.id ?? '') === eventId);
   if (!event || !event.route) {
     return Response.json({ error: 'Event or route not found' }, { status: 404 });

@@ -1,6 +1,6 @@
 import type { PoolClient } from 'pg';
 import pool from '@/lib/db';
-import { getProfile, saveProfile } from '@/lib/profile';
+import { getProfileFull, saveProfile } from '@/lib/profile';
 
 export const runtime = 'nodejs';
 
@@ -92,7 +92,7 @@ export async function GET(
 ) {
   const { id: eventId } = await params;
 
-  const profile = await getProfile();
+  const profile = await getProfileFull(); // needs event.route + saves profile back
   const event   = profile.events.find(e => (e.id ?? '') === eventId);
   if (!event) return Response.json({ error: 'Event not found' }, { status: 404 });
 
@@ -184,7 +184,7 @@ export async function PATCH(
   const { id: eventId } = await params;
   const body = await req.json() as { linked_activity_ids: number[] };
 
-  const profile = await getProfile();
+  const profile = await getProfileFull(); // needs event.route + saves profile back
   const events  = profile.events.map(e =>
     (e.id ?? '') === eventId
       ? { ...e, linked_activity_ids: body.linked_activity_ids }

@@ -1,6 +1,6 @@
 import { PoolClient } from 'pg';
 import pool from '@/lib/db';
-import { getProfile, saveProfile } from '@/lib/profile';
+import { getProfileFull, saveProfile } from '@/lib/profile';
 
 export const runtime    = 'nodejs';
 export const maxDuration = 60;
@@ -64,7 +64,7 @@ export async function GET() {
  * Returns { synced, oldestDate, newestDate }.
  */
 export async function POST(req: Request) {
-  const profile = await getProfile();
+  const profile = await getProfileFull(); // read-modify-write: preserve event.route on save
 
   const athleteId = profile.intervals_athlete_id?.trim();
   const apiKey    = profile.intervals_api_key?.trim();

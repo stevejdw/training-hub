@@ -1,10 +1,12 @@
-import { getProfile, saveProfile } from '@/lib/profile';
+import { getProfileFull, saveProfile } from '@/lib/profile';
 
 export const runtime = 'nodejs';
 
 export async function GET() {
   try {
-    const profile = await getProfile();
+    // Full profile: the client edits this object and PUTs it back, so it must
+    // include events[].route or saveProfile would drop the geometry.
+    const profile = await getProfileFull();
     return Response.json(profile);
   } catch (err) {
     return Response.json({ error: String(err) }, { status: 500 });
