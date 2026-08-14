@@ -94,6 +94,8 @@ export async function syncPowerMeters(oldest: string, newest: string): Promise<n
   try {
     await client.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS power_meter TEXT`);
     await client.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS power_meter_serial TEXT`);
+    // Set by an in-app power deletion — don't re-attribute a meter to it.
+    await client.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS power_deleted BOOLEAN NOT NULL DEFAULT FALSE`);
 
     const result = await client.query(`
       UPDATE activities a
@@ -101,6 +103,7 @@ export async function syncPowerMeters(oldest: string, newest: string): Promise<n
           power_meter_serial = u.serial
       FROM unnest($1::timestamptz[], $2::text[], $3::text[]) AS u(ts, pm, serial)
       WHERE ABS(EXTRACT(EPOCH FROM (a.start_date - u.ts))) < 60
+        AND COALESCE(a.power_deleted, FALSE) = FALSE
         AND (a.power_meter IS DISTINCT FROM u.pm
              OR a.power_meter_serial IS DISTINCT FROM u.serial)
     `, [timestamps, displayNames, serials]);

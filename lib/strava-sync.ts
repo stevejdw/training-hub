@@ -1,6 +1,7 @@
 import pool from './db';
 import { getProfile, effectiveFtp } from './profile';
 import { computeBestPower, BEST_POWER_INTERVALS, BestPowerResult } from './best-power';
+import { getDeletionFlags, filterTombstoned } from './activity-delete';
 
 const CLIENT_ID     = process.env.STRAVA_CLIENT_ID!;
 const CLIENT_SECRET = process.env.STRAVA_CLIENT_SECRET!;
@@ -159,7 +160,11 @@ export async function syncHistoricalBatch(beforeEpoch?: number): Promise<{
   // this endpoint well within the 60s Vercel timeout even for 100 activities.
   const client = await pool.connect();
   try {
+    // Don't resurrect activities the user deleted in the app.
+    const tombstoned = await filterTombstoned(client, list.map(a => Number(a.id)));
+
     for (const a of list) {
+      if (tombstoned.has(Number(a.id))) continue;
       const np      = (a.weighted_average_watts as number | null) ?? null;
       const movingT = a.moving_time as number;
       const avgHr   = (a.average_heartrate as number | null) ?? null;
@@ -243,8 +248,10 @@ export async function syncRecentActivities(): Promise<{ synced: number; names: s
   const names: string[] = [];
 
   for (const a of list) {
-    await syncActivity(Number(a.id));
-    names.push(String(a.name));
+    // syncActivity is a no-op for deleted activities, but skipping here also
+    // saves the Strava detail/stream round-trips.
+    const synced = await syncActivity(Number(a.id));
+    if (synced) names.push(String(a.name));
   }
 
   return { synced: names.length, names };
@@ -308,7 +315,23 @@ export async function ensureSegmentTables(): Promise<void> {
   }
 }
 
-export async function syncActivity(activityId: number): Promise<void> {
+/**
+ * Import one activity from Strava in full (detail, streams, laps, best power).
+ * Returns false when the activity was deleted in the app and was therefore
+ * skipped rather than re-imported.
+ */
+export async function syncActivity(activityId: number): Promise<boolean> {
+  // Respect in-app deletions before spending any Strava API calls.
+  const flagClient = await pool.connect();
+  let flags;
+  try {
+    flags = await getDeletionFlags(flagClient, activityId);
+  } finally {
+    flagClient.release();
+  }
+  if (flags.tombstoned) return false;
+  const { powerDeleted, hrDeleted } = flags;
+
   const token   = await getStravaToken();
   const profile = await getProfile();
   const ftp     = effectiveFtp(profile);
@@ -320,9 +343,16 @@ export async function syncActivity(activityId: number): Promise<void> {
   if (!aRes.ok) throw new Error(`Strava activity fetch failed: ${aRes.status}`);
   const a = await aRes.json() as Record<string, unknown>;
 
-  const np         = (a.weighted_average_watts as number | null) ?? null;
+  // Channels the user deleted in the app are dropped from the Strava payload
+  // rather than written back over the top of the deletion.
+  const avgWatts   = powerDeleted ? null : (a.average_watts as number | null) ?? null;
+  const maxWatts   = powerDeleted ? null : (a.max_watts as number | null) ?? null;
+  const kj         = powerDeleted ? null : (a.kilojoules as number | null) ?? null;
+  const np         = powerDeleted ? null : (a.weighted_average_watts as number | null) ?? null;
   const movingTime = a.moving_time as number;
-  const avgHr      = (a.average_heartrate as number | null) ?? null;
+  const avgHr      = hrDeleted ? null : (a.average_heartrate as number | null) ?? null;
+  const maxHr      = hrDeleted ? null : (a.max_heartrate as number | null) ?? null;
+  const suffer     = hrDeleted ? null : (a.suffer_score as number | null) ?? null;
   const hrss       = (!np && avgHr) ? calculateHrss(movingTime, avgHr) : null;
   const tss        = np ? calculateTss(movingTime, np, ftp) : hrss;
   const ifVal      = np ? Math.round((np / ftp) * 1000) / 1000 : null;
@@ -375,9 +405,9 @@ export async function syncActivity(activityId: number): Promise<void> {
       a.start_date,
       a.elapsed_time, movingTime,
       a.distance, a.total_elevation_gain,
-      a.average_watts, np, a.max_watts,
-      a.kilojoules, a.average_heartrate, a.max_heartrate,
-      a.suffer_score, a.trainer ?? false, a.average_speed,
+      avgWatts, np, maxWatts,
+      kj, avgHr, maxHr,
+      suffer, a.trainer ?? false, a.average_speed,
       tss, hrss, ifVal, np, polyline,
       gearId,
     ]);
@@ -404,8 +434,8 @@ export async function syncActivity(activityId: number): Promise<void> {
     ]);
 
     const streamData  = streamRes.ok ? await streamRes.json() as Record<string, unknown> : null;
-    const powerStream = (streamData?.watts     as { data: number[] } | null)?.data ?? null;
-    const hrStream    = (streamData?.heartrate as { data: number[] } | null)?.data ?? null;
+    const powerStream = powerDeleted ? null : (streamData?.watts     as { data: number[] } | null)?.data ?? null;
+    const hrStream    = hrDeleted    ? null : (streamData?.heartrate as { data: number[] } | null)?.data ?? null;
     const altRaw      = (streamData?.altitude  as { data: number[] } | null)?.data ?? null;
     const distRaw     = (streamData?.distance  as { data: number[] } | null)?.data ?? null;
     const latlngRaw   = (streamData?.latlng    as { data: number[][] } | null)?.data ?? null;
@@ -490,8 +520,9 @@ export async function syncActivity(activityId: number): Promise<void> {
           lap.id, activityId,
           lap.name, lap.lap_index,
           lap.elapsed_time, lap.moving_time, lap.distance,
-          lap.average_watts, lapNp,
-          lap.average_heartrate, lap.max_heartrate,
+          powerDeleted ? null : lap.average_watts, lapNp,
+          hrDeleted ? null : lap.average_heartrate,
+          hrDeleted ? null : lap.max_heartrate,
           lap.average_speed, lap.total_elevation_gain,
           startIdx, endIdx,
         ]);
@@ -520,9 +551,9 @@ export async function syncActivity(activityId: number): Promise<void> {
         se.elapsed_time, se.moving_time,
         se.start_date,
         se.distance,
-        (se.average_watts as number | null) ?? null,
-        (se.average_heartrate as number | null) ?? null,
-        (se.max_heartrate as number | null) ?? null,
+        powerDeleted ? null : (se.average_watts as number | null) ?? null,
+        hrDeleted    ? null : (se.average_heartrate as number | null) ?? null,
+        hrDeleted    ? null : (se.max_heartrate as number | null) ?? null,
         (se.pr_rank as number | null) ?? null,
         (se.kom_rank as number | null) ?? null,
       ]);
@@ -534,4 +565,6 @@ export async function syncActivity(activityId: number): Promise<void> {
   } finally {
     client.release();
   }
+
+  return true;
 }

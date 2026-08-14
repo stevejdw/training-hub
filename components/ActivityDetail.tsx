@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { sportLabel, sportColor } from '@/lib/sport-types';
 import ZoneDistribution from './ZoneDistribution';
@@ -58,6 +59,23 @@ const INTERVALS: { label: string; seconds: number }[] = [
 const ActivityMap = dynamic(() => import('./ActivityMap'), { ssr: false });
 
 type Tab = 'stats' | 'laps' | 'power-hr' | 'segments';
+
+type DeleteScope = 'activity' | 'power' | 'hr';
+
+const DELETE_ACTIONS: Record<DeleteScope, { label: string; confirm: string }> = {
+  activity: {
+    label:   'Delete activity',
+    confirm: 'Delete this activity along with its laps, streams, segment efforts and best-power records? It will not be re-imported on the next Strava sync.',
+  },
+  power: {
+    label:   'Delete power data',
+    confirm: 'Remove all power data from this activity — average/normalised/max watts, the power stream, best-power efforts and lap power? TSS falls back to heart rate where available.',
+  },
+  hr: {
+    label:   'Delete heart rate data',
+    confirm: 'Remove all heart rate data from this activity — average/max HR, the HR stream, lap HR and suffer score?',
+  },
+};
 
 interface SegmentEffort {
   id: number;
@@ -152,7 +170,41 @@ export default function ActivityDetail({ id }: { id: string }) {
   const [editingName, setEditingName] = useState(false);
   const [nameDraft,   setNameDraft]   = useState('');
   const [hoverPoint,  setHoverPoint]  = useState<[number, number] | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<DeleteScope | null>(null);
+  const [deleting,      setDeleting]      = useState(false);
+  const [deleteError,   setDeleteError]   = useState<string | null>(null);
   const isDesktop = useIsDesktop();
+  const router = useRouter();
+
+  async function runDelete(scope: DeleteScope) {
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      const r = await fetch(`/api/activities/${id}?scope=${scope}`, { method: 'DELETE' });
+      if (!r.ok) {
+        const body = await r.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? `Request failed (${r.status})`);
+      }
+      if (scope === 'activity') {
+        router.replace('/activities');
+        router.refresh();
+        return;
+      }
+      // Re-read the activity so every panel reflects the cleared fields.
+      const d = await fetch(`/api/activities/${id}`).then(x => x.json());
+      setActivity(d.activity);
+      setLaps(d.laps ?? []);
+      setBpResults([]);
+      setCurveData(null);
+      setSegments([]);
+      setSegFetched(false);
+      setPendingDelete(null);
+    } catch (e) {
+      setDeleteError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   async function saveName() {
     if (!activity) return;
@@ -388,10 +440,67 @@ export default function ActivityDetail({ id }: { id: string }) {
         </div>
   );
 
+  const hasPower = activity.average_watts != null || activity.normalized_power != null || activity.max_watts != null;
+  const hasHr    = activity.average_heartrate != null || activity.max_heartrate != null;
+
+  const deleteScopes: DeleteScope[] = [
+    ...(hasPower ? ['power' as const] : []),
+    ...(hasHr    ? ['hr'    as const] : []),
+    'activity',
+  ];
+
+  const dangerZone = (
+    <div className="mt-8 rounded-xl border border-red-900/50 bg-red-950/20 p-4">
+      <p className="text-xs font-semibold text-red-400 uppercase tracking-wider mb-1">Delete data</p>
+      <p className="text-xs text-gray-500 mb-3">
+        Deletions are permanent and are remembered, so a Strava re-sync won&apos;t bring the data back.
+      </p>
+
+      {pendingDelete ? (
+        <div className="space-y-3">
+          <p className="text-sm text-gray-300">{DELETE_ACTIONS[pendingDelete].confirm}</p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => runDelete(pendingDelete)}
+              disabled={deleting}
+              className="px-3 py-2 rounded-lg bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white text-sm font-semibold transition-colors"
+            >
+              {deleting ? 'Deleting…' : `Yes, ${DELETE_ACTIONS[pendingDelete].label.toLowerCase()}`}
+            </button>
+            <button
+              onClick={() => { setPendingDelete(null); setDeleteError(null); }}
+              disabled={deleting}
+              className="px-3 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 disabled:opacity-50 text-gray-300 text-sm font-medium transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          {deleteScopes.map(scope => (
+            <button
+              key={scope}
+              onClick={() => { setPendingDelete(scope); setDeleteError(null); }}
+              className="px-3 py-2 rounded-lg border border-red-800/60 bg-red-900/20 hover:bg-red-900/40 text-red-300 text-sm font-medium transition-colors"
+            >
+              {DELETE_ACTIONS[scope].label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {deleteError && (
+        <p className="mt-3 text-sm text-red-400">{deleteError}</p>
+      )}
+    </div>
+  );
+
   const tabPanels = (
     <>
         {/* Tab: Stats */}
         {tab === 'stats' && (
+          <>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8">
             <div>
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Performance</p>
@@ -414,6 +523,8 @@ export default function ActivityDetail({ id }: { id: string }) {
               <StatRow label="Max Heart Rate" value={activity.max_heartrate ? `${Math.round(activity.max_heartrate)} bpm` : null} />
             </div>
           </div>
+          {dangerZone}
+          </>
         )}
 
         {/* Tab: Laps */}

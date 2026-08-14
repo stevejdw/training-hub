@@ -1,5 +1,6 @@
 import pool from '@/lib/db';
 import { getStravaToken } from '@/lib/strava-sync';
+import { getDeletionFlags } from '@/lib/activity-delete';
 
 export const runtime = 'nodejs';
 
@@ -8,6 +9,18 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+
+  // Don't pull back streams the user deleted in the app.
+  const flagClient = await pool.connect();
+  let flags;
+  try {
+    flags = await getDeletionFlags(flagClient, Number(id));
+  } finally {
+    flagClient.release();
+  }
+  if (flags.tombstoned) {
+    return Response.json({ error: 'not found' }, { status: 404 });
+  }
 
   const token = await getStravaToken();
 
@@ -22,8 +35,8 @@ export async function POST(
 
   const streamData = await streamRes.json() as Record<string, unknown>;
   const availableKeys = Object.keys(streamData);
-  const watts = (streamData?.watts     as { data: number[] } | null)?.data ?? null;
-  const hr    = (streamData?.heartrate as { data: number[] } | null)?.data ?? null;
+  const watts = flags.powerDeleted ? null : (streamData?.watts     as { data: number[] } | null)?.data ?? null;
+  const hr    = flags.hrDeleted    ? null : (streamData?.heartrate as { data: number[] } | null)?.data ?? null;
 
   if (!watts && !hr) {
     return Response.json({
