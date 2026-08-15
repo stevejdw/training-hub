@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "garmin:login": "uv run --python 3.12 --with garminconnect==0.3.10 --with psycopg2-binary==2.9.12 --with cryptography==50.0.0 scripts/garmin_login.py"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.89.0",

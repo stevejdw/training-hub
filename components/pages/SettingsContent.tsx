@@ -82,15 +82,14 @@ export default function SettingsContent() {
       .finally(() => setWellnessLoading(false));
   }, []);
 
-  // Pre-fill intervals credentials from loaded profile
+  // Pre-fill the athlete ID from the loaded profile. The API key is never sent
+  // to the browser — the field stays blank and an empty value means "leave the
+  // stored key alone" (see app/api/profile/route.ts).
   useEffect(() => {
     if (profile) {
-      setIntervalsCreds({
-        id:  profile.intervals_athlete_id ?? '',
-        key: profile.intervals_api_key    ?? '',
-      });
+      setIntervalsCreds({ id: profile.intervals_athlete_id ?? '', key: '' });
     }
-  }, [profile?.intervals_athlete_id, profile?.intervals_api_key]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [profile?.intervals_athlete_id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function changeTheme(t: ThemePreference) {
     setTheme(t);
@@ -235,20 +234,22 @@ export default function SettingsContent() {
 
   async function saveIntervalsCreds() {
     update('intervals_athlete_id', intervalsCreds.id.trim());
-    update('intervals_api_key',    intervalsCreds.key.trim());
+    // Only send a key when one was actually typed. An empty field means
+    // "unchanged", so saving the athlete ID alone can't wipe the stored key.
+    if (intervalsCreds.key.trim()) update('intervals_api_key', intervalsCreds.key.trim());
     await save();
   }
 
   async function runWellnessSync(days: number) {
     if (wellnessBusy) return;
-    // Persist credentials first if they differ from profile
+    // Persist credentials first if the ID changed or a new key was typed. The
+    // stored key is never readable here, so a blank field can't be compared —
+    // it just means "unchanged".
     if (
-      intervalsCreds.id.trim()  !== (profile?.intervals_athlete_id ?? '') ||
-      intervalsCreds.key.trim() !== (profile?.intervals_api_key    ?? '')
+      intervalsCreds.id.trim() !== (profile?.intervals_athlete_id ?? '') ||
+      intervalsCreds.key.trim()
     ) {
-      update('intervals_athlete_id', intervalsCreds.id.trim());
-      update('intervals_api_key',    intervalsCreds.key.trim());
-      await save();
+      await saveIntervalsCreds();
     }
 
     setWellnessBusy(true);
@@ -749,8 +750,13 @@ export default function SettingsContent() {
               value={intervalsCreds.key}
               onChange={e => setIntervalsCreds(c => ({ ...c, key: e.target.value }))}
               className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-orange-500 font-mono"
-              placeholder="••••••••••••••••"
+              placeholder={profile?.intervals_api_key_set ? '•••••••• (saved)' : '••••••••••••••••'}
             />
+            <p className="text-[10px] text-gray-500 mt-1">
+              {profile?.intervals_api_key_set
+                ? 'A key is saved. Leave blank to keep it, or type a new one to replace it.'
+                : 'No key saved yet.'}
+            </p>
           </div>
         </div>
 
@@ -776,7 +782,7 @@ export default function SettingsContent() {
         <div className="flex flex-wrap gap-2">
           <button
             onClick={() => runWellnessSync(90)}
-            disabled={wellnessBusy || !intervalsCreds.id || !intervalsCreds.key}
+            disabled={wellnessBusy || !intervalsCreds.id || !(intervalsCreds.key || profile?.intervals_api_key_set)}
             className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-white text-sm font-medium transition-colors"
           >
             {wellnessBusy ? (
@@ -791,14 +797,14 @@ export default function SettingsContent() {
           </button>
           <button
             onClick={() => runWellnessSync(365)}
-            disabled={wellnessBusy || !intervalsCreds.id || !intervalsCreds.key}
+            disabled={wellnessBusy || !intervalsCreds.id || !(intervalsCreds.key || profile?.intervals_api_key_set)}
             className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-gray-800 hover:bg-gray-700 disabled:opacity-50 text-gray-300 text-sm font-medium transition-colors border border-gray-700"
           >
             Backfill 1 year
           </button>
           <button
             onClick={saveIntervalsCreds}
-            disabled={saving || !intervalsCreds.id || !intervalsCreds.key}
+            disabled={saving || !intervalsCreds.id || !(intervalsCreds.key || profile?.intervals_api_key_set)}
             className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-orange-500/10 hover:bg-orange-500/20 disabled:opacity-50 text-orange-400 text-sm font-medium transition-colors border border-orange-500/30"
           >
             Save credentials

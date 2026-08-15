@@ -86,6 +86,9 @@ export interface AthleteProfile {
   // intervals.icu integration
   intervals_athlete_id?: string;
   intervals_api_key?: string;
+  /** Response-only: GET /api/profile reports whether a key is stored instead
+   *  of returning it. Stripped before persisting — never in the JSONB blob. */
+  intervals_api_key_set?: boolean;
   intervals_last_synced?: string; // ISO date of most recent wellness record synced
   // Weekly TSS targets configuration (for rolling 4-week chart)
   tss_plan?: TssPlanConfig;

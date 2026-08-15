@@ -1,0 +1,32 @@
+name: Garmin probe (read-only)
+
+# Manual only, deliberately. This is the diagnostic you run to prove CI can use
+# the token bundle, and the one you run BEFORE bumping the pinned
+# garminconnect version — not something that should be on a schedule.
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # Exact pins, not ranges. Garmin's unofficial SSO flow breaks roughly
+      # annually and the fix always arrives as a new garminconnect release; a
+      # floating version means a transitive upgrade can break a working job on
+      # a day you weren't touching Garmin at all. Bump deliberately, and run
+      # this probe first.
+      - name: Install dependencies
+        run: pip install 'garminconnect==0.3.10' 'psycopg2-binary==2.9.12' 'cryptography==50.0.0'
+
+      - name: Run probe
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          APP_SECRETS_KEY: ${{ secrets.APP_SECRETS_KEY }}
+        run: python .github/scripts/garmin_probe.py
