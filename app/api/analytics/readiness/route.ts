@@ -34,6 +34,10 @@ function toIntOrNull(v: unknown): number | null {
 
 async function autoSyncWellness(): Promise<void> {
   const profile = await getProfile();
+  // Respect the Settings toggle. intervals.icu is independent of the primary
+  // activity source because it supplies no activities — only wellness and
+  // power-meter device names.
+  if (profile.intervals_wellness_enabled === false) return;
   const athleteId = profile.intervals_athlete_id?.trim();
   const apiKey    = profile.intervals_api_key?.trim();
   if (!athleteId || !apiKey) return;

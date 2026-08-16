@@ -172,10 +172,37 @@ def connect_db():
     )
     raise SystemExit(0)
 
+def strava_ingest_enabled(cur) -> bool:
+    """Mirror of lib/sync-sources.ts. Exactly one provider writes activities at
+    a time; if Garmin is primary this cron must not also insert rows, or the
+    same ride lands twice and double-counts TSS into CTL/ATL/TSB.
+
+    Defaults to enabled when the setting is absent, so nothing stops working
+    before the user has chosen a source."""
+    try:
+        cur.execute("SELECT data->>'primary_source' FROM athlete_profile WHERE id = 1")
+        row = cur.fetchone()
+    except Exception as e:
+        print(f"Could not read primary_source ({e}) — assuming Strava is enabled.")
+        return True
+    return not (row and row[0] == "garmin")
+
+
 def sync():
-    token = get_access_token()
     conn = connect_db()
     cur = conn.cursor()
+
+    if not strava_ingest_enabled(cur):
+        print(
+            "Strava ingest is off — primary source is set to Garmin.\n"
+            "Change it in Settings -> Data sources to re-enable this sync."
+        )
+        cur.close()
+        conn.close()
+        return
+
+    # Fetched after the gate so a disabled sync spends no Strava API calls.
+    token = get_access_token()
 
     cur.execute("SELECT start_date FROM activities ORDER BY start_date DESC LIMIT 1")
     row = cur.fetchone()

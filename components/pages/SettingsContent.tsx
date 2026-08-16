@@ -643,6 +643,76 @@ export default function SettingsContent() {
       {/* Training Plans */}
       <TrainingPlansSettings />
 
+      {/* Data sources — exactly one provider writes activities */}
+      <div className="bg-gray-900 rounded-xl p-5 space-y-4 border border-gray-800">
+        <div>
+          <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Data Sources</h2>
+          <p className="text-xs text-gray-500 mt-1">
+            One provider supplies activities at a time. Running both would let the same
+            ride land twice and double-count TSS, which skews Fitness &amp; Freshness.
+          </p>
+        </div>
+
+        <div className="space-y-2">
+          {([
+            // Garmin stays unselectable until its activity sync exists. Turning
+            // it on before then would switch Strava off with nothing to replace
+            // it — a silent blackout rather than a failover.
+            { id: 'garmin', label: 'Garmin', ready: false,
+              hint: 'Direct from Garmin Connect. Full FIT detail and native wellness.' },
+            { id: 'strava', label: 'Strava', ready: true,
+              hint: 'Real-time webhook. Currently the only provider that writes activities.' },
+          ] as const).map(opt => {
+            const active = (profile?.primary_source ?? 'strava') === opt.id;
+            return (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={async () => { update('primary_source', opt.id); await save(); }}
+                disabled={saving || !opt.ready}
+                aria-pressed={active}
+                title={opt.ready ? undefined : 'Garmin activity sync is not built yet'}
+                className={`w-full text-left px-4 py-3 rounded-lg border transition-colors ${
+                  active
+                    ? 'bg-orange-600/15 border-orange-500 text-white'
+                    : 'bg-gray-800 border-gray-700 text-gray-300 hover:border-gray-600'
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">{opt.label}</span>
+                  {active && <span className="text-[10px] uppercase tracking-wider text-orange-400">Active</span>}
+                  {!opt.ready && <span className="text-[10px] uppercase tracking-wider text-gray-500">Coming soon</span>}
+                </div>
+                <p className="text-xs text-gray-500 mt-0.5">{opt.hint}</p>
+              </button>
+            );
+          })}
+        </div>
+
+        <p className="text-[11px] text-gray-500 border-t border-gray-800 pt-3">
+          Switching only changes which provider <em>writes</em> activities. Your Strava
+          login keeps working either way, and nothing already imported is removed.
+        </p>
+
+        {/* intervals.icu is wellness-only, so it's independent of the choice above */}
+        <label className="flex items-start gap-3 border-t border-gray-800 pt-4 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={profile?.intervals_wellness_enabled !== false}
+            onChange={async e => { update('intervals_wellness_enabled', e.target.checked); await save(); }}
+            disabled={saving}
+            className="mt-0.5 w-4 h-4 accent-orange-500"
+          />
+          <span>
+            <span className="text-sm text-gray-300">Use intervals.icu for wellness</span>
+            <span className="block text-xs text-gray-500 mt-0.5">
+              HRV, sleep and readiness, plus power-meter device names. Supplies no
+              activities, so this is independent of the source above.
+            </span>
+          </span>
+        </label>
+      </div>
+
       {/* Strava Connection */}
       <div className="bg-gray-900 rounded-xl p-5 space-y-4 border border-gray-800">
         <div>

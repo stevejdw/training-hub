@@ -84,6 +84,12 @@ export interface AthleteProfile {
   ai_training_plan_guidance?: string;
   ai_communication_style?: string;
   // intervals.icu integration
+  /** Which provider may write activities — see lib/sync-sources.ts. Ingest
+   *  only; Strava OAuth login is never gated on this. */
+  primary_source?: 'garmin' | 'strava';
+  /** intervals.icu wellness + power-meter attribution. Independent of
+   *  primary_source because intervals.icu supplies no activities. */
+  intervals_wellness_enabled?: boolean;
   intervals_athlete_id?: string;
   intervals_api_key?: string;
   /** Response-only: GET /api/profile reports whether a key is stored instead
