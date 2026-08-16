@@ -91,6 +91,14 @@ def fetch_page(token, page):
         time.sleep(910)
     return r.json()
 
+FATAL_DB_ERRORS = (
+    "password authentication failed",
+    'role "',
+    "does not exist",
+    "no pg_hba.conf entry",
+)
+
+
 def connect_db():
     """Open a Neon connection, retrying transient outages.
 
@@ -109,6 +117,13 @@ def connect_db():
                 keepalives_count=5,
             )
         except psycopg2.OperationalError as e:
+            if any(s in str(e).lower() for s in FATAL_DB_ERRORS):
+                raise SystemExit(
+                    f"DATABASE_URL is rejected by Neon: {e}\n"
+                    "This will not fix itself — the credential is stale or revoked.\n"
+                    "Update the DATABASE_URL GitHub secret from the current Neon "
+                    "connection string (and check the Vercel env var matches)."
+                )
             last_err = e
             print(f"DB connect failed (attempt {attempt + 1}/5): {e}")
             time.sleep(2 ** attempt + random.uniform(0, 1))

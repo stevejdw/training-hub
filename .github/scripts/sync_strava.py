@@ -123,12 +123,26 @@ def fetch_laps(token, activity_id):
     )
     return r.json() if r.status_code == 200 else []
 
+# Retrying cannot fix a stale credential, and exiting 0 turns a dead cron into
+# a green tick. A rotated Neon password once ran unnoticed for hours because
+# every run reported success while connecting to nothing.
+FATAL_DB_ERRORS = (
+    "password authentication failed",
+    'role "',
+    "does not exist",
+    "no pg_hba.conf entry",
+)
+
+
 def connect_db():
     """Open a Neon connection, retrying transient outages.
 
     Neon is serverless and can be briefly unreachable (cold start / network
     blip). connect_timeout bounds each attempt; if the DB stays unreachable we
-    skip this run (exit 0) rather than failing the job and emailing."""
+    skip this run (exit 0) rather than failing the job and emailing.
+
+    An authentication/authorisation failure is different — it will never
+    recover on its own, so it exits non-zero and fails the workflow."""
     last_err = None
     for attempt in range(5):
         try:
@@ -141,6 +155,13 @@ def connect_db():
                 keepalives_count=5,
             )
         except psycopg2.OperationalError as e:
+            if any(s in str(e).lower() for s in FATAL_DB_ERRORS):
+                raise SystemExit(
+                    f"DATABASE_URL is rejected by Neon: {e}\n"
+                    "This will not fix itself — the credential is stale or revoked.\n"
+                    "Update the DATABASE_URL GitHub secret from the current Neon "
+                    "connection string (and check the Vercel env var matches)."
+                )
             last_err = e
             print(f"DB connect failed (attempt {attempt + 1}/5): {e}")
             time.sleep(2 ** attempt + random.uniform(0, 1))

@@ -90,11 +90,30 @@ def decrypt_secret(nonce: bytes, ciphertext: bytes):
 
 # ---------------------------------------------------------------- database
 
+# A stale credential is not a transient outage: retrying can never fix it, and
+# exiting 0 turns a dead cron into a green tick. A rotated Neon password once
+# went unnoticed for hours because every workflow reported success while doing
+# nothing, so these must fail the job loudly.
+FATAL_DB_ERRORS = (
+    "password authentication failed",
+    "role \"",
+    "does not exist",
+    "no pg_hba.conf entry",
+)
+
+
+def _is_fatal_db_error(err) -> bool:
+    msg = str(err).lower()
+    return any(s.lower() in msg for s in FATAL_DB_ERRORS)
+
+
 def connect_db():
     """Open a Neon connection, retrying transient outages.
 
-    Same posture as sync_strava.py: Neon is serverless and can be briefly
-    unreachable, and a cron that skips a run is not worth an email."""
+    Neon is serverless and can be briefly unreachable, so a timed-out or
+    refused connection just skips the run (exit 0) rather than emailing. An
+    authentication or authorisation failure exits non-zero instead — see
+    FATAL_DB_ERRORS."""
     last_err = None
     for attempt in range(5):
         try:
@@ -107,6 +126,13 @@ def connect_db():
                 keepalives_count=5,
             )
         except psycopg2.OperationalError as e:
+            if _is_fatal_db_error(e):
+                raise SystemExit(
+                    f"DATABASE_URL is rejected by Neon: {e}\n"
+                    "This will not fix itself — the credential is stale or revoked.\n"
+                    "Update the DATABASE_URL GitHub secret from the current Neon "
+                    "connection string (and check the Vercel env var matches)."
+                )
             last_err = e
             print(f"DB connect failed (attempt {attempt + 1}/5): {e}")
             time.sleep(2 ** attempt + random.uniform(0, 1))

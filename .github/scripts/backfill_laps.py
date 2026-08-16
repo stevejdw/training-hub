@@ -22,6 +22,14 @@ LIMIT = int(os.environ.get("BACKFILL_LIMIT", "500"))
 # Stop with headroom before hitting daily limit so other app calls still work
 DAILY_LIMIT_STOP_AT = 950
 
+FATAL_DB_ERRORS = (
+    "password authentication failed",
+    'role "',
+    "does not exist",
+    "no pg_hba.conf entry",
+)
+
+
 def connect_db():
     """Open Neon connection with TCP keepalives so idle waits don't drop us."""
     last_err = None
@@ -36,6 +44,13 @@ def connect_db():
                 keepalives_count=5,
             )
         except psycopg2.OperationalError as e:
+            if any(s in str(e).lower() for s in FATAL_DB_ERRORS):
+                raise SystemExit(
+                    f"DATABASE_URL is rejected by Neon: {e}\n"
+                    "This will not fix itself — the credential is stale or revoked.\n"
+                    "Update the DATABASE_URL GitHub secret from the current Neon "
+                    "connection string (and check the Vercel env var matches)."
+                )
             last_err = e
             print(f"DB connect failed (attempt {attempt + 1}/5): {e}")
             time.sleep(2 ** attempt + random.uniform(0, 1))
