@@ -4,6 +4,16 @@ import { createSessionCookie } from '@/lib/auth';
 
 export const runtime = 'nodejs';
 
+/**
+ * Password login. The only way into the app.
+ *
+ * Previously this refused with 404 "connect Strava first" whenever the `users`
+ * table was empty, which made a third-party OAuth round-trip a prerequisite for
+ * signing in to a single-user app — and left no way back in if that row ever
+ * went missing. The session no longer depends on a Strava identity: the row is
+ * used to populate the display name when it exists, and a local placeholder is
+ * created when it doesn't.
+ */
 export async function POST(req: Request) {
   const { password } = await req.json() as { password?: string };
 
@@ -25,24 +35,34 @@ export async function POST(req: Request) {
 
   const client = await pool.connect();
   try {
-    const res = await client.query<{ id: number; strava_id: string; name: string }>(
-      'SELECT id, strava_id, name FROM users LIMIT 1'
+    const res = await client.query<{ id: number; strava_id: string | null; name: string | null }>(
+      'SELECT id, strava_id, name FROM users ORDER BY id LIMIT 1'
     );
-    if (res.rows.length === 0) {
-      return Response.json(
-        { error: 'No account found — connect Strava first via the setup flow' },
-        { status: 404 }
+
+    let user = res.rows[0];
+    if (!user) {
+      // No account row yet. Create a local one rather than sending the user to
+      // Strava — the password already proved who they are.
+      const created = await client.query<{ id: number }>(
+        `INSERT INTO users (id, name) VALUES (1, 'Athlete')
+         ON CONFLICT (id) DO UPDATE SET name = COALESCE(users.name, 'Athlete')
+         RETURNING id`
       );
+      user = { id: created.rows[0]?.id ?? 1, strava_id: null, name: 'Athlete' };
     }
-    const user = res.rows[0];
+
     const cookie = await createSessionCookie({
       userId:   user.id,
-      stravaId: Number(user.strava_id),
-      name:     user.name,
+      stravaId: user.strava_id ? Number(user.strava_id) : null,
+      name:     user.name ?? 'Athlete',
     });
     return new Response(JSON.stringify({ ok: true }), {
       headers: { 'Content-Type': 'application/json', 'Set-Cookie': cookie },
     });
+  } catch (err) {
+    // A database blip must not look like a wrong password.
+    console.error('[auth/login]', err);
+    return Response.json({ error: 'Database unavailable — try again' }, { status: 503 });
   } finally {
     client.release();
   }

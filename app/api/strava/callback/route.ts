@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import pool from '@/lib/db';
-import { createSessionCookie, destroySessionCookie } from '@/lib/auth';
+import { destroySessionCookie } from '@/lib/auth';
 
 export const runtime = 'nodejs';
 
@@ -180,33 +180,21 @@ export async function GET(req: NextRequest) {
     dbClient.release();
   }
 
-  // Create session cookie
-  const sessionCookie = await createSessionCookie({
-    userId,
-    stravaId,
-    name: athleteName,
-  });
-
-
+  // Deliberately does NOT create a session. Connecting Strava is an
+  // authenticated action performed from Settings by someone already signed in
+  // with the app password — it links a data source, it does not establish
+  // identity. Minting a session here made Strava an identity provider, which
+  // meant a Strava outage or a misconfigured client id could lock you out of
+  // your own app.
   const scope = tokens.scope ?? '(unknown)';
 
-  // Return HTML that sets the cookie via JS (to work in redirect context)
-  // then redirects to the dashboard
   return new Response(
     `<html><body style="font-family:sans-serif;padding:2rem;background:#111;color:#eee">
-      <script>
-        document.cookie = "${sessionCookie}";
-        window.location.href = "/dashboard";
-      </script>
-      <h2 style="color:#f97316">✓ Connected as ${athleteName}</h2>
+      <script>setTimeout(function(){ window.location.href = "/settings"; }, 1200);</script>
+      <h2 style="color:#f97316">✓ Strava connected as ${athleteName}</h2>
       <p style="color:#9ca3af;font-size:0.85rem">Scopes granted: <code style="color:#f97316">${scope}</code></p>
-      <p><a href="/dashboard" style="color:#f97316">Continue to dashboard →</a></p>
+      <p><a href="/settings" style="color:#f97316">Back to settings →</a></p>
     </body></html>`,
-    {
-      headers: {
-        'Content-Type': 'text/html',
-        'Set-Cookie': sessionCookie,
-      },
-    }
+    { headers: { 'Content-Type': 'text/html' } }
   );
 }

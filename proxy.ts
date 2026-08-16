@@ -7,9 +7,11 @@ const PUBLIC_ROUTES = [
   '/login',
   '/api/auth/login',
   '/api/auth/logout',
-  '/api/strava/auth',
-  '/api/strava/callback',
-  '/api/strava/webhook',  // Strava posts activity events here without a session
+  // NOTE: /api/strava/auth and /api/strava/callback are deliberately NOT
+  // public. Connecting Strava is an authenticated action started from
+  // Settings, not a way to sign in. The webhook stays public because Strava
+  // posts to it with no session.
+  '/api/strava/webhook',
   '/theme-preview',       // Colour profile preview page — no sensitive data
 ];
 

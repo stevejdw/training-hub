@@ -11,7 +11,9 @@ const SESSION_DURATION = 60 * 60 * 24 * 30; // 30 days in seconds
 
 export interface SessionUser {
   userId: number;
-  stravaId: number;
+  /** Null when Strava has never been connected — it's a data source, not the
+   *  identity provider, so a session must not depend on having one. */
+  stravaId: number | null;
   name: string;
 }
 
