@@ -1,0 +1,42 @@
+name: Sync Garmin wellness
+
+on:
+  schedule:
+    # Hourly at :12. Wellness lands once the watch syncs, so there is nothing
+    # to gain from a tighter cadence — and the offset keeps this away from the
+    # Strava sync (:00/:30) and the stream backfills, so the two Python jobs
+    # don't contend for the Neon connection or the Garmin token advisory lock.
+    - cron: '12 * * * *'
+  workflow_dispatch:
+    inputs:
+      days:
+        description: 'Days of history to sync (use a larger number to backfill)'
+        required: false
+        default: '7'
+
+jobs:
+  wellness:
+    runs-on: ubuntu-latest
+    # One at a time: two overlapping runs would fight over the token bundle.
+    concurrency:
+      group: garmin-wellness
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # Exact pins — Garmin's unofficial SSO breaks roughly annually and the
+      # fix arrives as a new garminconnect release. Run garmin-probe.yml before
+      # bumping these.
+      - name: Install dependencies
+        run: pip install 'garminconnect==0.3.10' 'psycopg2-binary==2.9.12' 'cryptography==50.0.0'
+
+      - name: Sync wellness
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          APP_SECRETS_KEY: ${{ secrets.APP_SECRETS_KEY }}
+        run: python .github/scripts/sync_garmin_wellness.py ${{ github.event.inputs.days || '7' }}

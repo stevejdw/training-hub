@@ -132,6 +132,10 @@ export async function POST(req: Request) {
           icu_tss         = EXCLUDED.icu_tss,
           source          = EXCLUDED.source,
           synced_at       = NOW()
+        -- Garmin is the richer, first-party source: once it has written a day,
+        -- intervals.icu must not overwrite it. Precedence is resolved here so
+        -- every read path stays a plain SELECT with no CTE.
+        WHERE daily_wellness.source IS DISTINCT FROM 'garmin'
       `, [
         date,
         toFloatOrNull(row.hrv_rmssd  ?? row.hrvRMSSD  ?? row.hrv),

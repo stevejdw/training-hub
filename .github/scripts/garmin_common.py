@@ -28,6 +28,7 @@ import random
 import sys
 import time
 from contextlib import contextmanager
+from pathlib import Path
 
 import psycopg2
 
@@ -107,6 +108,22 @@ def _is_fatal_db_error(err) -> bool:
     return any(s.lower() in msg for s in FATAL_DB_ERRORS)
 
 
+def load_dotenv_local() -> None:
+    """Populate env from .env.local when running on a laptop.
+
+    In GitHub Actions the values arrive as secrets and this is a no-op, but
+    without it every local invocation needs the vars exported by hand."""
+    path = Path(__file__).resolve().parents[2] / ".env.local"
+    if not path.exists():
+        return
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+
+
 def connect_db():
     """Open a Neon connection, retrying transient outages.
 
@@ -114,6 +131,7 @@ def connect_db():
     refused connection just skips the run (exit 0) rather than emailing. An
     authentication or authorisation failure exits non-zero instead — see
     FATAL_DB_ERRORS."""
+    load_dotenv_local()
     last_err = None
     for attempt in range(5):
         try:

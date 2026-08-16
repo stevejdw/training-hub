@@ -104,6 +104,10 @@ async function autoSyncWellness(): Promise<void> {
         icu_tss         = EXCLUDED.icu_tss,
         source          = EXCLUDED.source,
         synced_at       = NOW()
+      -- Same precedence rule as app/api/intervals/sync/route.ts: Garmin owns a
+      -- day once it has written it, so intervals.icu can't clobber the richer
+      -- record on a background refresh.
+      WHERE daily_wellness.source IS DISTINCT FROM 'garmin'
     `, values);
   } catch (err) {
     console.warn('[readiness autoSync] error', err);
@@ -139,13 +143,15 @@ export async function GET(req: Request) {
       resting_hr:      number | null;
       sleep_score:     number | null;
       readiness_score: number | null;
+      training_readiness: number | null;
     }>(`
       SELECT
         TO_CHAR(date, 'YYYY-MM-DD') AS date,
         hrv_rmssd,
         resting_hr,
         sleep_score,
-        readiness_score
+        readiness_score,
+        training_readiness
       FROM daily_wellness
       WHERE date >= CURRENT_DATE - INTERVAL '1 day' * $1
       ORDER BY date ASC
@@ -218,7 +224,13 @@ export async function GET(req: Request) {
         date:            r.date,
         hrv:             r.hrv_rmssd !== null ? Math.round(r.hrv_rmssd * 10) / 10 : null,
         sleep_score:     r.sleep_score,
-        readiness_score: r.readiness_score ?? computeReadiness(r.hrv_rmssd, r.sleep_score, r.resting_hr),
+        // Garmin's own Training Readiness first: it blends recovery time,
+        // acute load and stress history alongside HRV and sleep, so it beats
+        // the local three-factor estimate. intervals.icu's readiness is next,
+        // and the local computation remains the fallback for pre-Garmin days.
+        readiness_score: r.training_readiness
+                      ?? r.readiness_score
+                      ?? computeReadiness(r.hrv_rmssd, r.sleep_score, r.resting_hr),
         resting_hr:      r.resting_hr,
       }));
 
