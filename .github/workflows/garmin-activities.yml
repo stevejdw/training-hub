@@ -1,0 +1,40 @@
+name: Sync Garmin activities
+
+on:
+  schedule:
+    # :42 keeps this clear of the Strava sync (:00/:30), the stream backfills
+    # (:05/:20/:35/:50) and the Garmin wellness job (:12), so the two Garmin
+    # jobs never contend for the token bundle's advisory lock.
+    - cron: '42 * * * *'
+  workflow_dispatch:
+    inputs:
+      days:
+        description: 'Days of history to sync (larger to backfill)'
+        required: false
+        default: '14'
+
+jobs:
+  activities:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: garmin-activities
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install 'garminconnect==0.3.10' 'psycopg2-binary==2.9.12' 'cryptography==50.0.0'
+
+      # Exits non-zero if it ever finds a cross-provider duplicate, so one ride
+      # landing as two rows surfaces as a failed workflow rather than silently
+      # double-counting TSS into CTL/ATL/TSB.
+      - name: Sync activities
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          APP_SECRETS_KEY: ${{ secrets.APP_SECRETS_KEY }}
+        run: python .github/scripts/sync_garmin_activities.py ${{ github.event.inputs.days || '14' }}

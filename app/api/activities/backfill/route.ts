@@ -53,6 +53,9 @@ export async function POST() {
     const pending = await client.query(`
       SELECT id FROM activities
       WHERE segments_synced_at IS NULL
+        -- Garmin-only rides have no Strava counterpart; without this they
+        -- would 404 against Strava on every backfill tick, forever.
+        AND strava_id IS NOT NULL
       ORDER BY start_date DESC
       LIMIT 15
     `);

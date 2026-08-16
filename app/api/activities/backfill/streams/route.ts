@@ -53,10 +53,11 @@ export async function POST() {
     const token = await getStravaToken();
 
     const pending = await client.query<{ activity_id: number }>(
-      `SELECT activity_id FROM activity_streams
-       WHERE distance_km IS NOT NULL AND array_length(distance_km, 1) > 0
-         AND (time_s IS NULL OR array_length(time_s, 1) IS NULL)
-       ORDER BY activity_id DESC
+      `SELECT s.activity_id FROM activity_streams s
+       JOIN activities a ON a.id = s.activity_id AND a.strava_id IS NOT NULL
+       WHERE s.distance_km IS NOT NULL AND array_length(s.distance_km, 1) > 0
+         AND (s.time_s IS NULL OR array_length(s.time_s, 1) IS NULL)
+       ORDER BY s.activity_id DESC
        LIMIT 15`
     );
 

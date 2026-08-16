@@ -1,6 +1,7 @@
 import pool from '@/lib/db';
 import { getStravaToken } from '@/lib/strava-sync';
 import { getDeletionFlags } from '@/lib/activity-delete';
+import { stravaIdFor } from '@/lib/activity-identity';
 
 export const runtime = 'nodejs';
 
@@ -12,20 +13,28 @@ export async function POST(
 
   // Don't pull back streams the user deleted in the app.
   const flagClient = await pool.connect();
-  let flags;
+  let flags, stravaId: number | null;
   try {
     flags = await getDeletionFlags(flagClient, Number(id));
+    // The internal id is not Strava's id for Garmin-sourced rides.
+    stravaId = await stravaIdFor(flagClient, Number(id));
   } finally {
     flagClient.release();
   }
   if (flags.tombstoned) {
     return Response.json({ error: 'not found' }, { status: 404 });
   }
+  if (stravaId === null) {
+    return Response.json(
+      { error: 'This activity came from Garmin and has no Strava streams to fetch.' },
+      { status: 409 }
+    );
+  }
 
   const token = await getStravaToken();
 
   const streamRes = await fetch(
-    `https://www.strava.com/api/v3/activities/${id}/streams?keys=watts,heartrate&key_by_type=true`,
+    `https://www.strava.com/api/v3/activities/${stravaId}/streams?keys=watts,heartrate&key_by_type=true`,
     { headers: { Authorization: `Bearer ${token}` } }
   );
 

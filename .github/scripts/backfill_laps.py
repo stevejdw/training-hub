@@ -208,6 +208,8 @@ def backfill():
     _db["cur"].execute("""
         SELECT a.id, a.name FROM activities a
         WHERE NOT EXISTS (SELECT 1 FROM laps l WHERE l.activity_id = a.id)
+          -- Garmin-only rides have no Strava id to fetch laps with.
+          AND a.strava_id IS NOT NULL
         ORDER BY a.start_date DESC
         LIMIT %s
     """, (LIMIT,))

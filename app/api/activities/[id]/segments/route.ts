@@ -1,6 +1,8 @@
 import pool from '@/lib/db';
 import { getStravaToken, ensureSegmentTables } from '@/lib/strava-sync';
 
+import { stravaIdFor } from '@/lib/activity-identity';
+
 export const runtime = 'nodejs';
 
 export async function GET(
@@ -23,10 +25,14 @@ export async function GET(
       alreadySynced = false;
     }
 
-    if (!alreadySynced) {
+    // Segments are a Strava-only concept, and a Garmin-sourced ride has no
+    // Strava id to look them up with.
+    const stravaId = await stravaIdFor(client, Number(id));
+
+    if (!alreadySynced && stravaId !== null) {
       // First time: fetch from Strava and store
       const token = await getStravaToken();
-      const aRes  = await fetch(`https://www.strava.com/api/v3/activities/${id}`, {
+      const aRes  = await fetch(`https://www.strava.com/api/v3/activities/${stravaId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (aRes.ok) {

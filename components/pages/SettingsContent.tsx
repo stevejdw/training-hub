@@ -24,6 +24,23 @@ interface WellnessStatus {
   newestDate: string | null;
 }
 
+interface SyncHealth {
+  primary: string;
+  intervalsWellness: boolean;
+  providers: { provider: string; lastOkAt: string | null; lastError: string | null; detail: string | null; stale: boolean }[];
+  garmin?: { connected: boolean; status: string; lastOkAt: string | null; lastError: string | null } | null;
+}
+
+function sinceLabel(iso: string | null): string {
+  if (!iso) return 'never';
+  const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
+}
+
 export default function SettingsContent() {
   const { profile, update, save, saving, saved } = useProfileEdit();
   const [theme, setTheme] = useState<ThemePreference>('dark');
@@ -49,6 +66,10 @@ export default function SettingsContent() {
   const [pmSyncing, setPmSyncing] = useState(false);
   const [pmSyncLog, setPmSyncLog] = useState<string[]>([]);
 
+  // Sync health strip — with one active source there's no redundancy, so a
+  // stalled provider has to be visible rather than inferred.
+  const [health, setHealth] = useState<SyncHealth | null>(null);
+
   // intervals.icu sync state
   const [wellnessStatus, setWellnessStatus]   = useState<WellnessStatus | null>(null);
   const [wellnessLoading, setWellnessLoading] = useState(false);
@@ -57,6 +78,13 @@ export default function SettingsContent() {
   const [intervalsCreds, setIntervalsCreds]   = useState({ id: '', key: '' });
 
   useEffect(() => { setTheme(getThemePreference()); }, []);
+
+  useEffect(() => {
+    fetch('/api/sync/health')
+      .then(r => r.json())
+      .then((d: SyncHealth) => setHealth(d))
+      .catch(() => {});
+  }, [profile?.primary_source]);
 
   // Load history status on mount
   useEffect(() => {
@@ -655,13 +683,10 @@ export default function SettingsContent() {
 
         <div className="space-y-2">
           {([
-            // Garmin stays unselectable until its activity sync exists. Turning
-            // it on before then would switch Strava off with nothing to replace
-            // it — a silent blackout rather than a failover.
-            { id: 'garmin', label: 'Garmin', ready: false,
-              hint: 'Direct from Garmin Connect. Full FIT detail and native wellness.' },
+            { id: 'garmin', label: 'Garmin', ready: true,
+              hint: 'Direct from Garmin Connect. Device-measured power and native wellness.' },
             { id: 'strava', label: 'Strava', ready: true,
-              hint: 'Real-time webhook. Currently the only provider that writes activities.' },
+              hint: 'Real-time webhook. Switch back here if Garmin stops syncing.' },
           ] as const).map(opt => {
             const active = (profile?.primary_source ?? 'strava') === opt.id;
             return (
@@ -688,6 +713,31 @@ export default function SettingsContent() {
             );
           })}
         </div>
+
+        {/* Liveness. With no redundancy behind the active source, a stalled
+            sync must be visible rather than inferred from missing rides. */}
+        {health && (
+          <div className="border-t border-gray-800 pt-3 space-y-1.5">
+            {health.garmin?.status === 'reauth_required' && (
+              <p className="text-xs text-red-400">
+                Garmin needs re-authentication — run <code className="font-mono">npm run garmin:login</code>.
+              </p>
+            )}
+            {health.providers.map(p => (
+              <div key={p.provider} className="flex items-center gap-2 text-xs">
+                <span
+                  className={`w-1.5 h-1.5 rounded-full ${
+                    p.lastError ? 'bg-red-500' : p.stale ? 'bg-amber-500' : 'bg-green-500'
+                  }`}
+                />
+                <span className="text-gray-400 capitalize w-20">{p.provider}</span>
+                <span className="text-gray-500">{sinceLabel(p.lastOkAt)}</span>
+                {p.detail && <span className="text-gray-600 truncate">· {p.detail}</span>}
+                {p.lastError && <span className="text-red-400 truncate">· {p.lastError}</span>}
+              </div>
+            ))}
+          </div>
+        )}
 
         <p className="text-[11px] text-gray-500 border-t border-gray-800 pt-3">
           Switching only changes which provider <em>writes</em> activities. Your Strava

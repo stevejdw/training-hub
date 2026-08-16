@@ -295,6 +295,82 @@ def garmin_session():
         conn.close()
 
 
+# ---------------------------------------------------------------- health
+
+def ensure_sync_health(cur) -> None:
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS sync_health (
+          provider             TEXT PRIMARY KEY,
+          last_ok_at           TIMESTAMPTZ,
+          last_error           TEXT,
+          consecutive_failures INT NOT NULL DEFAULT 0,
+          detail               TEXT,
+          updated_at           TIMESTAMPTZ DEFAULT NOW()
+        )
+        """
+    )
+
+
+def record_sync_health(cur, provider: str, ok: bool, detail=None, error=None) -> None:
+    """One row per provider, written at the end of every sync path.
+
+    With a single active source there is no redundancy to fall back on, so a
+    stalled sync has to be *visible* — the Settings page reads this and shows
+    amber once a provider hasn't succeeded in 6 hours."""
+    ensure_sync_health(cur)
+    if ok:
+        cur.execute(
+            """
+            INSERT INTO sync_health (provider, last_ok_at, last_error, consecutive_failures, detail, updated_at)
+            VALUES (%s, NOW(), NULL, 0, %s, NOW())
+            ON CONFLICT (provider) DO UPDATE SET
+              last_ok_at = NOW(), last_error = NULL, consecutive_failures = 0,
+              detail = EXCLUDED.detail, updated_at = NOW()
+            """,
+            (provider, (detail or "")[:200] or None),
+        )
+    else:
+        cur.execute(
+            """
+            INSERT INTO sync_health (provider, last_error, consecutive_failures, updated_at)
+            VALUES (%s, %s, 1, NOW())
+            ON CONFLICT (provider) DO UPDATE SET
+              last_error = EXCLUDED.last_error,
+              consecutive_failures = sync_health.consecutive_failures + 1,
+              updated_at = NOW()
+            """,
+            (provider, (error or "")[:500] or None),
+        )
+
+
+def primary_source(cur) -> str:
+    """Mirror of lib/sync-sources.ts. Defaults to strava when unset."""
+    try:
+        cur.execute("SELECT data->>'primary_source' FROM athlete_profile WHERE id = 1")
+        row = cur.fetchone()
+    except Exception:
+        return "strava"
+    return "garmin" if (row and row[0] == "garmin") else "strava"
+
+
+def athlete_ftp(cur, default: float = 250.0) -> float:
+    """Mirror of effectiveFtp() in lib/profile.ts — eFTP wins when use_eftp."""
+    try:
+        cur.execute(
+            "SELECT data->>'ftp', data->>'eftp', data->>'use_eftp' FROM athlete_profile WHERE id = 1"
+        )
+        row = cur.fetchone() or (None, None, None)
+        ftp, eftp, use_eftp = row
+        if use_eftp in ("true", "True", True) and eftp:
+            return float(eftp)
+        if ftp:
+            return float(ftp)
+    except Exception:
+        pass
+    return default
+
+
 def bail_on_reauth(exc: ReauthRequired) -> None:
     """Print and exit 0. A dead Garmin token is expected eventually; Strava is
     still running, so this must not fail the workflow or send email. The
