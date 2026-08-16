@@ -8,7 +8,10 @@ export const runtime = 'nodejs';
  * After approval Strava redirects to /api/strava/callback which stores the tokens.
  */
 export async function GET(req: NextRequest) {
-  const clientId   = process.env.STRAVA_CLIENT_ID;
+  // Trim: a stray trailing space in the env var makes Strava fail to resolve
+  // the application at all, and it reports that as an invalid redirect_url —
+  // which sends you looking at the callback domain instead of the client id.
+  const clientId   = process.env.STRAVA_CLIENT_ID?.trim();
   if (!clientId) {
     return Response.json({ error: 'STRAVA_CLIENT_ID env var not set' }, { status: 500 });
   }

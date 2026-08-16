@@ -30,8 +30,8 @@ export async function GET(req: NextRequest) {
     return Response.json({ error: 'No code returned from Strava' }, { status: 400 });
   }
 
-  const clientId     = process.env.STRAVA_CLIENT_ID!;
-  const clientSecret = process.env.STRAVA_CLIENT_SECRET!;
+  const clientId     = process.env.STRAVA_CLIENT_ID!.trim();
+  const clientSecret = process.env.STRAVA_CLIENT_SECRET!.trim();
 
   const tokenRes = await fetch('https://www.strava.com/oauth/token', {
     method: 'POST',

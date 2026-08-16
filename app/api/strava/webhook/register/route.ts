@@ -9,8 +9,8 @@
  */
 export const runtime = 'nodejs';
 
-const CLIENT_ID     = process.env.STRAVA_CLIENT_ID!;
-const CLIENT_SECRET = process.env.STRAVA_CLIENT_SECRET!;
+const CLIENT_ID     = process.env.STRAVA_CLIENT_ID!.trim();
+const CLIENT_SECRET = process.env.STRAVA_CLIENT_SECRET!.trim();
 const VERIFY_TOKEN  = process.env.STRAVA_WEBHOOK_VERIFY_TOKEN ?? 'training-hub-strava';
 
 function appUrl(req: Request): string {

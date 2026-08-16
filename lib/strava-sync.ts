@@ -3,9 +3,11 @@ import { getProfile, effectiveFtp } from './profile';
 import { computeBestPower, BEST_POWER_INTERVALS, BestPowerResult } from './best-power';
 import { getDeletionFlags, filterTombstoned } from './activity-delete';
 
-const CLIENT_ID     = process.env.STRAVA_CLIENT_ID!;
-const CLIENT_SECRET = process.env.STRAVA_CLIENT_SECRET!;
-const REFRESH_TOKEN = process.env.STRAVA_REFRESH_TOKEN!;   // fallback only
+// Trimmed because credentials pasted into env vars pick up trailing
+// whitespace easily, and Strava's failure mode for it is misleading.
+const CLIENT_ID     = process.env.STRAVA_CLIENT_ID!.trim();
+const CLIENT_SECRET = process.env.STRAVA_CLIENT_SECRET!.trim();
+const REFRESH_TOKEN = process.env.STRAVA_REFRESH_TOKEN!.trim();   // fallback only
 
 // In-memory cache for the current access token.
 let _tokenCache: { token: string; expiresAt: number } | null = null;
