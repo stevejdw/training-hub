@@ -55,9 +55,19 @@ def _key() -> bytes:
         )
     import base64
 
-    key = base64.b64decode(raw)
+    # Restore stripped '=' padding before decoding. Node's Buffer.from(x,
+    # 'base64') accepts unpadded input and lib/secrets.ts therefore does too,
+    # but Python's b64decode raises "Incorrect padding" on the same string —
+    # so an unpadded key silently worked on Vercel and blew up in the Python
+    # jobs. Both sides must accept exactly the same input; they decode to
+    # identical bytes either way.
+    raw = raw.strip()
+    key = base64.b64decode(raw + "=" * (-len(raw) % 4))
     if len(key) != 32:
-        raise SystemExit(f"APP_SECRETS_KEY must decode to 32 bytes, got {len(key)}")
+        raise SystemExit(
+            f"APP_SECRETS_KEY must decode to 32 bytes, got {len(key)}. "
+            "Generate one with: openssl rand -base64 32"
+        )
     return key
 
 

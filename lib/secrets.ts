@@ -36,7 +36,11 @@ function key(): Buffer {
       "node -e \"console.log(require('crypto').randomBytes(32).toString('base64'))\""
     );
   }
-  const buf = Buffer.from(raw, 'base64');
+  // Buffer.from tolerates missing '=' padding; Python's b64decode does not.
+  // Normalise here so both implementations accept exactly the same string —
+  // see the matching comment in .github/scripts/garmin_common.py.
+  const trimmed = raw.trim();
+  const buf = Buffer.from(trimmed + '='.repeat((4 - (trimmed.length % 4)) % 4), 'base64');
   if (buf.length !== 32) {
     throw new Error(`APP_SECRETS_KEY must decode to 32 bytes, got ${buf.length}`);
   }
