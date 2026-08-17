@@ -17,13 +17,17 @@ export const runtime = 'nodejs';
 export async function POST(req: Request) {
   const { password } = await req.json() as { password?: string };
 
-  const APP_PASSWORD = process.env.APP_PASSWORD;
+  // Trimmed for the same reason as the Strava credentials: a value pasted into
+  // the Vercel dashboard picks up a trailing space very easily, and here the
+  // symptom is an unfixable "Incorrect password" on a password that is right.
+  const APP_PASSWORD = process.env.APP_PASSWORD?.trim();
   if (!APP_PASSWORD) {
     return Response.json({ error: 'APP_PASSWORD env var not set' }, { status: 500 });
   }
 
-  // Timing-safe comparison to prevent timing attacks
-  const inputBuf    = Buffer.from(password ?? '');
+  // Timing-safe comparison to prevent timing attacks. The submitted value is
+  // trimmed too — a mobile keyboard appending a space should not lock you out.
+  const inputBuf    = Buffer.from((password ?? '').trim());
   const expectedBuf = Buffer.from(APP_PASSWORD);
   const match =
     inputBuf.length === expectedBuf.length &&
