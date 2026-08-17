@@ -37,8 +37,12 @@ export async function POST(req: Request) {
     return Response.json({ error: 'Incorrect password' }, { status: 401 });
   }
 
-  const client = await pool.connect();
+  // pool.connect() must be inside the try: a DB failure here was escaping as
+  // an unhandled HTML 500, which the client could only report as a generic
+  // error. It is a 503 with a readable message now.
+  let client;
   try {
+    client = await pool.connect();
     const res = await client.query<{ id: number; strava_id: string | null; name: string | null }>(
       'SELECT id, strava_id, name FROM users ORDER BY id LIMIT 1'
     );
@@ -66,8 +70,11 @@ export async function POST(req: Request) {
   } catch (err) {
     // A database blip must not look like a wrong password.
     console.error('[auth/login]', err);
-    return Response.json({ error: 'Database unavailable — try again' }, { status: 503 });
+    return Response.json(
+      { error: `Database unavailable: ${String(err instanceof Error ? err.message : err)}` },
+      { status: 503 }
+    );
   } finally {
-    client.release();
+    client?.release();
   }
 }
