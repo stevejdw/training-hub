@@ -263,19 +263,21 @@ def assert_no_cross_provider_duplicates(cur) -> int:
     """The failure that is expensive to find late: one ride as two rows means
     double-counted TSS and phantom power PBs, and nothing errors.
 
-    Scoped to cross-provider pairs on purpose — the data already contains ~21
-    Strava-to-Strava duplicates from activities uploaded twice by different
-    apps years ago, which are not this sync's doing.
+    Scoped to rows this sync MINTED (source='garmin' with no strava_id) that sit
+    on top of a Strava row. A merged row legitimately carries both ids, and the
+    data already contains ~21 Strava-to-Strava duplicates from activities
+    uploaded twice by different apps years ago — matching on garmin_id alone
+    flagged those too, which would fail every run and make the check worthless.
     """
     cur.execute(
         """
-        SELECT a.id, b.id, a.name, b.name
-          FROM activities a JOIN activities b
-            ON a.id < b.id
-           AND ABS(EXTRACT(EPOCH FROM (a.start_date - b.start_date))) < %s
-           AND ABS(a.elapsed_time - b.elapsed_time) < %s
-         WHERE (a.garmin_id IS NOT NULL AND b.strava_id IS NOT NULL AND b.garmin_id IS NULL)
-            OR (b.garmin_id IS NOT NULL AND a.strava_id IS NOT NULL AND a.garmin_id IS NULL)
+        SELECT g.id, s.id, g.name, s.name
+          FROM activities g JOIN activities s
+            ON g.id <> s.id
+           AND ABS(EXTRACT(EPOCH FROM (g.start_date - s.start_date))) < %s
+           AND ABS(g.elapsed_time - s.elapsed_time) < %s
+         WHERE g.source = 'garmin' AND g.strava_id IS NULL
+           AND s.strava_id IS NOT NULL
         """,
         (MATCH_WINDOW_S, MATCH_WINDOW_S),
     )
