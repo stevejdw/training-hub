@@ -3,7 +3,14 @@ import { getProfile } from '@/lib/profile';
 import { NextRequest } from 'next/server';
 
 export const runtime = 'nodejs';
-export const maxDuration = 30;
+// Averaging both halves of every qualifying ride costs ~500ms per ride because
+// the stored 1 Hz arrays run to tens of thousands of samples on long rides.
+// That was fine while only a few hundred rides had normalized_power; the Garmin
+// backfill made ~2,200 eligible, and 6-month and longer ranges started
+// exceeding 30s and returning nothing. Raised so the chart works today — the
+// real fix is to precompute the half-ride averages once per activity rather
+// than on every chart load (see the note on the query below).
+export const maxDuration = 120;
 
 const CYCLING = ['Ride', 'VirtualRide', 'GravelRide', 'MountainBikeRide'];
 
@@ -84,19 +91,48 @@ export async function GET(req: NextRequest) {
     // Half-ride power/HR averages are computed inside Postgres so only a few
     // scalar columns per ride cross the wire — never the raw watts/hr arrays
     // (which cost ~100-200KB of egress per ride).
+    // Select the qualifying rides FIRST, then unnest streams for only those.
+    //
+    // Previously the stream join and the two LATERALs sat in the same query as
+    // the activity filters, so the planner averaged 1 Hz watts/hr arrays for
+    // every cycling ride before discarding most of them. That was survivable
+    // while few rides had normalized_power; once the Garmin backfill populated
+    // it on ~2,200 rides the query went to ~24s at 90 days and ~46s at 6
+    // months — past the 30s maxDuration, which is why the longer ranges
+    // returned nothing at all.
+    //
+    // MATERIALIZED forces the candidate set to be built before any array work,
+    // so the expensive part runs on tens of rides rather than thousands.
     const sql = `
+      WITH candidates AS MATERIALIZED (
+        SELECT
+          a.id,
+          a.start_date,
+          a.start_date::date::text AS date,
+          a.name,
+          a.average_watts,
+          a.normalized_power,
+          a.average_heartrate,
+          a.moving_time,
+          a.summary_polyline
+        FROM activities a
+        WHERE a.sport_type = ANY($1::text[])
+          AND a.normalized_power IS NOT NULL
+          AND a.average_watts    > 0
+          AND a.average_heartrate > 60
+          AND (a.normalized_power::float / a.average_watts) < 1.10
+          AND a.moving_time >= 3600  -- exclude rides shorter than 60 minutes
+          ${interval ? `AND a.start_date >= NOW() - INTERVAL '${interval}'` : ''}
+          ${excludeClause}
+        ORDER BY a.start_date ASC
+        LIMIT 500
+      )
       SELECT
-        a.id,
-        a.start_date::date::text     AS date,
-        a.name,
-        a.average_watts,
-        a.normalized_power,
-        a.average_heartrate,
-        a.moving_time,
-        a.summary_polyline,
+        c.id, c.date, c.name, c.average_watts, c.normalized_power,
+        c.average_heartrate, c.moving_time, c.summary_polyline,
         halves.pw1, halves.hr1, halves.pw2, halves.hr2
-      FROM activities a
-      JOIN activity_streams s ON s.activity_id = a.id
+      FROM candidates c
+      JOIN activity_streams s ON s.activity_id = c.id
       CROSS JOIN LATERAL (
         SELECT LEAST(array_length(s.watts, 1), array_length(s.hr, 1)) AS n
       ) dims
@@ -109,20 +145,11 @@ export async function GET(req: NextRequest) {
         FROM unnest(s.watts, s.hr) WITH ORDINALITY AS t(wv, hv, ord)
         WHERE t.wv IS NOT NULL AND t.hv IS NOT NULL AND t.hv > 30
       ) halves
-      WHERE a.sport_type = ANY($1::text[])
-        AND a.normalized_power IS NOT NULL
-        AND a.average_watts    > 0
-        AND a.average_heartrate > 60
-        AND (a.normalized_power::float / a.average_watts) < 1.10
-        AND a.moving_time >= 3600  -- exclude rides shorter than 60 minutes
-        AND s.watts IS NOT NULL
+      WHERE s.watts IS NOT NULL
         AND s.hr    IS NOT NULL
         AND array_length(s.watts, 1) > 60
         AND array_length(s.hr, 1)    > 60
-        ${interval ? `AND a.start_date >= NOW() - INTERVAL '${interval}'` : ''}
-        ${excludeClause}
-      ORDER BY a.start_date ASC
-      LIMIT 500
+      ORDER BY c.start_date ASC
     `;
 
     const res = await client.query(sql, params);
