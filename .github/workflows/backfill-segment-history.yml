@@ -1,8 +1,11 @@
 name: Backfill Segment History
 
 on:
-  schedule:
-    - cron: '*/15 * * * *'   # every 15 minutes until remaining hits 0
+  # The backfill is complete — the endpoint has returned {"processed":0,"remaining":0}
+  # since 2026-08. The 15-minute schedule kept firing after there was nothing left
+  # to do, burning ~46 billed Actions minutes a day to confirm zero (every job is
+  # rounded up to a full minute, so a 5-second no-op still costs one).
+  # Re-run by hand if a bulk re-import ever leaves efforts to scan again.
   workflow_dispatch:
 
 jobs:

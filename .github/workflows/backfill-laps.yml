@@ -8,13 +8,20 @@ on:
         required: false
         default: '30'
   schedule:
-    # Every 15 minutes, like segment backfill. Each run processes ~30 activities
-    # (60 API calls, under the 100/15-min ceiling so no mid-run sleeps).
-    # Script stops itself once daily cap of 950 calls is reached; subsequent
-    # runs that day exit fast.
-    # Offset by 10 min from the sync (:00/:30) and full-streams (:05/:20/...) jobs
-    # so the scheduled workflows don't all hit Strava's token endpoint at once.
-    - cron: '10,25,40,55 * * * *'
+    # Every 4 hours. Each run processes ~30 activities (60 API calls, under the
+    # 100/15-min ceiling so no mid-run sleeps), and the script stops itself once
+    # the daily cap of 950 calls is reached.
+    #
+    # That daily cap — shared with full-streams — is what limits progress, not
+    # the schedule. The old 15-minute cron did real work for the first few runs
+    # each day and then no-opped ~44 times ("Processed 0 activities... re-run
+    # tomorrow"), costing ~48 billed Actions minutes a day, because every job is
+    # rounded up to a whole minute however briefly it runs. Six runs here plus
+    # six in full-streams is ~720 calls, which uses the daily quota with headroom
+    # left for the app and the hourly sync.
+    # Offset by 10 min from the sync (:00) and full-streams (:05) jobs so the
+    # scheduled workflows don't all hit Strava's token endpoint at once.
+    - cron: '10 0,4,8,12,16,20 * * *'
 
 jobs:
   backfill:

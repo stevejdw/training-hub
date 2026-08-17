@@ -8,12 +8,19 @@ on:
         required: false
         default: '60'
   schedule:
-    # Every 15 minutes. Each run uses up to 60 Strava calls (well within the
+    # Every 4 hours. Each run uses up to 60 Strava calls (well within the
     # 100/15-min window). The script self-stops at 950 daily calls so it
     # doesn't crowd out the app or other workflows.
-    # Offset by 5 min from the sync (:00/:30) and laps (:10/:25/...) jobs so the
-    # scheduled workflows don't all hit Strava's token endpoint on the same minute.
-    - cron: '5,20,35,50 * * * *'
+    #
+    # That daily cap — shared with the laps backfill — is the real limit, not the
+    # schedule. The old 15-minute cron exhausted the quota early and then no-opped
+    # for the rest of the day ("Re-run tomorrow — daily Strava limit resets at
+    # 00:00 UTC"), costing ~40 billed Actions minutes a day, because every job is
+    # rounded up to a whole minute however briefly it runs. Six runs here plus six
+    # in laps is ~720 calls, which uses the quota with headroom for the app.
+    # Offset by 5 min from the sync (:00) and laps (:10) jobs so the scheduled
+    # workflows don't all hit Strava's token endpoint on the same minute.
+    - cron: '5 0,4,8,12,16,20 * * *'
 
 jobs:
   backfill:
