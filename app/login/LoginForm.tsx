@@ -11,20 +11,44 @@ export default function LoginForm() {
     e.preventDefault();
     setError('');
     setLoading(true);
+    // Absolute URL: inside the iOS shell a relative path resolves against the
+    // WebView origin, which is capacitor://localhost whenever the remote page
+    // failed to load and the local fallback is showing. The request then never
+    // reaches Vercel and surfaces as an unexplained failure.
+    const endpoint = new URL('/api/auth/login', window.location.origin).toString();
+
+    let res: Response;
     try {
-      const res = await fetch('/api/auth/login', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ password }),
+      res = await fetch(endpoint, {
+        method:      'POST',
+        headers:     { 'Content-Type': 'application/json' },
+        body:        JSON.stringify({ password }),
+        credentials: 'same-origin',
       });
+    } catch (err) {
+      // Only a genuine transport failure lands here — reading the body is
+      // deliberately kept out of this try so a non-JSON response can't be
+      // misreported as "no connection".
+      setError(`Can't reach the server (${window.location.origin}) — ${String(err)}`);
+      setLoading(false);
+      return;
+    }
+
+    try {
       if (res.ok) {
         window.location.href = '/dashboard';
-      } else {
-        const data = await res.json() as { error?: string };
-        setError(data.error ?? 'Login failed');
+        return;
       }
-    } catch {
-      setError('Network error — try again');
+      const body = await res.text();
+      let message = `Login failed (HTTP ${res.status})`;
+      try {
+        message = (JSON.parse(body) as { error?: string }).error ?? message;
+      } catch {
+        // Not JSON — surface the status rather than pretending it was a
+        // network problem. An HTML body here means a redirect or error page.
+        message = `Unexpected ${res.status} response from the server`;
+      }
+      setError(message);
     } finally {
       setLoading(false);
     }
