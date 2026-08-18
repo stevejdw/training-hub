@@ -26,7 +26,7 @@ jobs:
           python-version: '3.12'
 
       - name: Install dependencies
-        run: pip install 'garminconnect==0.3.10' 'psycopg2-binary==2.9.12' 'cryptography==50.0.0'
+        run: pip install requests 'garminconnect==0.3.10' 'psycopg2-binary==2.9.12' 'cryptography==50.0.0'
 
       # A short window: this runs seconds after the ride, so only the newest
       # activities can possibly be missing.
@@ -42,3 +42,14 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           APP_SECRETS_KEY: ${{ secrets.APP_SECRETS_KEY }}
         run: python .github/scripts/sync_garmin_details.py 5
+
+      # Adopt names the athlete set in Strava. Reads names only — Garmin stays
+      # the source of truth for every measurement.
+      - name: Adopt Strava names
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          APP_SECRETS_KEY: ${{ secrets.APP_SECRETS_KEY }}
+          STRAVA_CLIENT_ID: ${{ secrets.STRAVA_CLIENT_ID }}
+          STRAVA_CLIENT_SECRET: ${{ secrets.STRAVA_CLIENT_SECRET }}
+          STRAVA_REFRESH_TOKEN: ${{ secrets.STRAVA_REFRESH_TOKEN }}
+        run: python .github/scripts/sync_strava_names.py 7
