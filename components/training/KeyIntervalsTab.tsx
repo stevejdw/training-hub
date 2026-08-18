@@ -288,9 +288,18 @@ function IntervalCard({ target, current, weekly, effectiveTarget, onClick }: Int
     .filter(r => r.watts != null);
 
   return (
-    <button
+    /* role="button" rather than a real <button>: this card contains the
+       sparkline's own "enlarge" button, and a button inside a button is
+       invalid HTML — React flagged it as a hydration error, and the inner
+       control's clicks also fired the card's action. */
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onClick}
-      className="bg-gray-800/60 border border-gray-800 rounded-xl p-2.5 md:p-4 space-y-2 text-left hover:border-gray-700 hover:bg-gray-800/80 active:bg-gray-800 transition-colors w-full"
+      onKeyDown={e => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); }
+      }}
+      className="bg-gray-800/60 border border-gray-800 rounded-xl p-2.5 md:p-4 space-y-2 text-left hover:border-gray-700 hover:bg-gray-800/80 active:bg-gray-800 transition-colors w-full cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
     >
       <div className="flex items-start justify-between gap-1.5">
         <div className="min-w-0 flex-1">
@@ -340,7 +349,7 @@ function IntervalCard({ target, current, weekly, effectiveTarget, onClick }: Int
           </EnlargeableChart>
         </div>
       )}
-    </button>
+    </div>
   );
 }
 

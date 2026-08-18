@@ -39,7 +39,7 @@ export default function EnlargeableChart({ children, title, subtitle, controls, 
     <div className={`relative ${className ?? ''}`}>
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={e => { e.stopPropagation(); setOpen(true); }}
         aria-label="Enlarge chart"
         title="Enlarge"
         className="absolute top-0 right-0 z-10 p-1 rounded text-gray-500 hover:text-white hover:bg-gray-800/80 transition-colors"

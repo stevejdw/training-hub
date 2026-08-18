@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
+import { rollingMean } from '@/lib/smooth';
+import { CHART } from '@/lib/chart-theme';
 import {
   LineChart, Line,
   XAxis, YAxis, CartesianGrid,
@@ -87,8 +89,10 @@ export default function AerobicEfficiencyChart({ activityId, showCompare }: { ac
   const [comparePeriod, setComparePeriod] = useState<ComparePeriod | null>(null);
   const [compareData, setCompareData] = useState<AerobicData | null>(null);
   const [compareLoading, setCompareLoading] = useState(false);
-  const [showPower, setShowPower] = useState(true);
-  const [showHr, setShowHr] = useState(true);
+  /* EF alone by default. Power and HR are context, and at equal weight they
+     buried the line the chart exists to show. */
+  const [showPower, setShowPower] = useState(false);
+  const [showHr, setShowHr] = useState(false);
   const [showEf, setShowEf] = useState(true);
 
   useEffect(() => {
@@ -121,13 +125,24 @@ export default function AerobicEfficiencyChart({ activityId, showCompare }: { ac
     if (!data) return [];
     const n = data.watts.length;
     const secPerSample = data.sec_per_sample || 1;
+
+    const rawEf = Array.from({ length: n }, (_, i) =>
+      (data.watts[i] != null && data.hr[i] != null && data.hr[i]! > 0)
+        ? data.watts[i]! / data.hr[i]!
+        : null);
+
+    /* Smoothed: instantaneous W/HR is far too spiky to read drift from — a
+       one-second power blip swings efficiency wildly. EF gets the wider
+       window because it is the subject of the chart. */
+    const ef    = rollingMean(rawEf, 30);
+    const watts = rollingMean(data.watts.map(v => v ?? null), 10);
+    const hr    = rollingMean(data.hr.map(v => v ?? null), 10);
+
     return Array.from({ length: n }, (_, i) => ({
       t:     Math.round((i * secPerSample) / 60),   // minutes
-      watts: data.watts[i] ?? null,
-      hr:    data.hr[i]    ?? null,
-      ef:    (data.watts[i] != null && data.hr[i] != null && data.hr[i]! > 0) 
-        ? data.watts[i]! / data.hr[i]! 
-        : null,
+      watts: watts[i],
+      hr:    hr[i],
+      ef:    ef[i],
     }));
   }, [data]);
 
@@ -370,53 +385,56 @@ export default function AerobicEfficiencyChart({ activityId, showCompare }: { ac
               {(fs) => (
             <ResponsiveContainer width="100%" height={fs ? '100%' : 220}>
               <LineChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke={CHART.grid} vertical={false} />
                 <XAxis
                   dataKey="t"
                   type="number"
                   domain={[0, 'dataMax']}
-                  tick={{ fill: '#6b7280', fontSize: 10 }}
+                  tick={{ fill: CHART.axisText, fontSize: 10 }}
                   axisLine={false}
                   tickLine={false}
                   tickFormatter={v => `${v}m`}
                   tickCount={6}
                 />
-                {/* Watts Y-axis (left) — hidden when Power toggled off */}
+                {/* EF on the LEFT — it is what the chart is for. It used to sit
+                    on the far right in white at 0.7 opacity, the least visible
+                    series on its own chart. */}
+                {showEf && (
+                  <YAxis
+                    yAxisId="ef"
+                    domain={efDomain}
+                    tick={{ fill: CHART.axisText, fontSize: 10 }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={44}
+                    tickFormatter={v => v.toFixed(2)}
+                    label={{ value: 'W/bpm', angle: -90, position: 'insideLeft',
+                             fill: CHART.axisText, fontSize: 10, offset: 8 }}
+                  />
+                )}
+                {/* Power and HR are supporting context, on the right. */}
                 {showPower && (
                   <YAxis
                     yAxisId="w"
+                    orientation="right"
                     domain={['auto', 'auto']}
-                    tick={{ fill: '#f97316', fontSize: 10 }}
+                    tick={{ fill: CHART.axisText, fontSize: 10 }}
                     axisLine={false}
                     tickLine={false}
                     width={36}
                     tickFormatter={v => `${v}W`}
                   />
                 )}
-                {/* HR Y-axis (right) — hidden when HR toggled off */}
                 {showHr && (
                   <YAxis
                     yAxisId="hr"
                     orientation="right"
                     domain={['auto', 'auto']}
-                    tick={{ fill: '#60a5fa', fontSize: 10 }}
+                    tick={{ fill: CHART.axisText, fontSize: 10 }}
                     axisLine={false}
                     tickLine={false}
                     width={36}
                     tickFormatter={v => `${v}`}
-                  />
-                )}
-                {/* EF Y-axis (far right) — hidden when EF toggled off */}
-                {showEf && (
-                  <YAxis
-                    yAxisId="ef"
-                    orientation="right"
-                    domain={efDomain}
-                    tick={{ fill: '#ffffff', fontSize: 10 }}
-                    axisLine={false}
-                    tickLine={false}
-                    width={40}
-                    tickFormatter={v => v.toFixed(2)}
                   />
                 )}
                 {/* Always-mounted hidden axis. The half-split used to hang off
@@ -431,7 +449,7 @@ export default function AerobicEfficiencyChart({ activityId, showCompare }: { ac
                     x2={halfMin}
                     y1={0}
                     y2={1}
-                    fill="#f97316"
+                    fill={CHART.ef}
                     fillOpacity={0.09}
                     stroke="none"
                   />
@@ -440,18 +458,19 @@ export default function AerobicEfficiencyChart({ activityId, showCompare }: { ac
                   <ReferenceLine
                     yAxisId="split"
                     x={halfMin}
-                    stroke="#374151"
+                    stroke={CHART.axis}
                     strokeDasharray="4 3"
                     label={{ value: 'Half', fill: '#6b7280', fontSize: 9, position: 'insideTopRight' }}
                   />
                 )}
-                <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#374151', strokeWidth: 1 }} />
+                <Tooltip content={<CustomTooltip />} cursor={{ stroke: CHART.cursor, strokeWidth: 1 }} />
                 {showPower && (
                   <Line
                     yAxisId="w"
                     dataKey="watts"
-                    stroke="#f97316"
-                    strokeWidth={1.5}
+                    stroke={CHART.power}
+                    strokeWidth={1}
+                    strokeOpacity={0.45}
                     dot={false}
                     isAnimationActive={false}
                     connectNulls
@@ -461,8 +480,9 @@ export default function AerobicEfficiencyChart({ activityId, showCompare }: { ac
                   <Line
                     yAxisId="hr"
                     dataKey="hr"
-                    stroke="#60a5fa"
-                    strokeWidth={1.5}
+                    stroke={CHART.hr}
+                    strokeWidth={1}
+                    strokeOpacity={0.45}
                     dot={false}
                     isAnimationActive={false}
                     connectNulls
@@ -472,12 +492,11 @@ export default function AerobicEfficiencyChart({ activityId, showCompare }: { ac
                   <Line
                     yAxisId="ef"
                     dataKey="ef"
-                    stroke="#ffffff"
-                    strokeWidth={1.5}
+                    stroke={CHART.ef}
+                    strokeWidth={2}
                     dot={false}
                     isAnimationActive={false}
                     connectNulls
-                    opacity={0.7}
                   />
                 )}
                 {/* Comparison overlay lines — match active toggles */}

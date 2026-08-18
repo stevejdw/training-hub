@@ -45,7 +45,10 @@ const geistFonts = `${geistSans.variable} ${geistMono.variable}`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" data-theme="dark" className={`${geistFonts} antialiased`}>
+    /* suppressHydrationWarning: the inline script below rewrites data-theme
+       before React hydrates, so the server's "dark" and the client's stored
+       theme legitimately differ on every non-default theme. */
+    <html lang="en" data-theme="dark" suppressHydrationWarning className={`${geistFonts} antialiased`}>
       {/* Anti-flash: apply stored theme before first paint */}
       <head>
         <script dangerouslySetInnerHTML={{ __html: `(function(){try{var p=localStorage.getItem('theme')||'dark';var valid={'dark':1,'light':1,'ocean':1,'ocean-light':1,'sand':1,'sand-dark':1};var t=p==='auto'?(new Date().getHours()>=7&&new Date().getHours()<19?'light':'dark'):(valid[p]?p:'dark');document.documentElement.setAttribute('data-theme',t);if(window.Capacitor&&window.Capacitor.isNativePlatform&&window.Capacitor.isNativePlatform()){document.documentElement.classList.add('native-app');}}catch(e){}})();` }} />
