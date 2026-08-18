@@ -2,11 +2,11 @@ name: Sync Garmin wellness
 
 on:
   schedule:
-    # Hourly at :12. Wellness lands once the watch syncs, so there is nothing
-    # to gain from a tighter cadence — and the offset keeps this away from the
-    # Strava sync (:00/:30) and the stream backfills, so the two Python jobs
-    # don't contend for the Neon connection or the Garmin token advisory lock.
-    - cron: '12 * * * *'
+    # Wellness is not tied to a ride finishing, so it stays on a poll — four
+    # times a day is ample for sleep, HRV and readiness, which update once the
+    # watch syncs. Offset from the other Garmin jobs to avoid contending for
+    # the token bundle's advisory lock.
+    - cron: '5 */6 * * *'
   workflow_dispatch:
     inputs:
       days:

@@ -2,10 +2,12 @@ name: Sync Garmin activities
 
 on:
   schedule:
-    # :42 keeps this clear of the Strava sync (:00/:30), the stream backfills
-    # (:05/:20/:35/:50) and the Garmin wellness job (:12), so the two Garmin
-    # jobs never contend for the token bundle's advisory lock.
-    - cron: '42 * * * *'
+    # Safety net only — new rides arrive via garmin-push.yml within a minute
+    # of finishing. This catches anything the Strava doorbell missed (an
+    # activity that never reached Strava, or a webhook delivery failure).
+    # Offset from the other Garmin jobs so they never contend for the token
+    # bundle's advisory lock.
+    - cron: '10 */6 * * *'
   workflow_dispatch:
     inputs:
       days:

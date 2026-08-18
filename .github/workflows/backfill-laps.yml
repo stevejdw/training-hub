@@ -21,7 +21,7 @@ on:
     # left for the app and the hourly sync.
     # Offset by 10 min from the sync (:00) and full-streams (:05) jobs so the
     # scheduled workflows don't all hit Strava's token endpoint at once.
-    - cron: '10 0,4,8,12,16,20 * * *'
+    - cron: '50 3 * * *'
 
 jobs:
   backfill:

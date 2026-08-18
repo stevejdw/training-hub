@@ -2,10 +2,10 @@ name: Sync Garmin activity details
 
 on:
   schedule:
-    # :52 — clear of the Strava sync (:00/:30), Garmin wellness (:12) and
-    # Garmin activities (:42), so the two Garmin jobs never contend for the
-    # token bundle's advisory lock.
-    - cron: '52 * * * *'
+    # Safety net only — garmin-push.yml fills details immediately after a new
+    # ride. Offset from the other Garmin jobs to avoid contending for the token
+    # bundle's advisory lock.
+    - cron: '25 */6 * * *'
   workflow_dispatch:
     inputs:
       limit:

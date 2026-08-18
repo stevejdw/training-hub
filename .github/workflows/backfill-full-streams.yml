@@ -20,7 +20,7 @@ on:
     # in laps is ~720 calls, which uses the quota with headroom for the app.
     # Offset by 5 min from the sync (:00) and laps (:10) jobs so the scheduled
     # workflows don't all hit Strava's token endpoint on the same minute.
-    - cron: '5 0,4,8,12,16,20 * * *'
+    - cron: '40 3 * * *'
 
 jobs:
   backfill:

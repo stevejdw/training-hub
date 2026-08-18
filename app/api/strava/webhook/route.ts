@@ -2,6 +2,7 @@ import { after } from 'next/server';
 import { syncActivity } from '@/lib/strava-sync';
 import { syncPowerMeters } from '@/lib/power-meter-sync';
 import { getSyncSources } from '@/lib/sync-sources';
+import { dispatchGarminSync } from '@/lib/github-dispatch';
 
 export const runtime = 'nodejs';
 
@@ -40,8 +41,19 @@ export async function POST(req: Request) {
         // deliberately never checked against this.
         const { primary, intervalsWellness } = await getSyncSources();
         if (primary !== 'strava') {
+          // Strava is only the doorbell here. Garmin has no webhook of its own,
+          // but it auto-syncs to Strava — so this notification means the ride
+          // exists on Garmin too, and we can pull it now rather than waiting
+          // for the next scheduled poll.
+          const r = await dispatchGarminSync({
+            reason:      'strava-webhook',
+            strava_id:   body.object_id,
+            aspect_type: body.aspect_type,
+          });
           console.log(
-            `Webhook: ignored activity ${body.object_id} — primary source is ${primary}`
+            r.ok
+              ? `Webhook: triggered Garmin sync for Strava activity ${body.object_id}`
+              : `Webhook: could not trigger Garmin sync (${r.reason}) — the scheduled poll will catch it`
           );
           return;
         }

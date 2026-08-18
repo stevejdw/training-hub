@@ -41,20 +41,52 @@ export async function DELETE(
   }
 }
 
+/**
+ * PATCH /api/activities/:id — edit user-owned fields.
+ *
+ * `name` renames the activity; `gear_id` reassigns the bike (null clears it).
+ * Both are overwritten by a subsequent Strava sync, which is authoritative
+ * for these fields.
+ */
 export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const body = await req.json().catch(() => ({})) as { name?: string };
-  const name = (body.name ?? '').trim();
-  if (!name) return Response.json({ error: 'name required' }, { status: 400 });
+  const body = await req.json().catch(() => ({})) as { name?: string; gear_id?: string | null };
+
+  const sets: string[] = [];
+  const vals: unknown[] = [];
+  let p = 1;
+
+  if (body.name !== undefined) {
+    const name = body.name.trim();
+    if (!name) return Response.json({ error: 'name cannot be empty' }, { status: 400 });
+    sets.push(`name = $${p++}`);
+    vals.push(name);
+  }
+
+  if ('gear_id' in body) {
+    const gearId = body.gear_id ? String(body.gear_id).trim() : null;
+    if (gearId) {
+      const g = await pool.query(`SELECT 1 FROM gear WHERE id = $1`, [gearId]);
+      if (g.rowCount === 0) return Response.json({ error: 'unknown gear' }, { status: 400 });
+    }
+    sets.push(`gear_id = $${p++}`);
+    vals.push(gearId);
+  }
+
+  if (sets.length === 0) return Response.json({ error: 'name or gear_id required' }, { status: 400 });
 
   const client = await pool.connect();
   try {
+    vals.push(id);
     const r = await client.query(
-      `UPDATE activities SET name = $1, updated_at = NOW() WHERE id = $2 RETURNING id, name`,
-      [name, id]
+      `UPDATE activities a SET ${sets.join(', ')}, updated_at = NOW()
+       WHERE a.id = $${p}
+       RETURNING a.id, a.name, a.gear_id,
+                 (SELECT COALESCE(g.nickname, g.name) FROM gear g WHERE g.id = a.gear_id) AS gear_name`,
+      vals
     );
     if (r.rowCount === 0) return Response.json({ error: 'not found' }, { status: 404 });
     return Response.json({ ok: true, activity: r.rows[0] });

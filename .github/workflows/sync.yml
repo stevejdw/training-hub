@@ -6,7 +6,7 @@ on:
     # minutes (each job is rounded up to a whole minute, and this one runs for
     # ~12 seconds) to halve a freshness window that nothing depends on — rides
     # land once a day, and Garmin activities already sync hourly at :42.
-    - cron: '0 * * * *'
+    - cron: '35 */6 * * *'
   workflow_dispatch:
 
 jobs:

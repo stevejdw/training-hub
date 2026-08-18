@@ -1,0 +1,44 @@
+name: Garmin push sync
+
+# Fired by the app when Strava's webhook reports a new activity. Garmin has no
+# webhook of its own, but it auto-syncs to Strava, so that notification means
+# the ride is on Garmin too — this pulls it within a minute or two instead of
+# waiting for the next scheduled poll. See lib/github-dispatch.ts.
+on:
+  repository_dispatch:
+    types: [garmin-activity]
+  workflow_dispatch:
+
+jobs:
+  push-sync:
+    runs-on: ubuntu-latest
+    # Rides often produce a create and an update event seconds apart. Cancelling
+    # the in-flight run keeps that to one sync rather than two.
+    concurrency:
+      group: garmin-activities
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install 'garminconnect==0.3.10' 'psycopg2-binary==2.9.12' 'cryptography==50.0.0'
+
+      # A short window: this runs seconds after the ride, so only the newest
+      # activities can possibly be missing.
+      - name: Sync recent activities
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          APP_SECRETS_KEY: ${{ secrets.APP_SECRETS_KEY }}
+        run: python .github/scripts/sync_garmin_activities.py 3
+
+      # Streams, laps and route for whatever the step above just inserted.
+      - name: Fill activity details
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          APP_SECRETS_KEY: ${{ secrets.APP_SECRETS_KEY }}
+        run: python .github/scripts/sync_garmin_details.py 5
