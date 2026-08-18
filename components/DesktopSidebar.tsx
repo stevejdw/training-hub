@@ -3,8 +3,8 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useState } from 'react';
 import { ALL_NAV_ITEMS } from './nav-items';
+import { useAppIcon } from '@/components/ProfileProvider';
 
 function isActive(prefixes: readonly string[], pathname: string) {
   return prefixes.some(p => pathname === p || pathname.startsWith(p + '/'));
@@ -16,14 +16,7 @@ function isActive(prefixes: readonly string[], pathname: string) {
  *  clears it via margin-left (see .content-area in globals.css). */
 export default function DesktopSidebar() {
   const pathname = usePathname();
-  const [appIcon, setAppIcon] = useState<string>('speed');
-
-  useEffect(() => {
-    fetch('/api/profile')
-      .then(r => r.json())
-      .then((p: { app_icon?: string }) => { if (p.app_icon) setAppIcon(p.app_icon); })
-      .catch(() => {});
-  }, []);
+  const appIcon = useAppIcon();
 
   // Everything except More (redundant when all items are visible); Settings pinned at the bottom.
   const mainItems = ALL_NAV_ITEMS.filter(i => i.key !== 'more' && i.key !== 'settings');

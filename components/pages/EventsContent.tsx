@@ -184,7 +184,7 @@ export default function EventsContent() {
       <PageHeader icon={iconFor('events')} title="Events" right={plusBtn} />
 
       <div className="flex-1 overflow-y-auto scroll-touch">
-        <div className="max-w-2xl md:max-w-5xl xl:max-w-7xl mx-auto px-4 py-4 md:px-8 md:py-8 space-y-6">
+        <div className="max-w-2xl md:max-w-5xl xl:max-w-7xl mx-auto px-4 py-4 md:px-8 md:py-8 space-y-6 pb-nav">
 
           {/* Upcoming */}
           {upcoming.length > 0 ? (
@@ -207,7 +207,6 @@ export default function EventsContent() {
             </section>
           )}
 
-          <div className="h-20" />
         </div>
       </div>
 

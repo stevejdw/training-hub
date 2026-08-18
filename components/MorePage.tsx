@@ -66,7 +66,7 @@ export default function MorePage() {
     <div className="h-full flex flex-col">
       <PageHeader icon={iconFor('more')} title="More" />
       <div className="flex-1 overflow-y-auto scroll-touch">
-        <div className="max-w-2xl md:max-w-5xl mx-auto">
+        <div className="max-w-2xl md:max-w-5xl mx-auto pb-nav">
 
         {overflow.length > 0 && (
           <div className="bg-surface border-y border-line mb-2 divide-y divide-line/60">
@@ -78,7 +78,6 @@ export default function MorePage() {
           <ItemRow item={editMenuItem} />
         </div>
 
-          <div className="h-20" />
         </div>
       </div>
     </div>

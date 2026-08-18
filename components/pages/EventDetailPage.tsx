@@ -574,7 +574,7 @@ export default function EventDetailPage({ eventId }: Props) {
           <button onClick={cancelEdit} className="text-sm text-ink-4 hover:text-accent-hi transition-colors">← Back</button>
         </div>
         <div className="flex-1 overflow-y-auto scroll-touch">
-          <div className="max-w-2xl md:max-w-5xl xl:max-w-7xl mx-auto px-4 py-4 md:px-8 md:py-6 space-y-5">
+          <div className="max-w-2xl md:max-w-5xl xl:max-w-7xl mx-auto px-4 py-4 md:px-8 md:py-6 space-y-5 pb-nav">
 
             <section className="bg-surface border border-line rounded-2xl p-4 space-y-3">
               <h2 className="text-xs font-semibold text-ink-4 uppercase tracking-wider">Event Details</h2>
@@ -642,7 +642,6 @@ export default function EventDetailPage({ eventId }: Props) {
                 {saving ? 'Saving…' : 'Save event'}
               </button>
             </div>
-            <div className="h-20" />
           </div>
         </div>
       </div>
@@ -662,7 +661,7 @@ export default function EventDetailPage({ eventId }: Props) {
       </div>
 
       <div className="flex-1 overflow-y-auto scroll-touch">
-        <div className="max-w-2xl md:max-w-5xl xl:max-w-7xl mx-auto px-4 py-4 md:px-8 md:py-6 space-y-4">
+        <div className="max-w-2xl md:max-w-5xl xl:max-w-7xl mx-auto px-4 py-4 md:px-8 md:py-6 space-y-4 pb-nav">
 
           {/* ── Event summary ─────────────────────────────────── */}
           <section className="bg-surface border border-line rounded-2xl p-4 space-y-2">
@@ -878,6 +877,7 @@ export default function EventDetailPage({ eventId }: Props) {
                           </div>
                           <button
                             onClick={() => deleteClimb(i)}
+                            aria-label="Remove climb"
                             className="flex-shrink-0 text-ink-5 hover:text-red-400 transition-colors text-lg leading-none ml-1"
                             title="Remove climb"
                           >×</button>
@@ -934,7 +934,7 @@ export default function EventDetailPage({ eventId }: Props) {
                         <button onClick={addCustomClimb} disabled={!addStart || !addEnd}
                           className="flex-shrink-0 px-3 py-1.5 bg-accent hover:bg-accent-hi disabled:opacity-40 text-ink text-xs font-medium rounded-lg transition-colors">Add</button>
                         <button onClick={() => { setShowAddClimb(false); setAddStart(''); setAddEnd(''); }}
-                          className="flex-shrink-0 text-ink-5 hover:text-ink-3 text-xl leading-none pb-0.5">×</button>
+                          aria-label="Remove" className="flex-shrink-0 text-ink-5 hover:text-ink-3 text-xl leading-none pb-0.5">×</button>
                       </div>
                     </div>
                   ) : (
@@ -1010,7 +1010,6 @@ export default function EventDetailPage({ eventId }: Props) {
             </Link>
           )}
 
-          <div className="h-20" />
         </div>
       </div>
     </div>

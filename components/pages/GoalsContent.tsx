@@ -56,6 +56,7 @@ export default function GoalsContent() {
               />
               <button
                 onClick={() => removeAt(i)}
+                aria-label="Remove goal"
                 className="flex-shrink-0 text-ink-5 hover:text-red-400 transition-colors px-2 py-1 text-xs"
               >
                 ✕

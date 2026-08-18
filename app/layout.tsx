@@ -4,6 +4,7 @@ import './globals.css';
 import Nav from '@/components/Nav';
 import ThemeProvider from '@/components/ThemeProvider';
 import NativeShell from '@/components/NativeShell';
+import ProfileProvider from '@/components/ProfileProvider';
 import CommandPalette from '@/components/desktop/CommandPalette';
 
 const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] });
@@ -56,14 +57,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="flex flex-col">
         <ThemeProvider />
         <NativeShell />
-        {/* Top nav — desktop only */}
-        <Nav />
-        {/* ⌘K command palette (desktop only) */}
-        <CommandPalette />
-        {/* Main content fills remaining space */}
-        <main className="content-area flex-1 overflow-hidden">
-          {children}
-        </main>
+        {/* One shared /api/profile read; Nav, PageHeader and the sidebar all
+            used to fetch it separately just to resolve the app icon. */}
+        <ProfileProvider>
+          {/* Top nav — desktop only */}
+          <Nav />
+          {/* ⌘K command palette (desktop only) */}
+          <CommandPalette />
+          {/* Main content fills remaining space */}
+          <main className="content-area flex-1 overflow-hidden">
+            {children}
+          </main>
+        </ProfileProvider>
       </body>
     </html>
   );

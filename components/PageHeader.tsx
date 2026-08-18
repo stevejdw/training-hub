@@ -1,8 +1,8 @@
 'use client';
 
 import Image from 'next/image';
-import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
+import { useAppIcon } from '@/components/ProfileProvider';
 
 export default function PageHeader({
   icon,
@@ -13,14 +13,7 @@ export default function PageHeader({
   title: string;
   right?: ReactNode;
 }) {
-  const [appIcon, setAppIcon] = useState<string>('speed');
-
-  useEffect(() => {
-    fetch('/api/profile')
-      .then(r => r.json())
-      .then((p: { app_icon?: string }) => { if (p.app_icon) setAppIcon(p.app_icon); })
-      .catch(() => {});
-  }, []);
+  const appIcon = useAppIcon();
 
   return (
     <div className="flex-shrink-0 relative flex items-center justify-center md:justify-start px-4 md:px-8 py-3 md:py-4 border-b border-line md:border-b-0 bg-page">

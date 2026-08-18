@@ -468,7 +468,7 @@ function TssGoalEditModal({ initial, onClose, onSaved }: ModalProps) {
             <h3 className="text-sm font-semibold text-ink">TSS Goal Settings</h3>
             <p className="text-mini text-ink-4 mt-0.5">Configure weekly targets for the rolling chart</p>
           </div>
-          <button onClick={onClose} className="text-ink-4 hover:text-ink text-lg leading-none">✕</button>
+          <button onClick={onClose} aria-label="Close" className="text-ink-4 hover:text-ink text-lg leading-none">✕</button>
         </div>
 
         <div className="p-5 space-y-4">

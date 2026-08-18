@@ -315,7 +315,7 @@ function RideModal({ ride, onClose }: { ride: ScatterPoint; onClose: () => void 
             <p className="text-xs text-ink-4">{new Date(ride.date).toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' })}</p>
             <p className="text-sm font-semibold text-ink mt-0.5 leading-tight">{ride.name}</p>
           </div>
-          <button onClick={onClose} className="text-ink-4 hover:text-ink-2 text-lg leading-none ml-4">✕</button>
+          <button onClick={onClose} aria-label="Close" className="text-ink-4 hover:text-ink-2 text-lg leading-none ml-4">✕</button>
         </div>
 
         {/* Route map */}

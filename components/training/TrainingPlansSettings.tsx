@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import CreatePlanModal from './CreatePlanModal';
 import EditPlanModal from './EditPlanModal';
 import { TrainingPlan } from '@/lib/training-plans';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 
 interface PlanMeta {
   id: number;
@@ -44,8 +45,12 @@ export default function TrainingPlansSettings() {
     }
   }
 
-  async function handleDelete(planId: number, name: string) {
-    if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
+  /* window.confirm sat oddly beside EditPlanModal's own in-app confirm step —
+     two confirmation patterns for the same destructive action. */
+  const [pendingDelete, setPendingDelete] = useState<{ id: number; name: string } | null>(null);
+
+  async function handleDelete(planId: number) {
+    setPendingDelete(null);
     setDeleting(planId);
     await fetch(`/api/training/plans/${planId}`, { method: 'DELETE' });
     setDeleting(null);
@@ -120,7 +125,7 @@ export default function TrainingPlansSettings() {
                   {loadingEdit === plan.id ? '…' : 'Edit'}
                 </button>
                 <button
-                  onClick={() => handleDelete(plan.id, plan.name)}
+                  onClick={() => setPendingDelete({ id: plan.id, name: plan.name })}
                   disabled={deleting === plan.id}
                   className="px-3 py-1.5 text-xs font-medium rounded-lg bg-raised hover:bg-red-900/50 text-ink-4 hover:text-red-400 transition-colors disabled:opacity-50"
                 >
@@ -148,6 +153,15 @@ export default function TrainingPlansSettings() {
           onUpdated={handleUpdated}
         />
       )}
+
+    <ConfirmDialog
+      open={pendingDelete !== null}
+      title="Delete training plan"
+      message={`Delete "${pendingDelete?.name ?? ''}"? This cannot be undone.`}
+      confirmLabel="Delete"
+      onConfirm={() => pendingDelete && handleDelete(pendingDelete.id)}
+      onCancel={() => setPendingDelete(null)}
+    />
     </div>
   );
 }

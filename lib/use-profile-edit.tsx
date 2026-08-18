@@ -81,16 +81,37 @@ export function useProfileEdit() {
 export const inputCls = 'w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-orange-500 transition-colors';
 
 /** Common page wrapper used by all account-style pages. */
-export function PageShell({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
+export function PageShell({
+  title,
+  icon,
+  right,
+  width = 'narrow',
+  children,
+}: {
+  title: string;
+  icon: React.ReactNode;
+  right?: React.ReactNode;
+  /** 'narrow' caps at 5xl; 'wide' goes to 7xl on xl screens, matching the
+   *  analytics pages. Page width used to depend on which wrapper a page
+   *  happened to use. */
+  width?: 'narrow' | 'wide';
+  children: React.ReactNode;
+}) {
   return (
     <div className="h-full flex flex-col">
-      <PageHeader icon={icon} title={title} />
+      <PageHeader icon={icon} title={title} right={right} />
       <div className="flex-1 overflow-y-auto scroll-touch">
-        <div className="max-w-2xl md:max-w-5xl mx-auto px-4 py-5 md:px-8 md:py-8 space-y-5">
+        {/* pb-nav derives the bottom clearance from --bottom-nav-h instead of
+            the <div className="h-20" /> spacer this used to end with. */}
+        <div className={`${CONTAINER[width]} mx-auto px-4 py-5 md:px-8 md:py-8 space-y-5 pb-nav`}>
           {children}
-          <div className="h-20" />
         </div>
       </div>
     </div>
   );
 }
+
+const CONTAINER = {
+  narrow: 'max-w-2xl md:max-w-5xl',
+  wide:   'max-w-2xl md:max-w-5xl xl:max-w-7xl',
+} as const;

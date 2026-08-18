@@ -16,14 +16,28 @@ interface Props {
 export default function PeriodSelect({ options, value, onChange, color, includeNone, noneLabel = 'None' }: Props) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     function handler(e: MouseEvent) {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     }
+    /* Escape had no handler at all: keyboard users could open the menu but
+       only close it by clicking elsewhere. Focus returns to the trigger. */
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape' && open) {
+        e.stopPropagation();
+        setOpen(false);
+        btnRef.current?.focus();
+      }
+    }
     document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', handler);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
 
   const selected = options.find((o) => o.key === value);
   const lineColor = color === 'orange' ? CHART.power : CHART.reference;
@@ -33,7 +47,11 @@ export default function PeriodSelect({ options, value, onChange, color, includeN
   return (
     <div ref={ref} className="relative">
       <button
+        ref={btnRef}
+        type="button"
         onClick={() => setOpen(!open)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
         className={`flex items-center gap-2 px-3 py-2 rounded-xl bg-raised border ${borderColor} hover:bg-hover transition-colors text-sm`}
       >
         {/* Line indicator */}
@@ -56,7 +74,7 @@ export default function PeriodSelect({ options, value, onChange, color, includeN
       </button>
 
       {open && (
-        <div className="absolute top-full mt-1 left-0 z-50 bg-surface border border-line-strong rounded-xl shadow-xl min-w-[220px] py-1 overflow-hidden">
+        <div role="listbox" className="absolute top-full mt-1 left-0 z-50 bg-surface border border-line-strong rounded-xl shadow-xl min-w-[220px] py-1 overflow-hidden">
           {includeNone && (
             <button
               onClick={() => { onChange('none'); setOpen(false); }}

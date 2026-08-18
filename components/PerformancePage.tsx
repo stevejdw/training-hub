@@ -10,6 +10,7 @@ import ReadinessTab from './training/ReadinessTab';
 import KeyIntervalsTab from './training/KeyIntervalsTab';
 import PowerCurveWidget from './training/PowerCurveWidget';
 import DashboardBestPower from './DashboardBestPower';
+import SideRail from '@/components/desktop/SideRail';
 
 type Tab = 'fitness' | 'power';
 
@@ -49,21 +50,7 @@ export default function PerformancePage() {
       </div>
 
       {/* Desktop: left sidebar */}
-      <nav className="hidden md:flex flex-col w-44 border-r border-line py-6 px-3 flex-shrink-0 gap-1">
-        {tabs.map(({ key, label }) => (
-          <button
-            key={key}
-            onClick={() => setTab(key)}
-            className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-              tab === key
-                ? 'bg-accent text-ink'
-                : 'text-ink-3 hover:text-ink hover:bg-raised'
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </nav>
+      <SideRail tabs={tabs} active={tab} onSelect={setTab} />
 
       {/* Scrollable content */}
       <div className="flex-1 overflow-y-auto scroll-touch">

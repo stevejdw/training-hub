@@ -192,7 +192,7 @@ export default function ProfileContent() {
                 {i === 0 && <div className="text-micro text-ink-5 mb-1 uppercase tracking-wider">Target W</div>}
                 <input type="number" value={t.target_watts} onChange={e => updatePT(i, 'target_watts', Number(e.target.value))} className={inputCls} placeholder="W" min={50} max={2000} />
               </div>
-              <button onClick={() => removePT(i)} className={`text-ink-5 hover:text-red-400 transition-colors text-xs px-1 py-2 ${i === 0 ? 'mt-5' : ''}`}>✕</button>
+              <button onClick={() => removePT(i)} aria-label="Remove power target" className={`text-ink-5 hover:text-red-400 transition-colors text-xs px-1 py-2 ${i === 0 ? 'mt-5' : ''}`}>✕</button>
             </div>
           ))}
         </div>

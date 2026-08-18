@@ -196,7 +196,7 @@ export default function ClimbDetailPage({ eventId, climbIdx }: Props) {
       </div>
 
       <div className="flex-1 overflow-y-auto scroll-touch">
-        <div className="max-w-2xl md:max-w-5xl xl:max-w-7xl mx-auto px-4 py-4 md:px-8 md:py-6 space-y-5">
+        <div className="max-w-2xl md:max-w-5xl xl:max-w-7xl mx-auto px-4 py-4 md:px-8 md:py-6 space-y-5 pb-nav">
 
           {/* Stats row */}
           <div className="grid grid-cols-4 gap-2">
@@ -377,7 +377,6 @@ export default function ClimbDetailPage({ eventId, climbIdx }: Props) {
             )}
           </section>
 
-          <div className="h-20" />
         </div>
       </div>
     </div>

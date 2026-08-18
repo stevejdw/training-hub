@@ -328,7 +328,7 @@ export default function EventPacingModal({ event, riderWeightKg, onSave, onClose
                       <span className="text-micro text-ink-4 flex-shrink-0">
                         {c.distance_km} km · {c.elevation_gain} m · {c.avg_gradient}%
                       </span>
-                      <button onClick={() => removeClimb(i)} className="text-ink-5 hover:text-red-400 transition-colors text-xs flex-shrink-0">✕</button>
+                      <button onClick={() => removeClimb(i)} aria-label="Remove climb" className="text-ink-5 hover:text-red-400 transition-colors text-xs flex-shrink-0">✕</button>
                     </div>
 
                     {/* Position + watts */}

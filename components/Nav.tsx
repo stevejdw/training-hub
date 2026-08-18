@@ -14,6 +14,7 @@ import {
   loadMiddle,
   moreMatchPrefixes,
 } from './nav-items';
+import { useAppIcon } from '@/components/ProfileProvider';
 
 function isActive(prefixes: readonly string[], pathname: string) {
   return prefixes.some(p => pathname === p || pathname.startsWith(p + '/'));
@@ -34,14 +35,7 @@ export default function Nav() {
   const pathname = usePathname();
 
   const [middle, setMiddle] = useState<string[]>(DEFAULT_MIDDLE);
-  const [appIcon, setAppIcon] = useState<string>('speed');
-
-  useEffect(() => {
-    fetch('/api/profile')
-      .then(r => r.json())
-      .then((p: { app_icon?: string }) => { if (p.app_icon) setAppIcon(p.app_icon); })
-      .catch(() => {});
-  }, []);
+  const appIcon = useAppIcon();
 
   useEffect(() => {
     setMiddle(loadMiddle());

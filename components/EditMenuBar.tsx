@@ -122,7 +122,7 @@ export default function EditMenuBar() {
       </div>
 
       <div className="flex-1 overflow-y-auto scroll-touch">
-      <div className="max-w-2xl md:max-w-5xl mx-auto p-4 md:p-8 space-y-5">
+      <div className="max-w-2xl md:max-w-5xl mx-auto p-4 md:p-8 space-y-5 pb-nav">
 
         <div>
           {tab === 'mobile' ? (
@@ -257,8 +257,6 @@ export default function EditMenuBar() {
           </button>
         </div>
 
-        {/* Spacer so the bottom nav doesn't overlap content */}
-        <div className="h-20" />
       </div>
       </div>
     </div>
