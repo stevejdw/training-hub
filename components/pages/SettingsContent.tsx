@@ -42,7 +42,18 @@ function sinceLabel(iso: string | null): string {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
+type SettingsTab = 'appearance' | 'coaching' | 'you' | 'connections' | 'data';
+
+const SETTINGS_TABS: Array<{ id: SettingsTab; label: string }> = [
+  { id: 'appearance',  label: 'Appearance'  },
+  { id: 'coaching',    label: 'Coaching'    },
+  { id: 'you',         label: 'You'         },
+  { id: 'connections', label: 'Connections' },
+  { id: 'data',        label: 'Data'        },
+];
+
 export default function SettingsContent() {
+  const [tab, setTab] = useState<SettingsTab>('appearance');
   const { profile, update, updateAndSave, save, saving, saved, error } = useProfileEdit();
   const [theme, setTheme] = useState<ThemePreference>('dark');
 
@@ -283,6 +294,25 @@ export default function SettingsContent() {
 
   return (
     <PageShell title="Settings" icon={iconFor("settings")}>
+      {/* Nine stacked sections in one scroll was the "busy" complaint. Five
+          short screens fixes it; an accordion would just hide the density. */}
+      <nav className="flex gap-1 overflow-x-auto scroll-touch -mx-1 px-1 pb-1">
+        {SETTINGS_TABS.map(t => (
+          <button
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
+              tab === t.id
+                ? 'bg-orange-500 text-white'
+                : 'bg-gray-800 text-gray-400 hover:text-gray-200'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </nav>
+
+      {tab === 'appearance' && (<>
       {/* Appearance */}
       <div className="bg-gray-900 rounded-xl p-5 space-y-4 border border-gray-800">
         <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Appearance</h2>
@@ -382,6 +412,8 @@ export default function SettingsContent() {
         </div>
       </div>
 
+      </>)}
+      {tab === 'coaching' && (<>
       {/* AI Settings */}
       <div className="bg-gray-900 rounded-xl p-5 space-y-4 border border-gray-800">
         <div>
@@ -530,6 +562,8 @@ export default function SettingsContent() {
         </div>
       </div>
 
+      </>)}
+      {tab === 'you' && (<>
       {/* Timezone */}
       <div className="bg-gray-900 rounded-xl p-5 space-y-3 border border-gray-800">
         <div>
@@ -641,6 +675,8 @@ export default function SettingsContent() {
       {/* Training Plans */}
       <TrainingPlansSettings />
 
+      </>)}
+      {tab === 'connections' && (<>
       {/* Data sources — exactly one provider writes activities */}
       <div className="bg-gray-900 rounded-xl p-5 space-y-4 border border-gray-800">
         <div>
@@ -911,6 +947,8 @@ export default function SettingsContent() {
         )}
       </div>
 
+      </>)}
+      {tab === 'data' && (<>
       {/* Activity Sync */}
       <div className="bg-gray-900 rounded-xl p-5 space-y-4 border border-gray-800">
         <div>
@@ -978,6 +1016,7 @@ export default function SettingsContent() {
         </div>
       </div>
 
+      </>)}
       <div className="flex justify-between items-center">
         <button
           onClick={async () => {
