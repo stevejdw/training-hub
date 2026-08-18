@@ -150,7 +150,9 @@ function StatRow({ label, value }: { label: string; value: string | number | nul
   );
 }
 
-export default function ActivityDetail({ id }: { id: string }) {
+export default function ActivityDetail(
+  { id, segmentsEnabled = true }: { id: string; segmentsEnabled?: boolean }
+) {
   const [activity, setActivity] = useState<Activity | null>(null);
   const [laps,     setLaps]     = useState<Lap[]>([]);
   const [loading,  setLoading]  = useState(true);
@@ -270,7 +272,7 @@ export default function ActivityDetail({ id }: { id: string }) {
 
   // Lazy-load segments only when Segments tab is opened
   useEffect(() => {
-    if (tab !== 'segments' || segFetched) return;
+    if (!segmentsEnabled || tab !== 'segments' || segFetched) return;
     setSegLoading(true);
     fetch(`/api/activities/${id}/segments`)
       .then(r => r.json())
@@ -304,7 +306,10 @@ export default function ActivityDetail({ id }: { id: string }) {
     { key: 'stats',     label: 'Stats' },
     { key: 'laps',      label: `Laps${laps.length ? ` (${laps.length})` : ''}` },
     { key: 'power-hr',  label: 'Power & HR' },
-    { key: 'segments',  label: `Segments${segments.length ? ` (${segments.length})` : ''}` },
+    // Strava-only concept; hidden when Garmin is the primary source.
+    ...(segmentsEnabled
+      ? [{ key: 'segments' as const, label: `Segments${segments.length ? ` (${segments.length})` : ''}` }]
+      : []),
   ];
 
   const backLink = (
@@ -855,7 +860,7 @@ export default function ActivityDetail({ id }: { id: string }) {
         )}
 
         {/* Tab: Segments */}
-        {tab === 'segments' && (
+        {segmentsEnabled && tab === 'segments' && (
           <div>
             {segLoading ? (
               <div className="space-y-2">
