@@ -1,5 +1,6 @@
 import pool from '@/lib/db';
 import { getStravaToken, ensureSegmentTables } from '@/lib/strava-sync';
+import { getSyncSources, skippedReason } from '@/lib/sync-sources';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -45,6 +46,14 @@ export async function GET() {
 
 // Force re-sync starred segments from Strava
 export async function POST() {
+  // These backfills read from Strava's API. With Garmin as the primary
+  // source they have nothing to add — Garmin's own details sync fills the
+  // same gaps — and running them only burns Strava rate limit.
+  const { primary } = await getSyncSources();
+  if (primary !== 'strava') {
+    return Response.json({ processed: 0, remaining: 0, skipped: skippedReason(primary, 'Strava starred segments backfill') });
+  }
+
   try {
     await ensureSegmentTables();
   } catch (err) {

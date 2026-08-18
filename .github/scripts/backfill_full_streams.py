@@ -242,7 +242,28 @@ def fetch_geo_streams(token, activity_id):
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
+def strava_ingest_enabled(cur) -> bool:
+    """Mirror of lib/sync-sources.ts. These backfills all read from Strava's
+    API, so when Garmin is the primary source they have nothing to contribute
+    and would only burn Strava rate limit — Garmin's own details sync fills the
+    same gaps. Defaults to enabled when the setting is absent."""
+    try:
+        cur.execute("SELECT data->>'primary_source' FROM athlete_profile WHERE id = 1")
+        row = cur.fetchone()
+    except Exception as e:
+        print(f"Could not read primary_source ({e}) — assuming Strava is enabled.")
+        return True
+    return not (row and row[0] == "garmin")
+
+
 def backfill():
+    _gate_conn = connect_db(); _gate_cur = _gate_conn.cursor()
+    _ok = strava_ingest_enabled(_gate_cur)
+    _gate_cur.close(); _gate_conn.close()
+    if not _ok:
+        print("Strava ingest is off — primary source is Garmin. Nothing to do.")
+        return
+
     token = get_access_token()
     _db["conn"] = connect_db()
     _db["cur"]  = _db["conn"].cursor()

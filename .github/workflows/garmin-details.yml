@@ -1,0 +1,40 @@
+name: Sync Garmin activity details
+
+on:
+  schedule:
+    # :52 — clear of the Strava sync (:00/:30), Garmin wellness (:12) and
+    # Garmin activities (:42), so the two Garmin jobs never contend for the
+    # token bundle's advisory lock.
+    - cron: '52 * * * *'
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: 'Max activities to fill this run'
+        required: false
+        default: '25'
+
+jobs:
+  details:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: garmin-details
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install 'garminconnect==0.3.10' 'psycopg2-binary==2.9.12' 'cryptography==50.0.0'
+
+      # Fills streams, laps and the route polyline for Garmin-sourced rides —
+      # everything the detail view, zone charts and map need, which
+      # sync_garmin_activities deliberately leaves alone.
+      - name: Sync details
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          APP_SECRETS_KEY: ${{ secrets.APP_SECRETS_KEY }}
+        run: python .github/scripts/sync_garmin_details.py ${{ github.event.inputs.limit || '25' }}
