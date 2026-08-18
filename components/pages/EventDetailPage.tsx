@@ -19,6 +19,7 @@ import { useProfileEdit, inputCls } from '@/lib/use-profile-edit';
 import Link from 'next/link';
 import { calendarDaysFromToday } from '@/lib/calendar-days';
 import SaveStatus from '@/components/ui/SaveStatus';
+import { CHART } from '@/lib/chart-theme';
 
 const DEFAULT_FLAT_WATTS    = 260;
 const DEFAULT_DESCENT_WATTS = 120;
@@ -162,9 +163,9 @@ function CourseMap({ latlng, climbs, distKm, selectedClimb }: CourseMapProps) {
       const isSel = selectedClimb === ci;
       if (isSel) {
         // Glow halo
-        L.polyline(pts, { color: '#f97316', weight: 10, opacity: 0.22 }).addTo(climbGroup);
+        L.polyline(pts, { color: CHART.power, weight: 10, opacity: 0.22 }).addTo(climbGroup);
         // Main highlight
-        L.polyline(pts, { color: '#f97316', weight: 4.5, opacity: 1 }).addTo(climbGroup);
+        L.polyline(pts, { color: CHART.power, weight: 4.5, opacity: 1 }).addTo(climbGroup);
       } else {
         L.polyline(pts, {
           color:   '#ef4444',
@@ -535,13 +536,13 @@ export default function EventDetailPage({ eventId }: Props) {
     : days > 0   ? `${days} days to go`
     : `${Math.abs(days)} days ago`;
   const daysColor = days !== null && days <= 7 && days > 0 ? 'text-yellow-400'
-    : days !== null && days <= 0 ? 'text-gray-500' : 'text-green-400';
+    : days !== null && days <= 0 ? 'text-ink-4' : 'text-green-400';
 
   if (!profile) {
     return (
       <div className="h-full flex flex-col">
         <PageHeader icon={iconFor('events')} title="Event" />
-        <div className="flex-1 flex items-center justify-center text-gray-600 text-sm">Loading…</div>
+        <div className="flex-1 flex items-center justify-center text-ink-5 text-sm">Loading…</div>
       </div>
     );
   }
@@ -552,14 +553,14 @@ export default function EventDetailPage({ eventId }: Props) {
   if (editing) {
     const editActions = (
       <div className="flex items-center gap-2">
-        <button onClick={cancelEdit} className="px-3 py-1.5 text-sm text-gray-400 hover:text-white transition-colors">
+        <button onClick={cancelEdit} className="px-3 py-1.5 text-sm text-ink-3 hover:text-ink transition-colors">
           Cancel
         </button>
         <SaveStatus error={error} onRetry={saveEdit} />
         <button
           onClick={saveEdit}
           disabled={saving}
-          className="px-4 py-1.5 rounded-lg bg-orange-500 hover:bg-orange-400 disabled:opacity-50 text-white text-sm font-medium transition-colors"
+          className="px-4 py-1.5 rounded-lg bg-accent hover:bg-accent-hi disabled:opacity-50 text-ink text-sm font-medium transition-colors"
         >
           {saving ? 'Saving…' : 'Save'}
         </button>
@@ -569,45 +570,45 @@ export default function EventDetailPage({ eventId }: Props) {
     return (
       <div className="h-full flex flex-col">
         <PageHeader icon={iconFor('events')} title="Edit Event" right={editActions} />
-        <div className="flex-shrink-0 px-4 md:px-8 py-2 border-b border-gray-800/60">
-          <button onClick={cancelEdit} className="text-sm text-gray-500 hover:text-orange-400 transition-colors">← Back</button>
+        <div className="flex-shrink-0 px-4 md:px-8 py-2 border-b border-line/60">
+          <button onClick={cancelEdit} className="text-sm text-ink-4 hover:text-accent-hi transition-colors">← Back</button>
         </div>
         <div className="flex-1 overflow-y-auto scroll-touch">
           <div className="max-w-2xl md:max-w-5xl xl:max-w-7xl mx-auto px-4 py-4 md:px-8 md:py-6 space-y-5">
 
-            <section className="bg-gray-900 border border-gray-800 rounded-2xl p-4 space-y-3">
-              <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Event Details</h2>
+            <section className="bg-surface border border-line rounded-2xl p-4 space-y-3">
+              <h2 className="text-xs font-semibold text-ink-4 uppercase tracking-wider">Event Details</h2>
               <div>
-                <label className="block text-[10px] text-gray-500 uppercase tracking-wider mb-1">Name</label>
+                <label className="block text-micro text-ink-4 uppercase tracking-wider mb-1">Name</label>
                 <input type="text" value={name} onChange={e => setName(e.target.value)} className={inputCls} placeholder="e.g. Peaks Challenge" />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[10px] text-gray-500 uppercase tracking-wider mb-1">Date</label>
+                  <label className="block text-micro text-ink-4 uppercase tracking-wider mb-1">Date</label>
                   <input type="date" value={date} onChange={e => setDate(e.target.value)} className={inputCls} />
                 </div>
                 <div>
-                  <label className="block text-[10px] text-gray-500 uppercase tracking-wider mb-1">Location</label>
+                  <label className="block text-micro text-ink-4 uppercase tracking-wider mb-1">Location</label>
                   <input type="text" value={location} onChange={e => setLocation(e.target.value)} className={inputCls} placeholder="e.g. Falls Creek, VIC" />
                 </div>
               </div>
               <div>
-                <label className="block text-[10px] text-gray-500 uppercase tracking-wider mb-1">Goal</label>
+                <label className="block text-micro text-ink-4 uppercase tracking-wider mb-1">Goal</label>
                 <input type="text" value={goal} onChange={e => setGoal(e.target.value)} className={inputCls} placeholder="e.g. Sub 8:30, finish strong, top 10" />
               </div>
             </section>
 
-            <section className="bg-gray-900 border border-gray-800 rounded-2xl p-4 space-y-3">
-              <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Strava Course</h2>
+            <section className="bg-surface border border-line rounded-2xl p-4 space-y-3">
+              <h2 className="text-xs font-semibold text-ink-4 uppercase tracking-wider">Strava Course</h2>
               {route ? (
                 <div className="flex items-center justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-white truncate">{route.name}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">{totalKm} km · {totalGain} m elevation</p>
+                    <p className="text-sm font-semibold text-ink truncate">{route.name}</p>
+                    <p className="text-xs text-ink-3 mt-0.5">{totalKm} km · {totalGain} m elevation</p>
                   </div>
                   <button
                     onClick={() => { setRoute(null); setClimbs([]); setAutoDetected(false); setRouteInput(''); }}
-                    className="flex-shrink-0 text-xs text-gray-500 hover:text-red-400 transition-colors"
+                    className="flex-shrink-0 text-xs text-ink-4 hover:text-red-400 transition-colors"
                   >
                     Remove
                   </button>
@@ -623,7 +624,7 @@ export default function EventDetailPage({ eventId }: Props) {
                       className={inputCls + ' flex-1'}
                     />
                     <button onClick={loadRoute} disabled={loadingRoute}
-                      className="flex-shrink-0 px-4 py-2 bg-orange-500 hover:bg-orange-400 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors">
+                      className="flex-shrink-0 px-4 py-2 bg-accent hover:bg-accent-hi disabled:opacity-50 text-ink text-sm font-medium rounded-lg transition-colors">
                       {loadingRoute ? '…' : 'Load'}
                     </button>
                   </div>
@@ -633,11 +634,11 @@ export default function EventDetailPage({ eventId }: Props) {
             </section>
 
             <div className="flex justify-between items-center pt-2 pb-4">
-              <button onClick={deleteEvent} className="text-xs text-gray-600 hover:text-red-400 transition-colors">
+              <button onClick={deleteEvent} className="text-xs text-ink-5 hover:text-red-400 transition-colors">
                 Delete event
               </button>
               <button onClick={saveEdit} disabled={saving}
-                className="px-6 py-2.5 rounded-lg bg-orange-500 hover:bg-orange-400 disabled:opacity-50 text-white text-sm font-medium transition-colors">
+                className="px-6 py-2.5 rounded-lg bg-accent hover:bg-accent-hi disabled:opacity-50 text-ink text-sm font-medium transition-colors">
                 {saving ? 'Saving…' : 'Save event'}
               </button>
             </div>
@@ -655,8 +656,8 @@ export default function EventDetailPage({ eventId }: Props) {
     <div className="h-full flex flex-col">
       <PageHeader icon={iconFor('events')} title={name || 'Event'} />
 
-      <div className="flex-shrink-0 px-4 md:px-8 py-2 border-b border-gray-800/60 flex items-center justify-between">
-        <Link href="/events" className="text-sm text-gray-500 hover:text-orange-400 transition-colors">← Events</Link>
+      <div className="flex-shrink-0 px-4 md:px-8 py-2 border-b border-line/60 flex items-center justify-between">
+        <Link href="/events" className="text-sm text-ink-4 hover:text-accent-hi transition-colors">← Events</Link>
         {daysLabel && <span className={`text-xs font-semibold uppercase tracking-wider ${daysColor}`}>{daysLabel}</span>}
       </div>
 
@@ -664,32 +665,32 @@ export default function EventDetailPage({ eventId }: Props) {
         <div className="max-w-2xl md:max-w-5xl xl:max-w-7xl mx-auto px-4 py-4 md:px-8 md:py-6 space-y-4">
 
           {/* ── Event summary ─────────────────────────────────── */}
-          <section className="bg-gray-900 border border-gray-800 rounded-2xl p-4 space-y-2">
+          <section className="bg-surface border border-line rounded-2xl p-4 space-y-2">
             {/* Name row + Edit button */}
             <div className="flex items-start justify-between gap-3">
-              <h2 className="text-xl font-bold text-white leading-tight flex-1">{name || 'Unnamed Event'}</h2>
+              <h2 className="text-xl font-bold text-ink leading-tight flex-1">{name || 'Unnamed Event'}</h2>
               <button
                 onClick={() => setEditing(true)}
-                className="flex-shrink-0 text-xs text-gray-400 hover:text-orange-400 border border-gray-700 hover:border-orange-500/50 rounded-lg px-2.5 py-1.5 transition-colors mt-0.5"
+                className="flex-shrink-0 text-xs text-ink-3 hover:text-accent-hi border border-line-strong hover:border-accent/50 rounded-lg px-2.5 py-1.5 transition-colors mt-0.5"
               >
                 Edit
               </button>
             </div>
-            {goal && <p className="text-sm text-orange-300">{goal}</p>}
+            {goal && <p className="text-sm text-accent-hi">{goal}</p>}
 
             {/* Date + location */}
             <div className="flex flex-wrap items-center gap-3 pt-1">
               {date && (
-                <span className="flex items-center gap-1.5 text-sm text-gray-400">
-                  <svg className="w-3.5 h-3.5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <span className="flex items-center gap-1.5 text-sm text-ink-3">
+                  <svg className="w-3.5 h-3.5 text-ink-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" strokeLinecap="round"/>
                   </svg>
                   {fmtDate(date)}
                 </span>
               )}
               {location && (
-                <span className="flex items-center gap-1.5 text-sm text-gray-400">
-                  <svg className="w-3.5 h-3.5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <span className="flex items-center gap-1.5 text-sm text-ink-3">
+                  <svg className="w-3.5 h-3.5 text-ink-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z" />
                     <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                   </svg>
@@ -697,8 +698,8 @@ export default function EventDetailPage({ eventId }: Props) {
                 </span>
               )}
               {route && (
-                <span className="flex items-center gap-1.5 text-sm text-gray-400">
-                  <svg className="w-3.5 h-3.5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <span className="flex items-center gap-1.5 text-sm text-ink-3">
+                  <svg className="w-3.5 h-3.5 text-ink-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 13l4.553 2.276A1 1 0 0021 21.382V10.618a1 1 0 00-.553-.894L15 7m0 13V7m0 0L9 4" />
                   </svg>
                   {totalKm} km · {totalGain} m
@@ -707,13 +708,13 @@ export default function EventDetailPage({ eventId }: Props) {
             </div>
 
             {!route && (
-              <p className="text-xs text-gray-600 italic pt-1">No Strava course — tap Edit to add one.</p>
+              <p className="text-xs text-ink-5 italic pt-1">No Strava course — tap Edit to add one.</p>
             )}
           </section>
 
           {/* ── Course map ────────────────────────────────────── */}
           {route && (
-            <section className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
+            <section className="bg-surface border border-line rounded-2xl overflow-hidden">
               {route.stream_latlng && route.stream_latlng.length > 1 ? (
                 <>
                   <CourseMap
@@ -722,19 +723,19 @@ export default function EventDetailPage({ eventId }: Props) {
                     distKm={route.stream_distance_km}
                     selectedClimb={selectedClimb}
                   />
-                  <p className="px-3 pb-2 pt-1 text-[10px] text-gray-500 flex items-center gap-3">
+                  <p className="px-3 pb-2 pt-1 text-micro text-ink-4 flex items-center gap-3">
                     <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-green-500" />Start</span>
                     <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-red-500" />Finish</span>
                     <span className="flex items-center gap-1"><span className="inline-block w-3 h-1.5 rounded-sm bg-red-500 opacity-80" />Climbs</span>
                     {selectedClimb !== null && (
-                      <span className="flex items-center gap-1"><span className="inline-block w-3 h-1.5 rounded-sm bg-orange-500" />{climbs[selectedClimb]?.name}</span>
+                      <span className="flex items-center gap-1"><span className="inline-block w-3 h-1.5 rounded-sm bg-accent" />{climbs[selectedClimb]?.name}</span>
                     )}
                   </p>
                 </>
               ) : (
                 <div className="flex items-center justify-between px-4 py-3">
-                  <p className="text-xs text-gray-600">Map unavailable — remove &amp; re-load course in Edit to enable</p>
-                  <button onClick={() => setEditing(true)} className="text-xs text-orange-400 hover:text-orange-300 transition-colors flex-shrink-0 ml-3">
+                  <p className="text-xs text-ink-5">Map unavailable — remove &amp; re-load course in Edit to enable</p>
+                  <button onClick={() => setEditing(true)} className="text-xs text-accent-hi hover:text-accent-hi transition-colors flex-shrink-0 ml-3">
                     Edit →
                   </button>
                 </div>
@@ -745,7 +746,7 @@ export default function EventDetailPage({ eventId }: Props) {
           {/* ── Elevation profile ─────────────────────────────── */}
           {route && chartData.length > 0 && (
             <section ref={elevationRef} className="bg-[#f5f7fa] border border-gray-200 rounded-2xl p-4 space-y-2">
-              <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Elevation Profile</h2>
+              <h2 className="text-xs font-semibold text-ink-4 uppercase tracking-wider">Elevation Profile</h2>
               <EnlargeableChart title="Elevation Profile">
                 {(fs) => (
                   <ResponsiveContainer width="100%" height={fs ? '100%' : 160}>
@@ -757,16 +758,16 @@ export default function EventDetailPage({ eventId }: Props) {
                         </linearGradient>
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" stroke="#d1d5db" vertical={false} />
-                      <XAxis dataKey="km" type="number" domain={['dataMin','dataMax']} tick={{ fill:'#6b7280', fontSize:10 }} axisLine={false} tickLine={false} tickFormatter={v=>`${v}km`} interval="preserveStartEnd" />
-                      <YAxis tick={{ fill:'#6b7280', fontSize:10 }} axisLine={false} tickLine={false} width={36} tickFormatter={v=>`${v}m`} />
+                      <XAxis dataKey="km" type="number" domain={['dataMin','dataMax']} tick={{ fill:CHART.axisText, fontSize:10 }} axisLine={false} tickLine={false} tickFormatter={v=>`${v}km`} interval="preserveStartEnd" />
+                      <YAxis tick={{ fill:CHART.axisText, fontSize:10 }} axisLine={false} tickLine={false} width={36} tickFormatter={v=>`${v}m`} />
                       <Tooltip content={({ active, payload }) => {
                         if (!active || !payload?.length) return null;
                         const km = payload[0].payload.km as number;
                         const inC = climbs.find(c => km >= c.start_km && km <= c.end_km);
                         return (
                           <div className="bg-white border border-gray-200 rounded-lg px-2 py-1 text-xs shadow-sm">
-                            <p className="text-gray-500">{km} km{inC ? ` · ${inC.name}` : ''}</p>
-                            <p className="text-gray-900 font-semibold">{payload[0].value} m</p>
+                            <p className="text-ink-4">{km} km{inC ? ` · ${inC.name}` : ''}</p>
+                            <p className="text-surface font-semibold">{payload[0].value} m</p>
                           </div>
                         );
                       }} />
@@ -776,9 +777,9 @@ export default function EventDetailPage({ eventId }: Props) {
                         return (
                           <ReferenceArea key={`c${i}-${sel}`}
                             x1={c.start_km} x2={c.end_km}
-                            fill={sel ? '#f97316' : '#ef4444'}
+                            fill={sel ? CHART.power : '#ef4444'}
                             fillOpacity={sel ? 0.25 : anySel ? 0 : 0.1}
-                            stroke={sel ? '#f97316' : '#ef4444'}
+                            stroke={sel ? CHART.power : '#ef4444'}
                             strokeOpacity={sel ? 0.9 : anySel ? 0 : 0.25}
                             strokeWidth={sel ? 2 : 1}
                           />
@@ -790,7 +791,7 @@ export default function EventDetailPage({ eventId }: Props) {
                 )}
               </EnlargeableChart>
               {selectedClimb !== null && climbs[selectedClimb] && (
-                <p className="text-xs text-orange-500 text-center font-medium">
+                <p className="text-xs text-accent text-center font-medium">
                   ▲ {climbs[selectedClimb].name} — {climbs[selectedClimb].start_km}–{climbs[selectedClimb].end_km} km
                 </p>
               )}
@@ -799,7 +800,7 @@ export default function EventDetailPage({ eventId }: Props) {
 
           {/* ── Key Climbs tile (expandable) ─────────────────── */}
           {route && (
-            <section className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
+            <section className="bg-surface border border-line rounded-2xl overflow-hidden">
               {/* Header row */}
               <div className="flex items-center justify-between p-4">
                 <button
@@ -808,14 +809,14 @@ export default function EventDetailPage({ eventId }: Props) {
                 >
                   <div className="flex items-center gap-2">
                     <svg
-                      className={`w-4 h-4 text-gray-500 transition-transform duration-200 ${climbsOpen || editingClimbs ? 'rotate-90' : ''}`}
+                      className={`w-4 h-4 text-ink-4 transition-transform duration-200 ${climbsOpen || editingClimbs ? 'rotate-90' : ''}`}
                       fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
                     >
                       <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                     </svg>
-                    <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Key Climbs</h2>
+                    <h2 className="text-xs font-semibold text-ink-4 uppercase tracking-wider">Key Climbs</h2>
                   </div>
-                  <p className="text-sm text-gray-300 mt-0.5">
+                  <p className="text-sm text-ink-2 mt-0.5">
                     {climbs.length > 0
                       ? `${climbs.length} climb${climbs.length !== 1 ? 's' : ''} · ${totalClimbAscent.toLocaleString()} m total ascent`
                       : 'No climbs detected'}
@@ -824,14 +825,14 @@ export default function EventDetailPage({ eventId }: Props) {
                 {editingClimbs ? (
                   <button
                     onClick={applyClimbEdits}
-                    className="flex-shrink-0 text-xs text-orange-400 hover:text-orange-300 border border-orange-500/30 hover:border-orange-500/60 rounded-lg px-3 py-1.5 transition-colors ml-3"
+                    className="flex-shrink-0 text-xs text-accent-hi hover:text-accent-hi border border-accent/30 hover:border-accent/60 rounded-lg px-3 py-1.5 transition-colors ml-3"
                   >
                     Done
                   </button>
                 ) : (
                   <button
                     onClick={() => { setClimbsOpen(true); startClimbEdit(); }}
-                    className="flex-shrink-0 text-xs text-gray-500 hover:text-orange-400 border border-gray-700 hover:border-orange-500/40 rounded-lg px-3 py-1.5 transition-colors ml-3"
+                    className="flex-shrink-0 text-xs text-ink-4 hover:text-accent-hi border border-line-strong hover:border-accent/40 rounded-lg px-3 py-1.5 transition-colors ml-3"
                   >
                     Edit
                   </button>
@@ -840,7 +841,7 @@ export default function EventDetailPage({ eventId }: Props) {
 
               {/* Climb list */}
               {(climbsOpen || editingClimbs) && climbs.length > 0 && (
-                <div className="border-t border-gray-800 divide-y divide-gray-800/60">
+                <div className="border-t border-line divide-y divide-line/60">
                   {climbs.map((c, i) => {
                     const seg    = segments.find(s => s.type === 'climb' && s.climb_idx === i);
                     const estStr = seg ? fmtTime(seg.est_time_min) : null;
@@ -849,35 +850,35 @@ export default function EventDetailPage({ eventId }: Props) {
                       const draft = climbDrafts[i] ?? { start_km: String(c.start_km), end_km: String(c.end_km) };
                       return (
                         <div key={i} className="flex items-center gap-2 px-4 py-2.5">
-                          <span className="flex-shrink-0 w-5 h-5 rounded-full bg-gray-800 flex items-center justify-center text-[10px] font-bold text-gray-400">
+                          <span className="flex-shrink-0 w-5 h-5 rounded-full bg-raised flex items-center justify-center text-micro font-bold text-ink-3">
                             {i + 1}
                           </span>
-                          <p className="text-xs font-medium text-white truncate flex-1 min-w-0">{c.name}</p>
+                          <p className="text-xs font-medium text-ink truncate flex-1 min-w-0">{c.name}</p>
                           <div className="flex items-center gap-1.5 flex-shrink-0">
                             <div className="flex flex-col items-end">
-                              <label className="text-[9px] text-gray-600 uppercase tracking-wider mb-0.5">Start km</label>
+                              <label className="text-micro text-ink-5 uppercase tracking-wider mb-0.5">Start km</label>
                               <input
                                 type="number"
                                 value={draft.start_km}
                                 step="0.1" min="0"
                                 onChange={e => setClimbDrafts(prev => prev.map((d, idx) => idx === i ? { ...d, start_km: e.target.value } : d))}
-                                className="w-16 bg-gray-800 border border-gray-700 rounded px-1.5 py-1 text-xs text-white text-right focus:outline-none focus:border-orange-500 tabular-nums"
+                                className="w-16 bg-raised border border-line-strong rounded px-1.5 py-1 text-xs text-ink text-right focus:outline-none focus:border-accent tabular-nums"
                               />
                             </div>
                             <div className="flex flex-col items-end">
-                              <label className="text-[9px] text-gray-600 uppercase tracking-wider mb-0.5">End km</label>
+                              <label className="text-micro text-ink-5 uppercase tracking-wider mb-0.5">End km</label>
                               <input
                                 type="number"
                                 value={draft.end_km}
                                 step="0.1" min="0"
                                 onChange={e => setClimbDrafts(prev => prev.map((d, idx) => idx === i ? { ...d, end_km: e.target.value } : d))}
-                                className="w-16 bg-gray-800 border border-gray-700 rounded px-1.5 py-1 text-xs text-white text-right focus:outline-none focus:border-orange-500 tabular-nums"
+                                className="w-16 bg-raised border border-line-strong rounded px-1.5 py-1 text-xs text-ink text-right focus:outline-none focus:border-accent tabular-nums"
                               />
                             </div>
                           </div>
                           <button
                             onClick={() => deleteClimb(i)}
-                            className="flex-shrink-0 text-gray-600 hover:text-red-400 transition-colors text-lg leading-none ml-1"
+                            className="flex-shrink-0 text-ink-5 hover:text-red-400 transition-colors text-lg leading-none ml-1"
                             title="Remove climb"
                           >×</button>
                         </div>
@@ -890,22 +891,22 @@ export default function EventDetailPage({ eventId }: Props) {
                           setSelectedClimb(isSel ? null : i);
                           if (!isSel) elevationRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                         }}
-                        className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-800/40 transition-colors group text-left ${isSel ? 'bg-orange-500/5' : ''}`}
+                        className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-raised/40 transition-colors group text-left ${isSel ? 'bg-accent/5' : ''}`}
                       >
-                        <span className={`flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold transition-colors ${isSel ? 'bg-orange-500/30 text-orange-400' : 'bg-gray-800 text-gray-400 group-hover:bg-orange-500/20 group-hover:text-orange-400'}`}>
+                        <span className={`flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-micro font-bold transition-colors ${isSel ? 'bg-accent/30 text-accent-hi' : 'bg-raised text-ink-3 group-hover:bg-accent/20 group-hover:text-accent-hi'}`}>
                           {i + 1}
                         </span>
                         <div className="flex-1 min-w-0">
-                          <p className={`text-sm font-semibold truncate ${isSel ? 'text-orange-400' : 'text-white'}`}>{c.name}</p>
-                          <div className="flex items-center gap-3 mt-0.5 text-[11px] text-gray-500">
+                          <p className={`text-sm font-semibold truncate ${isSel ? 'text-accent-hi' : 'text-ink'}`}>{c.name}</p>
+                          <div className="flex items-center gap-3 mt-0.5 text-mini text-ink-4">
                             <span>{c.start_km}–{c.end_km} km</span>
                             <span>{c.distance_km} km</span>
-                            <span className="text-orange-400">+{c.elevation_gain} m</span>
+                            <span className="text-accent-hi">+{c.elevation_gain} m</span>
                             <span>{c.avg_gradient}% avg</span>
                           </div>
                         </div>
                         {estStr && (
-                          <span className="flex-shrink-0 text-sm font-bold text-white tabular-nums">{estStr}</span>
+                          <span className="flex-shrink-0 text-sm font-bold text-ink tabular-nums">{estStr}</span>
                         )}
                       </button>
                     );
@@ -915,35 +916,35 @@ export default function EventDetailPage({ eventId }: Props) {
 
               {/* Edit mode footer: add + refresh */}
               {editingClimbs && (
-                <div className="border-t border-gray-800/60 p-3">
+                <div className="border-t border-line/60 p-3">
                   {showAddClimb ? (
                     <div className="space-y-2">
-                      <p className="text-[10px] text-gray-500 uppercase tracking-wider">Add climb</p>
+                      <p className="text-micro text-ink-4 uppercase tracking-wider">Add climb</p>
                       <div className="flex items-end gap-2">
                         <div className="flex-1">
-                          <label className="text-[9px] text-gray-600 uppercase tracking-wider block mb-1">Start km</label>
+                          <label className="text-micro text-ink-5 uppercase tracking-wider block mb-1">Start km</label>
                           <input type="number" value={addStart} onChange={e => setAddStart(e.target.value)} placeholder="e.g. 73.9"
-                            className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-orange-500" step="0.1" min="0" />
+                            className="w-full bg-raised border border-line-strong rounded px-2 py-1.5 text-xs text-ink focus:outline-none focus:border-accent" step="0.1" min="0" />
                         </div>
                         <div className="flex-1">
-                          <label className="text-[9px] text-gray-600 uppercase tracking-wider block mb-1">End km</label>
+                          <label className="text-micro text-ink-5 uppercase tracking-wider block mb-1">End km</label>
                           <input type="number" value={addEnd} onChange={e => setAddEnd(e.target.value)} placeholder="e.g. 83.9"
-                            className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-orange-500" step="0.1" min="0" />
+                            className="w-full bg-raised border border-line-strong rounded px-2 py-1.5 text-xs text-ink focus:outline-none focus:border-accent" step="0.1" min="0" />
                         </div>
                         <button onClick={addCustomClimb} disabled={!addStart || !addEnd}
-                          className="flex-shrink-0 px-3 py-1.5 bg-orange-500 hover:bg-orange-400 disabled:opacity-40 text-white text-xs font-medium rounded-lg transition-colors">Add</button>
+                          className="flex-shrink-0 px-3 py-1.5 bg-accent hover:bg-accent-hi disabled:opacity-40 text-ink text-xs font-medium rounded-lg transition-colors">Add</button>
                         <button onClick={() => { setShowAddClimb(false); setAddStart(''); setAddEnd(''); }}
-                          className="flex-shrink-0 text-gray-600 hover:text-gray-400 text-xl leading-none pb-0.5">×</button>
+                          className="flex-shrink-0 text-ink-5 hover:text-ink-3 text-xl leading-none pb-0.5">×</button>
                       </div>
                     </div>
                   ) : (
                     <div className="flex items-center justify-between">
                       <button onClick={() => setShowAddClimb(true)}
-                        className="text-xs text-orange-400 hover:text-orange-300 transition-colors flex items-center gap-1">
+                        className="text-xs text-accent-hi hover:text-accent-hi transition-colors flex items-center gap-1">
                         <span className="text-base leading-none">+</span> Add climb
                       </button>
                       <button onClick={() => { resetClimbs(); setClimbDrafts([]); }}
-                        className="text-xs text-gray-600 hover:text-gray-400 transition-colors flex items-center gap-1">
+                        className="text-xs text-ink-5 hover:text-ink-3 transition-colors flex items-center gap-1">
                         ↺ Refresh
                       </button>
                     </div>
@@ -952,7 +953,7 @@ export default function EventDetailPage({ eventId }: Props) {
               )}
 
               {(climbsOpen || editingClimbs) && climbs.length === 0 && !showAddClimb && (
-                <div className="border-t border-gray-800 px-4 py-4 text-sm text-gray-600">
+                <div className="border-t border-line px-4 py-4 text-sm text-ink-5">
                   {editingClimbs ? 'Add climbs below, or use Refresh to auto-detect.' : 'Load a Strava course to auto-detect climbs.'}
                 </div>
               )}
@@ -963,11 +964,11 @@ export default function EventDetailPage({ eventId }: Props) {
           {route && (
             <Link
               href={`/events/${eventId}/pacing`}
-              className="block bg-gray-900 border border-gray-800 rounded-2xl p-4 hover:bg-gray-800/40 hover:border-gray-700 transition-colors group"
+              className="block bg-surface border border-line rounded-2xl p-4 hover:bg-raised/40 hover:border-line-strong transition-colors group"
             >
               <div className="flex items-start justify-between gap-3 mb-3">
-                <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Pacing Strategy</h2>
-                <svg className="w-4 h-4 text-gray-600 group-hover:text-orange-400 flex-shrink-0 transition-colors mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <h2 className="text-xs font-semibold text-ink-4 uppercase tracking-wider">Pacing Strategy</h2>
+                <svg className="w-4 h-4 text-ink-5 group-hover:text-accent-hi flex-shrink-0 transition-colors mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                 </svg>
               </div>
@@ -976,12 +977,12 @@ export default function EventDetailPage({ eventId }: Props) {
                 <>
                   <div className="grid grid-cols-3 gap-2 mb-3">
                     {[
-                      { label: 'Est Time',  value: fmtTime(estMin),         color: 'text-white' },
-                      { label: 'Avg Power', value: `${avgWatts ?? '—'}W`,   color: 'text-orange-400' },
+                      { label: 'Est Time',  value: fmtTime(estMin),         color: 'text-ink' },
+                      { label: 'Avg Power', value: `${avgWatts ?? '—'}W`,   color: 'text-accent-hi' },
                       { label: 'NP',        value: `${np ?? '—'}W`,         color: 'text-yellow-400' },
                     ].map(({ label, value, color }) => (
-                      <div key={label} className="bg-gray-800/60 rounded-lg p-2 text-center">
-                        <p className="text-[9px] text-gray-500 uppercase tracking-wider mb-0.5">{label}</p>
+                      <div key={label} className="bg-raised/60 rounded-lg p-2 text-center">
+                        <p className="text-micro text-ink-4 uppercase tracking-wider mb-0.5">{label}</p>
                         <p className={`text-sm font-bold tabular-nums ${color}`}>{value}</p>
                       </div>
                     ))}
@@ -992,19 +993,19 @@ export default function EventDetailPage({ eventId }: Props) {
                     const descentMin = segments.filter(s => s.type === 'descent').reduce((t, s) => t + s.est_time_min, 0);
                     const flatMin    = segments.filter(s => s.type === 'flat').reduce((t, s) => t + s.est_time_min, 0);
                     return (
-                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500 border-t border-gray-800/60 pt-2">
-                        {climbMin > 0   && <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-orange-500/60" />Climbing {fmtTime(climbMin)}</span>}
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-4 border-t border-line/60 pt-2">
+                        {climbMin > 0   && <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-accent/60" />Climbing {fmtTime(climbMin)}</span>}
                         {descentMin > 0 && <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500/60" />Descending {fmtTime(descentMin)}</span>}
                         {flatMin > 0    && <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-gray-500/60" />Flat / Rolling {fmtTime(flatMin)}</span>}
                       </div>
                     );
                   })()}
-                  <p className="text-[10px] text-gray-600 mt-2 pt-2 border-t border-gray-800/60">
-                    Open pacing → Past rides → <span className="text-gray-400">Compare pacing</span> vs strategy.
+                  <p className="text-micro text-ink-5 mt-2 pt-2 border-t border-line/60">
+                    Open pacing → Past rides → <span className="text-ink-3">Compare pacing</span> vs strategy.
                   </p>
                 </>
               ) : (
-                <p className="text-xs text-gray-600">Tap to set up pacing — compare strategy vs past rides on this course</p>
+                <p className="text-xs text-ink-5">Tap to set up pacing — compare strategy vs past rides on this course</p>
               )}
             </Link>
           )}

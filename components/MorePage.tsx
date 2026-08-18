@@ -17,11 +17,11 @@ function ItemRow({ item }: { item: NavItem }) {
   return (
     <Link
       href={item.href}
-      className="flex items-center gap-3 px-4 py-3.5 hover:bg-gray-800/40 active:bg-gray-800/60 transition-colors"
+      className="flex items-center gap-3 px-4 py-3.5 hover:bg-raised/40 active:bg-raised/60 transition-colors"
     >
-      <span className="text-orange-400 flex-shrink-0">{item.icon}</span>
-      <span className="text-base text-gray-100 font-medium flex-1">{item.label}</span>
-      <svg className="w-5 h-5 text-gray-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+      <span className="text-accent-hi flex-shrink-0">{item.icon}</span>
+      <span className="text-base text-ink font-medium flex-1">{item.label}</span>
+      <svg className="w-5 h-5 text-ink-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
       </svg>
     </Link>
@@ -69,12 +69,12 @@ export default function MorePage() {
         <div className="max-w-2xl md:max-w-5xl mx-auto">
 
         {overflow.length > 0 && (
-          <div className="bg-gray-900 border-y border-gray-800 mb-2 divide-y divide-gray-800/60">
+          <div className="bg-surface border-y border-line mb-2 divide-y divide-line/60">
             {overflow.map(item => <ItemRow key={item.key} item={item} />)}
           </div>
         )}
 
-        <div className="bg-gray-900 border-y border-gray-800 mb-2 divide-y divide-gray-800/60">
+        <div className="bg-surface border-y border-line mb-2 divide-y divide-line/60">
           <ItemRow item={editMenuItem} />
         </div>
 

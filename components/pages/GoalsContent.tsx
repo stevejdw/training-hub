@@ -8,7 +8,7 @@ export default function GoalsContent() {
   const { profile, setProfile, save, saving, saved, error } = useProfileEdit();
 
   if (!profile) {
-    return <PageShell title="Goals" icon={iconFor("goals")}><div className="text-gray-500 text-sm">Loading…</div></PageShell>;
+    return <PageShell title="Goals" icon={iconFor("goals")}><div className="text-ink-4 text-sm">Loading…</div></PageShell>;
   }
 
   const goals = profile.goals ?? [];
@@ -28,20 +28,20 @@ export default function GoalsContent() {
 
   return (
     <PageShell title="Goals" icon={iconFor("goals")}>
-      <div className="bg-gray-900 rounded-xl p-5 space-y-3 border border-gray-800">
+      <div className="bg-surface rounded-xl p-5 space-y-3 border border-line">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Training Goals</h2>
-          <button onClick={add} className="text-sm text-orange-400 hover:text-orange-300 transition-colors">
+          <h2 className="text-sm font-semibold text-ink-2 uppercase tracking-wider">Training Goals</h2>
+          <button onClick={add} className="text-sm text-accent-hi hover:text-accent-hi transition-colors">
             + Add goal
           </button>
         </div>
 
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-ink-4">
           Goals are used by Coach AI when generating training plans and feedback.
         </p>
 
         {goals.length === 0 && (
-          <p className="text-sm text-gray-600 py-1">No goals yet. Add one above.</p>
+          <p className="text-sm text-ink-5 py-1">No goals yet. Add one above.</p>
         )}
 
         <div className="space-y-2">
@@ -56,7 +56,7 @@ export default function GoalsContent() {
               />
               <button
                 onClick={() => removeAt(i)}
-                className="flex-shrink-0 text-gray-600 hover:text-red-400 transition-colors px-2 py-1 text-xs"
+                className="flex-shrink-0 text-ink-5 hover:text-red-400 transition-colors px-2 py-1 text-xs"
               >
                 ✕
               </button>
@@ -67,7 +67,7 @@ export default function GoalsContent() {
 
       <div className="flex justify-end items-center gap-3">
         <SaveStatus error={error} onRetry={() => save()} />
-        <button onClick={() => save()} disabled={saving} className="px-6 py-2.5 rounded-lg bg-orange-500 hover:bg-orange-400 disabled:opacity-50 text-white text-sm font-medium transition-colors">
+        <button onClick={() => save()} disabled={saving} className="px-6 py-2.5 rounded-lg bg-accent hover:bg-accent-hi disabled:opacity-50 text-ink text-sm font-medium transition-colors">
           {saving ? 'Saving…' : saved ? 'Saved ✓' : 'Save goals'}
         </button>
       </div>

@@ -31,14 +31,14 @@ export default function DesktopSidebar() {
 
   const linkClass = (active: boolean) =>
     `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-      active ? 'bg-orange-500/15 text-orange-400' : 'text-gray-400 hover:text-white hover:bg-gray-800'
+      active ? 'bg-accent/15 text-accent-hi' : 'text-ink-3 hover:text-ink hover:bg-raised'
     }`;
 
   return (
-    <aside className="desktop-sidebar hidden lg:flex flex-col bg-gray-950 border-r border-gray-800">
+    <aside className="desktop-sidebar hidden lg:flex flex-col bg-page border-r border-line">
       <Link href="/home" className="flex items-center gap-3 px-4 h-16 flex-shrink-0">
         <Image src={`/app-icon-${appIcon}.png`} alt="Training Hub" width={32} height={32} className="rounded-lg" />
-        <span className="text-sm font-semibold text-white tracking-wide">Training Hub</span>
+        <span className="text-sm font-semibold text-ink tracking-wide">Training Hub</span>
       </Link>
 
       <nav className="flex-1 flex flex-col gap-0.5 px-3 py-2 overflow-y-auto">
@@ -50,7 +50,7 @@ export default function DesktopSidebar() {
         ))}
       </nav>
 
-      <div className="px-3 py-3 border-t border-gray-800">
+      <div className="px-3 py-3 border-t border-line">
         <Link href={settingsItem.href} className={linkClass(isActive(settingsItem.matchPrefixes, pathname))}>
           {settingsItem.icon}
           <span>{settingsItem.label}</span>

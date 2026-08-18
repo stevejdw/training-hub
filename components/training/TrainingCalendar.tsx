@@ -90,16 +90,16 @@ function DayCell({ day }: { day: CalendarDay }) {
         hasAct
           ? day.match_status === 'match' ? 'bg-green-500/20 text-green-400 ring-1 ring-green-500/40'
           : day.match_status === 'extra' ? 'bg-amber-500/20 text-amber-400 ring-1 ring-amber-500/40'
-          : 'bg-orange-500/20 text-orange-400 ring-1 ring-orange-500/30'
+          : 'bg-accent/20 text-accent-hi ring-1 ring-accent/30'
           : day.plan
-          ? 'bg-gray-700/40 text-gray-600 ring-1 ring-dashed ring-gray-700'
+          ? 'bg-hover/40 text-ink-5 ring-1 ring-dashed ring-line-strong'
           : day.isToday
-          ? 'ring-1 ring-orange-500/60 text-gray-600'
-          : 'text-gray-800'
+          ? 'ring-1 ring-accent/60 text-ink-5'
+          : 'text-raised'
       }`}>
         {hasAct && <SportIcon sportType={act.sport_type} />}
         {!hasAct && day.plan && (
-          <svg className="w-2.5 h-2.5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <svg className="w-2.5 h-2.5 text-ink-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
           </svg>
         )}
@@ -113,7 +113,7 @@ function DayCell({ day }: { day: CalendarDay }) {
 
       {/* Today ring */}
       {day.isToday && (
-        <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-orange-500" />
+        <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-accent" />
       )}
     </div>
   );
@@ -139,9 +139,9 @@ function WeekRow({ week }: { week: CalendarWeek }) {
   const weekLabel = `${M[wm-1]} ${wd}`;
 
   return (
-    <div className="grid grid-cols-[48px_repeat(7,1fr)_56px] gap-0 items-center border-b border-gray-800/60 last:border-b-0">
+    <div className="grid grid-cols-[48px_repeat(7,1fr)_56px] gap-0 items-center border-b border-line/60 last:border-b-0">
       {/* Week label */}
-      <div className="py-2 pr-1 text-[9px] text-gray-600 font-medium leading-tight text-right">{weekLabel}</div>
+      <div className="py-2 pr-1 text-micro text-ink-5 font-medium leading-tight text-right">{weekLabel}</div>
 
       {/* Day cells */}
       {week.days.map(day => (
@@ -151,15 +151,15 @@ function WeekRow({ week }: { week: CalendarWeek }) {
       ))}
 
       {/* Row totals */}
-      <div className="py-2 pl-1 text-[9px] text-gray-500 leading-tight text-right">
+      <div className="py-2 pl-1 text-micro text-ink-4 leading-tight text-right">
         {hasAny ? (
           <>
-            <div className="text-gray-400 font-medium">{totals.km}k</div>
+            <div className="text-ink-3 font-medium">{totals.km}k</div>
             <div>{totals.hours}h</div>
-            {totals.tss > 0 && <div className="text-gray-600">{totals.tss}</div>}
+            {totals.tss > 0 && <div className="text-ink-5">{totals.tss}</div>}
           </>
         ) : (
-          <span className="text-gray-800">—</span>
+          <span className="text-raised">—</span>
         )}
       </div>
     </div>
@@ -179,12 +179,12 @@ export default function TrainingCalendar({ numWeeks = 8 }: Props) {
 
   return (
     <div className="space-y-2">
-      <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 px-0.5">
+      <h3 className="text-xs font-semibold uppercase tracking-wider text-ink-4 px-0.5">
         Training Calendar
       </h3>
 
       {/* Legend */}
-      <div className="flex items-center gap-4 text-[10px] text-gray-500">
+      <div className="flex items-center gap-4 text-micro text-ink-4">
         <span className="flex items-center gap-1.5">
           <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
           Followed plan
@@ -199,29 +199,29 @@ export default function TrainingCalendar({ numWeeks = 8 }: Props) {
         </span>
       </div>
 
-      <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
+      <div className="bg-surface border border-line rounded-2xl overflow-hidden">
         {/* Header row */}
-        <div className="grid grid-cols-[48px_repeat(7,1fr)_56px] gap-0 border-b border-gray-800 bg-gray-950/60">
+        <div className="grid grid-cols-[48px_repeat(7,1fr)_56px] gap-0 border-b border-line bg-page/60">
           <div />
           {DOW_LABELS.map((d, i) => (
-            <div key={i} className="py-1.5 text-[9px] font-semibold uppercase tracking-wider text-gray-600 text-center">
+            <div key={i} className="py-1.5 text-micro font-semibold uppercase tracking-wider text-ink-5 text-center">
               {d}
             </div>
           ))}
-          <div className="py-1.5 text-[9px] font-semibold uppercase tracking-wider text-gray-600 text-right pr-1">
+          <div className="py-1.5 text-micro font-semibold uppercase tracking-wider text-ink-5 text-right pr-1">
             Totals
           </div>
         </div>
 
         {/* Week rows */}
         {loading && !data ? (
-          <div className="divide-y divide-gray-800/60">
+          <div className="divide-y divide-line/60">
             {Array.from({ length: numWeeks }).map((_, i) => (
               <div key={i} className="grid grid-cols-[48px_repeat(7,1fr)_56px] gap-0 py-2 animate-pulse">
                 <div />
                 {Array.from({ length: 7 }).map((_, j) => (
                   <div key={j} className="flex justify-center">
-                    <div className="w-7 h-7 rounded-full bg-gray-800" />
+                    <div className="w-7 h-7 rounded-full bg-raised" />
                   </div>
                 ))}
                 <div />
@@ -231,7 +231,7 @@ export default function TrainingCalendar({ numWeeks = 8 }: Props) {
         ) : data?.weeks?.length ? (
           data.weeks.map(week => <WeekRow key={week.week_start} week={week} />)
         ) : (
-          <div className="px-4 py-6 text-center text-sm text-gray-500">
+          <div className="px-4 py-6 text-center text-sm text-ink-4">
             No training data yet.
           </div>
         )}

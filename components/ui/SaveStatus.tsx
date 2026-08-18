@@ -34,7 +34,7 @@ export default function SaveStatus({
       </span>
     );
   }
-  if (saving) return <span className="text-xs text-gray-500">Saving…</span>;
+  if (saving) return <span className="text-xs text-ink-4">Saving…</span>;
   if (saved)  return <span className="text-xs text-green-400">Saved ✓</span>;
   return null;
 }

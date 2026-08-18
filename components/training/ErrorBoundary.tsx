@@ -34,7 +34,7 @@ export default class ErrorBoundary extends React.Component<Props, State> {
           <p className="text-sm text-red-400">Something went wrong.</p>
           <button
             onClick={() => this.setState({ hasError: false, error: null })}
-            className="mt-2 text-xs text-gray-400 hover:text-white underline"
+            className="mt-2 text-xs text-ink-3 hover:text-ink underline"
           >
             Try again
           </button>

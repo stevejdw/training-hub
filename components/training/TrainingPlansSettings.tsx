@@ -63,12 +63,12 @@ export default function TrainingPlansSettings() {
   }
 
   return (
-    <div className="bg-gray-900 rounded-xl p-5 space-y-4 border border-gray-800">
+    <div className="bg-surface rounded-xl p-5 space-y-4 border border-line">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Training Plans</h2>
+        <h2 className="text-sm font-semibold text-ink-2 uppercase tracking-wider">Training Plans</h2>
         <button
           onClick={() => setShowCreate(true)}
-          className="px-3 py-1.5 text-sm font-medium bg-orange-500 hover:bg-orange-400 text-white rounded-lg transition-colors"
+          className="px-3 py-1.5 text-sm font-medium bg-accent hover:bg-accent-hi text-ink rounded-lg transition-colors"
         >
           + Generate plan
         </button>
@@ -76,14 +76,14 @@ export default function TrainingPlansSettings() {
 
       {loading && (
         <div className="space-y-2">
-          {[1, 2].map(i => <div key={i} className="h-16 bg-gray-800 rounded-xl animate-pulse" />)}
+          {[1, 2].map(i => <div key={i} className="h-16 bg-raised rounded-xl animate-pulse" />)}
         </div>
       )}
 
       {!loading && plans.length === 0 && (
-        <div className="rounded-xl border border-gray-700 border-dashed p-6 text-center">
-          <p className="text-sm text-gray-500">No training plans yet</p>
-          <p className="text-xs text-gray-600 mt-1">Generate an AI-personalised plan based on your profile and goals</p>
+        <div className="rounded-xl border border-line-strong border-dashed p-6 text-center">
+          <p className="text-sm text-ink-4">No training plans yet</p>
+          <p className="text-xs text-ink-5 mt-1">Generate an AI-personalised plan based on your profile and goals</p>
         </div>
       )}
 
@@ -93,20 +93,20 @@ export default function TrainingPlansSettings() {
             <div
               key={plan.id}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl border ${
-                i === 0 ? 'border-orange-500/30 bg-orange-500/5' : 'border-gray-800 bg-gray-800/40'
+                i === 0 ? 'border-accent/30 bg-accent/5' : 'border-line bg-raised/40'
               }`}
             >
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <p className="text-sm font-medium text-white truncate">{plan.name}</p>
+                  <p className="text-sm font-medium text-ink truncate">{plan.name}</p>
                   {i === 0 && (
-                    <span className="flex-shrink-0 text-[10px] bg-orange-500/20 text-orange-400 border border-orange-500/30 rounded px-1.5 py-0.5 font-medium">
+                    <span className="flex-shrink-0 text-micro bg-accent/20 text-accent-hi border border-accent/30 rounded px-1.5 py-0.5 font-medium">
                       Active
                     </span>
                   )}
                 </div>
-                <p className="text-xs text-gray-500 mt-0.5">
-                  {plan.goal && <span className="text-gray-400">{plan.goal} · </span>}
+                <p className="text-xs text-ink-4 mt-0.5">
+                  {plan.goal && <span className="text-ink-3">{plan.goal} · </span>}
                   Created {fmtDate(plan.created_at)}
                 </p>
               </div>
@@ -115,14 +115,14 @@ export default function TrainingPlansSettings() {
                 <button
                   onClick={() => handleEdit(plan.id)}
                   disabled={loadingEdit === plan.id}
-                  className="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white transition-colors disabled:opacity-50"
+                  className="px-3 py-1.5 text-xs font-medium rounded-lg bg-raised hover:bg-hover text-ink-2 hover:text-ink transition-colors disabled:opacity-50"
                 >
                   {loadingEdit === plan.id ? '…' : 'Edit'}
                 </button>
                 <button
                   onClick={() => handleDelete(plan.id, plan.name)}
                   disabled={deleting === plan.id}
-                  className="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-800 hover:bg-red-900/50 text-gray-500 hover:text-red-400 transition-colors disabled:opacity-50"
+                  className="px-3 py-1.5 text-xs font-medium rounded-lg bg-raised hover:bg-red-900/50 text-ink-4 hover:text-red-400 transition-colors disabled:opacity-50"
                 >
                   {deleting === plan.id ? '…' : 'Delete'}
                 </button>
@@ -132,7 +132,7 @@ export default function TrainingPlansSettings() {
         </div>
       )}
 
-      <p className="text-xs text-gray-600">The most recently created plan is shown as Active on the Training tab.</p>
+      <p className="text-xs text-ink-5">The most recently created plan is shown as Active on the Training tab.</p>
 
       {showCreate && (
         <CreatePlanModal

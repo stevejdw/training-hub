@@ -187,8 +187,8 @@ export default function ThemePreviewPage() {
               <p className="text-base font-bold text-ink">Base bold — ink</p>
               <p className="text-sm text-ink-2">Small — ink-2, body copy</p>
               <p className="text-xs text-ink-3">Extra small — ink-3, labels</p>
-              <p className="text-mini text-ink-4">Mini — ink-4, replaces text-[11px]</p>
-              <p className="text-micro text-ink-4 uppercase tracking-wider">Micro — replaces text-[10px]</p>
+              <p className="text-mini text-ink-4">Mini — ink-4, replaces text-mini</p>
+              <p className="text-micro text-ink-4 uppercase tracking-wider">Micro — replaces text-micro</p>
               <p className="text-sm text-accent">Accent text</p>
             </div>
           </Card>

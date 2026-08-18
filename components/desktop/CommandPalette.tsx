@@ -187,34 +187,34 @@ export default function CommandPalette() {
       onMouseDown={e => { if (e.target === dialogRef.current) close(); }}
       className="m-0 p-0 bg-transparent backdrop:bg-black/60 fixed left-1/2 top-24 -translate-x-1/2 w-full max-w-xl"
     >
-      <div className="bg-gray-900 border border-gray-700 rounded-xl shadow-2xl overflow-hidden">
+      <div className="bg-surface border border-line-strong rounded-xl shadow-2xl overflow-hidden">
         <input
           ref={inputRef}
           value={query}
           onChange={e => { setQuery(e.target.value); setSelected(0); }}
           onKeyDown={onInputKeyDown}
           placeholder="Search pages, actions, activities…"
-          className="w-full bg-transparent px-4 py-3.5 text-sm text-white placeholder-gray-500 focus:outline-none border-b border-gray-800"
+          className="w-full bg-transparent px-4 py-3.5 text-sm text-ink placeholder-ink-4 focus:outline-none border-b border-line"
         />
         <div ref={listRef} className="max-h-80 overflow-y-auto py-1.5">
           {commands.length === 0 ? (
-            <p className="px-4 py-6 text-sm text-gray-500 text-center">No matches</p>
+            <p className="px-4 py-6 text-sm text-ink-4 text-center">No matches</p>
           ) : commands.map((c, i) => (
             <button
               key={c.key}
               onClick={() => c.run()}
               onMouseEnter={() => setSelected(i)}
               className={`w-full flex items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors ${
-                i === selected ? 'bg-orange-500/15 text-white' : 'text-gray-300'
+                i === selected ? 'bg-accent/15 text-ink' : 'text-ink-2'
               }`}
             >
-              {c.icon && <span className="text-gray-500 [&>svg]:w-4 [&>svg]:h-4">{c.icon}</span>}
+              {c.icon && <span className="text-ink-4 [&>svg]:w-4 [&>svg]:h-4">{c.icon}</span>}
               <span className="flex-1 truncate">{c.label}</span>
-              {c.hint && <span className="text-[10px] text-gray-500 flex-shrink-0">{c.hint}</span>}
+              {c.hint && <span className="text-micro text-ink-4 flex-shrink-0">{c.hint}</span>}
             </button>
           ))}
         </div>
-        <div className="flex items-center gap-4 px-4 py-2 border-t border-gray-800 text-[10px] text-gray-600">
+        <div className="flex items-center gap-4 px-4 py-2 border-t border-line text-micro text-ink-5">
           <span>↑↓ navigate</span>
           <span>↵ select</span>
           <span>esc close</span>

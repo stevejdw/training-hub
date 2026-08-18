@@ -5,6 +5,7 @@ import {
   ReferenceLine, Legend, Tooltip, ResponsiveContainer,
 } from 'recharts';
 import EnlargeableChart from '@/components/EnlargeableChart';
+import { CHART } from '@/lib/chart-theme';
 
 export interface FitnessPoint { date: string; atl: number; ctl: number; tsb: number }
 
@@ -39,9 +40,9 @@ export default function FitnessChart({
 }) {
   const emptyClass = height === '100%' ? 'h-full' : 'h-64';
 
-  if (loading) return <div className={`${emptyClass} animate-pulse bg-gray-800 rounded-lg`} />;
+  if (loading) return <div className={`${emptyClass} animate-pulse bg-raised rounded-lg`} />;
   if (data.length === 0) {
-    return <div className={`${emptyClass} flex items-center justify-center text-gray-500 text-sm`}>No TSS data found</div>;
+    return <div className={`${emptyClass} flex items-center justify-center text-ink-4 text-sm`}>No TSS data found</div>;
   }
 
   const chartData = data.length > 180
@@ -55,10 +56,10 @@ export default function FitnessChart({
           <button
             key={d}
             onClick={() => setDays(d)}
-            className={`px-2 py-1 rounded-md text-[10px] font-medium transition-colors ${
+            className={`px-2 py-1 rounded-md text-micro font-medium transition-colors ${
               days === d
-                ? 'bg-orange-500/20 text-orange-400 border border-orange-500/50'
-                : 'bg-gray-800 text-gray-400 hover:text-white'
+                ? 'bg-accent/20 text-accent-hi border border-accent/50'
+                : 'bg-raised text-ink-3 hover:text-ink'
             }`}
           >
             {label}
@@ -68,24 +69,24 @@ export default function FitnessChart({
     }>{(fs) => (
     <ResponsiveContainer width="100%" height={fs ? '100%' : height}>
       <LineChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
+        <CartesianGrid strokeDasharray="3 3" stroke={CHART.grid} vertical={false} />
         <XAxis
           dataKey="date"
           tickFormatter={fmtDate}
-          tick={{ fill: '#6b7280', fontSize: 10 }}
+          tick={{ fill: CHART.axisText, fontSize: 10 }}
           axisLine={false}
           tickLine={false}
           interval="preserveStartEnd"
         />
         <YAxis
-          tick={{ fill: '#6b7280', fontSize: 10 }}
+          tick={{ fill: CHART.axisText, fontSize: 10 }}
           axisLine={false}
           tickLine={false}
           width={32}
         />
-        <ReferenceLine y={0} stroke="#374151" strokeDasharray="3 3" />
+        <ReferenceLine y={0} stroke={CHART.axis} strokeDasharray="3 3" />
         <Tooltip
-          contentStyle={{ background: '#111827', border: '1px solid #374151', borderRadius: 8, fontSize: 12 }}
+          contentStyle={{ background: CHART.tooltipBg, border: '1px solid #374151', borderRadius: 8, fontSize: 12 }}
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           labelFormatter={(s: any) => fmtDate(String(s))}
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -98,12 +99,12 @@ export default function FitnessChart({
         <Legend
           formatter={(value) => {
             const labels: Record<string, string> = { ctl: 'Fitness (CTL)', atl: 'Fatigue (ATL)', tsb: 'Form (TSB)' };
-            return <span style={{ color: '#9ca3af', fontSize: 11 }}>{labels[value] ?? value}</span>;
+            return <span style={{ color: CHART.reference, fontSize: 11 }}>{labels[value] ?? value}</span>;
           }}
         />
-        <Line type="monotone" dataKey="ctl" stroke="#60a5fa" strokeWidth={2} dot={false} />
-        <Line type="monotone" dataKey="atl" stroke="#c084fc" strokeWidth={2} dot={false} />
-        <Line type="monotone" dataKey="tsb" stroke="#34d399" strokeWidth={1.5} dot={false} strokeDasharray="4 2" />
+        <Line type="monotone" dataKey="ctl" stroke={CHART.hr} strokeWidth={2} dot={false} />
+        <Line type="monotone" dataKey="atl" stroke={CHART.atl} strokeWidth={2} dot={false} />
+        <Line type="monotone" dataKey="tsb" stroke={CHART.pos} strokeWidth={1.5} dot={false} strokeDasharray="4 2" />
       </LineChart>
     </ResponsiveContainer>
     )}</EnlargeableChart>

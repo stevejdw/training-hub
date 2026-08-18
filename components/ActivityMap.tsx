@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import { CHART } from '@/lib/chart-theme';
 
 interface Props {
   polyline: string;
@@ -54,7 +55,7 @@ export default function ActivityMap({ polyline, className, thumbnail, hoverPoint
       }).addTo(map);
 
       const line = L.polyline(coords, {
-        color: '#f97316',
+        color: CHART.power,
         weight: 3,
         opacity: 0.9,
       }).addTo(map);
@@ -105,7 +106,7 @@ export default function ActivityMap({ polyline, className, thumbnail, hoverPoint
       let marker = hoverMarkerRef.current as import('leaflet').CircleMarker | null;
       if (!marker) {
         marker = L.circleMarker(hoverPoint, {
-          radius: 7, color: '#ffffff', fillColor: '#f97316', fillOpacity: 1, weight: 2,
+          radius: 7, color: CHART.reference, fillColor: CHART.power, fillOpacity: 1, weight: 2,
         }).addTo(map);
         hoverMarkerRef.current = marker;
       } else {
@@ -119,6 +120,6 @@ export default function ActivityMap({ polyline, className, thumbnail, hoverPoint
   }, [hoverPoint]);
 
   return (
-    <div ref={mapRef} className={className ?? 'w-full h-72 rounded-xl overflow-hidden bg-gray-800'} />
+    <div ref={mapRef} className={className ?? 'w-full h-72 rounded-xl overflow-hidden bg-raised'} />
   );
 }

@@ -87,16 +87,16 @@ export default function TrainingPlanTab() {
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
               {weekBadge && (
-                <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-orange-500/15 text-orange-400 text-[11px] font-semibold uppercase tracking-wider mb-2">
+                <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-accent/15 text-accent-hi text-mini font-semibold uppercase tracking-wider mb-2">
                   {weekBadge}
                 </span>
               )}
-              <h2 className="text-2xl font-bold text-white leading-tight">{title}</h2>
-              {plan.goal && <p className="text-base text-gray-400 mt-1.5 leading-snug">{plan.goal}</p>}
+              <h2 className="text-2xl font-bold text-ink leading-tight">{title}</h2>
+              {plan.goal && <p className="text-base text-ink-3 mt-1.5 leading-snug">{plan.goal}</p>}
             </div>
             <button
               onClick={() => setEditingPlan(true)}
-              className="flex-shrink-0 mt-1 px-3 py-1.5 text-xs text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
+              className="flex-shrink-0 mt-1 px-3 py-1.5 text-xs text-ink-3 hover:text-ink bg-raised hover:bg-hover rounded-lg transition-colors"
             >
               Edit
             </button>
@@ -106,14 +106,14 @@ export default function TrainingPlanTab() {
 
       {/* No plan — empty state with Add plan CTA */}
       {!loadingPlan && !plan && (
-        <div className="bg-gray-800/40 border border-gray-700 border-dashed rounded-2xl p-8 text-center space-y-4">
+        <div className="bg-raised/40 border border-line-strong border-dashed rounded-2xl p-8 text-center space-y-4">
           <div>
-            <p className="text-sm text-gray-300 font-medium">No active training plan</p>
-            <p className="text-xs text-gray-500 mt-1">Generate an AI-personalised plan based on your profile and goals.</p>
+            <p className="text-sm text-ink-2 font-medium">No active training plan</p>
+            <p className="text-xs text-ink-4 mt-1">Generate an AI-personalised plan based on your profile and goals.</p>
           </div>
           <button
             onClick={() => setCreatingPlan(true)}
-            className="px-4 py-2.5 text-sm font-medium bg-orange-500 hover:bg-orange-400 text-white rounded-lg transition-colors"
+            className="px-4 py-2.5 text-sm font-medium bg-accent hover:bg-accent-hi text-ink rounded-lg transition-colors"
           >
             + Add plan
           </button>
@@ -122,7 +122,7 @@ export default function TrainingPlanTab() {
 
       {loadingPlan && (
         <div className="space-y-3">
-          {[1, 2, 3, 4].map(i => <div key={i} className="bg-gray-800 rounded-xl h-32 animate-pulse" />)}
+          {[1, 2, 3, 4].map(i => <div key={i} className="bg-raised rounded-xl h-32 animate-pulse" />)}
         </div>
       )}
 

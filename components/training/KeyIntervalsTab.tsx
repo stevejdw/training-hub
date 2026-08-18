@@ -7,6 +7,7 @@ import {
 } from 'recharts';
 import { useCachedFetch } from '@/lib/use-cached-fetch';
 import EnlargeableChart from '@/components/EnlargeableChart';
+import { CHART } from '@/lib/chart-theme';
 
 interface Target {
   key:          string;
@@ -50,10 +51,10 @@ interface StoredConfig {
 }
 
 function progressBucket(currentW: number | null, targetW: number) {
-  if (!currentW) return { color: 'bg-gray-700', label: 'No data' };
+  if (!currentW) return { color: 'bg-hover', label: 'No data' };
   const pct = (currentW / targetW) * 100;
   if (pct >= 100) return { color: 'bg-green-500', label: 'On' };
-  if (pct >= 95)  return { color: 'bg-orange-500', label: 'Close' };
+  if (pct >= 95)  return { color: 'bg-accent', label: 'Close' };
   return { color: 'bg-yellow-500', label: 'Below' };
 }
 
@@ -87,15 +88,15 @@ function ExpandModal({ target, current, weekly, effectiveTarget, onClose }: Expa
       onClick={onClose}
     >
       <div
-        className="bg-gray-900 border border-gray-800 rounded-2xl p-5 w-full max-w-lg space-y-4"
+        className="bg-surface border border-line rounded-2xl p-5 w-full max-w-lg space-y-4"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex items-start justify-between gap-2">
           <div>
-            <h3 className="text-lg font-bold text-white">{formatLabel(target)}</h3>
-            <p className="text-xs text-gray-500 mt-0.5">
-              Target <span className="text-gray-300 font-medium">{effectiveTarget}W</span>
+            <h3 className="text-lg font-bold text-ink">{formatLabel(target)}</h3>
+            <p className="text-xs text-ink-4 mt-0.5">
+              Target <span className="text-ink-2 font-medium">{effectiveTarget}W</span>
               {gap !== null && (
                 <span className={`ml-2 ${gap >= 0 ? 'text-green-400' : 'text-yellow-400'}`}>
                   {gap >= 0 ? '+' : ''}{gap}W vs target
@@ -103,7 +104,7 @@ function ExpandModal({ target, current, weekly, effectiveTarget, onClose }: Expa
               )}
             </p>
           </div>
-          <button onClick={onClose} className="text-gray-500 hover:text-white p-1 transition-colors">
+          <button onClick={onClose} className="text-ink-4 hover:text-ink p-1 transition-colors">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -112,12 +113,12 @@ function ExpandModal({ target, current, weekly, effectiveTarget, onClose }: Expa
 
         {/* Progress bar */}
         <div className="space-y-1">
-          <div className="h-2 bg-gray-800 rounded-full overflow-hidden">
+          <div className="h-2 bg-raised rounded-full overflow-hidden">
             <div className={`h-full transition-all ${buck.color}`} style={{ width: `${Math.min(100, pct)}%` }} />
           </div>
-          <div className="flex items-center justify-between text-xs text-gray-400">
-            <span>Best <span className="text-white font-semibold">{current ? `${current}W` : '—'}</span></span>
-            <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider text-white ${buck.color}`}>
+          <div className="flex items-center justify-between text-xs text-ink-3">
+            <span>Best <span className="text-ink font-semibold">{current ? `${current}W` : '—'}</span></span>
+            <span className={`px-1.5 py-0.5 rounded text-micro font-semibold uppercase tracking-wider text-ink ${buck.color}`}>
               {buck.label}
             </span>
           </div>
@@ -133,24 +134,24 @@ function ExpandModal({ target, current, weekly, effectiveTarget, onClose }: Expa
               {() => (
               <ResponsiveContainer width="100%" height="100%">
               <LineChart data={series} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                <CartesianGrid stroke="#1f2937" strokeDasharray="3 3" />
+                <CartesianGrid stroke={CHART.grid} strokeDasharray="3 3" />
                 <XAxis
                   dataKey="week"
                   tickFormatter={v => v.slice(5)}
-                  tick={{ fill: '#9ca3af', fontSize: 10 }}
+                  tick={{ fill: CHART.reference, fontSize: 10 }}
                   axisLine={false}
                   tickLine={false}
                 />
                 <YAxis
                   domain={['dataMin - 10', 'dataMax + 20']}
-                  tick={{ fill: '#9ca3af', fontSize: 10 }}
+                  tick={{ fill: CHART.reference, fontSize: 10 }}
                   axisLine={false}
                   tickLine={false}
                   width={36}
                 />
-                <ReferenceLine y={effectiveTarget} stroke="#6b7280" strokeDasharray="4 4" label={{ value: 'Target', fill: '#6b7280', fontSize: 10 }} />
+                <ReferenceLine y={effectiveTarget} stroke={CHART.axisText} strokeDasharray="4 4" label={{ value: 'Target', fill: CHART.axisText, fontSize: 10 }} />
                 <Tooltip
-                  contentStyle={{ background: '#0f172a', border: '1px solid #374151', borderRadius: 6, fontSize: 12 }}
+                  contentStyle={{ background: CHART.tooltipBg, border: '1px solid #374151', borderRadius: 6, fontSize: 12 }}
                   labelFormatter={v => `Week of ${v}`}
                   formatter={(v) => [`${v}W`, 'Best']}
                 />
@@ -161,7 +162,7 @@ function ExpandModal({ target, current, weekly, effectiveTarget, onClose }: Expa
             </EnlargeableChart>
           </div>
         ) : (
-          <p className="text-sm text-gray-500 text-center py-8">Not enough data to chart yet.</p>
+          <p className="text-sm text-ink-4 text-center py-8">Not enough data to chart yet.</p>
         )}
       </div>
     </div>
@@ -208,15 +209,15 @@ function BulkEditModal({ targets, overrides, onCancel, onSave }: BulkEditModalPr
       onClick={onCancel}
     >
       <div
-        className="bg-gray-900 border border-gray-800 rounded-2xl p-5 w-full max-w-sm space-y-4"
+        className="bg-surface border border-line rounded-2xl p-5 w-full max-w-sm space-y-4"
         onClick={e => e.stopPropagation()}
       >
-        <h3 className="text-base font-semibold text-white">Edit intervals</h3>
+        <h3 className="text-base font-semibold text-ink">Edit intervals</h3>
 
         <div className="space-y-3">
           {targets.map((t, i) => (
             <div key={t.key} className="space-y-1.5">
-              <p className="text-xs font-medium text-gray-400">{formatLabel(t)}</p>
+              <p className="text-xs font-medium text-ink-3">{formatLabel(t)}</p>
               <div className="grid grid-cols-2 gap-2">
                 <div className="flex items-center gap-1.5">
                   <input
@@ -227,9 +228,9 @@ function BulkEditModal({ targets, overrides, onCancel, onSave }: BulkEditModalPr
                     value={rows[i]?.durationMin ?? ''}
                     onChange={e => setRow(i, 'durationMin', e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') onCancel(); }}
-                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-2.5 py-1.5 text-sm text-white focus:outline-none focus:border-orange-500"
+                    className="w-full bg-raised border border-line-strong rounded-lg px-2.5 py-1.5 text-sm text-ink focus:outline-none focus:border-accent"
                   />
-                  <span className="text-xs text-gray-500 flex-shrink-0">min</span>
+                  <span className="text-xs text-ink-4 flex-shrink-0">min</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <input
@@ -240,9 +241,9 @@ function BulkEditModal({ targets, overrides, onCancel, onSave }: BulkEditModalPr
                     value={rows[i]?.targetW ?? ''}
                     onChange={e => setRow(i, 'targetW', e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') onCancel(); }}
-                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-2.5 py-1.5 text-sm text-white focus:outline-none focus:border-orange-500"
+                    className="w-full bg-raised border border-line-strong rounded-lg px-2.5 py-1.5 text-sm text-ink focus:outline-none focus:border-accent"
                   />
-                  <span className="text-xs text-gray-500 flex-shrink-0">W</span>
+                  <span className="text-xs text-ink-4 flex-shrink-0">W</span>
                 </div>
               </div>
             </div>
@@ -252,13 +253,13 @@ function BulkEditModal({ targets, overrides, onCancel, onSave }: BulkEditModalPr
         <div className="flex justify-end gap-2 pt-1">
           <button
             onClick={onCancel}
-            className="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
+            className="px-4 py-2 rounded-lg text-sm font-medium text-ink-3 hover:text-ink hover:bg-raised transition-colors"
           >
             Cancel
           </button>
           <button
             onClick={commit}
-            className="px-4 py-2 rounded-lg text-sm font-medium bg-orange-500 hover:bg-orange-400 text-white transition-colors"
+            className="px-4 py-2 rounded-lg text-sm font-medium bg-accent hover:bg-accent-hi text-ink transition-colors"
           >
             Save
           </button>
@@ -299,27 +300,27 @@ function IntervalCard({ target, current, weekly, effectiveTarget, onClick }: Int
       onKeyDown={e => {
         if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); }
       }}
-      className="bg-gray-800/60 border border-gray-800 rounded-xl p-2.5 md:p-4 space-y-2 text-left hover:border-gray-700 hover:bg-gray-800/80 active:bg-gray-800 transition-colors w-full cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+      className="bg-raised/60 border border-line rounded-xl p-2.5 md:p-4 space-y-2 text-left hover:border-line-strong hover:bg-raised/80 active:bg-raised transition-colors w-full cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
     >
       <div className="flex items-start justify-between gap-1.5">
         <div className="min-w-0 flex-1">
-          <div className="text-[13px] md:text-sm font-semibold text-white truncate">{formatLabel(target)}</div>
-          <div className="text-[10px] md:text-xs text-gray-500 mt-0.5">
-            Target <span className="text-gray-300 font-medium">{effectiveTarget}W</span>
+          <div className="text-sm md:text-sm font-semibold text-ink truncate">{formatLabel(target)}</div>
+          <div className="text-micro md:text-xs text-ink-4 mt-0.5">
+            Target <span className="text-ink-2 font-medium">{effectiveTarget}W</span>
           </div>
         </div>
-        <span className={`px-1.5 py-0.5 rounded text-[9px] md:text-[10px] font-semibold uppercase tracking-wider text-white ${buck.color} flex-shrink-0`}>
+        <span className={`px-1.5 py-0.5 rounded text-micro md:text-micro font-semibold uppercase tracking-wider text-ink ${buck.color} flex-shrink-0`}>
           {buck.label}
         </span>
       </div>
 
       <div className="space-y-1">
-        <div className="h-1.5 bg-gray-900 rounded-full overflow-hidden">
+        <div className="h-1.5 bg-surface rounded-full overflow-hidden">
           <div className={`h-full transition-all ${buck.color}`} style={{ width: `${Math.min(100, pct)}%` }} />
         </div>
-        <div className="flex items-center justify-between text-[10px] md:text-[11px]">
-          <span className="text-gray-400">
-            Best <span className="text-white font-semibold">{current ? `${current}W` : '—'}</span>
+        <div className="flex items-center justify-between text-micro md:text-mini">
+          <span className="text-ink-3">
+            Best <span className="text-ink font-semibold">{current ? `${current}W` : '—'}</span>
           </span>
           {gap !== null && (
             <span className={gap >= 0 ? 'text-green-400' : 'text-yellow-400'}>
@@ -336,9 +337,9 @@ function IntervalCard({ target, current, weekly, effectiveTarget, onClick }: Int
             <ResponsiveContainer width="100%" height="100%">
             <LineChart data={series}>
               <YAxis hide domain={['dataMin - 10', 'dataMax + 10']} />
-              <ReferenceLine y={effectiveTarget} stroke="#6b7280" strokeDasharray="3 3" />
+              <ReferenceLine y={effectiveTarget} stroke={CHART.axisText} strokeDasharray="3 3" />
               <Tooltip
-                contentStyle={{ background: '#0f172a', border: '1px solid #374151', borderRadius: 6, fontSize: 11, padding: '4px 8px' }}
+                contentStyle={{ background: CHART.tooltipBg, border: '1px solid #374151', borderRadius: 6, fontSize: 11, padding: '4px 8px' }}
                 labelStyle={{ display: 'none' }}
                 formatter={(v) => [`${v}W`, ''] as [string, string]}
               />
@@ -426,13 +427,13 @@ export default function KeyIntervalsTab() {
     <div className="space-y-3">
       {/* Timeframe selector + Edit button */}
       <div className="flex items-center gap-2">
-        <div className="flex flex-1 bg-gray-800 rounded-xl p-1 gap-1">
+        <div className="flex flex-1 bg-raised rounded-xl p-1 gap-1">
           {TIMEFRAMES.map(t => (
             <button
               key={t.key}
               onClick={() => setTimeframe(t.key)}
               className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                timeframe === t.key ? 'bg-orange-500 text-white' : 'text-gray-400 hover:text-white'
+                timeframe === t.key ? 'bg-accent text-ink' : 'text-ink-3 hover:text-ink'
               }`}
             >
               {t.label}
@@ -441,7 +442,7 @@ export default function KeyIntervalsTab() {
         </div>
         <button
           onClick={() => setBulkEditing(true)}
-          className="flex-shrink-0 px-3 py-2 rounded-xl text-xs font-medium bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700 transition-colors"
+          className="flex-shrink-0 px-3 py-2 rounded-xl text-xs font-medium bg-raised text-ink-3 hover:text-ink hover:bg-hover transition-colors"
         >
           Edit
         </button>
@@ -450,13 +451,13 @@ export default function KeyIntervalsTab() {
       {loading && !data ? (
         <div className="grid grid-cols-2 gap-2 md:gap-3">
           {durations.map((_, i) => (
-            <div key={i} className="bg-gray-800 rounded-xl h-32 md:h-44 animate-pulse" />
+            <div key={i} className="bg-raised rounded-xl h-32 md:h-44 animate-pulse" />
           ))}
         </div>
       ) : !data || !data.targets || data.targets.length === 0 ? (
-        <div className="bg-gray-800/40 border border-gray-700 border-dashed rounded-2xl p-8 text-center">
-          <h3 className="text-base font-semibold text-white">No power data</h3>
-          <p className="text-sm text-gray-400 mt-2">Connect Strava and complete some rides to see interval progress.</p>
+        <div className="bg-raised/40 border border-line-strong border-dashed rounded-2xl p-8 text-center">
+          <h3 className="text-base font-semibold text-ink">No power data</h3>
+          <p className="text-sm text-ink-3 mt-2">Connect Strava and complete some rides to see interval progress.</p>
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-2 md:gap-3">

@@ -6,6 +6,7 @@ import { iconFor } from '@/components/nav-items';
 import { PageShell, useProfileEdit } from '@/lib/use-profile-edit';
 import TrainingPlansSettings from '@/components/training/TrainingPlansSettings';
 import SaveStatus from '@/components/ui/SaveStatus';
+import { CHART } from '@/lib/chart-theme';
 
 interface HistoryStatus {
   total:       number;
@@ -289,7 +290,7 @@ export default function SettingsContent() {
   }
 
   if (!profile) {
-    return <PageShell title="Settings" icon={iconFor("settings")}><div className="text-gray-500 text-sm">Loading…</div></PageShell>;
+    return <PageShell title="Settings" icon={iconFor("settings")}><div className="text-ink-4 text-sm">Loading…</div></PageShell>;
   }
 
   return (
@@ -303,8 +304,8 @@ export default function SettingsContent() {
             onClick={() => setTab(t.id)}
             className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
               tab === t.id
-                ? 'bg-orange-500 text-white'
-                : 'bg-gray-800 text-gray-400 hover:text-gray-200'
+                ? 'bg-accent text-ink'
+                : 'bg-raised text-ink-3 hover:text-ink'
             }`}
           >
             {t.label}
@@ -314,8 +315,8 @@ export default function SettingsContent() {
 
       {tab === 'appearance' && (<>
       {/* Appearance */}
-      <div className="bg-gray-900 rounded-xl p-5 space-y-4 border border-gray-800">
-        <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Appearance</h2>
+      <div className="bg-surface rounded-xl p-5 space-y-4 border border-line">
+        <h2 className="text-sm font-semibold text-ink-2 uppercase tracking-wider">Appearance</h2>
 
         {/* 3 theme families, each with dark + light variant */}
         <div className="space-y-2">
@@ -340,8 +341,8 @@ export default function SettingsContent() {
             const lightActive = theme === family.light.id;
             const anyActive   = darkActive || lightActive;
             return (
-              <div key={family.name} className={`rounded-xl border-2 overflow-hidden transition-colors ${anyActive ? 'border-orange-500' : 'border-gray-700'}`}>
-                <div className="px-3 pt-2.5 pb-1 text-[10px] font-semibold text-gray-500 uppercase tracking-wider">{family.name}</div>
+              <div key={family.name} className={`rounded-xl border-2 overflow-hidden transition-colors ${anyActive ? 'border-accent' : 'border-line-strong'}`}>
+                <div className="px-3 pt-2.5 pb-1 text-micro font-semibold text-ink-4 uppercase tracking-wider">{family.name}</div>
                 <div className="grid grid-cols-2">
                   {([
                     { variant: family.dark,  label: 'Dark',  side: 0 },
@@ -352,14 +353,14 @@ export default function SettingsContent() {
                       <button
                         key={variant.id}
                         onClick={() => changeTheme(variant.id)}
-                        className={`p-3 text-left transition-colors border-t border-gray-700 ${side === 0 ? 'border-r border-gray-700' : ''} ${isActive ? 'bg-orange-500/10' : 'hover:bg-gray-800'}`}
+                        className={`p-3 text-left transition-colors border-t border-line-strong ${side === 0 ? 'border-r border-line-strong' : ''} ${isActive ? 'bg-accent/10' : 'hover:bg-raised'}`}
                       >
                         <div className="flex gap-1.5 mb-2">
                           <div className="w-4 h-4 rounded" style={{ background: variant.bg }} />
-                          <div className="w-4 h-4 rounded" style={{ background: variant.card, border: variant.card === '#ffffff' ? '1px solid #d1d5db' : undefined }} />
+                          <div className="w-4 h-4 rounded" style={{ background: variant.card, border: variant.card === CHART.tooltipText ? '1px solid #d1d5db' : undefined }} />
                           <div className="w-4 h-4 rounded" style={{ background: variant.accent }} />
                         </div>
-                        <p className={`text-xs font-semibold ${isActive ? 'text-orange-400' : 'text-gray-300'}`}>{label}</p>
+                        <p className={`text-xs font-semibold ${isActive ? 'text-accent-hi' : 'text-ink-2'}`}>{label}</p>
                       </button>
                     );
                   })}
@@ -372,21 +373,21 @@ export default function SettingsContent() {
         {/* Auto toggle — switches Carbon between dark and light by time of day */}
         <button
           onClick={() => changeTheme('auto')}
-          className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl border transition-colors ${theme === 'auto' ? 'border-orange-500 bg-orange-500/10' : 'border-gray-700 hover:border-gray-600'}`}
+          className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl border transition-colors ${theme === 'auto' ? 'border-accent bg-accent/10' : 'border-line-strong hover:border-line-hover'}`}
         >
           <div className="text-left">
-            <p className={`text-xs font-semibold ${theme === 'auto' ? 'text-orange-400' : 'text-gray-300'}`}>Auto</p>
-            <p className="text-[10px] text-gray-500 mt-0.5">Switch Carbon between dark and light at 7am / 7pm</p>
+            <p className={`text-xs font-semibold ${theme === 'auto' ? 'text-accent-hi' : 'text-ink-2'}`}>Auto</p>
+            <p className="text-micro text-ink-4 mt-0.5">Switch Carbon between dark and light at 7am / 7pm</p>
           </div>
           <div className="flex gap-1 flex-shrink-0 ml-3">
             <div className="w-4 h-4 rounded" style={{ background: 'linear-gradient(135deg, #030712 50%, #f8fafc 50%)' }} />
-            <div className="w-4 h-4 rounded" style={{ background: '#f97316' }} />
+            <div className="w-4 h-4 rounded" style={{ background: CHART.power }} />
           </div>
         </button>
 
         {/* App icon */}
         <div className="space-y-2">
-          <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Home Screen Icon</p>
+          <p className="text-micro font-semibold text-ink-4 uppercase tracking-wider">Home Screen Icon</p>
           <div className="grid grid-cols-4 gap-2">
             {([
               { id: 'gear'       as const, label: 'Gear'       },
@@ -399,26 +400,26 @@ export default function SettingsContent() {
                 <button
                   key={id}
                   onClick={() => { void updateAndSave('app_icon', id); }}
-                  className={`flex flex-col items-center gap-1.5 p-2 rounded-xl border-2 transition-colors ${active ? 'border-orange-500 bg-orange-500/10' : 'border-gray-700 hover:border-gray-600'}`}
+                  className={`flex flex-col items-center gap-1.5 p-2 rounded-xl border-2 transition-colors ${active ? 'border-accent bg-accent/10' : 'border-line-strong hover:border-line-hover'}`}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={`/app-icon-${id}.png`} alt={label} className="w-14 h-14 rounded-xl object-cover" />
-                  <span className={`text-[10px] font-semibold ${active ? 'text-orange-400' : 'text-gray-400'}`}>{label}</span>
+                  <span className={`text-micro font-semibold ${active ? 'text-accent-hi' : 'text-ink-3'}`}>{label}</span>
                 </button>
               );
             })}
           </div>
-          <p className="text-[10px] text-gray-600">Takes effect when you re-add the app to your home screen.</p>
+          <p className="text-micro text-ink-5">Takes effect when you re-add the app to your home screen.</p>
         </div>
       </div>
 
       </>)}
       {tab === 'coaching' && (<>
       {/* AI Settings */}
-      <div className="bg-gray-900 rounded-xl p-5 space-y-4 border border-gray-800">
+      <div className="bg-surface rounded-xl p-5 space-y-4 border border-line">
         <div>
-          <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">AI Settings</h2>
-          <p className="text-xs text-gray-500 mt-1">
+          <h2 className="text-sm font-semibold text-ink-2 uppercase tracking-wider">AI Settings</h2>
+          <p className="text-xs text-ink-4 mt-1">
             Give the coaching AI specific guidance on how it should communicate, give feedback, and build training plans. 
             The more specific you are, the more tailored the results.
           </p>
@@ -427,19 +428,19 @@ export default function SettingsContent() {
         {/* Persona */}
         <div className="space-y-1.5">
           <div className="flex items-center gap-1.5">
-            <svg className="w-3.5 h-3.5 text-orange-400 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+            <svg className="w-3.5 h-3.5 text-accent-hi flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
             </svg>
-            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Coach Persona</label>
+            <label className="text-xs font-semibold text-ink-3 uppercase tracking-wider">Coach Persona</label>
           </div>
-          <p className="text-[10px] text-gray-500 leading-relaxed">
+          <p className="text-micro text-ink-4 leading-relaxed">
             How would you describe the ideal coach? This sets the overall identity and tone.
           </p>
           <textarea
             value={profile.coach_persona ?? ''}
             onChange={e => update('coach_persona', e.target.value)}
             rows={2}
-            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white resize-none focus:outline-none focus:border-orange-500"
+            className="w-full bg-raised border border-line-strong rounded-lg px-3 py-2 text-sm text-ink resize-none focus:outline-none focus:border-accent"
             placeholder="e.g. You are an experienced but approachable coach who balances hard truths with genuine belief in the athlete's potential. You've coached dozens of amateur racers."
           />
           <div className="flex gap-1.5 flex-wrap">
@@ -449,7 +450,7 @@ export default function SettingsContent() {
               'Scientific and detail-oriented. Reference research and explain the why',
               'Hard-ass military coach. Tough love, short, blunt',
             ].map(s => (
-              <button key={s} onClick={() => update('coach_persona', s)} className={`text-[10px] px-2 py-1 rounded-md border transition-colors ${(profile.coach_persona ?? '') === s ? 'border-orange-500 bg-orange-500/10 text-orange-400' : 'border-gray-700 text-gray-500 hover:border-gray-600'}`}>
+              <button key={s} onClick={() => update('coach_persona', s)} className={`text-micro px-2 py-1 rounded-md border transition-colors ${(profile.coach_persona ?? '') === s ? 'border-accent bg-accent/10 text-accent-hi' : 'border-line-strong text-ink-4 hover:border-line-hover'}`}>
                 {s.startsWith('Direct') ? 'Direct' : s.startsWith('Supportive') ? 'Supportive' : s.startsWith('Scientific') ? 'Scientific' : 'Tough love'}
               </button>
             ))}
@@ -457,24 +458,24 @@ export default function SettingsContent() {
         </div>
 
         {/* Divider */}
-        <div className="border-t border-gray-800" />
+        <div className="border-t border-line" />
 
         {/* Coaching Feedback Guidance */}
         <div className="space-y-1.5">
           <div className="flex items-center gap-1.5">
-            <svg className="w-3.5 h-3.5 text-orange-400 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+            <svg className="w-3.5 h-3.5 text-accent-hi flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Ride Feedback Style</label>
+            <label className="text-xs font-semibold text-ink-3 uppercase tracking-wider">Ride Feedback Style</label>
           </div>
-          <p className="text-[10px] text-gray-500 leading-relaxed">
+          <p className="text-micro text-ink-4 leading-relaxed">
             How should the AI analyse and give feedback on your rides? Length, depth, what to focus on.
           </p>
           <textarea
             value={profile.ai_coaching_feedback ?? ''}
             onChange={e => update('ai_coaching_feedback', e.target.value)}
             rows={2}
-            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white resize-none focus:outline-none focus:border-orange-500"
+            className="w-full bg-raised border border-line-strong rounded-lg px-3 py-2 text-sm text-ink resize-none focus:outline-none focus:border-accent"
             placeholder="e.g. Keep it to 3–4 sentences. Don't restate my lap data — I can read that. Compare my interval power to the previous 3 similar sessions and tell me if I'm improving."
           />
           <div className="flex gap-1.5 flex-wrap">
@@ -484,7 +485,7 @@ export default function SettingsContent() {
               'Minimal feedback: just tell me if it was a good session or not and what to do next time',
               'Full breakdown: lap-by-lap power, HR drift, VI, and a suggested adjustment for next session',
             ].map(s => (
-              <button key={s} onClick={() => update('ai_coaching_feedback', s)} className={`text-[10px] px-2 py-1 rounded-md border transition-colors ${(profile.ai_coaching_feedback ?? '') === s ? 'border-orange-500 bg-orange-500/10 text-orange-400' : 'border-gray-700 text-gray-500 hover:border-gray-600'}`}>
+              <button key={s} onClick={() => update('ai_coaching_feedback', s)} className={`text-micro px-2 py-1 rounded-md border transition-colors ${(profile.ai_coaching_feedback ?? '') === s ? 'border-accent bg-accent/10 text-accent-hi' : 'border-line-strong text-ink-4 hover:border-line-hover'}`}>
                 {s.startsWith('Brief') ? 'Brief' : s.startsWith('Detailed') ? 'Detailed' : s.startsWith('Minimal') ? 'Minimal' : 'Full'}
               </button>
             ))}
@@ -492,24 +493,24 @@ export default function SettingsContent() {
         </div>
 
         {/* Divider */}
-        <div className="border-t border-gray-800" />
+        <div className="border-t border-line" />
 
         {/* Training Plan Guidance */}
         <div className="space-y-1.5">
           <div className="flex items-center gap-1.5">
-            <svg className="w-3.5 h-3.5 text-orange-400 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+            <svg className="w-3.5 h-3.5 text-accent-hi flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
             </svg>
-            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Training Plan Approach</label>
+            <label className="text-xs font-semibold text-ink-3 uppercase tracking-wider">Training Plan Approach</label>
           </div>
-          <p className="text-[10px] text-gray-500 leading-relaxed">
+          <p className="text-micro text-ink-4 leading-relaxed">
             What philosophy or constraints should guide training plan generation? Volume preference, intensity bias, periodisation style.
           </p>
           <textarea
             value={profile.ai_training_plan_guidance ?? ''}
             onChange={e => update('ai_training_plan_guidance', e.target.value)}
             rows={2}
-            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white resize-none focus:outline-none focus:border-orange-500"
+            className="w-full bg-raised border border-line-strong rounded-lg px-3 py-2 text-sm text-ink resize-none focus:outline-none focus:border-accent"
             placeholder="e.g. Polarised approach: 80% Z2, 20% hard. Prefer longer intervals (8–20 min) over short sprints. Avoid more than 2 hard days per week."
           />
           <div className="flex gap-1.5 flex-wrap">
@@ -519,7 +520,7 @@ export default function SettingsContent() {
               'Traditional base-build-peak: long Z2 blocks early, introduce intensity later',
               'Low volume, high intensity: 2 rides per week, both high quality. Prioritise VO2 and threshold',
             ].map(s => (
-              <button key={s} onClick={() => update('ai_training_plan_guidance', s)} className={`text-[10px] px-2 py-1 rounded-md border transition-colors ${(profile.ai_training_plan_guidance ?? '') === s ? 'border-orange-500 bg-orange-500/10 text-orange-400' : 'border-gray-700 text-gray-500 hover:border-gray-600'}`}>
+              <button key={s} onClick={() => update('ai_training_plan_guidance', s)} className={`text-micro px-2 py-1 rounded-md border transition-colors ${(profile.ai_training_plan_guidance ?? '') === s ? 'border-accent bg-accent/10 text-accent-hi' : 'border-line-strong text-ink-4 hover:border-line-hover'}`}>
                 {s.startsWith('Polarised') ? 'Polarised' : s.startsWith('Sweet') ? 'Sweet spot' : s.startsWith('Traditional') ? 'Traditional' : 'Low vol / high int'}
               </button>
             ))}
@@ -527,24 +528,24 @@ export default function SettingsContent() {
         </div>
 
         {/* Divider */}
-        <div className="border-t border-gray-800" />
+        <div className="border-t border-line" />
 
         {/* Communication Style */}
         <div className="space-y-1.5">
           <div className="flex items-center gap-1.5">
-            <svg className="w-3.5 h-3.5 text-orange-400 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+            <svg className="w-3.5 h-3.5 text-accent-hi flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
             </svg>
-            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Communication Style</label>
+            <label className="text-xs font-semibold text-ink-3 uppercase tracking-wider">Communication Style</label>
           </div>
-          <p className="text-[10px] text-gray-500 leading-relaxed">
+          <p className="text-micro text-ink-4 leading-relaxed">
             Tone, length, and structure for chat conversations. How formal, how much detail, use of emoji / markdown.
           </p>
           <textarea
             value={profile.ai_communication_style ?? ''}
             onChange={e => update('ai_communication_style', e.target.value)}
             rows={2}
-            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white resize-none focus:outline-none focus:border-orange-500"
+            className="w-full bg-raised border border-line-strong rounded-lg px-3 py-2 text-sm text-ink resize-none focus:outline-none focus:border-accent"
             placeholder="e.g. Casual and conversational. Use some emoji. Be concise — I don't need paragraphs. Skip the markdown tables."
           />
           <div className="flex gap-1.5 flex-wrap">
@@ -554,7 +555,7 @@ export default function SettingsContent() {
               'Minimalist. Just give me the answer. No fluff, no emoji, no formatting',
               'Conversational and thorough. Explain your reasoning. Use analogies. Don\'t be afraid to be detailed',
             ].map(s => (
-              <button key={s} onClick={() => update('ai_communication_style', s)} className={`text-[10px] px-2 py-1 rounded-md border transition-colors ${(profile.ai_communication_style ?? '') === s ? 'border-orange-500 bg-orange-500/10 text-orange-400' : 'border-gray-700 text-gray-500 hover:border-gray-600'}`}>
+              <button key={s} onClick={() => update('ai_communication_style', s)} className={`text-micro px-2 py-1 rounded-md border transition-colors ${(profile.ai_communication_style ?? '') === s ? 'border-accent bg-accent/10 text-accent-hi' : 'border-line-strong text-ink-4 hover:border-line-hover'}`}>
                 {s.startsWith('Casual') ? 'Casual' : s.startsWith('Professional') ? 'Professional' : s.startsWith('Minimalist') ? 'Minimalist' : 'Conversational'}
               </button>
             ))}
@@ -565,17 +566,17 @@ export default function SettingsContent() {
       </>)}
       {tab === 'you' && (<>
       {/* Timezone */}
-      <div className="bg-gray-900 rounded-xl p-5 space-y-3 border border-gray-800">
+      <div className="bg-surface rounded-xl p-5 space-y-3 border border-line">
         <div>
-          <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Timezone</h2>
-          <p className="text-xs text-gray-500 mt-1">
+          <h2 className="text-sm font-semibold text-ink-2 uppercase tracking-wider">Timezone</h2>
+          <p className="text-xs text-ink-4 mt-1">
             All dates and times throughout the app will use this timezone. Used for training plan generation, activity dates, and calendar views.
           </p>
         </div>
         <select
           value={profile.timezone || 'Australia/Sydney'}
           onChange={e => update('timezone', e.target.value)}
-          className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-orange-500"
+          className="w-full bg-raised border border-line-strong rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-accent"
         >
           <option value="Pacific/Auckland">Pacific/Auckland (UTC+12/+13)</option>
           <option value="Australia/Sydney">Australia/Sydney (UTC+10/+11)</option>
@@ -601,20 +602,20 @@ export default function SettingsContent() {
       </div>
 
       {/* Physical — used for event pacing calculations */}
-      <div className="bg-gray-900 rounded-xl p-5 space-y-3 border border-gray-800">
+      <div className="bg-surface rounded-xl p-5 space-y-3 border border-line">
 
         <div>
-          <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Physical</h2>
-          <p className="text-xs text-gray-500 mt-1">Used for climb time estimates and pacing strategy calculations.</p>
+          <h2 className="text-sm font-semibold text-ink-2 uppercase tracking-wider">Physical</h2>
+          <p className="text-xs text-ink-4 mt-1">Used for climb time estimates and pacing strategy calculations.</p>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-[10px] text-gray-500 uppercase tracking-wider mb-1">Max Heart Rate</label>
+            <label className="block text-micro text-ink-4 uppercase tracking-wider mb-1">Max Heart Rate</label>
             <input
               type="number"
               value={profile.max_hr ?? ''}
               onChange={e => update('max_hr', e.target.value ? Number(e.target.value) : null)}
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-orange-500"
+              className="w-full bg-raised border border-line-strong rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-accent"
               placeholder="193"
               step={1}
               min={100}
@@ -622,18 +623,18 @@ export default function SettingsContent() {
             />
           </div>
           <div>
-            <label className="block text-[10px] text-gray-500 uppercase tracking-wider mb-1">Lactate Threshold HR</label>
+            <label className="block text-micro text-ink-4 uppercase tracking-wider mb-1">Lactate Threshold HR</label>
             <input
               type="number"
               value={profile.lthr ?? ''}
               onChange={e => update('lthr', e.target.value ? Number(e.target.value) : null)}
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-orange-500"
+              className="w-full bg-raised border border-line-strong rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-accent"
               placeholder={profile.max_hr ? String(Math.round(profile.max_hr * 0.9)) : '173'}
               step={1}
               min={80}
               max={220}
             />
-            <p className="text-[10px] text-gray-500 mt-0.5">
+            <p className="text-micro text-ink-4 mt-0.5">
               {profile.lthr
                 ? `Used for HR-based TSS (HRSS) on non-power activities`
                 : profile.max_hr
@@ -644,12 +645,12 @@ export default function SettingsContent() {
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-[10px] text-gray-500 uppercase tracking-wider mb-1">Rider Weight (kg)</label>
+            <label className="block text-micro text-ink-4 uppercase tracking-wider mb-1">Rider Weight (kg)</label>
             <input
               type="number"
               value={profile.weight_kg ?? ''}
               onChange={e => update('weight_kg', e.target.value ? Number(e.target.value) : null)}
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-orange-500"
+              className="w-full bg-raised border border-line-strong rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-accent"
               placeholder="75"
               step={0.5}
               min={40}
@@ -657,12 +658,12 @@ export default function SettingsContent() {
             />
           </div>
           <div>
-            <label className="block text-[10px] text-gray-500 uppercase tracking-wider mb-1">Bike Weight (kg)</label>
+            <label className="block text-micro text-ink-4 uppercase tracking-wider mb-1">Bike Weight (kg)</label>
             <input
               type="number"
               value={profile.bike_weight_kg ?? ''}
               onChange={e => update('bike_weight_kg', e.target.value ? Number(e.target.value) : null)}
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-orange-500"
+              className="w-full bg-raised border border-line-strong rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-accent"
               placeholder="8"
               step={0.5}
               min={3}
@@ -678,10 +679,10 @@ export default function SettingsContent() {
       </>)}
       {tab === 'connections' && (<>
       {/* Data sources — exactly one provider writes activities */}
-      <div className="bg-gray-900 rounded-xl p-5 space-y-4 border border-gray-800">
+      <div className="bg-surface rounded-xl p-5 space-y-4 border border-line">
         <div>
-          <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Data Sources</h2>
-          <p className="text-xs text-gray-500 mt-1">
+          <h2 className="text-sm font-semibold text-ink-2 uppercase tracking-wider">Data Sources</h2>
+          <p className="text-xs text-ink-4 mt-1">
             One provider supplies activities at a time. Running both would let the same
             ride land twice and double-count TSS, which skews Fitness &amp; Freshness.
           </p>
@@ -705,16 +706,16 @@ export default function SettingsContent() {
                 title={opt.ready ? undefined : 'Garmin activity sync is not built yet'}
                 className={`w-full text-left px-4 py-3 rounded-lg border transition-colors ${
                   active
-                    ? 'bg-orange-600/15 border-orange-500 text-white'
-                    : 'bg-gray-800 border-gray-700 text-gray-300 hover:border-gray-600'
+                    ? 'bg-accent/15 border-accent text-ink'
+                    : 'bg-raised border-line-strong text-ink-2 hover:border-line-hover'
                 } disabled:opacity-50 disabled:cursor-not-allowed`}
               >
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium">{opt.label}</span>
-                  {active && <span className="text-[10px] uppercase tracking-wider text-orange-400">Active</span>}
-                  {!opt.ready && <span className="text-[10px] uppercase tracking-wider text-gray-500">Coming soon</span>}
+                  {active && <span className="text-micro uppercase tracking-wider text-accent-hi">Active</span>}
+                  {!opt.ready && <span className="text-micro uppercase tracking-wider text-ink-4">Coming soon</span>}
                 </div>
-                <p className="text-xs text-gray-500 mt-0.5">{opt.hint}</p>
+                <p className="text-xs text-ink-4 mt-0.5">{opt.hint}</p>
               </button>
             );
           })}
@@ -723,7 +724,7 @@ export default function SettingsContent() {
         {/* Liveness. With no redundancy behind the active source, a stalled
             sync must be visible rather than inferred from missing rides. */}
         {health && (
-          <div className="border-t border-gray-800 pt-3 space-y-1.5">
+          <div className="border-t border-line pt-3 space-y-1.5">
             {health.garmin?.status === 'reauth_required' && (
               <p className="text-xs text-red-400">
                 Garmin needs re-authentication — run <code className="font-mono">npm run garmin:login</code>.
@@ -736,32 +737,32 @@ export default function SettingsContent() {
                     p.lastError ? 'bg-red-500' : p.stale ? 'bg-amber-500' : 'bg-green-500'
                   }`}
                 />
-                <span className="text-gray-400 capitalize w-20">{p.provider}</span>
-                <span className="text-gray-500">{sinceLabel(p.lastOkAt)}</span>
-                {p.detail && <span className="text-gray-600 truncate">· {p.detail}</span>}
+                <span className="text-ink-3 capitalize w-20">{p.provider}</span>
+                <span className="text-ink-4">{sinceLabel(p.lastOkAt)}</span>
+                {p.detail && <span className="text-ink-5 truncate">· {p.detail}</span>}
                 {p.lastError && <span className="text-red-400 truncate">· {p.lastError}</span>}
               </div>
             ))}
           </div>
         )}
 
-        <p className="text-[11px] text-gray-500 border-t border-gray-800 pt-3">
+        <p className="text-mini text-ink-4 border-t border-line pt-3">
           Switching only changes which provider <em>writes</em> activities. Your Strava
           login keeps working either way, and nothing already imported is removed.
         </p>
 
         {/* intervals.icu is wellness-only, so it's independent of the choice above */}
-        <label className="flex items-start gap-3 border-t border-gray-800 pt-4 cursor-pointer">
+        <label className="flex items-start gap-3 border-t border-line pt-4 cursor-pointer">
           <input
             type="checkbox"
             checked={profile?.intervals_wellness_enabled !== false}
             onChange={async e => { await updateAndSave('intervals_wellness_enabled', e.target.checked); }}
             disabled={saving}
-            className="mt-0.5 w-4 h-4 accent-orange-500"
+            className="mt-0.5 w-4 h-4 accent-accent"
           />
           <span>
-            <span className="text-sm text-gray-300">Use intervals.icu for wellness</span>
-            <span className="block text-xs text-gray-500 mt-0.5">
+            <span className="text-sm text-ink-2">Use intervals.icu for wellness</span>
+            <span className="block text-xs text-ink-4 mt-0.5">
               HRV, sleep and readiness, plus power-meter device names. Supplies no
               activities, so this is independent of the source above.
             </span>
@@ -770,16 +771,16 @@ export default function SettingsContent() {
       </div>
 
       {/* Strava Connection */}
-      <div className="bg-gray-900 rounded-xl p-5 space-y-4 border border-gray-800">
+      <div className="bg-surface rounded-xl p-5 space-y-4 border border-line">
         <div>
-          <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Strava Connection</h2>
-          <p className="text-xs text-gray-500 mt-1">
+          <h2 className="text-sm font-semibold text-ink-2 uppercase tracking-wider">Strava Connection</h2>
+          <p className="text-xs text-ink-4 mt-1">
             Re-authorise to grant access to routes and segments. Required to load Strava courses on event pages.
           </p>
         </div>
         <a
           href="/api/strava/auth"
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-orange-600 hover:bg-orange-500 text-white text-sm font-medium transition-colors"
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-accent hover:bg-accent text-ink text-sm font-medium transition-colors"
         >
           <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
             <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169" />
@@ -788,10 +789,10 @@ export default function SettingsContent() {
         </a>
 
         {/* Activity history import */}
-        <div className="border-t border-gray-800 pt-4 space-y-3">
+        <div className="border-t border-line pt-4 space-y-3">
           <div>
-            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Import Activity History</h3>
-            <p className="text-xs text-gray-500 mt-1">
+            <h3 className="text-xs font-semibold text-ink-3 uppercase tracking-wider">Import Activity History</h3>
+            <p className="text-xs text-ink-4 mt-1">
               Pull in older activities from Strava that aren&apos;t yet in the database.
               Imports up to 1 000 activities per press, oldest first.
             </p>
@@ -799,20 +800,20 @@ export default function SettingsContent() {
 
           {/* Status strip */}
           {historyLoading ? (
-            <p className="text-xs text-gray-600">Loading…</p>
+            <p className="text-xs text-ink-5">Loading…</p>
           ) : historyStatus ? (
             <div className="grid grid-cols-3 gap-2">
-              <div className="bg-gray-800 rounded-lg p-2.5 text-center">
-                <p className="text-[10px] text-gray-500 uppercase tracking-wider">Stored</p>
-                <p className="text-base font-bold text-white mt-0.5">{historyStatus.total.toLocaleString()}</p>
+              <div className="bg-raised rounded-lg p-2.5 text-center">
+                <p className="text-micro text-ink-4 uppercase tracking-wider">Stored</p>
+                <p className="text-base font-bold text-ink mt-0.5">{historyStatus.total.toLocaleString()}</p>
               </div>
-              <div className="bg-gray-800 rounded-lg p-2.5 text-center">
-                <p className="text-[10px] text-gray-500 uppercase tracking-wider">Newest</p>
-                <p className="text-[11px] font-semibold text-white mt-0.5">{fmtDate(historyStatus.newestDate)}</p>
+              <div className="bg-raised rounded-lg p-2.5 text-center">
+                <p className="text-micro text-ink-4 uppercase tracking-wider">Newest</p>
+                <p className="text-mini font-semibold text-ink mt-0.5">{fmtDate(historyStatus.newestDate)}</p>
               </div>
-              <div className="bg-gray-800 rounded-lg p-2.5 text-center">
-                <p className="text-[10px] text-gray-500 uppercase tracking-wider">Oldest</p>
-                <p className="text-[11px] font-semibold text-white mt-0.5">{fmtDate(historyStatus.oldestDate)}</p>
+              <div className="bg-raised rounded-lg p-2.5 text-center">
+                <p className="text-micro text-ink-4 uppercase tracking-wider">Oldest</p>
+                <p className="text-mini font-semibold text-ink mt-0.5">{fmtDate(historyStatus.oldestDate)}</p>
               </div>
             </div>
           ) : null}
@@ -820,7 +821,7 @@ export default function SettingsContent() {
           <button
             onClick={runHistoryImport}
             disabled={historyBusy}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-white text-sm font-medium transition-colors"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-hover hover:bg-hover-2 disabled:opacity-50 text-ink text-sm font-medium transition-colors"
           >
             {historyBusy ? (
               <>
@@ -839,9 +840,9 @@ export default function SettingsContent() {
 
           {/* Progress log */}
           {historyLog.length > 0 && (
-            <div className="bg-gray-950 rounded-lg p-3 space-y-1 max-h-32 overflow-y-auto">
+            <div className="bg-page rounded-lg p-3 space-y-1 max-h-32 overflow-y-auto">
               {historyLog.map((line, i) => (
-                <p key={i} className="text-[11px] text-gray-400 font-mono">{line}</p>
+                <p key={i} className="text-mini text-ink-3 font-mono">{line}</p>
               ))}
             </div>
           )}
@@ -849,36 +850,36 @@ export default function SettingsContent() {
       </div>
 
       {/* intervals.icu Integration */}
-      <div className="bg-gray-900 rounded-xl p-5 space-y-4 border border-gray-800">
+      <div className="bg-surface rounded-xl p-5 space-y-4 border border-line">
         <div>
-          <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">intervals.icu</h2>
-          <p className="text-xs text-gray-500 mt-1">
+          <h2 className="text-sm font-semibold text-ink-2 uppercase tracking-wider">intervals.icu</h2>
+          <p className="text-xs text-ink-4 mt-1">
             Sync daily HRV, readiness score, and sleep score to power the Readiness dashboard.
-            Find your Athlete ID in your intervals.icu URL: <span className="text-gray-400 font-mono">intervals.icu/athlete/</span><span className="text-orange-400 font-mono">i12345</span>.
+            Find your Athlete ID in your intervals.icu URL: <span className="text-ink-3 font-mono">intervals.icu/athlete/</span><span className="text-accent-hi font-mono">i12345</span>.
           </p>
         </div>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
-            <label className="block text-[10px] text-gray-500 uppercase tracking-wider mb-1">Athlete ID</label>
+            <label className="block text-micro text-ink-4 uppercase tracking-wider mb-1">Athlete ID</label>
             <input
               type="text"
               value={intervalsCreds.id}
               onChange={e => setIntervalsCreds(c => ({ ...c, id: e.target.value }))}
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-orange-500 font-mono"
+              className="w-full bg-raised border border-line-strong rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-accent font-mono"
               placeholder="i12345"
             />
           </div>
           <div>
-            <label className="block text-[10px] text-gray-500 uppercase tracking-wider mb-1">API Key</label>
+            <label className="block text-micro text-ink-4 uppercase tracking-wider mb-1">API Key</label>
             <input
               type="password"
               value={intervalsCreds.key}
               onChange={e => setIntervalsCreds(c => ({ ...c, key: e.target.value }))}
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-orange-500 font-mono"
+              className="w-full bg-raised border border-line-strong rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-accent font-mono"
               placeholder={profile?.intervals_api_key_set ? '•••••••• (saved)' : '••••••••••••••••'}
             />
-            <p className="text-[10px] text-gray-500 mt-1">
+            <p className="text-micro text-ink-4 mt-1">
               {profile?.intervals_api_key_set
                 ? 'A key is saved. Leave blank to keep it, or type a new one to replace it.'
                 : 'No key saved yet.'}
@@ -889,17 +890,17 @@ export default function SettingsContent() {
         {/* Wellness DB status */}
         {!wellnessLoading && wellnessStatus && wellnessStatus.total > 0 && (
           <div className="grid grid-cols-3 gap-2">
-            <div className="bg-gray-800 rounded-lg p-2.5 text-center">
-              <p className="text-[10px] text-gray-500 uppercase tracking-wider">Stored</p>
-              <p className="text-base font-bold text-white mt-0.5">{wellnessStatus.total.toLocaleString()}</p>
+            <div className="bg-raised rounded-lg p-2.5 text-center">
+              <p className="text-micro text-ink-4 uppercase tracking-wider">Stored</p>
+              <p className="text-base font-bold text-ink mt-0.5">{wellnessStatus.total.toLocaleString()}</p>
             </div>
-            <div className="bg-gray-800 rounded-lg p-2.5 text-center">
-              <p className="text-[10px] text-gray-500 uppercase tracking-wider">Newest</p>
-              <p className="text-[11px] font-semibold text-white mt-0.5">{fmtDate(wellnessStatus.newestDate)}</p>
+            <div className="bg-raised rounded-lg p-2.5 text-center">
+              <p className="text-micro text-ink-4 uppercase tracking-wider">Newest</p>
+              <p className="text-mini font-semibold text-ink mt-0.5">{fmtDate(wellnessStatus.newestDate)}</p>
             </div>
-            <div className="bg-gray-800 rounded-lg p-2.5 text-center">
-              <p className="text-[10px] text-gray-500 uppercase tracking-wider">Oldest</p>
-              <p className="text-[11px] font-semibold text-white mt-0.5">{fmtDate(wellnessStatus.oldestDate)}</p>
+            <div className="bg-raised rounded-lg p-2.5 text-center">
+              <p className="text-micro text-ink-4 uppercase tracking-wider">Oldest</p>
+              <p className="text-mini font-semibold text-ink mt-0.5">{fmtDate(wellnessStatus.oldestDate)}</p>
             </div>
           </div>
         )}
@@ -909,7 +910,7 @@ export default function SettingsContent() {
           <button
             onClick={() => runWellnessSync(90)}
             disabled={wellnessBusy || !intervalsCreds.id || !(intervalsCreds.key || profile?.intervals_api_key_set)}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-white text-sm font-medium transition-colors"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-hover hover:bg-hover-2 disabled:opacity-50 text-ink text-sm font-medium transition-colors"
           >
             {wellnessBusy ? (
               <>
@@ -924,14 +925,14 @@ export default function SettingsContent() {
           <button
             onClick={() => runWellnessSync(365)}
             disabled={wellnessBusy || !intervalsCreds.id || !(intervalsCreds.key || profile?.intervals_api_key_set)}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-gray-800 hover:bg-gray-700 disabled:opacity-50 text-gray-300 text-sm font-medium transition-colors border border-gray-700"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-raised hover:bg-hover disabled:opacity-50 text-ink-2 text-sm font-medium transition-colors border border-line-strong"
           >
             Backfill 1 year
           </button>
           <button
             onClick={saveIntervalsCreds}
             disabled={saving || !intervalsCreds.id || !(intervalsCreds.key || profile?.intervals_api_key_set)}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-orange-500/10 hover:bg-orange-500/20 disabled:opacity-50 text-orange-400 text-sm font-medium transition-colors border border-orange-500/30"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-accent/10 hover:bg-accent/20 disabled:opacity-50 text-accent-hi text-sm font-medium transition-colors border border-accent/30"
           >
             Save credentials
           </button>
@@ -939,9 +940,9 @@ export default function SettingsContent() {
 
         {/* Sync log */}
         {wellnessLog.length > 0 && (
-          <div className="bg-gray-950 rounded-lg p-3 space-y-1">
+          <div className="bg-page rounded-lg p-3 space-y-1">
             {wellnessLog.map((line, i) => (
-              <p key={i} className="text-[11px] text-gray-400 font-mono">{line}</p>
+              <p key={i} className="text-mini text-ink-3 font-mono">{line}</p>
             ))}
           </div>
         )}
@@ -950,22 +951,22 @@ export default function SettingsContent() {
       </>)}
       {tab === 'data' && (<>
       {/* Activity Sync */}
-      <div className="bg-gray-900 rounded-xl p-5 space-y-4 border border-gray-800">
+      <div className="bg-surface rounded-xl p-5 space-y-4 border border-line">
         <div>
-          <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Activity Sync</h2>
-          <p className="text-xs text-gray-500 mt-1">
+          <h2 className="text-sm font-semibold text-ink-2 uppercase tracking-wider">Activity Sync</h2>
+          <p className="text-xs text-ink-4 mt-1">
             Sync recent activities from Strava and update power meter data from intervals.icu.
           </p>
         </div>
 
         {/* Strava recent sync */}
         <div className="space-y-2">
-          <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Strava Recent Sync</h3>
-          <p className="text-xs text-gray-500">Pull in new activities from the past few weeks.</p>
+          <h3 className="text-xs font-semibold text-ink-3 uppercase tracking-wider">Strava Recent Sync</h3>
+          <p className="text-xs text-ink-4">Pull in new activities from the past few weeks.</p>
           <button
             onClick={runStravaSync}
             disabled={stravaSyncing}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-white text-sm font-medium transition-colors"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-hover hover:bg-hover-2 disabled:opacity-50 text-ink text-sm font-medium transition-colors"
           >
             {stravaSyncing ? (
               <>
@@ -978,24 +979,24 @@ export default function SettingsContent() {
             ) : 'Sync from Strava'}
           </button>
           {stravaSyncLog.length > 0 && (
-            <div className="bg-gray-950 rounded-lg p-3 space-y-1">
+            <div className="bg-page rounded-lg p-3 space-y-1">
               {stravaSyncLog.map((line, i) => (
-                <p key={i} className="text-[11px] text-gray-400 font-mono">{line}</p>
+                <p key={i} className="text-mini text-ink-3 font-mono">{line}</p>
               ))}
             </div>
           )}
         </div>
 
-        <div className="border-t border-gray-800" />
+        <div className="border-t border-line" />
 
         {/* Power meter backfill */}
         <div className="space-y-2">
-          <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Power Meter Data</h3>
-          <p className="text-xs text-gray-500">Backfill power meter device names from intervals.icu across all activities.</p>
+          <h3 className="text-xs font-semibold text-ink-3 uppercase tracking-wider">Power Meter Data</h3>
+          <p className="text-xs text-ink-4">Backfill power meter device names from intervals.icu across all activities.</p>
           <button
             onClick={runPmBackfill}
             disabled={pmSyncing}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-white text-sm font-medium transition-colors"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-hover hover:bg-hover-2 disabled:opacity-50 text-ink text-sm font-medium transition-colors"
           >
             {pmSyncing ? (
               <>
@@ -1007,9 +1008,9 @@ export default function SettingsContent() {
             ) : 'Sync power meter data'}
           </button>
           {pmSyncLog.length > 0 && (
-            <div className="bg-gray-950 rounded-lg p-3 space-y-1">
+            <div className="bg-page rounded-lg p-3 space-y-1">
               {pmSyncLog.map((line, i) => (
-                <p key={i} className="text-[11px] text-gray-400 font-mono">{line}</p>
+                <p key={i} className="text-mini text-ink-3 font-mono">{line}</p>
               ))}
             </div>
           )}
@@ -1023,13 +1024,13 @@ export default function SettingsContent() {
             await fetch('/api/auth/logout', { method: 'POST' });
             window.location.href = '/login';
           }}
-          className="px-4 py-2.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white text-sm font-medium transition-colors border border-gray-700"
+          className="px-4 py-2.5 rounded-lg bg-raised hover:bg-hover text-ink-3 hover:text-ink text-sm font-medium transition-colors border border-line-strong"
         >
           Sign out
         </button>
         <div className="flex items-center gap-3">
           <SaveStatus error={error} onRetry={() => save()} />
-          <button onClick={() => save()} disabled={saving} className="px-6 py-2.5 rounded-lg bg-orange-500 hover:bg-orange-400 disabled:opacity-50 text-white text-sm font-medium transition-colors">
+          <button onClick={() => save()} disabled={saving} className="px-6 py-2.5 rounded-lg bg-accent hover:bg-accent-hi disabled:opacity-50 text-ink text-sm font-medium transition-colors">
             {saving ? 'Saving…' : saved ? 'Saved ✓' : 'Save settings'}
           </button>
         </div>

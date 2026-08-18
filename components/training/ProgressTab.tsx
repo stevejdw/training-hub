@@ -11,6 +11,7 @@ import { useCachedFetch } from '@/lib/use-cached-fetch';
 import EnlargeableChart from '@/components/EnlargeableChart';
 import TrainingCalendar from './TrainingCalendar';
 import TssRollingChart from './TssRollingChart';
+import { CHART } from '@/lib/chart-theme';
 
 type Period = 'wtd' | 'mtd' | 'ytd';
 type Metric = 'km' | 'time' | 'elevation' | 'tss' | 'activities';
@@ -78,27 +79,27 @@ function SportDropdown({ selected, onChange }: {
     <div ref={ref} className="relative flex-shrink-0">
       <button
         onClick={() => setOpen(v => !v)}
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-gray-700 bg-gray-800 text-xs font-medium text-white hover:border-gray-600 transition-colors"
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-line-strong bg-raised text-xs font-medium text-ink hover:border-line-hover transition-colors"
       >
         {label}
-        <svg className={`w-3 h-3 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+        <svg className={`w-3 h-3 text-ink-3 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
         </svg>
       </button>
       {open && (
-        <div className="absolute z-20 top-full left-0 mt-1.5 bg-gray-800 border border-gray-700 rounded-xl p-1.5 shadow-xl min-w-[110px]">
+        <div className="absolute z-20 top-full left-0 mt-1.5 bg-raised border border-line-strong rounded-xl p-1.5 shadow-xl min-w-[110px]">
           {TYPE_OPTIONS.map(f => (
             <label
               key={f}
-              className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg hover:bg-gray-700/60 cursor-pointer transition-colors"
+              className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg hover:bg-hover/60 cursor-pointer transition-colors"
             >
               <input
                 type="checkbox"
-                className="w-3.5 h-3.5 accent-orange-500 cursor-pointer"
+                className="w-3.5 h-3.5 accent-accent cursor-pointer"
                 checked={selected.includes(f)}
                 onChange={() => toggle(f)}
               />
-              <span className="text-xs text-gray-200">{f}</span>
+              <span className="text-xs text-ink">{f}</span>
             </label>
           ))}
         </div>
@@ -182,7 +183,7 @@ export default function ProgressTab() {
     <div className="space-y-4">
 
       {/* Heading */}
-      <h2 className="text-sm font-semibold text-white">Progress</h2>
+      <h2 className="text-sm font-semibold text-ink">Progress</h2>
 
       {/* Controls: sport dropdown + metric pills (scrollable row) */}
       <div className="flex items-center gap-2">
@@ -198,8 +199,8 @@ export default function ProgressTab() {
                 onClick={() => { setMetric(mx.key); setOffset(0); }}
                 className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors border ${
                   metric === mx.key
-                    ? 'bg-orange-500 text-white border-orange-500'
-                    : 'bg-transparent text-gray-400 border-gray-700 hover:text-white hover:border-gray-500'
+                    ? 'bg-accent text-ink border-accent'
+                    : 'bg-transparent text-ink-3 border-line-strong hover:text-ink hover:border-line-hover'
                 }`}
               >
                 {mx.label}
@@ -210,18 +211,18 @@ export default function ProgressTab() {
       </div>
 
       {/* Chart panel */}
-      <div className="bg-gray-800/60 rounded-xl p-4 space-y-3">
+      <div className="bg-raised/60 rounded-xl p-4 space-y-3">
 
         {/* Total header */}
         <div>
-          <p className="text-[10px] text-gray-500 uppercase tracking-wider">Total {m.label}</p>
+          <p className="text-micro text-ink-4 uppercase tracking-wider">Total {m.label}</p>
           {loading ? (
-            <div className="h-9 w-36 bg-gray-700/50 rounded animate-pulse mt-1" />
+            <div className="h-9 w-36 bg-hover/50 rounded animate-pulse mt-1" />
           ) : (
             <div className="flex items-end gap-2.5 mt-0.5">
-              <p className="text-3xl font-bold text-white leading-tight">
+              <p className="text-3xl font-bold text-ink leading-tight">
                 {m.fmt(curTotal)}
-                {m.unit && <span className="text-lg font-semibold text-gray-400 ml-1">{m.unit}</span>}
+                {m.unit && <span className="text-lg font-semibold text-ink-3 ml-1">{m.unit}</span>}
               </p>
               {deltaPct !== null && (
                 <p className={`text-sm font-semibold mb-0.5 ${deltaPct >= 0 ? 'text-green-400' : 'text-red-400'}`}>
@@ -230,9 +231,9 @@ export default function ProgressTab() {
               )}
             </div>
           )}
-          <p className="text-xs text-gray-500 mt-0.5">{dateRange}</p>
+          <p className="text-xs text-ink-4 mt-0.5">{dateRange}</p>
           {deltaPct !== null && priorTotal > 0 && (
-            <p className="text-[10px] text-gray-600 mt-0.5">
+            <p className="text-micro text-ink-5 mt-0.5">
               vs. prior period ({m.fmt(priorTotal)}{m.unit ? ` ${m.unit}` : ''})
             </p>
           )}
@@ -240,19 +241,19 @@ export default function ProgressTab() {
 
         {/* Area chart */}
         {loading ? (
-          <div className="h-48 animate-pulse bg-gray-700/40 rounded-lg" />
+          <div className="h-48 animate-pulse bg-hover/40 rounded-lg" />
         ) : chartData.length === 0 ? (
-          <div className="h-48 flex items-center justify-center text-gray-600 text-sm">No data for this period</div>
+          <div className="h-48 flex items-center justify-center text-ink-5 text-sm">No data for this period</div>
         ) : (
           <EnlargeableChart title={`Total ${m.label}`} subtitle={dateRange} controls={
             <div className="flex items-center gap-2">
-              <div className="flex bg-gray-800 rounded-lg p-0.5 gap-0.5">
+              <div className="flex bg-raised rounded-lg p-0.5 gap-0.5">
                 {PERIODS.map(p => (
                   <button
                     key={p.key}
                     onClick={() => { setPeriod(p.key); setOffset(0); }}
                     className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
-                      period === p.key ? 'bg-orange-500 text-white' : 'text-gray-400 hover:text-white'
+                      period === p.key ? 'bg-accent text-ink' : 'text-ink-3 hover:text-ink'
                     }`}
                   >
                     {p.label}
@@ -262,7 +263,7 @@ export default function ProgressTab() {
               <div className="flex items-center gap-1">
                 <button
                   onClick={() => setOffset(o => o - 1)}
-                  className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
+                  className="p-1.5 rounded-lg text-ink-3 hover:text-ink hover:bg-raised transition-colors"
                   aria-label="Previous period"
                 >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
@@ -273,7 +274,7 @@ export default function ProgressTab() {
                   onClick={() => setOffset(o => Math.min(0, o + 1))}
                   disabled={offset >= 0}
                   className={`p-1.5 rounded-lg transition-colors ${
-                    offset >= 0 ? 'text-gray-700 cursor-not-allowed' : 'text-gray-400 hover:text-white hover:bg-gray-800'
+                    offset >= 0 ? 'text-ink-5 cursor-not-allowed' : 'text-ink-3 hover:text-ink hover:bg-raised'
                   }`}
                   aria-label="Next period"
                 >
@@ -288,29 +289,29 @@ export default function ProgressTab() {
             <AreaChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
               <defs>
                 <linearGradient id="progressGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%"  stopColor="#f97316" stopOpacity={0.35} />
-                  <stop offset="95%" stopColor="#f97316" stopOpacity={0.04} />
+                  <stop offset="5%"  stopColor={CHART.power} stopOpacity={0.35} />
+                  <stop offset="95%" stopColor={CHART.power} stopOpacity={0.04} />
                 </linearGradient>
               </defs>
-              <CartesianGrid stroke="#1f2937" strokeDasharray="3 3" vertical={false} />
+              <CartesianGrid stroke={CHART.grid} strokeDasharray="3 3" vertical={false} />
               <XAxis
                 dataKey="label"
-                tick={{ fill: '#6b7280', fontSize: 10 }}
+                tick={{ fill: CHART.axisText, fontSize: 10 }}
                 axisLine={false}
                 tickLine={false}
                 interval="preserveStartEnd"
                 tickFormatter={formatXLabel}
               />
               <YAxis
-                tick={{ fill: '#6b7280', fontSize: 10 }}
+                tick={{ fill: CHART.axisText, fontSize: 10 }}
                 axisLine={false}
                 tickLine={false}
                 width={36}
                 tickFormatter={v => m.fmt(Number(v))}
               />
               <Tooltip
-                contentStyle={{ background: '#111827', border: '1px solid #374151', borderRadius: 8, fontSize: 12 }}
-                labelStyle={{ color: '#9ca3af' }}
+                contentStyle={{ background: CHART.tooltipBg, border: '1px solid #374151', borderRadius: 8, fontSize: 12 }}
+                labelStyle={{ color: CHART.reference }}
                 formatter={(v, name) => [
                   `${m.fmt(Number(v))}${m.unit ? ' ' + m.unit : ''}`,
                   name === 'current' ? 'This period' : 'Prior period',
@@ -319,7 +320,7 @@ export default function ProgressTab() {
               <Line
                 type="monotone"
                 dataKey="prior"
-                stroke="#6b7280"
+                stroke={CHART.axisText}
                 strokeWidth={1.5}
                 strokeDasharray="5 3"
                 dot={false}
@@ -328,11 +329,11 @@ export default function ProgressTab() {
               <Area
                 type="monotone"
                 dataKey="current"
-                stroke="#f97316"
+                stroke={CHART.power}
                 strokeWidth={2.5}
                 fill="url(#progressGrad)"
                 dot={false}
-                activeDot={{ r: 5, fill: '#f97316' }}
+                activeDot={{ r: 5, fill: CHART.power }}
                 connectNulls={false}
               />
             </AreaChart>
@@ -342,13 +343,13 @@ export default function ProgressTab() {
       </div>
 
       {/* Period selector */}
-      <div className="flex bg-gray-800 rounded-xl p-1 gap-1">
+      <div className="flex bg-raised rounded-xl p-1 gap-1">
         {PERIODS.map(p => (
           <button
             key={p.key}
             onClick={() => { setPeriod(p.key); setOffset(0); }}
             className={`flex-1 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-              period === p.key ? 'bg-orange-500 text-white' : 'text-gray-400 hover:text-white'
+              period === p.key ? 'bg-accent text-ink' : 'text-ink-3 hover:text-ink'
             }`}
           >
             {p.label}
@@ -360,19 +361,19 @@ export default function ProgressTab() {
       <div className="flex items-center justify-between">
         <button
           onClick={() => setOffset(o => o - 1)}
-          className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
+          className="p-2 rounded-lg text-ink-3 hover:text-ink hover:bg-raised transition-colors"
           aria-label="Previous period"
         >
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
           </svg>
         </button>
-        <span className="text-sm text-gray-200 font-medium tabular-nums">{dateRange}</span>
+        <span className="text-sm text-ink font-medium tabular-nums">{dateRange}</span>
         <button
           onClick={() => setOffset(o => Math.min(0, o + 1))}
           disabled={offset >= 0}
           className={`p-2 rounded-lg transition-colors ${
-            offset >= 0 ? 'text-gray-700 cursor-not-allowed' : 'text-gray-400 hover:text-white hover:bg-gray-800'
+            offset >= 0 ? 'text-ink-5 cursor-not-allowed' : 'text-ink-3 hover:text-ink hover:bg-raised'
           }`}
           aria-label="Next period"
         >
@@ -383,13 +384,13 @@ export default function ProgressTab() {
       </div>
 
       {/* Weekly TSS — above calendar */}
-      <div id="weekly-tss" className="border-t border-gray-800/60 pt-4">
-        <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-3">Weekly TSS</p>
+      <div id="weekly-tss" className="border-t border-line/60 pt-4">
+        <p className="text-micro font-semibold text-ink-4 uppercase tracking-wider mb-3">Weekly TSS</p>
         <TssRollingChart />
       </div>
 
       {/* Training calendar */}
-      <div className="border-t border-gray-800/60 pt-4">
+      <div className="border-t border-line/60 pt-4">
         <TrainingCalendar numWeeks={8} />
       </div>
 

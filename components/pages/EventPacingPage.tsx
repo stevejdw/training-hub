@@ -49,7 +49,7 @@ function isRolling(seg: PacingSegment) {
 }
 
 function segColors(seg: PacingSegment) {
-  if (seg.type === 'climb')   return { rowBg: 'bg-orange-500/8',  label: 'text-orange-300', dot: 'bg-orange-500/70',  name: 'Climbing'    };
+  if (seg.type === 'climb')   return { rowBg: 'bg-accent/8',  label: 'text-accent-hi', dot: 'bg-accent/70',  name: 'Climbing'    };
   if (seg.type === 'descent') return { rowBg: 'bg-blue-500/8',    label: 'text-blue-300',   dot: 'bg-blue-500/70',    name: 'Descending'  };
   if (isRolling(seg))         return { rowBg: 'bg-yellow-500/5',  label: 'text-yellow-300', dot: 'bg-yellow-500/70',  name: 'Rolling'     };
   return                             { rowBg: '',                  label: 'text-green-300',  dot: 'bg-green-500/70',   name: 'Flat'        };
@@ -436,7 +436,7 @@ export default function EventPacingPage({ eventId }: Props) {
     return (
       <div className="h-full flex flex-col">
         <PageHeader icon={iconFor('events')} title="Pacing Strategy" />
-        <div className="flex-1 flex items-center justify-center text-gray-600 text-sm">Loading…</div>
+        <div className="flex-1 flex items-center justify-center text-ink-5 text-sm">Loading…</div>
       </div>
     );
   }
@@ -445,8 +445,8 @@ export default function EventPacingPage({ eventId }: Props) {
     <div className="h-full flex flex-col">
       <PageHeader icon={iconFor('events')} title="Pacing Strategy" />
 
-      <div className="flex-shrink-0 px-4 md:px-8 py-2 border-b border-gray-800/60">
-        <Link href={`/events/${eventId}`} className="text-sm text-gray-500 hover:text-orange-400 transition-colors">
+      <div className="flex-shrink-0 px-4 md:px-8 py-2 border-b border-line/60">
+        <Link href={`/events/${eventId}`} className="text-sm text-ink-4 hover:text-accent-hi transition-colors">
           ← {eventName || 'Event'}
         </Link>
       </div>
@@ -455,9 +455,9 @@ export default function EventPacingPage({ eventId }: Props) {
         <div className="max-w-2xl md:max-w-5xl xl:max-w-7xl mx-auto px-4 py-4 md:px-8 md:py-6 space-y-4">
 
           {!route && (
-            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 text-center">
-              <p className="text-gray-500 text-sm">No Strava course loaded — add one in the event editor.</p>
-              <Link href={`/events/${eventId}`} className="mt-3 inline-block text-orange-400 hover:text-orange-300 text-sm">
+            <div className="bg-surface border border-line rounded-2xl p-6 text-center">
+              <p className="text-ink-4 text-sm">No Strava course loaded — add one in the event editor.</p>
+              <Link href={`/events/${eventId}`} className="mt-3 inline-block text-accent-hi hover:text-accent-hi text-sm">
                 Edit event →
               </Link>
             </div>
@@ -465,32 +465,32 @@ export default function EventPacingPage({ eventId }: Props) {
 
           {/* ── Pacing Strategy ────────────────────────────────────── */}
           {route && segments.length > 0 && (
-            <section className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
+            <section className="bg-surface border border-line rounded-2xl overflow-hidden">
 
               {/* ── Top summary ── */}
               <div className="p-4">
                 <div className="flex items-start justify-between gap-3 mb-3">
-                  <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Pacing Strategy</h2>
+                  <h2 className="text-xs font-semibold text-ink-4 uppercase tracking-wider">Pacing Strategy</h2>
                   <button
                     onClick={editingPacing ? cancelPacingEdit : startPacingEdit}
-                    className="flex-shrink-0 text-xs text-orange-400 hover:text-orange-300 border border-orange-500/30 hover:border-orange-500/60 rounded-lg px-3 py-1.5 transition-colors"
+                    className="flex-shrink-0 text-xs text-accent-hi hover:text-accent-hi border border-accent/30 hover:border-accent/60 rounded-lg px-3 py-1.5 transition-colors"
                   >
                     {editingPacing ? 'Cancel' : 'Edit'}
                   </button>
                 </div>
 
                 <div className="grid grid-cols-3 gap-3 mb-3">
-                  <div className="bg-gray-800/60 rounded-xl p-3 text-center col-span-1">
-                    <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Est Time</p>
-                    <p className="text-2xl font-bold text-white tabular-nums">{fmtTime(estMin)}</p>
+                  <div className="bg-raised/60 rounded-xl p-3 text-center col-span-1">
+                    <p className="text-micro text-ink-4 uppercase tracking-wider mb-1">Est Time</p>
+                    <p className="text-2xl font-bold text-ink tabular-nums">{fmtTime(estMin)}</p>
                   </div>
-                  <div className="bg-gray-800/60 rounded-xl p-3 text-center">
-                    <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Avg Power</p>
-                    <p className="text-2xl font-bold text-orange-400 tabular-nums">{avgWatts ?? '—'}<span className="text-sm font-normal text-gray-500 ml-0.5">W</span></p>
+                  <div className="bg-raised/60 rounded-xl p-3 text-center">
+                    <p className="text-micro text-ink-4 uppercase tracking-wider mb-1">Avg Power</p>
+                    <p className="text-2xl font-bold text-accent-hi tabular-nums">{avgWatts ?? '—'}<span className="text-sm font-normal text-ink-4 ml-0.5">W</span></p>
                   </div>
-                  <div className="bg-gray-800/60 rounded-xl p-3 text-center">
-                    <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">NP</p>
-                    <p className="text-2xl font-bold text-yellow-400 tabular-nums">{np ?? '—'}<span className="text-sm font-normal text-gray-500 ml-0.5">W</span></p>
+                  <div className="bg-raised/60 rounded-xl p-3 text-center">
+                    <p className="text-micro text-ink-4 uppercase tracking-wider mb-1">NP</p>
+                    <p className="text-2xl font-bold text-yellow-400 tabular-nums">{np ?? '—'}<span className="text-sm font-normal text-ink-4 ml-0.5">W</span></p>
                   </div>
                 </div>
 
@@ -500,42 +500,42 @@ export default function EventPacingPage({ eventId }: Props) {
                     { label: 'Calories',  value: calories ? `${calories.toLocaleString()} kcal` : '—' },
                     { label: 'Descent',   value: `-${totalDescM.toLocaleString()}m` },
                   ].map(({ label, value }) => (
-                    <div key={label} className="bg-gray-800/40 rounded-lg px-2 py-1.5 text-center">
-                      <p className="text-[9px] text-gray-600 uppercase tracking-wider">{label}</p>
-                      <p className="text-xs font-semibold text-gray-300 tabular-nums mt-0.5">{value}</p>
+                    <div key={label} className="bg-raised/40 rounded-lg px-2 py-1.5 text-center">
+                      <p className="text-micro text-ink-5 uppercase tracking-wider">{label}</p>
+                      <p className="text-xs font-semibold text-ink-2 tabular-nums mt-0.5">{value}</p>
                     </div>
                   ))}
                 </div>
               </div>
 
               {/* ── Terrain breakdown ── */}
-              <div className="border-t border-gray-800 px-4 py-3 grid grid-cols-4 gap-2">
+              <div className="border-t border-line px-4 py-3 grid grid-cols-4 gap-2">
                 {[
-                  { label: 'Climbing',   value: fmtTime(climbMin),   pct: estMin > 0 ? Math.round(climbMin   / estMin * 100) : 0, color: 'text-orange-400', dot: 'bg-orange-500/70' },
+                  { label: 'Climbing',   value: fmtTime(climbMin),   pct: estMin > 0 ? Math.round(climbMin   / estMin * 100) : 0, color: 'text-accent-hi', dot: 'bg-accent/70' },
                   { label: 'Descending', value: fmtTime(descentMin), pct: estMin > 0 ? Math.round(descentMin / estMin * 100) : 0, color: 'text-blue-400',   dot: 'bg-blue-500/70'   },
                   { label: 'Rolling',    value: fmtTime(rollingMin), pct: estMin > 0 ? Math.round(rollingMin / estMin * 100) : 0, color: 'text-yellow-400', dot: 'bg-yellow-500/70' },
                   { label: 'Flat',       value: fmtTime(flatMin),    pct: estMin > 0 ? Math.round(flatMin    / estMin * 100) : 0, color: 'text-green-400',  dot: 'bg-green-500/70'  },
                 ].map(({ label, value, pct, color, dot }) => (
                   <div key={label} className="text-center">
                     <span className={`inline-block w-1.5 h-1.5 rounded-full ${dot} mb-0.5`} />
-                    <p className="text-[9px] text-gray-600 uppercase tracking-wider leading-tight">{label}</p>
+                    <p className="text-micro text-ink-5 uppercase tracking-wider leading-tight">{label}</p>
                     <p className={`text-xs font-bold tabular-nums ${color} mt-0.5`}>{value}</p>
-                    <p className="text-[9px] text-gray-600">{pct}%</p>
+                    <p className="text-micro text-ink-5">{pct}%</p>
                   </div>
                 ))}
               </div>
 
               {/* ── Rider setup ── */}
-              <div className="border-t border-gray-800 px-4 py-3">
-                <p className="text-[9px] text-gray-600 uppercase tracking-wider mb-2">Rider Setup</p>
+              <div className="border-t border-line px-4 py-3">
+                <p className="text-micro text-ink-5 uppercase tracking-wider mb-2">Rider Setup</p>
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
                   {/* Weight summary */}
-                  <span className="text-xs text-gray-500">
+                  <span className="text-xs text-ink-4">
                     {riderKg} kg rider · {bikeKg} kg bike
                   </span>
 
                   {/* Accessories weight */}
-                  <label className="flex items-center gap-1.5 text-xs text-gray-500">
+                  <label className="flex items-center gap-1.5 text-xs text-ink-4">
                     <span>+ accessories</span>
                     {editingPacing ? (
                       <input
@@ -543,17 +543,17 @@ export default function EventPacingPage({ eventId }: Props) {
                         value={accessoriesKg}
                         onChange={e => setAccessoriesKg(Math.max(0, parseFloat(e.target.value) || 0))}
                         step={0.5} min={0} max={10}
-                        className="w-12 bg-gray-800 border border-gray-700 rounded px-1.5 py-0.5 text-xs text-white text-right focus:outline-none focus:border-orange-500 tabular-nums"
+                        className="w-12 bg-raised border border-line-strong rounded px-1.5 py-0.5 text-xs text-ink text-right focus:outline-none focus:border-accent tabular-nums"
                       />
                     ) : (
-                      <span className="text-gray-400">{accessoriesKg}</span>
+                      <span className="text-ink-3">{accessoriesKg}</span>
                     )}
-                    <span>kg = <span className="text-gray-300 font-medium">{totalKg} kg</span> total</span>
+                    <span>kg = <span className="text-ink-2 font-medium">{totalKg} kg</span> total</span>
                   </label>
 
                   {/* Air density note */}
                   {avgRouteAlt !== null && (
-                    <span className="text-[10px] text-gray-600">
+                    <span className="text-micro text-ink-5">
                       ρ {(physicsParams.rho ?? 1.225).toFixed(3)} kg/m³ @ {avgRouteAlt}m avg alt
                     </span>
                   )}
@@ -562,9 +562,9 @@ export default function EventPacingPage({ eventId }: Props) {
               </div>
 
               {/* ── Scrollable segment table ── */}
-              <div className="border-t border-gray-800 overflow-x-auto">
+              <div className="border-t border-line overflow-x-auto">
                 <div className="min-w-[420px]">
-                  <div className={`px-3 py-1.5 grid ${COLS} gap-2 text-[9px] font-semibold text-gray-600 uppercase tracking-wider border-b border-gray-800/60`}>
+                  <div className={`px-3 py-1.5 grid ${COLS} gap-2 text-micro font-semibold text-ink-5 uppercase tracking-wider border-b border-line/60`}>
                     <span>Segment</span>
                     <span className="text-right">Dist</span>
                     {/* GAIN column — shows total ascent for climbs/flat, net for descents */}
@@ -574,7 +574,7 @@ export default function EventPacingPage({ eventId }: Props) {
                     <span className="text-right">Time</span>
                   </div>
 
-                  <div className="divide-y divide-gray-800/40">
+                  <div className="divide-y divide-line/40">
                     {segments.map((seg, i) => {
                       const { rowBg, label: labelColor } = segColors(seg);
                       const editWatts = getEditWatts(seg);
@@ -587,62 +587,62 @@ export default function EventPacingPage({ eventId }: Props) {
                         : seg.elevation_gain >= 0
                           ? `+${seg.elevation_gain}m`
                           : `${seg.elevation_gain}m`;
-                      const gainColor = seg.elevation_gain >= 0 ? 'text-orange-400' : 'text-blue-400';
+                      const gainColor = seg.elevation_gain >= 0 ? 'text-accent-hi' : 'text-blue-400';
 
                       return (
                         <div key={i} className={`px-3 py-2 ${rowBg} grid ${COLS} items-center gap-2`}>
                           <div className="min-w-0">
                             <p className={`text-xs font-medium truncate ${labelColor}`}>{seg.label}</p>
-                            <p className="text-[10px] text-gray-600">{seg.start_km}–{seg.end_km} km</p>
+                            <p className="text-micro text-ink-5">{seg.start_km}–{seg.end_km} km</p>
                           </div>
-                          <span className="text-xs text-gray-500 text-right tabular-nums">{seg.distance_km}</span>
+                          <span className="text-xs text-ink-4 text-right tabular-nums">{seg.distance_km}</span>
                           <span className={`text-xs text-right tabular-nums ${gainColor}`}>{gainDisplay}</span>
                           {editingPacing ? (
                             <input type="number" value={editWatts}
                               onChange={e => { const w = parseInt(e.target.value, 10); if (!isNaN(w) && w > 0) handleWattsChange(seg, w); }}
-                              className="w-full bg-gray-800 border border-gray-700 rounded px-1.5 py-1 text-xs text-white text-right focus:outline-none focus:border-orange-500 tabular-nums"
+                              className="w-full bg-raised border border-line-strong rounded px-1.5 py-1 text-xs text-ink text-right focus:outline-none focus:border-accent tabular-nums"
                               step={5} min={0} max={700} />
                           ) : (
-                            <span className="text-xs text-gray-300 text-right tabular-nums">{seg.target_watts}W</span>
+                            <span className="text-xs text-ink-2 text-right tabular-nums">{seg.target_watts}W</span>
                           )}
                           {editingPacing ? (
                             <input type="number" value={dispSpeed}
                               onChange={e => setSpeedDraft(seg, e.target.value)}
                               onBlur={e => handleSpeedBlur(seg, e.target.value)}
-                              className="w-full bg-gray-800 border border-gray-700 rounded px-1.5 py-1 text-xs text-white text-right focus:outline-none focus:border-blue-500 tabular-nums"
+                              className="w-full bg-raised border border-line-strong rounded px-1.5 py-1 text-xs text-ink text-right focus:outline-none focus:border-blue-500 tabular-nums"
                               step={0.5} min={1} max={120} />
                           ) : (
-                            <span className="text-xs text-gray-400 text-right tabular-nums">{seg.avg_speed_kmh}</span>
+                            <span className="text-xs text-ink-3 text-right tabular-nums">{seg.avg_speed_kmh}</span>
                           )}
-                          <span className="text-xs font-semibold text-white text-right tabular-nums">{fmtTime(seg.est_time_min)}</span>
+                          <span className="text-xs font-semibold text-ink text-right tabular-nums">{fmtTime(seg.est_time_min)}</span>
                         </div>
                       );
                     })}
                   </div>
 
                   {/* Totals row */}
-                  <div className={`border-t-2 border-gray-700 px-3 py-2.5 grid ${COLS} items-center gap-2`}>
-                    <span className="text-xs font-bold text-white uppercase tracking-wider">Total</span>
-                    <span className="text-xs font-bold text-white text-right tabular-nums">{totalKm}</span>
-                    <span className="text-xs font-bold text-orange-400 text-right tabular-nums">+{totalAscentM.toLocaleString()}m</span>
-                    <span className="text-xs font-bold text-white text-right tabular-nums">{avgWatts ?? '—'}W</span>
-                    <span className="text-xs font-bold text-white text-right tabular-nums">{avgSpeedKmh ?? '—'}</span>
-                    <span className="text-xs font-bold text-white text-right tabular-nums">{fmtTime(estMin)}</span>
+                  <div className={`border-t-2 border-line-strong px-3 py-2.5 grid ${COLS} items-center gap-2`}>
+                    <span className="text-xs font-bold text-ink uppercase tracking-wider">Total</span>
+                    <span className="text-xs font-bold text-ink text-right tabular-nums">{totalKm}</span>
+                    <span className="text-xs font-bold text-accent-hi text-right tabular-nums">+{totalAscentM.toLocaleString()}m</span>
+                    <span className="text-xs font-bold text-ink text-right tabular-nums">{avgWatts ?? '—'}W</span>
+                    <span className="text-xs font-bold text-ink text-right tabular-nums">{avgSpeedKmh ?? '—'}</span>
+                    <span className="text-xs font-bold text-ink text-right tabular-nums">{fmtTime(estMin)}</span>
                   </div>
                 </div>
               </div>
 
               {/* ── Save button ── */}
-              <div className="border-t border-gray-800 px-4 py-3 flex items-center justify-end gap-2">
+              <div className="border-t border-line px-4 py-3 flex items-center justify-end gap-2">
                 {editingPacing && (
                   <button onClick={cancelPacingEdit}
-                    className="px-4 py-2 rounded-lg bg-gray-800 text-gray-400 hover:text-gray-200 text-sm transition-colors">
+                    className="px-4 py-2 rounded-lg bg-raised text-ink-3 hover:text-ink text-sm transition-colors">
                     Cancel
                   </button>
                 )}
                 <SaveStatus error={error} onRetry={saveAndPersist} />
                 <button onClick={saveAndPersist} disabled={saving}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 ${editingPacing ? 'bg-orange-500 hover:bg-orange-400 text-white' : 'bg-orange-500/20 text-orange-400 hover:bg-orange-500/30'}`}>
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 ${editingPacing ? 'bg-accent hover:bg-accent-hi text-ink' : 'bg-accent/20 text-accent-hi hover:bg-accent/30'}`}>
                   {saving ? 'Saving…' : editingPacing ? 'Save' : 'Save pacing'}
                 </button>
               </div>
@@ -651,10 +651,10 @@ export default function EventPacingPage({ eventId }: Props) {
           )}
 
           {route && segments.length === 0 && (
-            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 text-center space-y-2">
-              <p className="text-gray-500 text-sm">No climbs defined yet.</p>
-              <p className="text-gray-600 text-xs">Set up key climbs on the event page to generate a segment breakdown.</p>
-              <Link href={`/events/${eventId}`} className="inline-block mt-1 text-orange-400 hover:text-orange-300 text-sm transition-colors">
+            <div className="bg-surface border border-line rounded-2xl p-6 text-center space-y-2">
+              <p className="text-ink-4 text-sm">No climbs defined yet.</p>
+              <p className="text-ink-5 text-xs">Set up key climbs on the event page to generate a segment breakdown.</p>
+              <Link href={`/events/${eventId}`} className="inline-block mt-1 text-accent-hi hover:text-accent-hi text-sm transition-colors">
                 ← Back to event
               </Link>
             </div>
@@ -662,11 +662,11 @@ export default function EventPacingPage({ eventId }: Props) {
 
           {/* ── Comparison table (when active) ── */}
           {compareData && (
-            <section className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
-              <div className="px-4 py-3 flex items-center justify-between border-b border-gray-800">
+            <section className="bg-surface border border-line rounded-2xl overflow-hidden">
+              <div className="px-4 py-3 flex items-center justify-between border-b border-line">
                 <div>
-                  <p className="text-xs font-semibold text-gray-300">{compareData.activity_name}</p>
-                  <p className="text-[10px] text-gray-600 mt-0.5">
+                  <p className="text-xs font-semibold text-ink-2">{compareData.activity_name}</p>
+                  <p className="text-micro text-ink-5 mt-0.5">
                     {fmtShortDate(compareData.activity_date)} · planned {fmtTime(compareData.total_planned_min)}
                     {compareData.total_actual_min != null && (
                       <> · actual {fmtTime(compareData.total_actual_min)}
@@ -680,22 +680,22 @@ export default function EventPacingPage({ eventId }: Props) {
                   </p>
                 </div>
                 <button onClick={() => { setCompareActivityId(null); setCompareData(null); }}
-                  className="text-xs text-gray-600 hover:text-gray-400 transition-colors">✕ Close</button>
+                  className="text-xs text-ink-5 hover:text-ink-3 transition-colors">✕ Close</button>
               </div>
               {!compareData.has_streams && (
-                <div className="px-4 py-3 text-xs text-amber-400 bg-amber-500/5 border-b border-gray-800">
+                <div className="px-4 py-3 text-xs text-amber-400 bg-amber-500/5 border-b border-line">
                   This activity has no detailed streams stored. Re-sync to fetch altitude and distance data.
                 </div>
               )}
               {compareData.has_streams && (
-                <div className="px-4 py-2 text-[10px] text-gray-600 border-b border-gray-800">
+                <div className="px-4 py-2 text-micro text-ink-5 border-b border-line">
                   Planned time and speed use reference-calibrated physics and observed descent speed caps when latlng/distance streams match the course.
                 </div>
               )}
               <div className="overflow-x-auto">
                 <table className="w-full text-xs min-w-[640px]">
                   <thead>
-                    <tr className="text-[9px] text-gray-600 uppercase tracking-wider border-b border-gray-800">
+                    <tr className="text-micro text-ink-5 uppercase tracking-wider border-b border-line">
                       <th className="px-3 py-1.5 text-left font-semibold">Segment</th>
                       <th className="px-2 py-1.5 text-right font-semibold">Plan W</th>
                       <th className="px-2 py-1.5 text-right font-semibold">Ref W</th>
@@ -706,31 +706,31 @@ export default function EventPacingPage({ eventId }: Props) {
                       <th className="px-2 py-1.5 text-right font-semibold">Δ</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-800/40">
+                  <tbody className="divide-y divide-line/40">
                     {compareData.segments.map((seg, i) => {
                       const diff = seg.actual_time_min != null
                         ? seg.actual_time_min - seg.planned_time_min : null;
                       const diffPct = diff != null ? diff / seg.planned_time_min : null;
-                      const diffColor = diff == null ? 'text-gray-600'
+                      const diffColor = diff == null ? 'text-ink-5'
                         : diff <= 0 ? 'text-green-400'
                         : diffPct! <= 0.05 ? 'text-amber-400'
                         : 'text-red-400';
                       return (
-                        <tr key={i} className="hover:bg-gray-800/30">
+                        <tr key={i} className="hover:bg-raised/30">
                           <td className="px-3 py-1.5">
-                            <p className="font-medium text-gray-300">{seg.label}</p>
-                            <p className="text-[9px] text-gray-600">{seg.start_km}–{seg.end_km} km</p>
+                            <p className="font-medium text-ink-2">{seg.label}</p>
+                            <p className="text-micro text-ink-5">{seg.start_km}–{seg.end_km} km</p>
                           </td>
-                          <td className="px-2 py-1.5 text-right tabular-nums text-gray-400">{seg.planned_watts}W</td>
-                          <td className="px-2 py-1.5 text-right tabular-nums text-gray-300">
+                          <td className="px-2 py-1.5 text-right tabular-nums text-ink-3">{seg.planned_watts}W</td>
+                          <td className="px-2 py-1.5 text-right tabular-nums text-ink-2">
                             {seg.actual_watts != null ? `${seg.actual_watts}W` : '—'}
                           </td>
-                          <td className="px-2 py-1.5 text-right tabular-nums text-gray-400">{seg.planned_speed_kmh}</td>
-                          <td className="px-2 py-1.5 text-right tabular-nums text-gray-300">
+                          <td className="px-2 py-1.5 text-right tabular-nums text-ink-3">{seg.planned_speed_kmh}</td>
+                          <td className="px-2 py-1.5 text-right tabular-nums text-ink-2">
                             {seg.actual_speed_kmh != null ? seg.actual_speed_kmh : '—'}
                           </td>
-                          <td className="px-2 py-1.5 text-right tabular-nums text-gray-400">{fmtTime(seg.planned_time_min)}</td>
-                          <td className="px-2 py-1.5 text-right tabular-nums text-gray-300">
+                          <td className="px-2 py-1.5 text-right tabular-nums text-ink-3">{fmtTime(seg.planned_time_min)}</td>
+                          <td className="px-2 py-1.5 text-right tabular-nums text-ink-2">
                             {seg.actual_time_min != null ? fmtTime(seg.actual_time_min) : '—'}
                           </td>
                           <td className={`px-2 py-1.5 text-right tabular-nums font-medium ${diffColor}`}>
@@ -748,12 +748,12 @@ export default function EventPacingPage({ eventId }: Props) {
 
           {/* ── Past Rides panel ── */}
           {route && (
-            <section className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
-              <div className="px-4 pt-3 pb-2 border-b border-gray-800/80 bg-gray-800/20">
-                <p className="text-[11px] text-gray-400 leading-relaxed">
-                  <span className="font-semibold text-gray-300">Strategy vs past ride:</span>{' '}
-                  Open <span className="text-gray-200">Past Rides on This Route</span> below, then tap{' '}
-                  <span className="text-orange-400 font-medium">Compare pacing</span> on any matching activity.
+            <section className="bg-surface border border-line rounded-2xl overflow-hidden">
+              <div className="px-4 pt-3 pb-2 border-b border-line/80 bg-raised/20">
+                <p className="text-mini text-ink-3 leading-relaxed">
+                  <span className="font-semibold text-ink-2">Strategy vs past ride:</span>{' '}
+                  Open <span className="text-ink">Past Rides on This Route</span> below, then tap{' '}
+                  <span className="text-accent-hi font-medium">Compare pacing</span> on any matching activity.
                   Linked rides are highlighted — linking is optional and saves favourites on this event.
                 </p>
               </div>
@@ -764,41 +764,41 @@ export default function EventPacingPage({ eventId }: Props) {
                   setShowPastRides(next);
                   if (next) void loadMatchingActivities(false);
                 }}
-                className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-gray-800/40 transition-colors"
+                className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-raised/40 transition-colors"
               >
-                <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                <span className="text-xs font-semibold text-ink-3 uppercase tracking-wider">
                   Past Rides on This Route
                   {linkedIds.length > 0 && (
-                    <span className="ml-2 text-orange-400 normal-case">{linkedIds.length} linked</span>
+                    <span className="ml-2 text-accent-hi normal-case">{linkedIds.length} linked</span>
                   )}
                 </span>
-                <span className="text-gray-600 text-xs">{showPastRides ? '▲' : '▼'}</span>
+                <span className="text-ink-5 text-xs">{showPastRides ? '▲' : '▼'}</span>
               </button>
 
               {showPastRides && (
-                <div className="border-t border-gray-800">
+                <div className="border-t border-line">
                   {loadingRides ? (
-                    <div className="px-4 py-6 text-center text-gray-600 text-xs">Finding matching activities…</div>
+                    <div className="px-4 py-6 text-center text-ink-5 text-xs">Finding matching activities…</div>
                   ) : matchingActivities?.length === 0 ? (
                     <div className="px-4 py-6 text-center">
-                      <p className="text-gray-500 text-sm">No activities found within ±20% of route distance.</p>
-                      <p className="text-gray-600 text-xs mt-1">Make sure your Strava activities are synced.</p>
+                      <p className="text-ink-4 text-sm">No activities found within ±20% of route distance.</p>
+                      <p className="text-ink-5 text-xs mt-1">Make sure your Strava activities are synced.</p>
                     </div>
                   ) : (
-                    <div className="divide-y divide-gray-800/40">
+                    <div className="divide-y divide-line/40">
                       {matchingActivities?.map(act => {
                         const isLinked    = linkedIds.includes(act.id);
                         const isComparing = compareActivityId === act.id;
                         const isSyncing   = syncingIds.has(act.id);
                         return (
-                          <div key={act.id} className={`px-4 py-3 flex items-center gap-3 ${isLinked ? 'bg-orange-500/5' : ''}`}>
+                          <div key={act.id} className={`px-4 py-3 flex items-center gap-3 ${isLinked ? 'bg-accent/5' : ''}`}>
                             <div className="flex-1 min-w-0">
-                              <p className="text-xs font-medium text-gray-300 truncate">{act.name}</p>
-                              <p className="text-[10px] text-gray-600 mt-0.5">
+                              <p className="text-xs font-medium text-ink-2 truncate">{act.name}</p>
+                              <p className="text-micro text-ink-5 mt-0.5">
                                 {fmtShortDate(act.start_date)} · {Math.round(act.distance_m / 100) / 10} km
                                 {' · '}{fmtMovingTime(act.moving_time)}
                                 {act.normalized_power && <> · {Math.round(act.normalized_power)}W NP</>}
-                                {isSyncing && <span className="ml-1 text-orange-400/70 animate-pulse">· syncing…</span>}
+                                {isSyncing && <span className="ml-1 text-accent-hi/70 animate-pulse">· syncing…</span>}
                               </p>
                             </div>
                             <div className="flex items-center gap-2 shrink-0">
@@ -806,22 +806,22 @@ export default function EventPacingPage({ eventId }: Props) {
                                 type="button"
                                 onClick={() => loadComparison(act.id)}
                                 disabled={(loadingCompare && !isComparing) || isSyncing}
-                                className={`text-[10px] px-2 py-1 rounded border transition-colors ${
+                                className={`text-micro px-2 py-1 rounded border transition-colors ${
                                   isComparing
                                     ? 'bg-blue-500/20 text-blue-400 border-blue-500/50'
                                     : isSyncing
-                                    ? 'border-gray-800 text-gray-600 cursor-not-allowed'
-                                    : 'border-gray-700 text-gray-400 hover:text-gray-200'
+                                    ? 'border-line text-ink-5 cursor-not-allowed'
+                                    : 'border-line-strong text-ink-3 hover:text-ink'
                                 }`}
                               >
                                 {loadingCompare && isComparing ? 'Loading…' : isComparing ? 'Comparing' : 'Compare pacing'}
                               </button>
                               <button
                                 onClick={() => toggleLink(act.id)}
-                                className={`text-[10px] px-2 py-1 rounded border transition-colors ${
+                                className={`text-micro px-2 py-1 rounded border transition-colors ${
                                   isLinked
-                                    ? 'bg-orange-500/10 text-orange-400 border-orange-500/30 hover:bg-orange-500/20'
-                                    : 'border-gray-700 text-gray-600 hover:text-gray-300'
+                                    ? 'bg-accent/10 text-accent-hi border-accent/30 hover:bg-accent/20'
+                                    : 'border-line-strong text-ink-5 hover:text-ink-2'
                                 }`}
                               >
                                 {isLinked ? 'Linked ✓' : 'Link'}

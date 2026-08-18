@@ -50,15 +50,15 @@ export default function PowerCurveWidget() {
   }, [comparing]);
 
   return (
-    <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4 space-y-3">
+    <div className="bg-surface border border-line rounded-2xl p-4 space-y-3">
       <div className="flex items-center justify-between gap-3">
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Power Curve</p>
+        <p className="text-xs font-semibold text-ink-4 uppercase tracking-wider">Power Curve</p>
         <button
           onClick={() => setComparing(c => !c)}
           className={`text-xs px-2.5 py-1 rounded-lg border transition-colors ${
             comparing
               ? 'bg-blue-500/15 text-blue-400 border-blue-500/40 hover:bg-blue-500/20'
-              : 'bg-gray-800 text-gray-500 border-gray-700 hover:text-gray-300'
+              : 'bg-raised text-ink-4 border-line-strong hover:text-ink-2'
           }`}
         >
           {comparing ? 'Remove compare' : '+ Compare'}
@@ -69,7 +69,7 @@ export default function PowerCurveWidget() {
       <div className="space-y-2">
         <div className="flex items-center gap-2 flex-wrap">
           {comparing && (
-            <span className="text-[10px] text-orange-400 uppercase tracking-wider w-10 flex-shrink-0">Base</span>
+            <span className="text-micro text-accent-hi uppercase tracking-wider w-10 flex-shrink-0">Base</span>
           )}
           <div className="flex gap-1 flex-wrap">
             {PERIODS.map(({ key, label }) => (
@@ -78,8 +78,8 @@ export default function PowerCurveWidget() {
                 onClick={() => setP1(key)}
                 className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
                   p1 === key
-                    ? 'bg-orange-500/20 text-orange-400 border border-orange-500/50'
-                    : 'bg-gray-800 text-gray-500 hover:text-gray-300 border border-transparent'
+                    ? 'bg-accent/20 text-accent-hi border border-accent/50'
+                    : 'bg-raised text-ink-4 hover:text-ink-2 border border-transparent'
                 }`}
               >
                 {label}
@@ -90,7 +90,7 @@ export default function PowerCurveWidget() {
 
         {comparing && (
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[10px] text-blue-400 uppercase tracking-wider w-10 flex-shrink-0">Vs</span>
+            <span className="text-micro text-blue-400 uppercase tracking-wider w-10 flex-shrink-0">Vs</span>
             <div className="flex gap-1 flex-wrap">
               {PERIODS.filter(p => p.key !== p1).map(({ key, label }) => (
                 <button
@@ -99,7 +99,7 @@ export default function PowerCurveWidget() {
                   className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
                     p2 === key
                       ? 'bg-blue-500/20 text-blue-400 border border-blue-500/50'
-                      : 'bg-gray-800 text-gray-500 hover:text-gray-300 border border-transparent'
+                      : 'bg-raised text-ink-4 hover:text-ink-2 border border-transparent'
                   }`}
                 >
                   {label}
@@ -112,7 +112,7 @@ export default function PowerCurveWidget() {
 
       {/* Chart */}
       {loading && (
-        <div className="h-52 bg-gray-800/60 rounded-xl animate-pulse" />
+        <div className="h-52 bg-raised/60 rounded-xl animate-pulse" />
       )}
       {!loading && data && (
         <PowerCurveChart
@@ -124,7 +124,7 @@ export default function PowerCurveWidget() {
         />
       )}
       {!loading && !data && (
-        <div className="h-52 flex items-center justify-center text-gray-600 text-sm">
+        <div className="h-52 flex items-center justify-center text-ink-5 text-sm">
           Failed to load power curve
         </div>
       )}

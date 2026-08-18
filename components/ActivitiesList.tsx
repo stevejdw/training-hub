@@ -90,8 +90,8 @@ function fmt(seconds: number): string {
 const TYPE_FILTERS = SPORT_FILTER_LABELS.filter(f => f !== 'All') as SportFilter[];
 
 function SortArrow({ col, sortBy, sortDir }: { col: SortCol; sortBy: SortCol; sortDir: SortDir }) {
-  if (sortBy !== col) return <span className="text-gray-700 ml-0.5">↕</span>;
-  return <span className="text-orange-400 ml-0.5">{sortDir === 'ASC' ? '↑' : '↓'}</span>;
+  if (sortBy !== col) return <span className="text-ink-5 ml-0.5">↕</span>;
+  return <span className="text-accent-hi ml-0.5">{sortDir === 'ASC' ? '↑' : '↓'}</span>;
 }
 
 export default function ActivitiesList() {
@@ -277,7 +277,7 @@ export default function ActivitiesList() {
     <div className="h-full flex flex-col md:max-w-5xl xl:max-w-7xl md:mx-auto md:w-full">
 
       {/* Top bar */}
-      <div className="border-b border-gray-800 px-3 py-2.5 flex-shrink-0 space-y-2">
+      <div className="border-b border-line px-3 py-2.5 flex-shrink-0 space-y-2">
         <div className="flex items-center gap-2">
           {/* Sport filter chips — scrollable, no wrap */}
           <div className="flex gap-1.5 overflow-x-auto flex-1 min-w-0 scrollbar-none">
@@ -287,8 +287,8 @@ export default function ActivitiesList() {
                 onClick={() => toggleType(f)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap flex-shrink-0 ${
                   selected.includes(f)
-                    ? 'bg-orange-500 text-white'
-                    : 'bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700'
+                    ? 'bg-accent text-ink'
+                    : 'bg-raised text-ink-3 hover:text-ink hover:bg-hover'
                 }`}
               >
                 {f}
@@ -297,7 +297,7 @@ export default function ActivitiesList() {
             {selected.length > 0 && (
               <button
                 onClick={() => { setSelected([]); setPage(1); }}
-                className="px-2 py-1.5 rounded-lg text-xs text-gray-500 hover:text-white transition-colors whitespace-nowrap flex-shrink-0"
+                className="px-2 py-1.5 rounded-lg text-xs text-ink-4 hover:text-ink transition-colors whitespace-nowrap flex-shrink-0"
               >
                 ✕
               </button>
@@ -307,7 +307,7 @@ export default function ActivitiesList() {
           {/* Right controls */}
           <div className="flex items-center gap-1.5 flex-shrink-0">
             {!loading && (
-              <span className="text-xs text-gray-600">{total.toLocaleString()}</span>
+              <span className="text-xs text-ink-5">{total.toLocaleString()}</span>
             )}
 
             {/* Filter toggle */}
@@ -316,8 +316,8 @@ export default function ActivitiesList() {
               title="More filters"
               className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors ${
                 showFilters || hasActiveFilters
-                  ? 'bg-orange-500/20 text-orange-400 border border-orange-500/50'
-                  : 'bg-gray-800 text-gray-400 hover:text-white'
+                  ? 'bg-accent/20 text-accent-hi border border-accent/50'
+                  : 'bg-raised text-ink-3 hover:text-ink'
               }`}
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -332,8 +332,8 @@ export default function ActivitiesList() {
                 title="Show/hide columns"
                 className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors ${
                   colPickerOpen
-                    ? 'bg-orange-500/20 text-orange-400 border border-orange-500/50'
-                    : 'bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700'
+                    ? 'bg-accent/20 text-accent-hi border border-accent/50'
+                    : 'bg-raised text-ink-3 hover:text-ink hover:bg-hover'
                 }`}
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -341,26 +341,26 @@ export default function ActivitiesList() {
                 </svg>
               </button>
               {colPickerOpen && (
-                <div className="absolute right-0 top-10 z-40 w-44 bg-gray-900 border border-gray-700 rounded-xl shadow-2xl py-2">
-                  <p className="text-[10px] text-gray-500 uppercase tracking-wider px-3 pb-1.5">Columns</p>
+                <div className="absolute right-0 top-10 z-40 w-44 bg-surface border border-line-strong rounded-xl shadow-2xl py-2">
+                  <p className="text-micro text-ink-4 uppercase tracking-wider px-3 pb-1.5">Columns</p>
                   {ALL_COLUMNS.map(col => (
                     <button
                       key={col.key}
                       onClick={() => toggleCol(col.key)}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-gray-800 transition-colors text-left"
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-raised transition-colors text-left"
                     >
                       <span className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${
                         visibleCols.has(col.key)
-                          ? 'bg-orange-500 border-orange-500'
-                          : 'border-gray-600'
+                          ? 'bg-accent border-accent'
+                          : 'border-line-hover'
                       }`}>
                         {visibleCols.has(col.key) && (
-                          <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                          <svg className="w-3 h-3 text-ink" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                           </svg>
                         )}
                       </span>
-                      <span className={visibleCols.has(col.key) ? 'text-white' : 'text-gray-400'}>{col.label}</span>
+                      <span className={visibleCols.has(col.key) ? 'text-ink' : 'text-ink-3'}>{col.label}</span>
                     </button>
                   ))}
                 </div>
@@ -375,20 +375,20 @@ export default function ActivitiesList() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
             {/* Date range */}
             <div className="space-y-1">
-              <p className="text-xs text-gray-500 uppercase tracking-wider">Date range</p>
+              <p className="text-xs text-ink-4 uppercase tracking-wider">Date range</p>
               <div className="flex gap-2">
                 <input
                   type="date"
                   value={dateFrom}
                   onChange={e => { setDateFrom(e.target.value); setPage(1); }}
-                  className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-2 py-1.5 text-sm text-gray-300 focus:outline-none focus:border-orange-500"
+                  className="flex-1 bg-raised border border-line-strong rounded-lg px-2 py-1.5 text-sm text-ink-2 focus:outline-none focus:border-accent"
                   placeholder="From"
                 />
                 <input
                   type="date"
                   value={dateTo}
                   onChange={e => { setDateTo(e.target.value); setPage(1); }}
-                  className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-2 py-1.5 text-sm text-gray-300 focus:outline-none focus:border-orange-500"
+                  className="flex-1 bg-raised border border-line-strong rounded-lg px-2 py-1.5 text-sm text-ink-2 focus:outline-none focus:border-accent"
                   placeholder="To"
                 />
               </div>
@@ -396,22 +396,22 @@ export default function ActivitiesList() {
 
             {/* Duration */}
             <div className="space-y-1">
-              <p className="text-xs text-gray-500 uppercase tracking-wider">Duration (minutes)</p>
+              <p className="text-xs text-ink-4 uppercase tracking-wider">Duration (minutes)</p>
               <div className="flex gap-2 items-center">
                 <input
                   type="number"
                   value={minMins}
                   onChange={e => { setMinMins(e.target.value); setPage(1); }}
-                  className="w-20 bg-gray-800 border border-gray-700 rounded-lg px-2 py-1.5 text-sm text-gray-300 focus:outline-none focus:border-orange-500"
+                  className="w-20 bg-raised border border-line-strong rounded-lg px-2 py-1.5 text-sm text-ink-2 focus:outline-none focus:border-accent"
                   placeholder="Min"
                   min="0"
                 />
-                <span className="text-gray-600">–</span>
+                <span className="text-ink-5">–</span>
                 <input
                   type="number"
                   value={maxMins}
                   onChange={e => { setMaxMins(e.target.value); setPage(1); }}
-                  className="w-20 bg-gray-800 border border-gray-700 rounded-lg px-2 py-1.5 text-sm text-gray-300 focus:outline-none focus:border-orange-500"
+                  className="w-20 bg-raised border border-line-strong rounded-lg px-2 py-1.5 text-sm text-ink-2 focus:outline-none focus:border-accent"
                   placeholder="Max"
                   min="0"
                 />
@@ -420,22 +420,22 @@ export default function ActivitiesList() {
 
             {/* Distance */}
             <div className="space-y-1">
-              <p className="text-xs text-gray-500 uppercase tracking-wider">Distance (km)</p>
+              <p className="text-xs text-ink-4 uppercase tracking-wider">Distance (km)</p>
               <div className="flex gap-2 items-center">
                 <input
                   type="number"
                   value={minKm}
                   onChange={e => { setMinKm(e.target.value); setPage(1); }}
-                  className="w-20 bg-gray-800 border border-gray-700 rounded-lg px-2 py-1.5 text-sm text-gray-300 focus:outline-none focus:border-orange-500"
+                  className="w-20 bg-raised border border-line-strong rounded-lg px-2 py-1.5 text-sm text-ink-2 focus:outline-none focus:border-accent"
                   placeholder="Min"
                   min="0"
                 />
-                <span className="text-gray-600">–</span>
+                <span className="text-ink-5">–</span>
                 <input
                   type="number"
                   value={maxKm}
                   onChange={e => { setMaxKm(e.target.value); setPage(1); }}
-                  className="w-20 bg-gray-800 border border-gray-700 rounded-lg px-2 py-1.5 text-sm text-gray-300 focus:outline-none focus:border-orange-500"
+                  className="w-20 bg-raised border border-line-strong rounded-lg px-2 py-1.5 text-sm text-ink-2 focus:outline-none focus:border-accent"
                   placeholder="Max"
                   min="0"
                 />
@@ -445,13 +445,13 @@ export default function ActivitiesList() {
             {/* Gear */}
             {(gearList.length > 0 || noGearCount > 0) && (
               <div className="space-y-1 sm:col-span-2" data-gear-dropdown>
-                <p className="text-xs text-gray-500 uppercase tracking-wider">Gear</p>
+                <p className="text-xs text-ink-4 uppercase tracking-wider">Gear</p>
                 <div className="relative">
                   <button
                     onClick={() => setGearDropdownOpen(o => !o)}
-                    className="w-full sm:w-72 flex items-center justify-between gap-2 bg-gray-800 border border-gray-700 hover:border-gray-600 rounded-lg px-3 py-2 text-sm text-left transition-colors"
+                    className="w-full sm:w-72 flex items-center justify-between gap-2 bg-raised border border-line-strong hover:border-line-hover rounded-lg px-3 py-2 text-sm text-left transition-colors"
                   >
-                    <span className="text-gray-300 truncate">
+                    <span className="text-ink-2 truncate">
                       {selectedGear.length === 0
                         ? 'All gear'
                         : selectedGear.length === 1
@@ -462,38 +462,38 @@ export default function ActivitiesList() {
                                   ?? selectedGear[0]))
                           : `${selectedGear.length} selected`}
                     </span>
-                    <svg className={`w-4 h-4 text-gray-500 transition-transform ${gearDropdownOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <svg className={`w-4 h-4 text-ink-4 transition-transform ${gearDropdownOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
                     </svg>
                   </button>
 
                   {gearDropdownOpen && (
-                    <div className="absolute z-30 mt-1 w-full sm:w-72 bg-gray-900 border border-gray-700 rounded-lg shadow-2xl py-1 max-h-72 overflow-y-auto">
+                    <div className="absolute z-30 mt-1 w-full sm:w-72 bg-surface border border-line-strong rounded-lg shadow-2xl py-1 max-h-72 overflow-y-auto">
                       {gearList.map(g => {
                         const label = g.nickname || g.name || g.id;
                         const isOn  = selectedGear.includes(g.id);
                         return (
                           <div
                             key={g.id}
-                            className={`flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-800 cursor-pointer ${isOn ? 'text-white' : 'text-gray-300'}`}
+                            className={`flex items-center gap-2 px-3 py-2 text-sm hover:bg-raised cursor-pointer ${isOn ? 'text-ink' : 'text-ink-2'}`}
                             onClick={() => toggleGear(g.id)}
                           >
                             <input
                               type="checkbox"
                               checked={isOn}
                               readOnly
-                              className="accent-orange-500 flex-shrink-0"
+                              className="accent-accent flex-shrink-0"
                             />
                             <div className="flex-1 min-w-0">
                               <div className="truncate">{label}</div>
                               {g.power_meter && (
-                                <div className="text-[10px] text-blue-400/70 truncate">{g.power_meter}</div>
+                                <div className="text-micro text-blue-400/70 truncate">{g.power_meter}</div>
                               )}
                             </div>
-                            <span className="text-xs text-gray-500 flex-shrink-0">{g.activity_count}</span>
+                            <span className="text-xs text-ink-4 flex-shrink-0">{g.activity_count}</span>
                             <button
                               onClick={(e) => { e.stopPropagation(); renameGear(g.id, label); }}
-                              className="text-gray-600 hover:text-orange-400 transition-colors flex-shrink-0"
+                              className="text-ink-5 hover:text-accent-hi transition-colors flex-shrink-0"
                               title="Rename gear"
                               aria-label="Rename gear"
                             >
@@ -503,7 +503,7 @@ export default function ActivitiesList() {
                             </button>
                             <button
                               onClick={(e) => { e.stopPropagation(); setPowerMeter(g.id, g.power_meter); }}
-                              className={`transition-colors flex-shrink-0 ${g.power_meter ? 'text-blue-400/70 hover:text-blue-400' : 'text-gray-600 hover:text-blue-400'}`}
+                              className={`transition-colors flex-shrink-0 ${g.power_meter ? 'text-blue-400/70 hover:text-blue-400' : 'text-ink-5 hover:text-blue-400'}`}
                               title={g.power_meter ? `Power meter: ${g.power_meter}` : 'Set power meter'}
                               aria-label="Set power meter"
                             >
@@ -516,24 +516,24 @@ export default function ActivitiesList() {
                       })}
                       {noGearCount > 0 && (
                         <div
-                          className={`flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-800 cursor-pointer border-t border-gray-800 ${selectedGear.includes('__none__') ? 'text-white' : 'text-gray-300'}`}
+                          className={`flex items-center gap-2 px-3 py-2 text-sm hover:bg-raised cursor-pointer border-t border-line ${selectedGear.includes('__none__') ? 'text-ink' : 'text-ink-2'}`}
                           onClick={() => toggleGear('__none__')}
                         >
                           <input
                             type="checkbox"
                             checked={selectedGear.includes('__none__')}
                             readOnly
-                            className="accent-orange-500 flex-shrink-0"
+                            className="accent-accent flex-shrink-0"
                           />
-                          <span className="flex-1 italic text-gray-400">No gear</span>
-                          <span className="text-xs text-gray-500 flex-shrink-0">{noGearCount}</span>
+                          <span className="flex-1 italic text-ink-3">No gear</span>
+                          <span className="text-xs text-ink-4 flex-shrink-0">{noGearCount}</span>
                         </div>
                       )}
                       {selectedGear.length > 0 && (
-                        <div className="border-t border-gray-800 px-3 py-1.5">
+                        <div className="border-t border-line px-3 py-1.5">
                           <button
                             onClick={() => { setSelectedGear([]); setPage(1); }}
-                            className="text-xs text-gray-500 hover:text-orange-400 transition-colors"
+                            className="text-xs text-ink-4 hover:text-accent-hi transition-colors"
                           >
                             Clear gear
                           </button>
@@ -548,7 +548,7 @@ export default function ActivitiesList() {
             {/* Power Meter filter */}
             {powerMeterList.length > 0 && (
               <div className="space-y-1 sm:col-span-2">
-                <p className="text-xs text-gray-500 uppercase tracking-wider">Power Meter</p>
+                <p className="text-xs text-ink-4 uppercase tracking-wider">Power Meter</p>
                 <div className="flex flex-wrap gap-2">
                   {powerMeterList.map(pm => {
                     const isOn = selectedPowerMeters.includes(pm.power_meter);
@@ -559,11 +559,11 @@ export default function ActivitiesList() {
                         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                           isOn
                             ? 'bg-blue-600/30 text-blue-300 border border-blue-500/50'
-                            : 'bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700'
+                            : 'bg-raised text-ink-3 hover:text-ink hover:bg-hover'
                         }`}
                       >
                         {pm.power_meter}
-                        <span className="text-gray-500">{pm.activity_count}</span>
+                        <span className="text-ink-4">{pm.activity_count}</span>
                       </button>
                     );
                   })}
@@ -576,7 +576,7 @@ export default function ActivitiesList() {
               <div className="sm:col-span-2">
                 <button
                   onClick={clearAll}
-                  className="text-xs text-gray-500 hover:text-white transition-colors"
+                  className="text-xs text-ink-4 hover:text-ink transition-colors"
                 >
                   Clear all filters
                 </button>
@@ -589,59 +589,59 @@ export default function ActivitiesList() {
       {/* Table */}
       <div className="flex-1 overflow-auto scroll-touch">
         <table className="min-w-[600px] w-full text-sm">
-          <thead className="sticky top-0 bg-gray-900 border-b border-gray-800">
+          <thead className="sticky top-0 bg-surface border-b border-line">
             <tr>
               <th
-                className="text-left px-4 py-3 text-gray-400 font-medium cursor-pointer hover:text-white select-none whitespace-nowrap"
+                className="text-left px-4 py-3 text-ink-3 font-medium cursor-pointer hover:text-ink select-none whitespace-nowrap"
                 onClick={() => handleSort('start_date')}
               >
                 Date <SortArrow col="start_date" sortBy={sortBy} sortDir={sortDir} />
               </th>
-              <th className="text-left px-4 py-3 text-gray-400 font-medium">Type</th>
-              <th className="text-left px-4 py-3 text-gray-400 font-medium">Name</th>
+              <th className="text-left px-4 py-3 text-ink-3 font-medium">Type</th>
+              <th className="text-left px-4 py-3 text-ink-3 font-medium">Name</th>
               {visibleCols.has('distance') && (
-                <th className="text-right px-4 py-3 text-gray-400 font-medium cursor-pointer hover:text-white select-none whitespace-nowrap" onClick={() => handleSort('distance')}>
+                <th className="text-right px-4 py-3 text-ink-3 font-medium cursor-pointer hover:text-ink select-none whitespace-nowrap" onClick={() => handleSort('distance')}>
                   Dist <SortArrow col="distance" sortBy={sortBy} sortDir={sortDir} />
                 </th>
               )}
               {visibleCols.has('moving_time') && (
-                <th className="text-right px-4 py-3 text-gray-400 font-medium cursor-pointer hover:text-white select-none whitespace-nowrap" onClick={() => handleSort('moving_time')}>
+                <th className="text-right px-4 py-3 text-ink-3 font-medium cursor-pointer hover:text-ink select-none whitespace-nowrap" onClick={() => handleSort('moving_time')}>
                   Time <SortArrow col="moving_time" sortBy={sortBy} sortDir={sortDir} />
                 </th>
               )}
               {visibleCols.has('average_watts') && (
-                <th className="text-right px-4 py-3 text-gray-400 font-medium cursor-pointer hover:text-white select-none whitespace-nowrap" onClick={() => handleSort('average_watts')}>
+                <th className="text-right px-4 py-3 text-ink-3 font-medium cursor-pointer hover:text-ink select-none whitespace-nowrap" onClick={() => handleSort('average_watts')}>
                   Avg W <SortArrow col="average_watts" sortBy={sortBy} sortDir={sortDir} />
                 </th>
               )}
               {visibleCols.has('normalized_power') && (
-                <th className="text-right px-4 py-3 text-gray-400 font-medium whitespace-nowrap">NP</th>
+                <th className="text-right px-4 py-3 text-ink-3 font-medium whitespace-nowrap">NP</th>
               )}
               {visibleCols.has('average_heartrate') && (
-                <th className="text-right px-4 py-3 text-gray-400 font-medium cursor-pointer hover:text-white select-none whitespace-nowrap" onClick={() => handleSort('average_heartrate')}>
+                <th className="text-right px-4 py-3 text-ink-3 font-medium cursor-pointer hover:text-ink select-none whitespace-nowrap" onClick={() => handleSort('average_heartrate')}>
                   Avg HR <SortArrow col="average_heartrate" sortBy={sortBy} sortDir={sortDir} />
                 </th>
               )}
               {visibleCols.has('tss') && (
-                <th className="text-right px-4 py-3 text-gray-400 font-medium cursor-pointer hover:text-white select-none whitespace-nowrap" onClick={() => handleSort('tss')}>
+                <th className="text-right px-4 py-3 text-ink-3 font-medium cursor-pointer hover:text-ink select-none whitespace-nowrap" onClick={() => handleSort('tss')}>
                   TSS <SortArrow col="tss" sortBy={sortBy} sortDir={sortDir} />
                 </th>
               )}
               {visibleCols.has('elevation') && (
-                <th className="text-right px-4 py-3 text-gray-400 font-medium whitespace-nowrap">Elev</th>
+                <th className="text-right px-4 py-3 text-ink-3 font-medium whitespace-nowrap">Elev</th>
               )}
               {visibleCols.has('power_meter') && (
-                <th className="text-left px-4 py-3 text-gray-400 font-medium whitespace-nowrap">Power Meter</th>
+                <th className="text-left px-4 py-3 text-ink-3 font-medium whitespace-nowrap">Power Meter</th>
               )}
             </tr>
           </thead>
           <tbody>
             {loading
               ? Array.from({ length: 10 }).map((_, i) => (
-                  <tr key={i} className="border-b border-gray-800/50">
+                  <tr key={i} className="border-b border-line/50">
                     {Array.from({ length: 3 + visibleCols.size }).map((_, j) => (
                       <td key={j} className="px-4 py-3">
-                        <div className="h-4 bg-gray-800 rounded animate-pulse" />
+                        <div className="h-4 bg-raised rounded animate-pulse" />
                       </td>
                     ))}
                   </tr>
@@ -650,8 +650,8 @@ export default function ActivitiesList() {
                   const date = new Date(a.start_date);
                   const color = sportColor(a.sport_type);
                   return (
-                    <tr key={a.id} className="border-b border-gray-800/50 hover:bg-gray-800/40 transition-colors">
-                      <td className="px-4 py-3 text-gray-400 whitespace-nowrap">
+                    <tr key={a.id} className="border-b border-line/50 hover:bg-raised/40 transition-colors">
+                      <td className="px-4 py-3 text-ink-3 whitespace-nowrap">
                         {date.toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' })}
                       </td>
                       <td className="px-4 py-3">
@@ -665,41 +665,41 @@ export default function ActivitiesList() {
                       <td className="px-4 py-3">
                         <Link
                           href={`/activities/${a.id}`}
-                          className="text-white hover:text-orange-400 transition-colors line-clamp-1"
+                          className="text-ink hover:text-accent-hi transition-colors line-clamp-1"
                         >
                           {a.name}
                         </Link>
                       </td>
                       {visibleCols.has('distance') && (
-                        <td className="px-4 py-3 text-right text-gray-300">
+                        <td className="px-4 py-3 text-right text-ink-2">
                           {a.distance > 0 ? `${(a.distance / 1000).toFixed(1)}` : '—'}
                         </td>
                       )}
                       {visibleCols.has('moving_time') && (
-                        <td className="px-4 py-3 text-right text-gray-300">{fmt(a.moving_time)}</td>
+                        <td className="px-4 py-3 text-right text-ink-2">{fmt(a.moving_time)}</td>
                       )}
                       {visibleCols.has('average_watts') && (
-                        <td className="px-4 py-3 text-right text-gray-300">
+                        <td className="px-4 py-3 text-right text-ink-2">
                           {a.average_watts ? `${Math.round(a.average_watts)}W` : '—'}
                         </td>
                       )}
                       {visibleCols.has('normalized_power') && (
-                        <td className="px-4 py-3 text-right text-gray-300">
+                        <td className="px-4 py-3 text-right text-ink-2">
                           {a.normalized_power ? `${Math.round(a.normalized_power)}W` : '—'}
                         </td>
                       )}
                       {visibleCols.has('average_heartrate') && (
-                        <td className="px-4 py-3 text-right text-gray-300">
+                        <td className="px-4 py-3 text-right text-ink-2">
                           {a.average_heartrate ? Math.round(a.average_heartrate) : '—'}
                         </td>
                       )}
                       {visibleCols.has('tss') && (
-                        <td className="px-4 py-3 text-right text-gray-300">
+                        <td className="px-4 py-3 text-right text-ink-2">
                           {a.tss ? Math.round(a.tss) : '—'}
                         </td>
                       )}
                       {visibleCols.has('elevation') && (
-                        <td className="px-4 py-3 text-right text-gray-300">
+                        <td className="px-4 py-3 text-right text-ink-2">
                           {a.total_elevation_gain > 0 ? `${Math.round(a.total_elevation_gain)}m` : '—'}
                         </td>
                       )}
@@ -707,7 +707,7 @@ export default function ActivitiesList() {
                         <td className="px-4 py-3 text-left whitespace-nowrap">
                           {a.power_meter
                             ? <span className="text-blue-400/80 text-xs">{a.power_meter}</span>
-                            : <span className="text-gray-700">—</span>}
+                            : <span className="text-ink-5">—</span>}
                         </td>
                       )}
                     </tr>
@@ -717,7 +717,7 @@ export default function ActivitiesList() {
         </table>
 
         {!loading && activities.length === 0 && (
-          <div className="flex items-center justify-center h-32 text-gray-500 text-sm">
+          <div className="flex items-center justify-center h-32 text-ink-4 text-sm">
             No activities match your filters
           </div>
         )}
@@ -725,19 +725,19 @@ export default function ActivitiesList() {
 
       {/* Pagination */}
       {pages > 1 && (
-        <div className="border-t border-gray-800 px-4 py-3 flex items-center justify-between flex-shrink-0">
+        <div className="border-t border-line px-4 py-3 flex items-center justify-between flex-shrink-0">
           <button
             onClick={() => setPage(p => Math.max(1, p - 1))}
             disabled={page === 1}
-            className="px-3 py-1.5 rounded-lg text-sm bg-gray-800 text-gray-400 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
+            className="px-3 py-1.5 rounded-lg text-sm bg-raised text-ink-3 hover:text-ink disabled:opacity-40 disabled:cursor-not-allowed"
           >
             ← Prev
           </button>
-          <span className="text-sm text-gray-500">Page {page} of {pages}</span>
+          <span className="text-sm text-ink-4">Page {page} of {pages}</span>
           <button
             onClick={() => setPage(p => Math.min(pages, p + 1))}
             disabled={page === pages}
-            className="px-3 py-1.5 rounded-lg text-sm bg-gray-800 text-gray-400 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
+            className="px-3 py-1.5 rounded-lg text-sm bg-raised text-ink-3 hover:text-ink disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Next →
           </button>

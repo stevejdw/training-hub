@@ -68,7 +68,7 @@ export default function Nav() {
       <DesktopSidebar />
 
       {/* ── Tablet band (768–1023px): top horizontal nav ── */}
-      <header className="hidden md:flex lg:hidden h-16 border-b border-gray-800 bg-gray-950 items-center flex-shrink-0 relative">
+      <header className="hidden md:flex lg:hidden h-16 border-b border-line bg-page items-center flex-shrink-0 relative">
         {/* Logo — pinned left */}
         <Link href="/home" className="absolute left-6 flex-shrink-0">
           <Image src={`/app-icon-${appIcon}.png`} alt="Training Hub" width={36} height={36} className="rounded-lg" />
@@ -83,7 +83,7 @@ export default function Nav() {
                 key={key}
                 href={href}
                 className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                  active ? 'bg-orange-500 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800'
+                  active ? 'bg-accent text-ink' : 'text-ink-3 hover:text-ink hover:bg-raised'
                 }`}
               >
                 {icon}
@@ -97,7 +97,7 @@ export default function Nav() {
         <Link
           href="/settings"
           className={`absolute right-6 p-2 rounded-lg transition-colors ${
-            isActive(['/settings'], pathname) ? 'text-orange-500' : 'text-gray-400 hover:text-white hover:bg-gray-800'
+            isActive(['/settings'], pathname) ? 'text-accent' : 'text-ink-3 hover:text-ink hover:bg-raised'
           }`}
         >
           {settingsItem.icon}
@@ -105,7 +105,7 @@ export default function Nav() {
       </header>
 
       {/* ── Mobile: fixed bottom tab bar ── */}
-      <nav className="mobile-bottom-nav md:hidden fixed bottom-0 left-0 right-0 z-50 bg-gray-950 border-t border-gray-800">
+      <nav className="mobile-bottom-nav md:hidden fixed bottom-0 left-0 right-0 z-50 bg-page border-t border-line">
         <div className="mobile-bottom-nav-inner flex h-[73px] pb-4">
           {mobileItems.map(({ key, href, label, icon, matchPrefixes }) => {
             const prefixes = key === 'more' ? mobileMore : matchPrefixes;
@@ -115,11 +115,11 @@ export default function Nav() {
                 key={key}
                 href={href}
                 className={`flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors ${
-                  active ? 'text-orange-500' : 'text-gray-500'
+                  active ? 'text-accent' : 'text-ink-4'
                 }`}
               >
                 {icon}
-                <span className="text-[10px] font-medium tracking-wide">{label}</span>
+                <span className="text-micro font-medium tracking-wide">{label}</span>
               </Link>
             );
           })}

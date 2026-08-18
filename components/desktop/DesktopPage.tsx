@@ -19,7 +19,7 @@ export default function DesktopPage({
   return (
     <div className="h-full flex flex-col">
       <div className="flex items-center justify-between gap-4 px-8 pt-6 pb-4 flex-shrink-0">
-        <h1 className="text-xl font-bold text-white">{title}</h1>
+        <h1 className="text-xl font-bold text-ink">{title}</h1>
         {actions}
       </div>
       <div className={`flex-1 min-h-0 px-8 pb-6 ${scroll ? 'overflow-y-auto' : 'overflow-hidden'}`}>

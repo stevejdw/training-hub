@@ -8,6 +8,7 @@ import {
 import EnlargeableChart from '@/components/EnlargeableChart';
 import type { EventGoal, EventClimb, CachedRoute, PacingStrategy } from '@/lib/profile';
 import { detectClimbs, estimateTime, fmtTime, mergeStarredIntoSegments } from '@/lib/pacing';
+import { CHART } from '@/lib/chart-theme';
 
 interface Props {
   event:          EventGoal;
@@ -178,27 +179,27 @@ export default function EventPacingModal({ event, riderWeightKg, onSave, onClose
   const totalKm  = route ? Math.round(route.distance_m / 100) / 10 : 0;
   const totalGain = route ? Math.round(route.elevation_gain) : 0;
 
-  const inputCls = 'bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-orange-500 transition-colors';
+  const inputCls = 'bg-raised border border-line-strong rounded-lg px-3 py-2 text-sm text-ink placeholder-ink-5 focus:outline-none focus:border-accent transition-colors';
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-gray-950">
+    <div className="fixed inset-0 z-50 flex flex-col bg-page">
       {/* Header */}
-      <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-gray-800">
+      <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-line">
         <div>
-          <h2 className="text-base font-semibold text-white">Pacing Strategy</h2>
-          <p className="text-xs text-gray-500">{event.name}</p>
+          <h2 className="text-base font-semibold text-ink">Pacing Strategy</h2>
+          <p className="text-xs text-ink-4">{event.name}</p>
         </div>
         <div className="flex items-center gap-2">
           {estMin && (
-            <span className="text-sm font-semibold text-orange-400">{fmtTime(estMin)}</span>
+            <span className="text-sm font-semibold text-accent-hi">{fmtTime(estMin)}</span>
           )}
           <button
             onClick={handleSave}
-            className="px-4 py-1.5 bg-orange-500 hover:bg-orange-400 text-white text-sm font-medium rounded-lg transition-colors"
+            className="px-4 py-1.5 bg-accent hover:bg-accent-hi text-ink text-sm font-medium rounded-lg transition-colors"
           >
             Save
           </button>
-          <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors px-2 py-1 text-sm">
+          <button onClick={onClose} className="text-ink-3 hover:text-ink transition-colors px-2 py-1 text-sm">
             ✕
           </button>
         </div>
@@ -209,8 +210,8 @@ export default function EventPacingModal({ event, riderWeightKg, onSave, onClose
         <div className="max-w-2xl mx-auto px-4 py-4 space-y-5">
 
           {/* Route input */}
-          <div className="bg-gray-900 rounded-xl p-4 space-y-3 border border-gray-800">
-            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Strava Route</h3>
+          <div className="bg-surface rounded-xl p-4 space-y-3 border border-line">
+            <h3 className="text-xs font-semibold text-ink-3 uppercase tracking-wider">Strava Route</h3>
             <div className="flex gap-2">
               <input
                 className={inputCls + ' flex-1'}
@@ -222,7 +223,7 @@ export default function EventPacingModal({ event, riderWeightKg, onSave, onClose
               <button
                 onClick={loadRoute}
                 disabled={loadingRoute}
-                className="flex-shrink-0 px-4 py-2 bg-orange-500 hover:bg-orange-400 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors"
+                className="flex-shrink-0 px-4 py-2 bg-accent hover:bg-accent-hi disabled:opacity-50 text-ink text-sm font-medium rounded-lg transition-colors"
               >
                 {loadingRoute ? '…' : 'Load'}
               </button>
@@ -231,37 +232,37 @@ export default function EventPacingModal({ event, riderWeightKg, onSave, onClose
 
             {route && (
               <div className="flex items-center gap-4 pt-1">
-                <span className="text-sm font-medium text-white truncate">{route.name}</span>
-                <span className="flex-shrink-0 text-xs text-gray-400">{totalKm} km</span>
-                <span className="flex-shrink-0 text-xs text-gray-400">{totalGain} m gain</span>
+                <span className="text-sm font-medium text-ink truncate">{route.name}</span>
+                <span className="flex-shrink-0 text-xs text-ink-3">{totalKm} km</span>
+                <span className="flex-shrink-0 text-xs text-ink-3">{totalGain} m gain</span>
               </div>
             )}
           </div>
 
           {/* Elevation profile */}
           {route && chartData.length > 0 && (
-            <div className="bg-gray-900 rounded-xl p-4 border border-gray-800">
-              <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Elevation Profile</h3>
+            <div className="bg-surface rounded-xl p-4 border border-line">
+              <h3 className="text-xs font-semibold text-ink-3 uppercase tracking-wider mb-3">Elevation Profile</h3>
               <EnlargeableChart title="Elevation Profile">
                 {(fs) => (
               <ResponsiveContainer width="100%" height={fs ? '100%' : 160}>
                 <AreaChart data={chartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
                   <defs>
                     <linearGradient id="elevGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%"  stopColor="#f97316" stopOpacity={0.4} />
-                      <stop offset="95%" stopColor="#f97316" stopOpacity={0.05} />
+                      <stop offset="5%"  stopColor={CHART.power} stopOpacity={0.4} />
+                      <stop offset="95%" stopColor={CHART.power} stopOpacity={0.05} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
+                  <CartesianGrid strokeDasharray="3 3" stroke={CHART.grid} vertical={false} />
                   <XAxis
                     dataKey="km"
-                    tick={{ fill: '#6b7280', fontSize: 10 }}
+                    tick={{ fill: CHART.axisText, fontSize: 10 }}
                     axisLine={false} tickLine={false}
                     tickFormatter={v => `${v}km`}
                     interval="preserveStartEnd"
                   />
                   <YAxis
-                    tick={{ fill: '#6b7280', fontSize: 10 }}
+                    tick={{ fill: CHART.axisText, fontSize: 10 }}
                     axisLine={false} tickLine={false}
                     width={36}
                     tickFormatter={v => `${v}m`}
@@ -270,9 +271,9 @@ export default function EventPacingModal({ event, riderWeightKg, onSave, onClose
                     content={({ active, payload }) => {
                       if (!active || !payload?.length) return null;
                       return (
-                        <div className="bg-gray-900 border border-gray-700 rounded-lg px-2 py-1 text-xs">
-                          <p className="text-gray-400">{payload[0].payload.km} km</p>
-                          <p className="text-white font-semibold">{payload[0].value} m</p>
+                        <div className="bg-surface border border-line-strong rounded-lg px-2 py-1 text-xs">
+                          <p className="text-ink-3">{payload[0].payload.km} km</p>
+                          <p className="text-ink font-semibold">{payload[0].value} m</p>
                         </div>
                       );
                     }}
@@ -288,7 +289,7 @@ export default function EventPacingModal({ event, riderWeightKg, onSave, onClose
                   ))}
                   <Area
                     type="monotone" dataKey="alt"
-                    stroke="#f97316" strokeWidth={2}
+                    stroke={CHART.power} strokeWidth={2}
                     fill="url(#elevGrad)"
                     dot={false} activeDot={{ r: 3 }}
                   />
@@ -301,39 +302,39 @@ export default function EventPacingModal({ event, riderWeightKg, onSave, onClose
 
           {/* Climbs */}
           {route && (
-            <div className="bg-gray-900 rounded-xl p-4 space-y-3 border border-gray-800">
+            <div className="bg-surface rounded-xl p-4 space-y-3 border border-line">
               <div className="flex items-center justify-between">
-                <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Key Climbs</h3>
-                <button onClick={addClimb} className="text-sm text-orange-400 hover:text-orange-300 transition-colors">
+                <h3 className="text-xs font-semibold text-ink-3 uppercase tracking-wider">Key Climbs</h3>
+                <button onClick={addClimb} className="text-sm text-accent-hi hover:text-accent-hi transition-colors">
                   + Add climb
                 </button>
               </div>
 
               {climbs.length === 0 && (
-                <p className="text-xs text-gray-600 py-1">No climbs detected — add manually or load a route with elevation data.</p>
+                <p className="text-xs text-ink-5 py-1">No climbs detected — add manually or load a route with elevation data.</p>
               )}
 
               <div className="space-y-3">
                 {climbs.map((c, i) => (
-                  <div key={i} className="border border-gray-800 rounded-xl p-3 space-y-2">
+                  <div key={i} className="border border-line rounded-xl p-3 space-y-2">
                     {/* Climb header */}
                     <div className="flex items-center gap-2">
                       <input
                         value={c.name}
                         onChange={e => updateClimb(i, { name: e.target.value })}
-                        className="flex-1 bg-transparent text-sm font-semibold text-white focus:outline-none border-b border-transparent focus:border-gray-600"
+                        className="flex-1 bg-transparent text-sm font-semibold text-ink focus:outline-none border-b border-transparent focus:border-line-hover"
                         placeholder="Climb name"
                       />
-                      <span className="text-[10px] text-gray-500 flex-shrink-0">
+                      <span className="text-micro text-ink-4 flex-shrink-0">
                         {c.distance_km} km · {c.elevation_gain} m · {c.avg_gradient}%
                       </span>
-                      <button onClick={() => removeClimb(i)} className="text-gray-600 hover:text-red-400 transition-colors text-xs flex-shrink-0">✕</button>
+                      <button onClick={() => removeClimb(i)} className="text-ink-5 hover:text-red-400 transition-colors text-xs flex-shrink-0">✕</button>
                     </div>
 
                     {/* Position + watts */}
                     <div className="grid grid-cols-3 gap-2">
                       <div>
-                        <div className="text-[10px] text-gray-600 mb-1">Start (km)</div>
+                        <div className="text-micro text-ink-5 mb-1">Start (km)</div>
                         <input
                           type="number"
                           value={c.start_km}
@@ -343,7 +344,7 @@ export default function EventPacingModal({ event, riderWeightKg, onSave, onClose
                         />
                       </div>
                       <div>
-                        <div className="text-[10px] text-gray-600 mb-1">End (km)</div>
+                        <div className="text-micro text-ink-5 mb-1">End (km)</div>
                         <input
                           type="number"
                           value={c.end_km}
@@ -353,7 +354,7 @@ export default function EventPacingModal({ event, riderWeightKg, onSave, onClose
                         />
                       </div>
                       <div>
-                        <div className="text-[10px] text-gray-600 mb-1">Target watts</div>
+                        <div className="text-micro text-ink-5 mb-1">Target watts</div>
                         <input
                           type="number"
                           value={c.target_watts}
@@ -370,11 +371,11 @@ export default function EventPacingModal({ event, riderWeightKg, onSave, onClose
           )}
 
           {/* Power settings */}
-          <div className="bg-gray-900 rounded-xl p-4 space-y-4 border border-gray-800">
-            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Power Settings</h3>
+          <div className="bg-surface rounded-xl p-4 space-y-4 border border-line">
+            <h3 className="text-xs font-semibold text-ink-3 uppercase tracking-wider">Power Settings</h3>
             <div className="grid grid-cols-3 gap-3">
               <div>
-                <label className="text-[10px] text-gray-500 uppercase tracking-wider mb-1 block">Flat / Rolling (W)</label>
+                <label className="text-micro text-ink-4 uppercase tracking-wider mb-1 block">Flat / Rolling (W)</label>
                 <input
                   type="number"
                   value={flatWatts}
@@ -384,7 +385,7 @@ export default function EventPacingModal({ event, riderWeightKg, onSave, onClose
                 />
               </div>
               <div>
-                <label className="text-[10px] text-gray-500 uppercase tracking-wider mb-1 block">Descent (W)</label>
+                <label className="text-micro text-ink-4 uppercase tracking-wider mb-1 block">Descent (W)</label>
                 <input
                   type="number"
                   value={descentWatts}
@@ -394,7 +395,7 @@ export default function EventPacingModal({ event, riderWeightKg, onSave, onClose
                 />
               </div>
               <div>
-                <label className="text-[10px] text-gray-500 uppercase tracking-wider mb-1 block">Bike weight (kg)</label>
+                <label className="text-micro text-ink-4 uppercase tracking-wider mb-1 block">Bike weight (kg)</label>
                 <input
                   type="number"
                   value={bikeKg}
@@ -404,24 +405,24 @@ export default function EventPacingModal({ event, riderWeightKg, onSave, onClose
                 />
               </div>
             </div>
-            <p className="text-[10px] text-gray-600">
+            <p className="text-micro text-ink-5">
               Rider weight: {riderWeightKg ? `${riderWeightKg} kg` : 'not set — add in Profile tab'} · Total system: {(riderWeightKg || 75) + bikeKg} kg
             </p>
           </div>
 
           {/* Estimated time breakdown */}
           {route && estMin && (
-            <div className="bg-gray-900 rounded-xl p-4 space-y-3 border border-gray-800">
-              <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Estimated Time</h3>
+            <div className="bg-surface rounded-xl p-4 space-y-3 border border-line">
+              <h3 className="text-xs font-semibold text-ink-3 uppercase tracking-wider">Estimated Time</h3>
 
               {/* Big number */}
               <div className="flex items-end gap-2">
-                <span className="text-4xl font-bold text-white tabular-nums">{fmtTime(estMin)}</span>
-                <span className="text-sm text-gray-500 pb-1">h:mm</span>
+                <span className="text-4xl font-bold text-ink tabular-nums">{fmtTime(estMin)}</span>
+                <span className="text-sm text-ink-4 pb-1">h:mm</span>
               </div>
 
               {/* Stats row */}
-              <div className="flex gap-4 text-xs text-gray-500">
+              <div className="flex gap-4 text-xs text-ink-4">
                 <span>{totalKm} km</span>
                 <span>{totalGain} m gain</span>
                 <span>Avg {Math.round(totalKm / (estMin / 60) * 10) / 10} km/h</span>
@@ -429,8 +430,8 @@ export default function EventPacingModal({ event, riderWeightKg, onSave, onClose
 
               {/* Climb breakdown */}
               {climbs.length > 0 && (
-                <div className="border-t border-gray-800 pt-3 space-y-1.5">
-                  <p className="text-[10px] text-gray-600 uppercase tracking-wider mb-2">Climb estimates</p>
+                <div className="border-t border-line pt-3 space-y-1.5">
+                  <p className="text-micro text-ink-5 uppercase tracking-wider mb-2">Climb estimates</p>
                   {climbs.map((c, i) => {
                     if (!route) return null;
                     const dSlice: number[] = [];
@@ -455,9 +456,9 @@ export default function EventPacingModal({ event, riderWeightKg, onSave, onClose
                     });
                     return (
                       <div key={i} className="flex items-center justify-between text-xs">
-                        <span className="text-gray-400">{c.name}</span>
-                        <span className="text-gray-500 tabular-nums">
-                          {c.distance_km} km · {c.elevation_gain} m · {c.target_watts}W → <span className="text-white font-medium">{fmtTime(climbMin)}</span>
+                        <span className="text-ink-3">{c.name}</span>
+                        <span className="text-ink-4 tabular-nums">
+                          {c.distance_km} km · {c.elevation_gain} m · {c.target_watts}W → <span className="text-ink font-medium">{fmtTime(climbMin)}</span>
                         </span>
                       </div>
                     );

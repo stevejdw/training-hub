@@ -28,6 +28,9 @@
   --surface-raised: #1f2937;
   --border-subtle:  #1f2937;
   --border-default: #374151;
+  --surface-hover:  #374151;
+  --border-hover:   #4b5563;
+  --text-dim:       #4b5563;
   --text-primary:   #f9fafb;
   --text-secondary: #d1d5db;
   --text-muted:     #9ca3af;
@@ -70,6 +73,9 @@
   --surface-raised: #f1f5f9;
   --border-subtle:  #e2e8f0;
   --border-default: #cbd5e1;
+  --surface-hover:  #e2e8f0;
+  --border-hover:   #94a3b8;
+  --text-dim:       #94a3b8;
   --text-primary:   #0f172a;
   --text-secondary: #334155;
   --text-muted:     #475569;
@@ -105,6 +111,9 @@
   --surface-raised: #002447;
   --border-subtle:  #002447;
   --border-default: #003a70;
+  --surface-hover:  #003a70;
+  --border-hover:   #005299;
+  --text-dim:       #3a7ca5;
   --text-primary:   #e0f2fe;
   --text-secondary: #b8e4f9;
   --text-muted:     #7ec8e3;
@@ -137,6 +146,9 @@
   --surface-raised: #e0f2fe;
   --border-subtle:  #d5eefc;
   --border-default: #bae6fd;
+  --surface-hover:  #e0f2fe;
+  --border-hover:   #7dd3fc;
+  --text-dim:       #5a93b5;
   --text-primary:   #0c4a6e;
   --text-secondary: #075985;
   --text-muted:     #0369a1;
@@ -172,6 +184,9 @@
   --surface-raised: #f2ebe1;
   --border-subtle:  #ece1d3;
   --border-default: #e6d8c8;
+  --surface-hover:  #f2ebe1;
+  --border-hover:   #d4c0a8;
+  --text-dim:       #9a8570;
   --text-primary:   #2c1810;
   --text-secondary: #4a2e1a;
   --text-muted:     #6b4a34;
@@ -209,6 +224,9 @@
   --surface-raised: #3a200e;
   --border-subtle:  #3a200e;
   --border-default: #4d2d15;
+  --surface-hover:  #4d2d15;
+  --border-hover:   #66401e;
+  --text-dim:       #8a6a52;
   --text-primary:   #fdf0e0;
   --text-secondary: #f0c890;
   --text-muted:     #d4a870;
@@ -241,111 +259,6 @@
   --accent-border: color-mix(in srgb, var(--accent) 45%, transparent);
 }
 
-/* ── Compat shim ──────────────────────────────────────────────────────────
-   The previous palette remap, copied verbatim so this phase is provably a
-   visual no-op while components migrate to the semantic utilities above.
-
-   Note the dark theme deliberately has no entries: it never remapped the
-   palette at all, it used Tailwind's defaults. Aliasing its grays to the new
-   semantic tokens would have shifted gray-600, gray-200/100 and text-white.
-
-   Delete this block once no component uses bare gray or orange utilities for
-   surfaces, text or accent. */
-
-[data-theme="light"] {
-  --color-white:    #0f172a;   /* text-white → near-black primary text     */
-  --color-gray-950: #f8fafc;   /* page background → off-white              */
-  --color-gray-900: #ffffff;   /* card background → white                  */
-  --color-gray-800: #f1f5f9;   /* secondary card → slate-100               */
-  --color-gray-700: #e2e8f0;   /* tertiary surface → slate-200             */
-  --color-gray-600: #cbd5e1;   /* muted borders → slate-300                */
-  --color-gray-500: #94a3b8;   /* muted text → slate-400                   */
-  --color-gray-400: #64748b;   /* tertiary text → slate-500                */
-  --color-gray-300: #334155;   /* secondary text → slate-700               */
-  --color-gray-200: #1e293b;   /* strong secondary → slate-800             */
-  --color-gray-100: #0f172a;   /* near-black text → slate-900              */
-}
-
-[data-theme="ocean"] {
-  --color-white:    #e0f2fe;
-  --color-gray-950: #000d1a;
-  --color-gray-900: #00172e;
-  --color-gray-800: #002447;
-  --color-gray-700: #003a70;
-  --color-gray-600: #005299;
-  --color-gray-500: #4a9fd4;
-  --color-gray-400: #7ec8e3;
-  --color-gray-300: #b8e4f9;
-  --color-gray-200: #cceeff;
-  --color-gray-100: #e0f2fe;
-  --color-orange-500: #0ea5e9;
-  --color-orange-400: #38bdf8;
-  --color-orange-300: #7dd3fc;
-  --color-orange-200: #bae6fd;
-  --color-orange-100: #e0f2fe;
-  --color-orange-600: #0284c7;
-}
-
-[data-theme="ocean-light"] {
-  --color-white:    #0c4a6e;   /* text-white → sky-900 navy                */
-  --color-gray-950: #f0f9ff;   /* page bg → sky-50                         */
-  --color-gray-900: #ffffff;   /* card bg → white                          */
-  --color-gray-800: #e0f2fe;   /* secondary card → sky-100                 */
-  --color-gray-700: #bae6fd;   /* tertiary surface → sky-200               */
-  --color-gray-600: #7dd3fc;   /* borders → sky-300                        */
-  --color-gray-500: #0369a1;   /* muted text → sky-700                     */
-  --color-gray-400: #075985;   /* secondary text → sky-800                 */
-  --color-gray-300: #0c4a6e;   /* strong secondary → sky-900               */
-  --color-gray-200: #082f49;
-  --color-gray-100: #0c4a6e;
-  --color-orange-500: #0ea5e9;
-  --color-orange-400: #38bdf8;
-  --color-orange-300: #7dd3fc;
-  --color-orange-200: #bae6fd;
-  --color-orange-100: #e0f2fe;
-  --color-orange-600: #0284c7;
-}
-
-[data-theme="sand"] {
-  --color-white:    #2c1810;   /* text-white → dark warm brown              */
-  --color-gray-950: #f8f4ef;   /* page bg → warm sand                       */
-  --color-gray-900: #ffffff;   /* card bg → white                           */
-  --color-gray-800: #f2ebe1;   /* secondary card → warm linen               */
-  --color-gray-700: #e6d8c8;   /* tertiary surface → warm beige             */
-  --color-gray-600: #d4c0a8;   /* borders → warm tan                        */
-  --color-gray-500: #9a7d65;   /* muted text → warm mid-brown               */
-  --color-gray-400: #7d5a42;   /* secondary text → deeper warm              */
-  --color-gray-300: #4a2e1a;   /* strong secondary → dark brown             */
-  --color-gray-200: #2c1810;
-  --color-gray-100: #1a0e08;
-  --color-orange-500: #0369a1;
-  --color-orange-400: #0284c7;
-  --color-orange-300: #38bdf8;
-  --color-orange-200: #bae6fd;
-  --color-orange-100: #e0f2fe;
-  --color-orange-600: #075985;
-}
-
-[data-theme="sand-dark"] {
-  --color-white:    #fdf0e0;   /* text-white → warm off-white              */
-  --color-gray-950: #1a100a;   /* page bg → near-black warm                */
-  --color-gray-900: #261510;   /* card bg → dark warm                      */
-  --color-gray-800: #3a200e;   /* secondary card                           */
-  --color-gray-700: #4d2d15;   /* borders                                  */
-  --color-gray-600: #66401e;   /* muted borders                            */
-  --color-gray-500: #b08060;   /* muted text — AA contrast on dark bg      */
-  --color-gray-400: #d4a870;   /* secondary text                           */
-  --color-gray-300: #f0c890;   /* strong secondary                         */
-  --color-gray-200: #fcd9a8;
-  --color-gray-100: #fdf0e0;
-  --color-orange-500: #0ea5e9;
-  --color-orange-400: #38bdf8;
-  --color-orange-300: #7dd3fc;
-  --color-orange-200: #bae6fd;
-  --color-orange-100: #e0f2fe;
-  --color-orange-600: #0284c7;
-}
-
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -355,10 +268,14 @@
   --color-raised:      var(--surface-raised);
   --color-line:        var(--border-subtle);
   --color-line-strong: var(--border-default);
+  --color-line-hover:  var(--border-hover);
+  --color-hover:       var(--surface-hover);
+  --color-hover-2:     var(--border-hover);
   --color-ink:         var(--text-primary);
   --color-ink-2:       var(--text-secondary);
   --color-ink-3:       var(--text-muted);
   --color-ink-4:       var(--text-faint);
+  --color-ink-5:       var(--text-dim);
   --color-accent:      var(--accent);
   --color-accent-hi:   var(--accent-hi);
   --color-accent-soft: var(--accent-soft);

@@ -55,12 +55,12 @@ export default function LoginForm() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-950 px-4">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-page px-4">
       <div className="w-full max-w-sm space-y-8 text-center">
 
         {/* Icon */}
-        <div className="mx-auto w-16 h-16 rounded-2xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center">
-          <svg className="w-8 h-8 text-orange-500" viewBox="0 0 24 24" fill="none"
+        <div className="mx-auto w-16 h-16 rounded-2xl bg-accent/10 border border-accent/20 flex items-center justify-center">
+          <svg className="w-8 h-8 text-accent" viewBox="0 0 24 24" fill="none"
                stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <rect x="3" y="11" width="18" height="11" rx="2" />
             <path d="M7 11V7a5 5 0 0 1 10 0v4" />
@@ -69,8 +69,8 @@ export default function LoginForm() {
 
         {/* Title */}
         <div>
-          <h1 className="text-2xl font-bold text-white">Training Hub</h1>
-          <p className="text-sm text-gray-400 mt-2">Enter your password to continue</p>
+          <h1 className="text-2xl font-bold text-ink">Training Hub</h1>
+          <p className="text-sm text-ink-3 mt-2">Enter your password to continue</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -81,7 +81,7 @@ export default function LoginForm() {
               placeholder="Password"
               autoFocus
               required
-              className="w-full px-4 py-3 rounded-xl bg-gray-800 border border-gray-700 text-white placeholder-gray-500 focus:outline-none focus:border-orange-500 text-base"
+              className="w-full px-4 py-3 rounded-xl bg-raised border border-line-strong text-ink placeholder-ink-4 focus:outline-none focus:border-accent text-base"
             />
             {error && (
               <p className="text-sm text-red-400">{error}</p>
@@ -89,7 +89,7 @@ export default function LoginForm() {
             <button
               type="submit"
               disabled={loading || !password}
-              className="w-full px-6 py-3.5 rounded-xl bg-orange-600 hover:bg-orange-500 active:bg-orange-400 disabled:opacity-50 text-white font-semibold text-base transition-colors"
+              className="w-full px-6 py-3.5 rounded-xl bg-accent hover:bg-accent active:bg-accent-hi disabled:opacity-50 text-ink font-semibold text-base transition-colors"
             >
               {loading ? 'Signing in…' : 'Sign in'}
             </button>

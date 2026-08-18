@@ -13,6 +13,7 @@ import { iconFor } from '@/components/nav-items';
 import { estimateTime, fmtTime, speedForPower, powerForSpeed } from '@/lib/pacing';
 import Link from 'next/link';
 import SaveStatus from '@/components/ui/SaveStatus';
+import { CHART } from '@/lib/chart-theme';
 
 interface Effort {
   id: number;
@@ -146,7 +147,7 @@ export default function ClimbDetailPage({ eventId, climbIdx }: Props) {
     return (
       <div className="h-full flex flex-col">
         <PageHeader icon={iconFor('events')} title="Climb" />
-        <div className="flex-1 flex items-center justify-center text-gray-600 text-sm">Loading…</div>
+        <div className="flex-1 flex items-center justify-center text-ink-5 text-sm">Loading…</div>
       </div>
     );
   }
@@ -155,14 +156,14 @@ export default function ClimbDetailPage({ eventId, climbIdx }: Props) {
     return (
       <div className="h-full flex flex-col">
         <PageHeader icon={iconFor('events')} title="Climb" />
-        <div className="flex-shrink-0 px-4 py-2 border-b border-gray-800/60">
-          <Link href={`/events/${eventId}`} className="text-sm text-gray-500 hover:text-orange-400 transition-colors">
+        <div className="flex-shrink-0 px-4 py-2 border-b border-line/60">
+          <Link href={`/events/${eventId}`} className="text-sm text-ink-4 hover:text-accent-hi transition-colors">
             ← {event.name || 'Event'}
           </Link>
         </div>
         <div className="flex-1 flex flex-col items-center justify-center gap-3 px-8 text-center">
-          <p className="text-gray-400 text-sm">Climb data not saved yet.</p>
-          <Link href={`/events/${eventId}`} className="mt-2 px-4 py-2 bg-orange-500/20 text-orange-400 rounded-lg text-sm hover:bg-orange-500/30 transition-colors">
+          <p className="text-ink-3 text-sm">Climb data not saved yet.</p>
+          <Link href={`/events/${eventId}`} className="mt-2 px-4 py-2 bg-accent/20 text-accent-hi rounded-lg text-sm hover:bg-accent/30 transition-colors">
             ← Back to Event
           </Link>
         </div>
@@ -178,7 +179,7 @@ export default function ClimbDetailPage({ eventId, climbIdx }: Props) {
     <div className="flex items-center gap-3">
       <SaveStatus error={error} onRetry={handleSave} />
       <button onClick={handleSave} disabled={saving}
-        className="px-4 py-1.5 rounded-lg bg-orange-500 hover:bg-orange-400 disabled:opacity-50 text-white text-sm font-medium transition-colors">
+        className="px-4 py-1.5 rounded-lg bg-accent hover:bg-accent-hi disabled:opacity-50 text-ink text-sm font-medium transition-colors">
         {saving ? 'Saving…' : 'Save'}
       </button>
     </div>
@@ -188,8 +189,8 @@ export default function ClimbDetailPage({ eventId, climbIdx }: Props) {
     <div className="h-full flex flex-col">
       <PageHeader icon={iconFor('events')} title={climb.name} right={saveBtn} />
 
-      <div className="flex-shrink-0 px-4 md:px-8 py-2 border-b border-gray-800/60">
-        <Link href={`/events/${eventId}`} className="text-sm text-gray-500 hover:text-orange-400 transition-colors">
+      <div className="flex-shrink-0 px-4 md:px-8 py-2 border-b border-line/60">
+        <Link href={`/events/${eventId}`} className="text-sm text-ink-4 hover:text-accent-hi transition-colors">
           ← {event.name || 'Event'}
         </Link>
       </div>
@@ -200,13 +201,13 @@ export default function ClimbDetailPage({ eventId, climbIdx }: Props) {
           {/* Stats row */}
           <div className="grid grid-cols-4 gap-2">
             {[
-              { label: 'From Start', value: `${climb.start_km} km`,       color: 'text-white' },
-              { label: 'Length',     value: `${climb.distance_km} km`,    color: 'text-white' },
-              { label: 'Ascent',     value: `${climb.elevation_gain} m`,  color: 'text-orange-400' },
-              { label: 'Gradient',   value: `${climb.avg_gradient}%`,     color: 'text-white' },
+              { label: 'From Start', value: `${climb.start_km} km`,       color: 'text-ink' },
+              { label: 'Length',     value: `${climb.distance_km} km`,    color: 'text-ink' },
+              { label: 'Ascent',     value: `${climb.elevation_gain} m`,  color: 'text-accent-hi' },
+              { label: 'Gradient',   value: `${climb.avg_gradient}%`,     color: 'text-ink' },
             ].map(({ label, value, color }) => (
-              <div key={label} className="bg-gray-900 border border-gray-800 rounded-xl p-3 text-center">
-                <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">{label}</p>
+              <div key={label} className="bg-surface border border-line rounded-xl p-3 text-center">
+                <p className="text-micro text-ink-4 uppercase tracking-wider mb-1">{label}</p>
                 <p className={`text-lg font-bold ${color}`}>{value}</p>
               </div>
             ))}
@@ -214,35 +215,35 @@ export default function ClimbDetailPage({ eventId, climbIdx }: Props) {
 
           {/* Elevation profile */}
           {chartData.length > 0 && (
-            <section className="bg-gray-900 border border-gray-800 rounded-2xl p-4">
-              <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Elevation Profile</h2>
+            <section className="bg-surface border border-line rounded-2xl p-4">
+              <h2 className="text-xs font-semibold text-ink-4 uppercase tracking-wider mb-3">Elevation Profile</h2>
               <EnlargeableChart title={`${climb.name} — Elevation Profile`}>
                 {(fs) => (
                   <ResponsiveContainer width="100%" height={fs ? '100%' : 180}>
                     <AreaChart data={chartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
                       <defs>
                         <linearGradient id="climbGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%"  stopColor="#f97316" stopOpacity={0.5} />
-                          <stop offset="95%" stopColor="#f97316" stopOpacity={0.05} />
+                          <stop offset="5%"  stopColor={CHART.power} stopOpacity={0.5} />
+                          <stop offset="95%" stopColor={CHART.power} stopOpacity={0.05} />
                         </linearGradient>
                       </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
-                      <XAxis dataKey="km" tick={{ fill: '#6b7280', fontSize: 10 }} axisLine={false} tickLine={false}
+                      <CartesianGrid strokeDasharray="3 3" stroke={CHART.grid} vertical={false} />
+                      <XAxis dataKey="km" tick={{ fill: CHART.axisText, fontSize: 10 }} axisLine={false} tickLine={false}
                         tickFormatter={v => `${v}km`} interval="preserveStartEnd" />
-                      <YAxis domain={[domainMin, altMax + 20]} tick={{ fill: '#6b7280', fontSize: 10 }}
+                      <YAxis domain={[domainMin, altMax + 20]} tick={{ fill: CHART.axisText, fontSize: 10 }}
                         axisLine={false} tickLine={false} width={40} tickFormatter={v => `${v}m`} />
-                      <ReferenceLine y={altMin} stroke="#374151" strokeDasharray="3 3"
-                        label={{ value: `${altMin}m`, fill: '#6b7280', fontSize: 9, position: 'insideBottomLeft' }} />
+                      <ReferenceLine y={altMin} stroke={CHART.axis} strokeDasharray="3 3"
+                        label={{ value: `${altMin}m`, fill: CHART.axisText, fontSize: 9, position: 'insideBottomLeft' }} />
                       <Tooltip content={({ active, payload }) => {
                         if (!active || !payload?.length) return null;
                         return (
-                          <div className="bg-gray-900 border border-gray-700 rounded-lg px-2 py-1 text-xs">
-                            <p className="text-gray-400">{payload[0].payload.km} km in</p>
-                            <p className="text-white font-semibold">{payload[0].value} m</p>
+                          <div className="bg-surface border border-line-strong rounded-lg px-2 py-1 text-xs">
+                            <p className="text-ink-3">{payload[0].payload.km} km in</p>
+                            <p className="text-ink font-semibold">{payload[0].value} m</p>
                           </div>
                         );
                       }} />
-                      <Area type="monotone" dataKey="alt" stroke="#f97316" strokeWidth={2}
+                      <Area type="monotone" dataKey="alt" stroke={CHART.power} strokeWidth={2}
                         fill="url(#climbGrad)" dot={false} activeDot={{ r: 3 }} />
                     </AreaChart>
                   </ResponsiveContainer>
@@ -252,13 +253,13 @@ export default function ClimbDetailPage({ eventId, climbIdx }: Props) {
           )}
 
           {/* Target power + speed */}
-          <section className="bg-gray-900 border border-gray-800 rounded-2xl p-4 space-y-4">
-            <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Target Power</h2>
+          <section className="bg-surface border border-line rounded-2xl p-4 space-y-4">
+            <h2 className="text-xs font-semibold text-ink-4 uppercase tracking-wider">Target Power</h2>
 
             <div className="grid grid-cols-2 gap-3">
               {/* Watts input */}
               <div>
-                <label className="block text-[10px] text-gray-500 uppercase tracking-wider mb-1">Power (W)</label>
+                <label className="block text-micro text-ink-4 uppercase tracking-wider mb-1">Power (W)</label>
                 <input
                   type="number"
                   value={targetWatts}
@@ -276,7 +277,7 @@ export default function ClimbDetailPage({ eventId, climbIdx }: Props) {
 
               {/* Speed input — linked to watts via avg_gradient */}
               <div>
-                <label className="block text-[10px] text-gray-500 uppercase tracking-wider mb-1">Avg Speed (km/h)</label>
+                <label className="block text-micro text-ink-4 uppercase tracking-wider mb-1">Avg Speed (km/h)</label>
                 <input
                   type="number"
                   value={displaySpeed}
@@ -296,12 +297,12 @@ export default function ClimbDetailPage({ eventId, climbIdx }: Props) {
             </div>
 
             <div className="flex items-center justify-between">
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-ink-4">
                 {riderKg} kg rider · {bikeKg} kg bike · {Math.round(targetWatts / riderKg * 10) / 10} W/kg
               </p>
               <div className="text-right">
-                <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-0.5">Est Time</p>
-                <p className="text-2xl font-bold text-white tabular-nums">
+                <p className="text-micro text-ink-4 uppercase tracking-wider mb-0.5">Est Time</p>
+                <p className="text-2xl font-bold text-ink tabular-nums">
                   {estMin ? fmtTime(estMin) : '—'}
                 </p>
               </div>
@@ -309,31 +310,31 @@ export default function ClimbDetailPage({ eventId, climbIdx }: Props) {
           </section>
 
           {/* Previous results */}
-          <section className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
+          <section className="bg-surface border border-line rounded-2xl overflow-hidden">
             <div className="p-4">
-              <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Previous Results</h2>
-              <p className="text-[10px] text-gray-600 mt-0.5">
+              <h2 className="text-xs font-semibold text-ink-4 uppercase tracking-wider">Previous Results</h2>
+              <p className="text-micro text-ink-5 mt-0.5">
                 Strava segment efforts matching this climb length (±25%)
               </p>
             </div>
 
             {loadingEfforts ? (
-              <div className="border-t border-gray-800 divide-y divide-gray-800/40">
+              <div className="border-t border-line divide-y divide-line/40">
                 {[0, 1, 2].map(i => (
                   <div key={i} className="flex items-center gap-3 px-4 py-3">
-                    <div className="flex-1 h-3 bg-gray-800 rounded animate-pulse" />
-                    <div className="w-12 h-3 bg-gray-800 rounded animate-pulse" />
-                    <div className="w-16 h-3 bg-gray-800 rounded animate-pulse" />
+                    <div className="flex-1 h-3 bg-raised rounded animate-pulse" />
+                    <div className="w-12 h-3 bg-raised rounded animate-pulse" />
+                    <div className="w-16 h-3 bg-raised rounded animate-pulse" />
                   </div>
                 ))}
               </div>
             ) : efforts.length === 0 ? (
-              <div className="border-t border-gray-800 px-4 py-6 text-center">
-                <p className="text-gray-600 text-sm">No matching segment efforts found</p>
-                <p className="text-gray-700 text-xs mt-1">Run the activities backfill to import segment data</p>
+              <div className="border-t border-line px-4 py-6 text-center">
+                <p className="text-ink-5 text-sm">No matching segment efforts found</p>
+                <p className="text-ink-5 text-xs mt-1">Run the activities backfill to import segment data</p>
               </div>
             ) : (
-              <div className="border-t border-gray-800 divide-y divide-gray-800/40">
+              <div className="border-t border-line divide-y divide-line/40">
                 {efforts.map((e, i) => {
                   const isPR  = e.pr_rank === 1;
                   const isTop3 = e.pr_rank !== null && e.pr_rank <= 3;
@@ -341,32 +342,32 @@ export default function ClimbDetailPage({ eventId, climbIdx }: Props) {
                     <Link
                       key={e.id}
                       href={`/activities/${e.activity_id}`}
-                      className="flex items-center gap-3 px-4 py-3 hover:bg-gray-800/40 transition-colors"
+                      className="flex items-center gap-3 px-4 py-3 hover:bg-raised/40 transition-colors"
                     >
                       {/* Rank badge */}
-                      <span className="w-5 text-[10px] font-bold text-gray-600 flex-shrink-0 text-center">{i + 1}</span>
+                      <span className="w-5 text-micro font-bold text-ink-5 flex-shrink-0 text-center">{i + 1}</span>
 
                       {/* Segment name + activity */}
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm text-white font-medium truncate">{e.name}</p>
-                        <p className="text-[10px] text-gray-500 truncate">{e.activity_name} · {e.date}</p>
+                        <p className="text-sm text-ink font-medium truncate">{e.name}</p>
+                        <p className="text-micro text-ink-4 truncate">{e.activity_name} · {e.date}</p>
                       </div>
 
                       {/* PR badge */}
                       {isPR && (
-                        <span className="flex-shrink-0 px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-400 text-[10px] font-bold">PR</span>
+                        <span className="flex-shrink-0 px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-400 text-micro font-bold">PR</span>
                       )}
                       {!isPR && isTop3 && (
-                        <span className="flex-shrink-0 px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-400 text-[10px] font-bold">Top {e.pr_rank}</span>
+                        <span className="flex-shrink-0 px-1.5 py-0.5 rounded bg-accent/20 text-accent-hi text-micro font-bold">Top {e.pr_rank}</span>
                       )}
 
                       {/* Power */}
                       {e.average_watts && (
-                        <span className="flex-shrink-0 text-xs text-gray-400 w-12 text-right">{e.average_watts}W</span>
+                        <span className="flex-shrink-0 text-xs text-ink-3 w-12 text-right">{e.average_watts}W</span>
                       )}
 
                       {/* Time */}
-                      <span className="flex-shrink-0 text-sm font-bold text-white tabular-nums w-14 text-right">
+                      <span className="flex-shrink-0 text-sm font-bold text-ink tabular-nums w-14 text-right">
                         {fmtSecs(e.moving_time)}
                       </span>
                     </Link>

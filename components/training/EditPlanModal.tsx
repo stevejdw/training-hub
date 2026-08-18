@@ -302,11 +302,11 @@ export default function EditPlanModal({ plan, onClose, onUpdated }: Props) {
   return (
 
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 px-4 pt-[calc(1rem_+_env(safe-area-inset-top))] pb-[calc(89px_+_env(safe-area-inset-bottom))] md:pt-4 md:pb-4">
-      <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-md max-h-[calc(100vh_-_73px_-_2rem_-_env(safe-area-inset-top)_-_env(safe-area-inset-bottom))] md:max-h-[90vh] flex flex-col">
+      <div className="bg-surface border border-line-strong rounded-2xl w-full max-w-md max-h-[calc(100vh_-_73px_-_2rem_-_env(safe-area-inset-top)_-_env(safe-area-inset-bottom))] md:max-h-[90vh] flex flex-col">
       <div className="p-6 overflow-y-auto flex-1 min-h-0 space-y-5">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-white">Edit Plan</h2>
-          <button onClick={onClose} disabled={busy} className="text-gray-500 hover:text-white transition-colors">
+          <h2 className="text-lg font-semibold text-ink">Edit Plan</h2>
+          <button onClick={onClose} disabled={busy} className="text-ink-4 hover:text-ink transition-colors">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -315,27 +315,27 @@ export default function EditPlanModal({ plan, onClose, onUpdated }: Props) {
 
         {/* Goal */}
         <div>
-          <label className="text-xs text-gray-400 uppercase tracking-wider block mb-1.5">Goal</label>
+          <label className="text-xs text-ink-3 uppercase tracking-wider block mb-1.5">Goal</label>
           <input
             value={goal}
             onChange={e => setGoal(e.target.value)}
             disabled={busy}
-            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-orange-500"
+            className="w-full bg-raised border border-line-strong rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-accent"
           />
         </div>
 
         {/* Start date */}
         <div>
-          <label className="text-xs text-gray-400 uppercase tracking-wider block mb-1.5">Plan start date (week of)</label>
+          <label className="text-xs text-ink-3 uppercase tracking-wider block mb-1.5">Plan start date (week of)</label>
           <input
             type="date"
             value={planStartDate}
             onChange={e => setPlanStartDate(e.target.value)}
             disabled={busy}
-            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-orange-500 [color-scheme:dark]"
+            className="w-full bg-raised border border-line-strong rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-accent [color-scheme:dark]"
           />
           {planStartDate && (
-            <p className="text-[10px] text-gray-500 mt-1">
+            <p className="text-micro text-ink-4 mt-1">
               Plan runs {planStartDate} – {addDays(planStartDate, weeks * 7 - 1)} ({weeks} weeks)
             </p>
           )}
@@ -343,7 +343,7 @@ export default function EditPlanModal({ plan, onClose, onUpdated }: Props) {
           <button
             onClick={handleRepairDates}
             disabled={busy}
-            className="mt-2 text-[11px] text-yellow-500 hover:text-yellow-300 disabled:opacity-40 transition-colors flex items-center gap-1"
+            className="mt-2 text-mini text-yellow-500 hover:text-yellow-300 disabled:opacity-40 transition-colors flex items-center gap-1"
           >
             <svg className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
@@ -355,20 +355,20 @@ export default function EditPlanModal({ plan, onClose, onUpdated }: Props) {
         {/* Additional notes */}
 
         <div>
-          <label className="text-xs text-gray-400 uppercase tracking-wider block mb-1.5">Additional notes (optional)</label>
+          <label className="text-xs text-ink-3 uppercase tracking-wider block mb-1.5">Additional notes (optional)</label>
           <textarea
             value={notes}
             onChange={e => setNotes(e.target.value)}
             disabled={busy}
             rows={3}
             placeholder="e.g. Focus on threshold work, available Tue/Thu/Sat/Sun, avoid back-to-back hard days"
-            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-orange-500 resize-none"
+            className="w-full bg-raised border border-line-strong rounded-lg px-3 py-2 text-sm text-ink placeholder-ink-5 focus:outline-none focus:border-accent resize-none"
           />
         </div>
 
         {/* Training days */}
         <div>
-          <label className="text-xs text-gray-400 uppercase tracking-wider block mb-2">Training days</label>
+          <label className="text-xs text-ink-3 uppercase tracking-wider block mb-2">Training days</label>
           <div className="flex gap-1.5">
             {DOW_LABELS.map((label, i) => (
               <button
@@ -377,32 +377,32 @@ export default function EditPlanModal({ plan, onClose, onUpdated }: Props) {
                 disabled={busy}
                 className={`flex-1 py-2 rounded-lg text-xs font-medium transition-colors ${
                   trainingDays.includes(i)
-                    ? 'bg-orange-500 text-white'
-                    : 'bg-gray-800 text-gray-400 hover:text-white'
+                    ? 'bg-accent text-ink'
+                    : 'bg-raised text-ink-3 hover:text-ink'
                 }`}
               >
                 {label}
               </button>
             ))}
           </div>
-          <p className="text-[10px] text-gray-500 mt-1.5">
+          <p className="text-micro text-ink-4 mt-1.5">
             {trainingDays.length} days/week selected.
           </p>
         </div>
 
         {/* Per-day settings */}
         <div>
-          <label className="text-xs text-gray-400 uppercase tracking-wider block mb-2">Day settings</label>
+          <label className="text-xs text-ink-3 uppercase tracking-wider block mb-2">Day settings</label>
           <div className="space-y-1.5">
             {/* Header row */}
             <div className="grid grid-cols-[56px_1fr_auto] gap-2 px-1">
-              <span className="text-[10px] text-gray-600 uppercase tracking-wider">Day</span>
-              <span className="text-[10px] text-gray-600 uppercase tracking-wider">Available time</span>
-              <span className="text-[10px] text-gray-600 uppercase tracking-wider">Group ride</span>
+              <span className="text-micro text-ink-5 uppercase tracking-wider">Day</span>
+              <span className="text-micro text-ink-5 uppercase tracking-wider">Available time</span>
+              <span className="text-micro text-ink-5 uppercase tracking-wider">Group ride</span>
             </div>
             {trainingDays.map(i => (
-              <div key={i} className="grid grid-cols-[56px_1fr_auto] gap-2 items-center bg-gray-800/50 rounded-lg px-2 py-1.5">
-                <span className="text-xs font-medium text-gray-300">{DOW_LABELS[i]}</span>
+              <div key={i} className="grid grid-cols-[56px_1fr_auto] gap-2 items-center bg-raised/50 rounded-lg px-2 py-1.5">
+                <span className="text-xs font-medium text-ink-2">{DOW_LABELS[i]}</span>
                 {/* Time pills */}
                 <div className="flex gap-1 flex-wrap">
                   {TIME_OPTIONS.map(opt => (
@@ -410,10 +410,10 @@ export default function EditPlanModal({ plan, onClose, onUpdated }: Props) {
                       key={opt.minutes}
                       onClick={() => updateDaySetting(i, 'maxMinutes', opt.minutes)}
                       disabled={busy}
-                      className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${
+                      className={`px-2 py-0.5 rounded text-micro font-medium transition-colors ${
                         daySettings[i]?.maxMinutes === opt.minutes
-                          ? 'bg-orange-500 text-white'
-                          : 'bg-gray-700 text-gray-400 hover:text-white'
+                          ? 'bg-accent text-ink'
+                          : 'bg-hover text-ink-3 hover:text-ink'
                       }`}
                     >
                       {opt.label}
@@ -425,7 +425,7 @@ export default function EditPlanModal({ plan, onClose, onUpdated }: Props) {
                   onClick={() => updateDaySetting(i, 'isGroupRide', !daySettings[i]?.isGroupRide)}
                   disabled={busy}
                   className={`relative w-9 h-5 rounded-full transition-colors duration-200 flex-shrink-0 ${
-                    daySettings[i]?.isGroupRide ? 'bg-blue-500' : 'bg-gray-700'
+                    daySettings[i]?.isGroupRide ? 'bg-blue-500' : 'bg-hover'
                   }`}
                 >
                   <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all duration-200 ${
@@ -435,18 +435,18 @@ export default function EditPlanModal({ plan, onClose, onUpdated }: Props) {
               </div>
             ))}
           </div>
-          <p className="text-[10px] text-gray-600 mt-1.5">Group ride days use steady-state targets, not structured intervals.</p>
+          <p className="text-micro text-ink-5 mt-1.5">Group ride days use steady-state targets, not structured intervals.</p>
         </div>
 
         {/* ── AI Edit ── */}
-        <div className="border-t border-gray-800 pt-4 space-y-3">
+        <div className="border-t border-line pt-4 space-y-3">
           <div className="flex items-center gap-2">
-            <svg className="w-4 h-4 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <svg className="w-4 h-4 text-accent-hi" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
             </svg>
-            <span className="text-xs font-semibold text-gray-300 uppercase tracking-wider">Coach AI — Edit Plan</span>
+            <span className="text-xs font-semibold text-ink-2 uppercase tracking-wider">Coach AI — Edit Plan</span>
           </div>
-          <p className="text-[10px] text-gray-500 leading-relaxed">
+          <p className="text-micro text-ink-4 leading-relaxed">
             Tell Coach AI how to modify your plan. It will review your recent training data (rides, intensity, terrain, laps) and rebuild the plan accordingly.
           </p>
           <textarea
@@ -455,12 +455,12 @@ export default function EditPlanModal({ plan, onClose, onUpdated }: Props) {
             disabled={busy || aiLoading}
             rows={3}
             placeholder='e.g. "Review my activities from the previous week, look at the duration, intensity, laps, terrain and use this as a baseline for my training plan. Identify key sessions and build progressive overload keeping the overall structure the same."'
-            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-orange-500 resize-none disabled:opacity-50"
+            className="w-full bg-raised border border-line-strong rounded-lg px-3 py-2 text-sm text-ink placeholder-ink-5 focus:outline-none focus:border-accent resize-none disabled:opacity-50"
           />
           <button
             onClick={handleAiEdit}
             disabled={!aiMessage.trim() || busy || aiLoading}
-            className="w-full py-2 rounded-lg bg-orange-500 hover:bg-orange-400 disabled:opacity-50 text-white text-sm font-medium transition-colors flex items-center justify-center gap-2"
+            className="w-full py-2 rounded-lg bg-accent hover:bg-accent-hi disabled:opacity-50 text-ink text-sm font-medium transition-colors flex items-center justify-center gap-2"
           >
             {aiLoading ? (
               <>
@@ -476,7 +476,7 @@ export default function EditPlanModal({ plan, onClose, onUpdated }: Props) {
         </div>
 
         {status === 'generating' && (
-          <div className="flex items-center gap-2 text-sm text-orange-400">
+          <div className="flex items-center gap-2 text-sm text-accent-hi">
             <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
@@ -484,14 +484,14 @@ export default function EditPlanModal({ plan, onClose, onUpdated }: Props) {
             Generating {weeks} weeks…
           </div>
         )}
-        {status === 'saving' && <p className="text-sm text-gray-400">Saving…</p>}
+        {status === 'saving' && <p className="text-sm text-ink-3">Saving…</p>}
         {status === 'error'   && <p className="text-sm text-red-400">{errorMsg}</p>}
 
         </div>
         {/* Sticky footer */}
-        <div className="flex gap-2 p-4 border-t border-gray-800 flex-shrink-0 flex-col">
+        <div className="flex gap-2 p-4 border-t border-line flex-shrink-0 flex-col">
           {willRegenerate && !confirmDelete && (
-            <p className="text-[11px] text-yellow-400/80 text-center -mt-1 mb-1">
+            <p className="text-mini text-yellow-400/80 text-center -mt-1 mb-1">
               Training days or durations changed — plan will regenerate
             </p>
           )}
@@ -500,14 +500,14 @@ export default function EditPlanModal({ plan, onClose, onUpdated }: Props) {
               <button
                 onClick={() => { setConfirmDelete(false); setErrorMsg(''); }}
                 disabled={busy}
-                className="flex-1 py-2 rounded-lg bg-gray-800 text-gray-400 hover:text-white text-sm transition-colors disabled:opacity-50"
+                className="flex-1 py-2 rounded-lg bg-raised text-ink-3 hover:text-ink text-sm transition-colors disabled:opacity-50"
               >
                 Keep plan
               </button>
               <button
                 onClick={handleDelete}
                 disabled={busy}
-                className="flex-1 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white text-sm font-medium transition-colors disabled:opacity-50"
+                className="flex-1 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-ink text-sm font-medium transition-colors disabled:opacity-50"
               >
                 {deleting ? 'Deleting…' : 'Yes, delete'}
               </button>
@@ -517,7 +517,7 @@ export default function EditPlanModal({ plan, onClose, onUpdated }: Props) {
               <button
                 onClick={() => setConfirmDelete(true)}
                 disabled={busy}
-                className="py-2 px-3 rounded-lg bg-gray-800 text-red-400 hover:text-red-300 text-sm transition-colors disabled:opacity-50 flex-shrink-0"
+                className="py-2 px-3 rounded-lg bg-raised text-red-400 hover:text-red-300 text-sm transition-colors disabled:opacity-50 flex-shrink-0"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -526,14 +526,14 @@ export default function EditPlanModal({ plan, onClose, onUpdated }: Props) {
               <button
                 onClick={onClose}
                 disabled={busy}
-                className="flex-1 py-2 rounded-lg bg-gray-800 text-gray-400 hover:text-white text-sm transition-colors disabled:opacity-50"
+                className="flex-1 py-2 rounded-lg bg-raised text-ink-3 hover:text-ink text-sm transition-colors disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSave}
                 disabled={busy}
-                className="flex-1 py-2 rounded-lg bg-orange-500 hover:bg-orange-400 text-white text-sm font-medium transition-colors disabled:opacity-50"
+                className="flex-1 py-2 rounded-lg bg-accent hover:bg-accent-hi text-ink text-sm font-medium transition-colors disabled:opacity-50"
               >
                 {busy ? 'Working…' : willRegenerate ? '↺ Regenerate' : 'Save'}
               </button>

@@ -128,12 +128,12 @@ export default function ActivityEditModal({
     // Leaflet panes/controls reach z-index 1000, so the overlay has to clear
     // that or the activity map paints over the modal.
     <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/60 px-4 pt-[calc(1rem_+_env(safe-area-inset-top))] pb-[calc(89px_+_env(safe-area-inset-bottom))] md:pt-4 md:pb-4">
-      <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-md max-h-[calc(100vh_-_73px_-_2rem_-_env(safe-area-inset-top)_-_env(safe-area-inset-bottom))] md:max-h-[90vh] flex flex-col">
+      <div className="bg-surface border border-line-strong rounded-2xl w-full max-w-md max-h-[calc(100vh_-_73px_-_2rem_-_env(safe-area-inset-top)_-_env(safe-area-inset-bottom))] md:max-h-[90vh] flex flex-col">
         <div className="p-6 overflow-y-auto flex-1 min-h-0 space-y-5">
 
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-white">Edit activity</h2>
-            <button onClick={onClose} disabled={busy} className="text-gray-500 hover:text-white transition-colors">
+            <h2 className="text-lg font-semibold text-ink">Edit activity</h2>
+            <button onClick={onClose} disabled={busy} className="text-ink-4 hover:text-ink transition-colors">
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
               </svg>
@@ -141,31 +141,31 @@ export default function ActivityEditModal({
           </div>
 
           <div>
-            <label className="text-xs text-gray-400 uppercase tracking-wider block mb-1">Name</label>
+            <label className="text-xs text-ink-3 uppercase tracking-wider block mb-1">Name</label>
             <input
               autoFocus
               value={nameDraft}
               onChange={e => setNameDraft(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); save(); } }}
               disabled={busy}
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-orange-500 disabled:opacity-50"
+              className="w-full bg-raised border border-line-strong rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-accent disabled:opacity-50"
             />
           </div>
 
           <div>
-            <label className="text-xs text-gray-400 uppercase tracking-wider block mb-1">Gear</label>
+            <label className="text-xs text-ink-3 uppercase tracking-wider block mb-1">Gear</label>
             <select
               value={gearDraft}
               onChange={e => setGearDraft(e.target.value)}
               disabled={busy}
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-orange-500 disabled:opacity-50"
+              className="w-full bg-raised border border-line-strong rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-accent disabled:opacity-50"
             >
               <option value="">No gear</option>
               {gear.map(g => (
                 <option key={g.id} value={g.id}>{gearLabel(g)}</option>
               ))}
             </select>
-            <p className="mt-1 text-[11px] text-gray-600">
+            <p className="mt-1 text-mini text-ink-5">
               Renaming a bike itself is done in Settings — this only changes which bike this ride used.
             </p>
           </div>
@@ -174,14 +174,14 @@ export default function ActivityEditModal({
             <button
               onClick={save}
               disabled={busy || !nameDraft.trim()}
-              className="flex-1 px-3 py-2 rounded-lg bg-orange-500 hover:bg-orange-400 disabled:opacity-50 text-white text-sm font-semibold transition-colors"
+              className="flex-1 px-3 py-2 rounded-lg bg-accent hover:bg-accent-hi disabled:opacity-50 text-ink text-sm font-semibold transition-colors"
             >
               {saving ? 'Saving…' : 'Save changes'}
             </button>
             <button
               onClick={onClose}
               disabled={busy}
-              className="px-3 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 disabled:opacity-50 text-gray-300 text-sm font-medium transition-colors"
+              className="px-3 py-2 rounded-lg bg-raised hover:bg-hover disabled:opacity-50 text-ink-2 text-sm font-medium transition-colors"
             >
               Cancel
             </button>
@@ -189,25 +189,25 @@ export default function ActivityEditModal({
 
           <div className="rounded-xl border border-red-900/50 bg-red-950/20 p-4">
             <p className="text-xs font-semibold text-red-400 uppercase tracking-wider mb-1">Delete data</p>
-            <p className="text-xs text-gray-500 mb-3">
+            <p className="text-xs text-ink-4 mb-3">
               Deletions are permanent and are remembered, so a Strava re-sync won&apos;t bring the data back.
             </p>
 
             {pendingDelete ? (
               <div className="space-y-3">
-                <p className="text-sm text-gray-300">{DELETE_ACTIONS[pendingDelete].confirm}</p>
+                <p className="text-sm text-ink-2">{DELETE_ACTIONS[pendingDelete].confirm}</p>
                 <div className="flex flex-wrap gap-2">
                   <button
                     onClick={() => runDelete(pendingDelete)}
                     disabled={busy}
-                    className="px-3 py-2 rounded-lg bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white text-sm font-semibold transition-colors"
+                    className="px-3 py-2 rounded-lg bg-red-600 hover:bg-red-500 disabled:opacity-50 text-ink text-sm font-semibold transition-colors"
                   >
                     {deleting ? 'Deleting…' : `Yes, ${DELETE_ACTIONS[pendingDelete].label.toLowerCase()}`}
                   </button>
                   <button
                     onClick={() => { setPendingDelete(null); setError(null); }}
                     disabled={busy}
-                    className="px-3 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 disabled:opacity-50 text-gray-300 text-sm font-medium transition-colors"
+                    className="px-3 py-2 rounded-lg bg-raised hover:bg-hover disabled:opacity-50 text-ink-2 text-sm font-medium transition-colors"
                   >
                     Cancel
                   </button>

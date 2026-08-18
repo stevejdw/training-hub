@@ -79,32 +79,32 @@ export default function EditMenuBar() {
 
   return (
     <div className="h-full flex flex-col">
-      <div className="flex-shrink-0 relative flex items-center justify-center px-4 md:px-8 py-3 md:py-4 border-b border-gray-800 bg-gray-950">
+      <div className="flex-shrink-0 relative flex items-center justify-center px-4 md:px-8 py-3 md:py-4 border-b border-line bg-page">
         <div className="flex items-center gap-2.5">
-          <span className="text-orange-400 [&_svg]:w-6 [&_svg]:h-6 md:[&_svg]:w-7 md:[&_svg]:h-7 flex-shrink-0">
+          <span className="text-accent-hi [&_svg]:w-6 [&_svg]:h-6 md:[&_svg]:w-7 md:[&_svg]:h-7 flex-shrink-0">
             <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
             </svg>
           </span>
-          <h1 className="text-lg md:text-xl font-bold text-white tracking-tight truncate">
+          <h1 className="text-lg md:text-xl font-bold text-ink tracking-tight truncate">
             Edit Menu Bar
           </h1>
         </div>
         <div className="absolute right-4 md:right-8 flex items-center">
-          <Link href="/more" className="text-sm text-gray-500 hover:text-orange-400 transition-colors">
+          <Link href="/more" className="text-sm text-ink-4 hover:text-accent-hi transition-colors">
             ← More
           </Link>
         </div>
       </div>
 
       {/* Tab switcher */}
-      <div className="flex-shrink-0 flex border-b border-gray-800 bg-gray-950">
+      <div className="flex-shrink-0 flex border-b border-line bg-page">
         <button
           onClick={() => setTab('mobile')}
           className={`flex-1 py-2.5 text-sm font-medium transition-colors ${
             tab === 'mobile'
-              ? 'text-orange-400 border-b-2 border-orange-400'
-              : 'text-gray-500 hover:text-gray-300'
+              ? 'text-accent-hi border-b-2 border-accent-hi'
+              : 'text-ink-4 hover:text-ink-2'
           }`}
         >
           Mobile
@@ -113,8 +113,8 @@ export default function EditMenuBar() {
           onClick={() => setTab('desktop')}
           className={`flex-1 py-2.5 text-sm font-medium transition-colors ${
             tab === 'desktop'
-              ? 'text-orange-400 border-b-2 border-orange-400'
-              : 'text-gray-500 hover:text-gray-300'
+              ? 'text-accent-hi border-b-2 border-accent-hi'
+              : 'text-ink-4 hover:text-ink-2'
           }`}
         >
           Desktop
@@ -126,11 +126,11 @@ export default function EditMenuBar() {
 
         <div>
           {tab === 'mobile' ? (
-            <p className="text-sm text-gray-400">
+            <p className="text-sm text-ink-3">
               Pick up to {MAX_MIDDLE_MOBILE} items for the mobile bottom bar. Items not in the bar are reachable from More.
             </p>
           ) : (
-            <p className="text-sm text-gray-400">
+            <p className="text-sm text-ink-3">
               Pick up to {MAX_MIDDLE} items for the desktop top nav. These settings are independent from mobile.
             </p>
           )}
@@ -140,12 +140,12 @@ export default function EditMenuBar() {
         <div className="space-y-3">
           {tab === 'mobile' ? (
             <div>
-              <p className="text-[10px] text-gray-500 uppercase tracking-wider px-1 mb-1.5">Mobile preview</p>
+              <p className="text-micro text-ink-4 uppercase tracking-wider px-1 mb-1.5">Mobile preview</p>
               <BarPreview keys={[first.key, ...mobileMiddle.slice(0, MAX_MIDDLE_MOBILE), last.key]} />
             </div>
           ) : (
             <div>
-              <p className="text-[10px] text-gray-500 uppercase tracking-wider px-1 mb-1.5">Desktop preview</p>
+              <p className="text-micro text-ink-4 uppercase tracking-wider px-1 mb-1.5">Desktop preview</p>
               <BarPreview
                 keys={(() => {
                   const allMid = ALL_NAV_ITEMS.filter(i => !i.pinned).map(i => i.key);
@@ -162,23 +162,23 @@ export default function EditMenuBar() {
 
         {/* In-bar list */}
         <section className="space-y-2">
-          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-1">
+          <h2 className="text-xs font-semibold text-ink-4 uppercase tracking-wider px-1">
             In the bar
           </h2>
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl divide-y divide-gray-800/60 overflow-hidden">
+          <div className="bg-surface border border-line rounded-2xl divide-y divide-line/60 overflow-hidden">
             <PinnedRow item={first} note="Always first" />
             {middleItems.map((item, idx) => (
               <div key={item.key} className="flex items-center gap-2 px-4 py-3">
-                <span className="text-orange-400 flex-shrink-0">{item.icon}</span>
-                <span className="text-base text-gray-100 font-medium flex-1">{item.label}</span>
+                <span className="text-accent-hi flex-shrink-0">{item.icon}</span>
+                <span className="text-base text-ink font-medium flex-1">{item.label}</span>
                 <button
                   onClick={() => move(idx, -1)}
                   disabled={idx === 0}
                   aria-label="Move up"
                   className={`p-2 rounded-lg transition-colors ${
                     idx === 0
-                      ? 'text-gray-700 cursor-not-allowed'
-                      : 'text-gray-400 hover:text-white hover:bg-gray-800'
+                      ? 'text-ink-5 cursor-not-allowed'
+                      : 'text-ink-3 hover:text-ink hover:bg-raised'
                   }`}
                 >
                   <ChevronIcon dir="up" />
@@ -189,8 +189,8 @@ export default function EditMenuBar() {
                   aria-label="Move down"
                   className={`p-2 rounded-lg transition-colors ${
                     idx === middleItems.length - 1
-                      ? 'text-gray-700 cursor-not-allowed'
-                      : 'text-gray-400 hover:text-white hover:bg-gray-800'
+                      ? 'text-ink-5 cursor-not-allowed'
+                      : 'text-ink-3 hover:text-ink hover:bg-raised'
                   }`}
                 >
                   <ChevronIcon dir="down" />
@@ -198,14 +198,14 @@ export default function EditMenuBar() {
                 <button
                   onClick={() => remove(item.key)}
                   aria-label={`Remove ${item.label}`}
-                  className="ml-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-800 text-gray-300 hover:bg-red-500/20 hover:text-red-400 transition-colors"
+                  className="ml-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-raised text-ink-2 hover:bg-red-500/20 hover:text-red-400 transition-colors"
                 >
                   Remove
                 </button>
               </div>
             ))}
             {middleItems.length === 0 && (
-              <div className="px-4 py-3 text-sm text-gray-500 italic">
+              <div className="px-4 py-3 text-sm text-ink-4 italic">
                 No middle items. Add some below.
               </div>
             )}
@@ -215,30 +215,30 @@ export default function EditMenuBar() {
 
         {/* Available items */}
         <section className="space-y-2">
-          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-1">
+          <h2 className="text-xs font-semibold text-ink-4 uppercase tracking-wider px-1">
             Available
             {barFull && (
-              <span className="ml-2 text-[10px] normal-case font-normal text-gray-600">
+              <span className="ml-2 text-micro normal-case font-normal text-ink-5">
                 (bar is full — remove an item to add another)
               </span>
             )}
           </h2>
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl divide-y divide-gray-800/60 overflow-hidden">
+          <div className="bg-surface border border-line rounded-2xl divide-y divide-line/60 overflow-hidden">
             {available.length === 0 ? (
-              <div className="px-4 py-3 text-sm text-gray-500 italic">
+              <div className="px-4 py-3 text-sm text-ink-4 italic">
                 Everything is in the bar.
               </div>
             ) : available.map(item => (
               <div key={item.key} className="flex items-center gap-2 px-4 py-3">
-                <span className="text-gray-500 flex-shrink-0">{item.icon}</span>
-                <span className="text-base text-gray-200 font-medium flex-1">{item.label}</span>
+                <span className="text-ink-4 flex-shrink-0">{item.icon}</span>
+                <span className="text-base text-ink font-medium flex-1">{item.label}</span>
                 <button
                   onClick={() => add(item.key)}
                   disabled={barFull}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                     barFull
-                      ? 'bg-gray-800 text-gray-600 cursor-not-allowed'
-                      : 'bg-orange-500/15 text-orange-400 hover:bg-orange-500/25'
+                      ? 'bg-raised text-ink-5 cursor-not-allowed'
+                      : 'bg-accent/15 text-accent-hi hover:bg-accent/25'
                   }`}
                 >
                   Add
@@ -251,7 +251,7 @@ export default function EditMenuBar() {
         <div className="flex justify-end pt-2">
           <button
             onClick={reset}
-            className="text-xs text-gray-500 hover:text-orange-400 transition-colors"
+            className="text-xs text-ink-4 hover:text-accent-hi transition-colors"
           >
             Reset to defaults
           </button>
@@ -267,10 +267,10 @@ export default function EditMenuBar() {
 
 function PinnedRow({ item, note }: { item: NavItem; note: string }) {
   return (
-    <div className="flex items-center gap-2 px-4 py-3 bg-gray-900/40">
-      <span className="text-orange-400 flex-shrink-0">{item.icon}</span>
-      <span className="text-base text-gray-100 font-medium flex-1">{item.label}</span>
-      <span className="text-[10px] uppercase tracking-wider text-gray-600 font-semibold">
+    <div className="flex items-center gap-2 px-4 py-3 bg-surface/40">
+      <span className="text-accent-hi flex-shrink-0">{item.icon}</span>
+      <span className="text-base text-ink font-medium flex-1">{item.label}</span>
+      <span className="text-micro uppercase tracking-wider text-ink-5 font-semibold">
         {note}
       </span>
     </div>
@@ -283,12 +283,12 @@ function BarPreview({ keys, desktop = false }: { keys: string[]; desktop?: boole
     .filter((i): i is NavItem => !!i);
   if (desktop) {
     return (
-      <div className="bg-gray-950 border border-gray-800 rounded-xl px-3 py-2 flex items-center gap-1 overflow-x-auto">
+      <div className="bg-page border border-line rounded-xl px-3 py-2 flex items-center gap-1 overflow-x-auto">
         <span className="text-base mr-2 flex-shrink-0">🚴</span>
         {items.map(({ key, label, icon }) => (
           <div
             key={key}
-            className="flex items-center gap-2 px-2.5 py-1 rounded-lg text-xs text-gray-400 flex-shrink-0"
+            className="flex items-center gap-2 px-2.5 py-1 rounded-lg text-xs text-ink-3 flex-shrink-0"
           >
             <span className="opacity-80 [&_svg]:w-4 [&_svg]:h-4">{icon}</span>
             <span>{label}</span>
@@ -298,15 +298,15 @@ function BarPreview({ keys, desktop = false }: { keys: string[]; desktop?: boole
     );
   }
   return (
-    <div className="bg-gray-950 border border-gray-800 rounded-2xl p-2">
+    <div className="bg-page border border-line rounded-2xl p-2">
       <div className="flex h-[73px] pb-4">
         {items.map(({ key, label, icon }) => (
           <div
             key={key}
-            className="flex-1 flex flex-col items-center justify-center gap-0.5 text-gray-500"
+            className="flex-1 flex flex-col items-center justify-center gap-0.5 text-ink-4"
           >
             {icon}
-            <span className="text-[10px] font-medium tracking-wide">{label}</span>
+            <span className="text-micro font-medium tracking-wide">{label}</span>
           </div>
         ))}
       </div>

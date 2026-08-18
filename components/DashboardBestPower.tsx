@@ -124,7 +124,7 @@ export default function DashboardBestPower() {
         <select
           value={seconds}
           onChange={e => setSeconds(Number(e.target.value))}
-          className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-orange-500"
+          className="bg-raised border border-line-strong rounded-lg px-3 py-1.5 text-sm text-ink focus:outline-none focus:border-accent"
         >
           {INTERVALS.map(iv => (
             <option key={iv.seconds} value={iv.seconds}>{iv.label}</option>
@@ -139,8 +139,8 @@ export default function DashboardBestPower() {
               onClick={() => setDays(tf.days)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                 days === tf.days
-                  ? 'bg-orange-500 text-white'
-                  : 'bg-gray-800 text-gray-400 hover:text-white'
+                  ? 'bg-accent text-ink'
+                  : 'bg-raised text-ink-3 hover:text-ink'
               }`}
             >
               {tf.label}
@@ -150,26 +150,26 @@ export default function DashboardBestPower() {
       </div>
 
       {/* Results */}
-      <div className="bg-gray-800/60 rounded-xl overflow-hidden">
+      <div className="bg-raised/60 rounded-xl overflow-hidden">
         {error ? (
           <p className="text-red-400 text-xs p-4">{error}</p>
         ) : loading ? (
-          <div className="divide-y divide-gray-700/50">
+          <div className="divide-y divide-line-strong/50">
             {Array.from({ length: 5 }).map((_, i) => (
               <div key={i} className="flex items-center gap-3 px-4 py-3">
-                <div className="w-5 h-3 bg-gray-700 rounded animate-pulse" />
-                <div className="flex-1 h-3 bg-gray-700 rounded animate-pulse" />
-                <div className="w-16 h-3 bg-gray-700 rounded animate-pulse" />
-                <div className="w-14 h-4 bg-gray-700 rounded animate-pulse" />
+                <div className="w-5 h-3 bg-hover rounded animate-pulse" />
+                <div className="flex-1 h-3 bg-hover rounded animate-pulse" />
+                <div className="w-16 h-3 bg-hover rounded animate-pulse" />
+                <div className="w-14 h-4 bg-hover rounded animate-pulse" />
               </div>
             ))}
           </div>
         ) : results.length === 0 ? (
-          <p className="text-gray-500 text-sm text-center py-8">
+          <p className="text-ink-4 text-sm text-center py-8">
             No power data for this period
           </p>
         ) : (
-          <div className="divide-y divide-gray-700/50">
+          <div className="divide-y divide-line-strong/50">
             {results.map((r, i) => {
               const color = sportColor(r.sport_type);
               const date  = new Date(r.start_date);
@@ -177,14 +177,14 @@ export default function DashboardBestPower() {
                 <Link
                   key={r.id}
                   href={`/activities/${r.id}`}
-                  className="flex items-center gap-3 px-4 py-3 hover:bg-gray-700/40 transition-colors"
+                  className="flex items-center gap-3 px-4 py-3 hover:bg-hover/40 transition-colors"
                 >
                   {/* Rank */}
-                  <span className="w-5 text-xs font-bold text-gray-500 flex-shrink-0">{i + 1}</span>
+                  <span className="w-5 text-xs font-bold text-ink-4 flex-shrink-0">{i + 1}</span>
 
                   {/* Sport badge */}
                   <span
-                    className="px-1.5 py-0.5 rounded text-[10px] font-medium flex-shrink-0"
+                    className="px-1.5 py-0.5 rounded text-micro font-medium flex-shrink-0"
                     style={{ background: color + '25', color }}
                   >
                     {sportLabel(r.sport_type)}
@@ -192,16 +192,16 @@ export default function DashboardBestPower() {
 
                   {/* Name + date */}
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm text-white truncate">{r.name}</p>
-                    <p className="text-[10px] text-gray-500">
+                    <p className="text-sm text-ink truncate">{r.name}</p>
+                    <p className="text-micro text-ink-4">
                       {date.toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' })}
                     </p>
                   </div>
 
                   {/* Watts */}
                   <div className="text-right flex-shrink-0">
-                    <span className="text-base font-bold text-white">{r.best_watts}</span>
-                    <span className="text-xs text-gray-400 ml-0.5">W</span>
+                    <span className="text-base font-bold text-ink">{r.best_watts}</span>
+                    <span className="text-xs text-ink-3 ml-0.5">W</span>
                   </div>
                 </Link>
               );
@@ -211,7 +211,7 @@ export default function DashboardBestPower() {
       </div>
 
       {results.length > 0 && (
-        <p className="text-[10px] text-gray-600 text-center">
+        <p className="text-micro text-ink-5 text-center">
           Top 10 best {intervalLabel} power
           {days > 0 ? ` · last ${TIME_FILTERS.find(t => t.days === days)?.label}` : ' · all time'}
         </p>

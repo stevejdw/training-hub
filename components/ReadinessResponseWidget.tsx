@@ -7,6 +7,7 @@ import {
 } from 'recharts';
 import { useCachedFetch } from '@/lib/use-cached-fetch';
 import EnlargeableChart from '@/components/EnlargeableChart';
+import { CHART } from '@/lib/chart-theme';
 
 interface DataPoint {
   date:   string;
@@ -27,7 +28,7 @@ interface ReadinessData {
 const STATUS_CONFIG = {
   green:   { label: 'Balanced',        textColor: 'text-green-400',  bg: 'bg-green-400/10 border-green-500/30'  },
   warning: { label: 'Recovery Needed', textColor: 'text-red-400',    bg: 'bg-red-400/10 border-red-500/30'      },
-  neutral: { label: 'Neutral',         textColor: 'text-gray-400',   bg: 'bg-gray-400/10 border-gray-500/30'    },
+  neutral: { label: 'Neutral',         textColor: 'text-ink-3',   bg: 'bg-gray-400/10 border-gray-500/30'    },
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -42,10 +43,10 @@ function ReadinessTooltip({ active, payload, baseline, metricLabel, metricUnit, 
   const outOfRangeLabel = invertedMetric ? ' ↑ elevated' : ' ↓ below normal';
 
   return (
-    <div className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-xs shadow-lg space-y-0.5">
-      <p className="text-gray-400">{new Date(d.date + 'T00:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+    <div className="bg-surface border border-line-strong rounded-lg px-3 py-2 text-xs shadow-lg space-y-0.5">
+      <p className="text-ink-3">{new Date(d.date + 'T00:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
       {tssEntry?.value != null && (
-        <p className="text-gray-300">{Math.round(tssEntry.value)} TSS</p>
+        <p className="text-ink-2">{Math.round(tssEntry.value)} TSS</p>
       )}
       {metricEntry?.value != null && (
         <p className={`font-semibold ${inRange ? 'text-green-400' : d.status === 'warning' ? 'text-red-400' : 'text-blue-400'}`}>
@@ -64,7 +65,7 @@ export default function ReadinessResponseWidget() {
   );
 
   if (loading && !resp) {
-    return <div className="h-48 animate-pulse bg-gray-800/60 rounded-2xl" />;
+    return <div className="h-48 animate-pulse bg-raised/60 rounded-2xl" />;
   }
 
   if (error) {
@@ -73,11 +74,11 @@ export default function ReadinessResponseWidget() {
 
   if (!resp?.intervalsConfigured) {
     return (
-      <div className="bg-gray-800/60 rounded-2xl p-4 border border-gray-700/40">
-        <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-2">Readiness & Response</p>
-        <p className="text-sm text-gray-500">
+      <div className="bg-raised/60 rounded-2xl p-4 border border-line-strong/40">
+        <p className="text-micro font-semibold text-ink-4 uppercase tracking-wider mb-2">Readiness & Response</p>
+        <p className="text-sm text-ink-4">
           Connect intervals.icu in{' '}
-          <Link href="/settings" className="text-orange-400 hover:text-orange-300 underline underline-offset-2 transition-colors">
+          <Link href="/settings" className="text-accent-hi hover:text-accent-hi underline underline-offset-2 transition-colors">
             Settings
           </Link>{' '}
           to see how your recovery metrics respond to training load.
@@ -88,11 +89,11 @@ export default function ReadinessResponseWidget() {
 
   if (!resp.data.length || !resp.metricKey) {
     return (
-      <div className="bg-gray-800/60 rounded-2xl p-4 border border-gray-700/40">
-        <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-2">Readiness & Response</p>
-        <p className="text-sm text-gray-500">
+      <div className="bg-raised/60 rounded-2xl p-4 border border-line-strong/40">
+        <p className="text-micro font-semibold text-ink-4 uppercase tracking-wider mb-2">Readiness & Response</p>
+        <p className="text-sm text-ink-4">
           No wellness data yet.{' '}
-          <Link href="/settings" className="text-orange-400 hover:text-orange-300 underline underline-offset-2 transition-colors">
+          <Link href="/settings" className="text-accent-hi hover:text-accent-hi underline underline-offset-2 transition-colors">
             Sync intervals.icu
           </Link>{' '}
           to get started.
@@ -112,10 +113,10 @@ export default function ReadinessResponseWidget() {
 
   return (
     <Link href="/performance?tab=fitness&sub=readiness" className="block group">
-      <div className="bg-gray-800/60 rounded-2xl p-4 border border-gray-700/40 group-hover:border-gray-600/60 group-hover:bg-gray-800/80 transition-colors">
+      <div className="bg-raised/60 rounded-2xl p-4 border border-line-strong/40 group-hover:border-line-hover/60 group-hover:bg-raised/80 transition-colors">
         <div className="flex items-center justify-between mb-3">
-          <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider group-hover:text-orange-400 transition-colors">Readiness & Response →</p>
-          <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${statusCfg.bg} ${statusCfg.textColor}`}>
+          <p className="text-micro font-semibold text-ink-4 uppercase tracking-wider group-hover:text-accent-hi transition-colors">Readiness & Response →</p>
+          <span className={`px-2 py-0.5 rounded-full text-micro font-semibold border ${statusCfg.bg} ${statusCfg.textColor}`}>
             {statusCfg.label}
           </span>
         </div>
@@ -126,10 +127,10 @@ export default function ReadinessResponseWidget() {
             {(fs) => (
           <ResponsiveContainer width="100%" height={fs ? '100%' : 160}>
             <ComposedChart data={displayData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke={CHART.grid} vertical={false} />
               <XAxis
                 dataKey="date"
-                tick={{ fill: '#6b7280', fontSize: 9 }}
+                tick={{ fill: CHART.axisText, fontSize: 9 }}
                 axisLine={false}
                 tickLine={false}
                 interval="preserveStartEnd"
@@ -138,7 +139,7 @@ export default function ReadinessResponseWidget() {
               <YAxis
                 yAxisId="tss"
                 orientation="left"
-                tick={{ fill: '#6b7280', fontSize: 9 }}
+                tick={{ fill: CHART.axisText, fontSize: 9 }}
                 axisLine={false}
                 tickLine={false}
                 width={28}
@@ -146,7 +147,7 @@ export default function ReadinessResponseWidget() {
               <YAxis
                 yAxisId="hrv"
                 orientation="right"
-                tick={{ fill: '#60a5fa', fontSize: 9 }}
+                tick={{ fill: CHART.hr, fontSize: 9 }}
                 axisLine={false}
                 tickLine={false}
                 width={32}
@@ -170,7 +171,7 @@ export default function ReadinessResponseWidget() {
                   yAxisId="hrv"
                   y1={baseline.mean - baseline.stdDev}
                   y2={baseline.mean + baseline.stdDev}
-                  fill="#34d399"
+                  fill={CHART.pos}
                   fillOpacity={0.07}
                   strokeOpacity={0}
                 />
@@ -179,7 +180,7 @@ export default function ReadinessResponseWidget() {
               <Bar
                 yAxisId="tss"
                 dataKey="tss"
-                fill="#374151"
+                fill={CHART.axis}
                 radius={[2, 2, 0, 0]}
                 isAnimationActive={false}
                 maxBarSize={10}
@@ -188,10 +189,10 @@ export default function ReadinessResponseWidget() {
                 yAxisId="hrv"
                 type="monotone"
                 dataKey="hrv"
-                stroke="#60a5fa"
+                stroke={CHART.hr}
                 strokeWidth={2}
                 dot={false}
-                activeDot={{ r: 3, fill: '#60a5fa' }}
+                activeDot={{ r: 3, fill: CHART.hr }}
                 connectNulls={false}
                 isAnimationActive={false}
               />
@@ -202,13 +203,13 @@ export default function ReadinessResponseWidget() {
         </div>
 
         <div className="mt-2">
-          <p className="text-[10px] text-gray-600">
-            <span className="text-gray-500">▪</span> TSS (left) ·
+          <p className="text-micro text-ink-5">
+            <span className="text-ink-4">▪</span> TSS (left) ·
             <span className="text-blue-400 ml-1">—</span> {metricLabel}{metricUnit ? ` (${metricUnit})` : ''} (right)
             {baseline && <span className="ml-1 text-green-400/60">· shaded = normal range</span>}
           </p>
           {resp.metricKey !== 'hrv' && (
-            <p className="text-[10px] text-gray-600 mt-0.5">
+            <p className="text-micro text-ink-5 mt-0.5">
               Using {metricLabel} — HRV not available from your intervals.icu data
             </p>
           )}

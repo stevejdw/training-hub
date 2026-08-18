@@ -6,6 +6,7 @@ import {
   Tooltip, ResponsiveContainer, ReferenceLine,
 } from 'recharts';
 import EnlargeableChart from '@/components/EnlargeableChart';
+import { CHART } from '@/lib/chart-theme';
 
 interface Target {
   key:          string;
@@ -35,8 +36,8 @@ function ChartTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null;
   const rows = (payload as { name: string; value: number; color: string }[]).filter(p => p.value != null);
   return (
-    <div className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-xs shadow-lg">
-      <p className="text-gray-400 mb-1">{label}</p>
+    <div className="bg-surface border border-line-strong rounded-lg px-3 py-2 text-xs shadow-lg">
+      <p className="text-ink-3 mb-1">{label}</p>
       {rows.map(p => (
         <p key={p.name} style={{ color: p.color }} className="font-semibold">
           {p.name}: {p.value}W
@@ -103,9 +104,9 @@ export default function PowerProgressChart() {
     return (
       <div className="space-y-3">
         <div className="grid grid-cols-5 gap-2">
-          {[1,2,3,4,5].map(i => <div key={i} className="h-20 bg-gray-800 rounded-xl animate-pulse" />)}
+          {[1,2,3,4,5].map(i => <div key={i} className="h-20 bg-raised rounded-xl animate-pulse" />)}
         </div>
-        <div className="h-52 bg-gray-800 rounded-xl animate-pulse" />
+        <div className="h-52 bg-raised rounded-xl animate-pulse" />
       </div>
     );
   }
@@ -113,9 +114,9 @@ export default function PowerProgressChart() {
   if (error) return <p className="text-red-400 text-xs px-1">{error}</p>;
   if (!data || !data.targets.length) {
     return (
-      <div className="bg-gray-800/40 border border-gray-700 border-dashed rounded-xl p-6 text-center">
-        <p className="text-sm text-gray-500">No power stream data yet</p>
-        <p className="text-xs text-gray-600 mt-1">Run the backfill workflow to load activity streams</p>
+      <div className="bg-raised/40 border border-line-strong border-dashed rounded-xl p-6 text-center">
+        <p className="text-sm text-ink-4">No power stream data yet</p>
+        <p className="text-xs text-ink-5 mt-1">Run the backfill workflow to load activity streams</p>
       </div>
     );
   }
@@ -163,13 +164,13 @@ export default function PowerProgressChart() {
               key={t.key}
               onClick={() => toggleDuration(t.key)}
               className={`rounded-xl p-3 text-left transition-colors border ${
-                isShown ? 'bg-gray-800 border-gray-600' : 'bg-gray-900/60 border-gray-800 opacity-60'
+                isShown ? 'bg-raised border-line-hover' : 'bg-surface/60 border-line opacity-60'
               }`}
             >
               {/* Duration + repeats label */}
               <div className="flex items-center gap-1.5 mb-2">
                 <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: t.color }} />
-                <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider leading-tight">
+                <span className="text-micro font-semibold text-ink-3 uppercase tracking-wider leading-tight">
                   {t.repeats ? `${t.repeats}×` : ''}{t.label}
                 </span>
               </div>
@@ -177,26 +178,26 @@ export default function PowerProgressChart() {
               {/* Current watts */}
               {typeof current === 'number' ? (
                 <p className="text-xl font-bold leading-none" style={{ color: achieved ? '#4ade80' : 'white' }}>
-                  {current}<span className="text-xs font-normal text-gray-500 ml-0.5">W</span>
+                  {current}<span className="text-xs font-normal text-ink-4 ml-0.5">W</span>
                 </p>
               ) : (
-                <p className="text-sm text-gray-600">No data</p>
+                <p className="text-sm text-ink-5">No data</p>
               )}
 
               {/* Target + progress */}
-              <p className="text-[10px] text-gray-500 mt-1">
+              <p className="text-micro text-ink-4 mt-1">
                 Target: {t.target_watts}W
-                {t.source === 'ftp' && <span className="ml-1 text-gray-700">est.</span>}
+                {t.source === 'ftp' && <span className="ml-1 text-ink-5">est.</span>}
               </p>
               {typeof current === 'number' && (
                 <div className="mt-1.5">
-                  <div className="h-1 rounded-full bg-gray-700 overflow-hidden">
+                  <div className="h-1 rounded-full bg-hover overflow-hidden">
                     <div
                       className="h-full rounded-full transition-all"
                       style={{ width: `${Math.min(pct ?? 0, 100)}%`, background: achieved ? '#4ade80' : t.color }}
                     />
                   </div>
-                  <p className={`text-[10px] mt-0.5 font-medium ${achieved ? 'text-green-400' : 'text-gray-500'}`}>
+                  <p className={`text-micro mt-0.5 font-medium ${achieved ? 'text-green-400' : 'text-ink-4'}`}>
                     {achieved ? `+${current - t.target_watts}W ✓` : `${t.target_watts - current}W to go`}
                   </p>
                 </div>
@@ -208,8 +209,8 @@ export default function PowerProgressChart() {
 
       {/* Line chart */}
       {chartData.length > 0 && (
-        <div className="bg-gray-800/60 rounded-xl p-3">
-          <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-3">Best power by week · last 26 weeks</p>
+        <div className="bg-raised/60 rounded-xl p-3">
+          <p className="text-micro text-ink-4 uppercase tracking-wider mb-3">Best power by week · last 26 weeks</p>
           <EnlargeableChart title="Best power by week · last 26 weeks" controls={
             <div className="flex items-center gap-1 flex-wrap justify-end">
               {data.targets.map(t => {
@@ -218,8 +219,8 @@ export default function PowerProgressChart() {
                   <button
                     key={t.key}
                     onClick={() => toggleDuration(t.key)}
-                    className={`flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium border transition-colors ${
-                      isShown ? 'bg-gray-800 border-gray-600 text-gray-200' : 'bg-gray-900/60 border-gray-800 text-gray-500'
+                    className={`flex items-center gap-1 px-2 py-1 rounded-md text-micro font-medium border transition-colors ${
+                      isShown ? 'bg-raised border-line-hover text-ink' : 'bg-surface/60 border-line text-ink-4'
                     }`}
                   >
                     <span className="w-2 h-2 rounded-full" style={{ background: t.color }} />
@@ -232,22 +233,22 @@ export default function PowerProgressChart() {
             {(fs) => (
             <ResponsiveContainer width="100%" height={fs ? '100%' : 200}>
             <LineChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke={CHART.grid} vertical={false} />
               <XAxis
                 dataKey="week"
-                tick={{ fill: '#6b7280', fontSize: 10 }}
+                tick={{ fill: CHART.axisText, fontSize: 10 }}
                 axisLine={false}
                 tickLine={false}
                 interval="preserveStartEnd"
               />
               <YAxis
                 domain={[yMin, yMax]}
-                tick={{ fill: '#6b7280', fontSize: 10 }}
+                tick={{ fill: CHART.axisText, fontSize: 10 }}
                 axisLine={false}
                 tickLine={false}
                 width={32}
               />
-              <Tooltip content={<ChartTooltip />} cursor={{ stroke: '#374151', strokeWidth: 1 }} />
+              <Tooltip content={<ChartTooltip />} cursor={{ stroke: CHART.axis, strokeWidth: 1 }} />
 
               {data.targets.filter(t => visibleKeys.has(t.key)).map(t => (
                 <ReferenceLine
@@ -282,8 +283,8 @@ export default function PowerProgressChart() {
             {data.targets.filter(t => visibleKeys.has(t.key)).map(t => (
               <div key={t.key} className="flex items-center gap-1.5">
                 <span className="w-3 h-0.5 inline-block rounded" style={{ background: t.color }} />
-                <span className="text-[10px] text-gray-400">{t.repeats ? `${t.repeats}×` : ''}{t.label}</span>
-                <span className="text-[10px] text-gray-600">— — {t.target_watts}W</span>
+                <span className="text-micro text-ink-3">{t.repeats ? `${t.repeats}×` : ''}{t.label}</span>
+                <span className="text-micro text-ink-5">— — {t.target_watts}W</span>
               </div>
             ))}
           </div>

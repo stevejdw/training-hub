@@ -9,6 +9,7 @@ import { sportLabel, sportColor } from '@/lib/sport-types';
 import { useCachedFetch } from '@/lib/use-cached-fetch';
 import TssRollingChart from './training/TssRollingChart';
 import { calendarDaysFromToday } from '@/lib/calendar-days';
+import { CHART } from '@/lib/chart-theme';
 
 const ActivityMap = dynamic(() => import('./ActivityMap'), { ssr: false });
 
@@ -99,7 +100,7 @@ function LazyMap({ polyline }: { polyline: string }) {
   }, []);
 
   return (
-    <div ref={ref} className="w-full h-44 rounded-xl overflow-hidden bg-gray-800/60">
+    <div ref={ref} className="w-full h-44 rounded-xl overflow-hidden bg-raised/60">
       {visible && <ActivityMap polyline={polyline} className="w-full h-44" thumbnail />}
     </div>
   );
@@ -173,7 +174,7 @@ function HomeProgressWidget({ wtd, mtd, ytd }: {
 
   return (
     <div
-      className="bg-gray-800/60 rounded-2xl border border-transparent hover:border-gray-700 hover:bg-gray-800/80 transition-colors overflow-hidden cursor-pointer"
+      className="bg-raised/60 rounded-2xl border border-transparent hover:border-line-strong hover:bg-raised/80 transition-colors overflow-hidden cursor-pointer"
       onClick={() => router.push('/training?tab=progress')}
       onTouchStart={e => { swipeRef.current = e.touches[0].clientX; }}
       onTouchEnd={e => {
@@ -188,7 +189,7 @@ function HomeProgressWidget({ wtd, mtd, ytd }: {
       <div className="px-3 pt-2.5 pb-0">
         {/* Header */}
         <div className="flex items-center justify-between mb-2">
-          <p className="text-[9px] font-semibold text-gray-500 uppercase tracking-wider">
+          <p className="text-micro font-semibold text-ink-4 uppercase tracking-wider">
             Progress →
           </p>
           <div className="flex gap-0.5">
@@ -196,8 +197,8 @@ function HomeProgressWidget({ wtd, mtd, ytd }: {
               <button
                 key={p.key}
                 onClick={e => handlePeriodClick(e, p.key)}
-                className={`px-2 py-0.5 rounded text-[9px] font-semibold transition-colors ${
-                  period === p.key ? 'bg-orange-500 text-white' : 'text-gray-500 hover:text-gray-300'
+                className={`px-2 py-0.5 rounded text-micro font-semibold transition-colors ${
+                  period === p.key ? 'bg-accent text-ink' : 'text-ink-4 hover:text-ink-2'
                 }`}
               >
                 {p.label}
@@ -215,15 +216,15 @@ function HomeProgressWidget({ wtd, mtd, ytd }: {
             { label: 'Activities', value: stats ? String(stats.rides)   : '—' },
           ].map(({ label, value }) => (
             <div key={label}>
-              <p className="text-[8px] text-gray-500">{label}</p>
-              <p className="text-[11px] font-bold text-white leading-tight">{value}</p>
+              <p className="text-micro text-ink-4">{label}</p>
+              <p className="text-mini font-bold text-ink leading-tight">{value}</p>
             </div>
           ))}
         </div>
 
         {/* Prior period reference */}
         {priorTotal > 0 && !chartLoading && (
-          <p className="text-[8px] text-gray-600 mb-1">
+          <p className="text-micro text-ink-5 mb-1">
             {PRIOR_LABEL[period]} · {fmtKm(priorTotal)}
           </p>
         )}
@@ -232,12 +233,12 @@ function HomeProgressWidget({ wtd, mtd, ytd }: {
       {/* Mini line chart — current (orange) vs prior (gray) */}
       <div className="px-1 pb-2">
         {chartLoading ? (
-          <div className="h-16 mx-2 animate-pulse bg-gray-700/30 rounded" />
+          <div className="h-16 mx-2 animate-pulse bg-hover/30 rounded" />
         ) : (
           <ResponsiveContainer width="100%" height={72}>
             <LineChart data={chartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
-              <Line type="monotone" dataKey="prior"   stroke="#6b7280" strokeWidth={1.5} strokeDasharray="4 2" dot={false} connectNulls />
-              <Line type="monotone" dataKey="current" stroke="#f97316" strokeWidth={2}   dot={false} connectNulls={false} />
+              <Line type="monotone" dataKey="prior"   stroke={CHART.axisText} strokeWidth={1.5} strokeDasharray="4 2" dot={false} connectNulls />
+              <Line type="monotone" dataKey="current" stroke={CHART.power} strokeWidth={2}   dot={false} connectNulls={false} />
             </LineChart>
           </ResponsiveContainer>
         )}
@@ -282,34 +283,34 @@ function CoachingTip() {
   }, []);
 
   return (
-    <div className="bg-gray-800/60 rounded-xl p-3 border border-orange-500/20">
+    <div className="bg-raised/60 rounded-xl p-3 border border-accent/20">
       <button
         type="button"
         onClick={() => setExpanded(v => !v)}
         className="w-full text-left flex items-start gap-2.5"
       >
-        <div className="w-6 h-6 rounded-full bg-orange-500 flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0 mt-0.5">C</div>
+        <div className="w-6 h-6 rounded-full bg-accent flex items-center justify-center text-ink text-micro font-bold flex-shrink-0 mt-0.5">C</div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-2 mb-1">
-            <span className="text-[10px] font-semibold text-orange-400 uppercase tracking-wider">Coaching Insight</span>
-            <svg className={`w-3 h-3 text-gray-500 transition-transform ${expanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <span className="text-micro font-semibold text-accent-hi uppercase tracking-wider">Coaching Insight</span>
+            <svg className={`w-3 h-3 text-ink-4 transition-transform ${expanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
             </svg>
           </div>
           {loading ? (
             <div className="space-y-1.5">
-              <div className="h-3 bg-gray-700 rounded animate-pulse w-full" />
-              <div className="h-3 bg-gray-700 rounded animate-pulse w-4/5" />
+              <div className="h-3 bg-hover rounded animate-pulse w-full" />
+              <div className="h-3 bg-hover rounded animate-pulse w-4/5" />
             </div>
           ) : (
-            <p className={`text-xs text-gray-300 leading-snug ${expanded ? '' : 'line-clamp-2'}`}>{tip}</p>
+            <p className={`text-xs text-ink-2 leading-snug ${expanded ? '' : 'line-clamp-2'}`}>{tip}</p>
           )}
         </div>
       </button>
       {expanded && !loading && (
         <Link
           href="/chat"
-          className="mt-3 ml-8 inline-flex items-center gap-1.5 text-xs font-medium text-orange-400 hover:text-orange-300 transition-colors"
+          className="mt-3 ml-8 inline-flex items-center gap-1.5 text-xs font-medium text-accent-hi hover:text-accent-hi transition-colors"
         >
           Open Coach
           <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -327,32 +328,32 @@ function FitnessSummary({ fitness }: { fitness?: { ctl: number; atl: number; tsb
 
   return (
     <Link href="/performance?tab=fitness" className="block group">
-      <div className="bg-gray-800/60 rounded-2xl border border-transparent hover:border-gray-700 hover:bg-gray-800/80 transition-colors h-full px-3 pt-2.5 pb-3">
-        <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider group-hover:text-orange-400 transition-colors mb-2">
+      <div className="bg-raised/60 rounded-2xl border border-transparent hover:border-line-strong hover:bg-raised/80 transition-colors h-full px-3 pt-2.5 pb-3">
+        <p className="text-micro font-semibold text-ink-4 uppercase tracking-wider group-hover:text-accent-hi transition-colors mb-2">
           Fitness →
         </p>
         {fitness ? (
           <div className="grid grid-cols-3 gap-2">
             <div className="text-center">
-              <p className="text-[9px] text-gray-500 uppercase tracking-wider mb-0.5">CTL</p>
+              <p className="text-micro text-ink-4 uppercase tracking-wider mb-0.5">CTL</p>
               <p className="text-lg font-bold text-blue-400 leading-none">{fitness.ctl}</p>
-              <p className="text-[9px] text-gray-500 mt-0.5">Fitness</p>
+              <p className="text-micro text-ink-4 mt-0.5">Fitness</p>
             </div>
             <div className="text-center">
-              <p className="text-[9px] text-gray-500 uppercase tracking-wider mb-0.5">ATL</p>
+              <p className="text-micro text-ink-4 uppercase tracking-wider mb-0.5">ATL</p>
               <p className="text-lg font-bold text-purple-400 leading-none">{fitness.atl}</p>
-              <p className="text-[9px] text-gray-500 mt-0.5">Fatigue</p>
+              <p className="text-micro text-ink-4 mt-0.5">Fatigue</p>
             </div>
             <div className="text-center">
-              <p className="text-[9px] text-gray-500 uppercase tracking-wider mb-0.5">TSB</p>
+              <p className="text-micro text-ink-4 uppercase tracking-wider mb-0.5">TSB</p>
               <p className="text-lg font-bold leading-none" style={{ color: tsbColor(fitness.tsb) }}>
                 {fitness.tsb > 0 ? '+' : ''}{fitness.tsb}
               </p>
-              <p className="text-[9px] mt-0.5" style={{ color: tsbColor(fitness.tsb) }}>{tsbLabel(fitness.tsb)}</p>
+              <p className="text-micro mt-0.5" style={{ color: tsbColor(fitness.tsb) }}>{tsbLabel(fitness.tsb)}</p>
             </div>
           </div>
         ) : (
-          <div className="h-12 bg-gray-700/40 rounded animate-pulse" />
+          <div className="h-12 bg-hover/40 rounded animate-pulse" />
         )}
       </div>
     </Link>
@@ -400,10 +401,10 @@ export default function FeedPage() {
     return (
       <div className="h-full overflow-y-auto scroll-touch">
         <div className="max-w-2xl md:max-w-5xl xl:max-w-7xl mx-auto px-4 py-4 md:px-8 md:py-8 space-y-4">
-          <div className="h-28 bg-gray-800 rounded-2xl animate-pulse" />
-          <div className="h-16 bg-gray-800 rounded-2xl animate-pulse" />
-          <div className="h-20 bg-gray-800 rounded-2xl animate-pulse" />
-          <div className="h-24 bg-gray-800 rounded-2xl animate-pulse" />
+          <div className="h-28 bg-raised rounded-2xl animate-pulse" />
+          <div className="h-16 bg-raised rounded-2xl animate-pulse" />
+          <div className="h-20 bg-raised rounded-2xl animate-pulse" />
+          <div className="h-24 bg-raised rounded-2xl animate-pulse" />
         </div>
       </div>
     );
@@ -443,22 +444,22 @@ export default function FeedPage() {
               {nextSession && (
                 <Link
                   href="/training?tab=plan"
-                  className="flex-1 min-w-0 rounded-2xl p-3 border transition-colors group bg-gray-800/70 border-gray-700/60 hover:border-gray-600"
+                  className="flex-1 min-w-0 rounded-2xl p-3 border transition-colors group bg-raised/70 border-line-strong/60 hover:border-line-hover"
                 >
-                  <p className="text-[9px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Next Session</p>
+                  <p className="text-micro font-semibold text-ink-4 uppercase tracking-wider mb-1.5">Next Session</p>
                   <div className="flex items-center gap-1.5 mb-1">
                     <span
-                      className="px-1.5 py-0.5 rounded text-[9px] font-semibold flex-shrink-0 capitalize"
+                      className="px-1.5 py-0.5 rounded text-micro font-semibold flex-shrink-0 capitalize"
                       style={{ background: sessionColor + '22', color: sessionColor }}
                     >
                       {nextSession.type}
                     </span>
-                    <span className="text-[10px] text-gray-500">{sessionDateLabel(nextSession.date)}</span>
+                    <span className="text-micro text-ink-4">{sessionDateLabel(nextSession.date)}</span>
                   </div>
-                  <p className="text-xs font-bold text-white group-hover:text-orange-300 transition-colors leading-snug line-clamp-2">
+                  <p className="text-xs font-bold text-ink group-hover:text-accent-hi transition-colors leading-snug line-clamp-2">
                     {nextSession.title}
                   </p>
-                  <div className="flex items-center gap-2 mt-1 text-[10px] text-gray-500">
+                  <div className="flex items-center gap-2 mt-1 text-micro text-ink-4">
                     {nextSession.duration_min && <span>{nextSession.duration_min} min</span>}
                     {nextSession.tss_target && <span>{nextSession.tss_target} TSS</span>}
                   </div>
@@ -468,14 +469,14 @@ export default function FeedPage() {
               {nextEvent && (
                 <Link
                   href={`/events/${nextEvent.id}`}
-                  className={`rounded-2xl p-2.5 bg-orange-500/10 border border-orange-500/25 hover:border-orange-500/60 hover:bg-orange-500/15 transition-colors flex flex-col items-center justify-center text-center gap-0.5 ${
+                  className={`rounded-2xl p-2.5 bg-accent/10 border border-accent/25 hover:border-accent/60 hover:bg-accent/15 transition-colors flex flex-col items-center justify-center text-center gap-0.5 ${
                     nextSession ? 'flex-shrink-0 w-20' : 'flex-1'
                   }`}
                 >
-                  <p className="text-[8px] font-semibold text-orange-400 uppercase tracking-wider">Event</p>
-                  <p className="text-xl font-black text-orange-400 leading-none">{nextEvent.daysAway}</p>
-                  <p className="text-[8px] text-orange-400/70">days</p>
-                  <p className="text-[9px] text-gray-400 font-medium mt-0.5 leading-tight line-clamp-2">{nextEvent.name}</p>
+                  <p className="text-micro font-semibold text-accent-hi uppercase tracking-wider">Event</p>
+                  <p className="text-xl font-black text-accent-hi leading-none">{nextEvent.daysAway}</p>
+                  <p className="text-micro text-accent-hi/70">days</p>
+                  <p className="text-micro text-ink-3 font-medium mt-0.5 leading-tight line-clamp-2">{nextEvent.name}</p>
                 </Link>
               )}
             </div>
@@ -500,27 +501,27 @@ export default function FeedPage() {
           {nextSession && (
             <Link
               href="/training?tab=plan"
-              className="rounded-2xl p-4 border transition-colors group bg-gray-800/70 border-gray-700/60 hover:border-gray-600"
+              className="rounded-2xl p-4 border transition-colors group bg-raised/70 border-line-strong/60 hover:border-line-hover"
             >
-              <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-2">Next Session</p>
+              <p className="text-micro font-semibold text-ink-4 uppercase tracking-wider mb-2">Next Session</p>
               <div className="flex items-center gap-2 mb-1.5">
                 <span
-                  className="px-2 py-0.5 rounded text-[10px] font-semibold flex-shrink-0 capitalize"
+                  className="px-2 py-0.5 rounded text-micro font-semibold flex-shrink-0 capitalize"
                   style={{ background: sessionColor + '22', color: sessionColor }}
                 >
                   {nextSession.type}
                 </span>
-                <span className="text-[11px] text-gray-500">{sessionDateLabel(nextSession.date)}</span>
+                <span className="text-mini text-ink-4">{sessionDateLabel(nextSession.date)}</span>
               </div>
-              <p className="text-sm font-bold text-white group-hover:text-orange-300 transition-colors leading-snug">
+              <p className="text-sm font-bold text-ink group-hover:text-accent-hi transition-colors leading-snug">
                 {nextSession.title}
               </p>
-              <div className="flex items-center gap-3 mt-1.5 text-[11px] text-gray-500">
+              <div className="flex items-center gap-3 mt-1.5 text-mini text-ink-4">
                 {nextSession.duration_min && <span>{nextSession.duration_min} min</span>}
                 {nextSession.tss_target && <span>{nextSession.tss_target} TSS</span>}
               </div>
               {nextSession.description && (
-                <p className="text-xs text-gray-500 mt-1.5 line-clamp-2 leading-relaxed">
+                <p className="text-xs text-ink-4 mt-1.5 line-clamp-2 leading-relaxed">
                   {nextSession.description}
                 </p>
               )}
@@ -534,17 +535,17 @@ export default function FeedPage() {
           {nextEvent ? (
             <Link
               href={`/events/${nextEvent.id}`}
-              className="rounded-2xl p-4 bg-orange-500/10 border border-orange-500/25 hover:border-orange-500/60 hover:bg-orange-500/15 transition-colors flex flex-col items-center justify-center text-center gap-0.5"
+              className="rounded-2xl p-4 bg-accent/10 border border-accent/25 hover:border-accent/60 hover:bg-accent/15 transition-colors flex flex-col items-center justify-center text-center gap-0.5"
             >
-              <p className="text-[9px] font-semibold text-orange-400 uppercase tracking-wider">Event</p>
-              <p className="text-2xl font-black text-orange-400 leading-none">{nextEvent.daysAway}</p>
-              <p className="text-[9px] text-orange-400/70">days</p>
-              <p className="text-[10px] text-gray-400 font-medium mt-1 leading-tight line-clamp-2">{nextEvent.name}</p>
+              <p className="text-micro font-semibold text-accent-hi uppercase tracking-wider">Event</p>
+              <p className="text-2xl font-black text-accent-hi leading-none">{nextEvent.daysAway}</p>
+              <p className="text-micro text-accent-hi/70">days</p>
+              <p className="text-micro text-ink-3 font-medium mt-1 leading-tight line-clamp-2">{nextEvent.name}</p>
             </Link>
           ) : (
-            <div className="rounded-2xl p-4 bg-gray-800/40 border border-gray-800 flex flex-col items-center justify-center text-center">
-              <p className="text-[9px] font-semibold text-gray-500 uppercase tracking-wider">Event</p>
-              <p className="text-sm text-gray-600 mt-2">No upcoming events</p>
+            <div className="rounded-2xl p-4 bg-raised/40 border border-line flex flex-col items-center justify-center text-center">
+              <p className="text-micro font-semibold text-ink-4 uppercase tracking-wider">Event</p>
+              <p className="text-sm text-ink-5 mt-2">No upcoming events</p>
             </div>
           )}
         </div>
@@ -553,10 +554,10 @@ export default function FeedPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <FitnessSummary fitness={data?.fitness} />
 
-          <div className="bg-gray-800/60 rounded-2xl border border-gray-700/40 overflow-hidden h-full">
+          <div className="bg-raised/60 rounded-2xl border border-line-strong/40 overflow-hidden h-full">
             <div className="px-3 pt-2.5 pb-1">
               <Link href="/training?tab=progress#weekly-tss" className="inline-flex items-center group">
-                <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider group-hover:text-orange-400 transition-colors">Weekly TSS →</p>
+                <p className="text-micro font-semibold text-ink-4 uppercase tracking-wider group-hover:text-accent-hi transition-colors">Weekly TSS →</p>
               </Link>
             </div>
             <div className="px-1 pb-1">
@@ -567,15 +568,15 @@ export default function FeedPage() {
 
         {/* Power PRs */}
         {powerHighlights.length > 0 && (
-          <div className="bg-gray-800/60 rounded-2xl p-4">
+          <div className="bg-raised/60 rounded-2xl p-4">
             <div className="flex items-center gap-2 mb-3">
               <svg className="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
                 <path d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" />
               </svg>
-              <span className="text-xs font-semibold text-gray-300 uppercase tracking-wider">
+              <span className="text-xs font-semibold text-ink-2 uppercase tracking-wider">
                 Last Ride Power
                 {newPRs.length > 0 && (
-                  <span className="ml-2 px-1.5 py-0.5 bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 rounded text-[10px]">
+                  <span className="ml-2 px-1.5 py-0.5 bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 rounded text-micro">
                     {newPRs.length} NEW PR{newPRs.length > 1 ? 's' : ''}
                   </span>
                 )}
@@ -585,14 +586,14 @@ export default function FeedPage() {
               {powerHighlights.map(p => (
                 <div
                   key={p.seconds}
-                  className={`rounded-xl p-3 ${p.isNew ? 'bg-yellow-500/10 border border-yellow-500/30' : 'bg-gray-700/40'}`}
+                  className={`rounded-xl p-3 ${p.isNew ? 'bg-yellow-500/10 border border-yellow-500/30' : 'bg-hover/40'}`}
                 >
-                  <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-0.5">{p.label}</p>
-                  <p className={`text-lg font-bold ${p.isNew ? 'text-yellow-300' : 'text-white'}`}>{p.watts}W</p>
+                  <p className="text-micro text-ink-4 uppercase tracking-wider mb-0.5">{p.label}</p>
+                  <p className={`text-lg font-bold ${p.isNew ? 'text-yellow-300' : 'text-ink'}`}>{p.watts}W</p>
                   {p.isNew ? (
-                    <p className="text-[10px] text-yellow-400 font-semibold">🏆 NEW PR{p.prevBest ? ` (+${p.watts - p.prevBest}W)` : ''}</p>
+                    <p className="text-micro text-yellow-400 font-semibold">🏆 NEW PR{p.prevBest ? ` (+${p.watts - p.prevBest}W)` : ''}</p>
                   ) : p.prevBest ? (
-                    <p className="text-[10px] text-gray-500">Best: {p.prevBest}W</p>
+                    <p className="text-micro text-ink-4">Best: {p.prevBest}W</p>
                   ) : null}
                 </div>
               ))}
@@ -600,7 +601,7 @@ export default function FeedPage() {
             {data?.lastCyclingRideId && (
               <Link
                 href={`/activities/${data.lastCyclingRideId}`}
-                className="mt-3 inline-flex items-center gap-1.5 text-xs text-gray-500 hover:text-orange-400 transition-colors"
+                className="mt-3 inline-flex items-center gap-1.5 text-xs text-ink-4 hover:text-accent-hi transition-colors"
               >
                 View full ride analysis →
               </Link>
@@ -611,8 +612,8 @@ export default function FeedPage() {
         {/* Recent rides feed */}
         <div>
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Recent Rides</h2>
-            <Link href="/activities" className="text-xs text-orange-400 hover:text-orange-300 transition-colors">
+            <h2 className="text-xs font-semibold text-ink-3 uppercase tracking-wider">Recent Rides</h2>
+            <Link href="/activities" className="text-xs text-accent-hi hover:text-accent-hi transition-colors">
               All activities →
             </Link>
           </div>
@@ -627,49 +628,49 @@ export default function FeedPage() {
                 <Link
                   key={ride.id}
                   href={`/activities/${ride.id}`}
-                  className="block bg-gray-800/60 rounded-2xl overflow-hidden border border-gray-700/40 hover:border-gray-600/60 transition-colors group"
+                  className="block bg-raised/60 rounded-2xl overflow-hidden border border-line-strong/40 hover:border-line-hover/60 transition-colors group"
                 >
                   <div className="px-4 pt-4 pb-3">
                     <div className="flex items-start justify-between gap-2 mb-2">
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 mb-1">
                           <span
-                            className="px-2 py-0.5 rounded text-[10px] font-semibold flex-shrink-0"
+                            className="px-2 py-0.5 rounded text-micro font-semibold flex-shrink-0"
                             style={{ background: color + '22', color }}
                           >
                             {sportLabel(ride.sport_type)}{ride.trainer ? ' · Indoor' : ''}
                           </span>
-                          <span className="text-[11px] text-gray-500 truncate">
+                          <span className="text-mini text-ink-4 truncate">
                             {relDate(ride.start_date)} · {timeOfDay(ride.start_date)}
                           </span>
                         </div>
-                        <h3 className="text-base font-bold text-white group-hover:text-orange-300 transition-colors truncate leading-tight">
+                        <h3 className="text-base font-bold text-ink group-hover:text-accent-hi transition-colors truncate leading-tight">
                           {ride.name}
                         </h3>
                       </div>
-                      <svg className="w-4 h-4 text-gray-600 group-hover:text-orange-400 transition-colors flex-shrink-0 mt-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <svg className="w-4 h-4 text-ink-5 group-hover:text-accent-hi transition-colors flex-shrink-0 mt-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                       </svg>
                     </div>
 
                     <div className="flex items-center gap-3 flex-wrap text-sm">
                       {ride.distance > 0 && (
-                        <span className="font-semibold text-white">
-                          {(ride.distance / 1000).toFixed(1)}<span className="text-xs text-gray-500 ml-0.5">km</span>
+                        <span className="font-semibold text-ink">
+                          {(ride.distance / 1000).toFixed(1)}<span className="text-xs text-ink-4 ml-0.5">km</span>
                         </span>
                       )}
                       {speedKph && (
-                        <span className="text-gray-400">{speedKph}<span className="text-xs ml-0.5">km/h</span></span>
+                        <span className="text-ink-3">{speedKph}<span className="text-xs ml-0.5">km/h</span></span>
                       )}
-                      <span className="text-gray-400">{fmt(ride.moving_time)}</span>
+                      <span className="text-ink-3">{fmt(ride.moving_time)}</span>
                       {ride.total_elevation_gain > 0 && (
-                        <span className="text-gray-400">{Math.round(ride.total_elevation_gain)}<span className="text-xs ml-0.5">m</span></span>
+                        <span className="text-ink-3">{Math.round(ride.total_elevation_gain)}<span className="text-xs ml-0.5">m</span></span>
                       )}
                       {np && (
-                        <span className="text-gray-300">{Math.round(np)}<span className="text-xs text-gray-500 ml-0.5">W</span></span>
+                        <span className="text-ink-2">{Math.round(np)}<span className="text-xs text-ink-4 ml-0.5">W</span></span>
                       )}
                       {ride.tss && (
-                        <span className="text-orange-400 text-xs font-medium">{Math.round(ride.tss)} TSS</span>
+                        <span className="text-accent-hi text-xs font-medium">{Math.round(ride.tss)} TSS</span>
                       )}
                       {ride.average_heartrate && (
                         <span className="text-red-400 text-xs">♥ {Math.round(ride.average_heartrate)}</span>
@@ -687,7 +688,7 @@ export default function FeedPage() {
             })}
 
             {recentRides.length === 0 && (
-              <div className="text-center py-10 text-gray-500 text-sm">No recent rides found.</div>
+              <div className="text-center py-10 text-ink-4 text-sm">No recent rides found.</div>
             )}
           </div>
         </div>

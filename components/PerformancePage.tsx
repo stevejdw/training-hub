@@ -16,8 +16,8 @@ type Tab = 'fitness' | 'power';
 function SectionHeading({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
     <div className="flex items-baseline gap-2 mb-3">
-      <h2 className="text-sm font-semibold text-white">{title}</h2>
-      {subtitle && <span className="text-[11px] text-gray-500">{subtitle}</span>}
+      <h2 className="text-sm font-semibold text-ink">{title}</h2>
+      {subtitle && <span className="text-mini text-ink-4">{subtitle}</span>}
     </div>
   );
 }
@@ -49,15 +49,15 @@ export default function PerformancePage() {
       </div>
 
       {/* Desktop: left sidebar */}
-      <nav className="hidden md:flex flex-col w-44 border-r border-gray-800 py-6 px-3 flex-shrink-0 gap-1">
+      <nav className="hidden md:flex flex-col w-44 border-r border-line py-6 px-3 flex-shrink-0 gap-1">
         {tabs.map(({ key, label }) => (
           <button
             key={key}
             onClick={() => setTab(key)}
             className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
               tab === key
-                ? 'bg-orange-500 text-white'
-                : 'text-gray-400 hover:text-white hover:bg-gray-800'
+                ? 'bg-accent text-ink'
+                : 'text-ink-3 hover:text-ink hover:bg-raised'
             }`}
           >
             {label}
@@ -74,13 +74,13 @@ export default function PerformancePage() {
                 <SectionHeading title="Fitness Performance" subtitle="ATL · CTL · TSB" />
                 <FitnessTab />
               </section>
-              <section className="pt-2 border-t border-gray-800/60">
+              <section className="pt-2 border-t border-line/60">
                 <SectionHeading title="Aerobic Efficiency" subtitle="Power vs HR drift on steady rides" />
                 <LazySection>
                   <AerobicEfficiencyTab />
                 </LazySection>
               </section>
-              <section id="readiness" className="pt-2 border-t border-gray-800/60">
+              <section id="readiness" className="pt-2 border-t border-line/60">
                 <SectionHeading title="Readiness" subtitle="HRV vs Normal Zone" />
                 <LazySection>
                   <ReadinessTab />
@@ -95,13 +95,13 @@ export default function PerformancePage() {
                 <SectionHeading title="Key Intervals" />
                 <KeyIntervalsTab />
               </section>
-              <section className="pt-2 border-t border-gray-800/60">
+              <section className="pt-2 border-t border-line/60">
                 <SectionHeading title="Power Curve" subtitle="Best power by duration" />
                 <LazySection>
                   <PowerCurveWidget />
                 </LazySection>
               </section>
-              <section className="pt-2 border-t border-gray-800/60">
+              <section className="pt-2 border-t border-line/60">
                 <SectionHeading title="Best Efforts" />
                 <LazySection>
                   <DashboardBestPower />

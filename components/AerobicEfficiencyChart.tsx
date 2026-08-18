@@ -61,10 +61,10 @@ function CustomTooltip({ active, payload, label }: any) {
   const p = payload[0]?.payload;
   if (!p) return null;
   return (
-    <div className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-xs shadow-lg space-y-1">
-      <p className="text-gray-400 font-medium">{label}</p>
+    <div className="bg-surface border border-line-strong rounded-lg px-3 py-2 text-xs shadow-lg space-y-1">
+      <p className="text-ink-3 font-medium">{label}</p>
       {p.watts != null && (
-        <p className="text-orange-400">
+        <p className="text-accent-hi">
           Power: <span className="font-bold">{p.watts} W</span>
         </p>
       )}
@@ -74,7 +74,7 @@ function CustomTooltip({ active, payload, label }: any) {
         </p>
       )}
       {p.ef != null && (
-        <p className="text-white">
+        <p className="text-ink">
           EF: <span className="font-bold">{p.ef.toFixed(3)}</span>
         </p>
       )}
@@ -169,13 +169,13 @@ export default function AerobicEfficiencyChart({ activityId, showCompare }: { ac
 
 
   if (loading) {
-    return <div className="h-64 bg-gray-800 rounded-xl animate-pulse" />;
+    return <div className="h-64 bg-raised rounded-xl animate-pulse" />;
   }
 
   if (error || !data) {
     return (
-      <div className="bg-gray-800/50 border border-gray-700 border-dashed rounded-xl p-6 text-center">
-        <p className="text-gray-500 text-sm">
+      <div className="bg-raised/50 border border-line-strong border-dashed rounded-xl p-6 text-center">
+        <p className="text-ink-4 text-sm">
           {error === 'Activity not found or missing streams'
             ? 'No power & HR stream data for this activity'
             : 'Unable to load aerobic efficiency data'}
@@ -197,13 +197,13 @@ export default function AerobicEfficiencyChart({ activityId, showCompare }: { ac
   ];
 
   return (
-    <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4 space-y-4">
+    <div className="bg-surface border border-line rounded-2xl p-4 space-y-4">
       {/* Header */}
       <div>
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+        <p className="text-xs font-semibold text-ink-4 uppercase tracking-wider">
           Efficiency Graph
         </p>
-        <p className="text-[11px] text-gray-600 mt-1">
+        <p className="text-mini text-ink-5 mt-1">
           First half vs second half comparison — measures aerobic decoupling (cardiac drift)
         </p>
       </div>
@@ -217,45 +217,45 @@ export default function AerobicEfficiencyChart({ activityId, showCompare }: { ac
           { label: 'Avg HR', value: `${data.avg_hr} bpm` },
           { label: 'EF', value: ef },
         ].map(s => (
-          <div key={s.label} className="bg-gray-800/60 rounded-xl p-2.5 text-center">
-            <p className="text-[10px] text-gray-500 uppercase tracking-wider">{s.label}</p>
-            <p className="text-base font-bold text-white mt-0.5">{s.value}</p>
+          <div key={s.label} className="bg-raised/60 rounded-xl p-2.5 text-center">
+            <p className="text-micro text-ink-4 uppercase tracking-wider">{s.label}</p>
+            <p className="text-base font-bold text-ink mt-0.5">{s.value}</p>
           </div>
         ))}
       </div>
 
       {/* Half-split comparison */}
       <div>
-        <p className="text-[11px] text-gray-500 uppercase tracking-wider mb-2">First vs Second Half</p>
+        <p className="text-mini text-ink-4 uppercase tracking-wider mb-2">First vs Second Half</p>
         <div className="grid grid-cols-2 gap-3">
           {[
             { label: 'First half', watts: data.pw_h1, hr: data.hr_h1, ef: data.ef_h1 },
             { label: 'Second half', watts: data.pw_h2, hr: data.hr_h2, ef: data.ef_h2 },
           ].map(h => (
-            <div key={h.label} className="bg-gray-800/60 rounded-xl p-3">
-              <p className="text-[10px] text-gray-500 mb-2">{h.label}</p>
+            <div key={h.label} className="bg-raised/60 rounded-xl p-3">
+              <p className="text-micro text-ink-4 mb-2">{h.label}</p>
               <div className="space-y-1">
                 <div className="flex justify-between text-xs">
-                  <span className="text-gray-500">Avg watts</span>
-                  <span className="text-orange-400 font-medium">{h.watts}W</span>
+                  <span className="text-ink-4">Avg watts</span>
+                  <span className="text-accent-hi font-medium">{h.watts}W</span>
                 </div>
                 <div className="flex justify-between text-xs">
-                  <span className="text-gray-500">Avg HR</span>
+                  <span className="text-ink-4">Avg HR</span>
                   <span className="text-blue-400 font-medium">{h.hr} bpm</span>
                 </div>
-                <div className="flex justify-between text-xs pt-1 border-t border-gray-700/50">
-                  <span className="text-gray-500">EF</span>
-                  <span className="text-white font-semibold">{h.ef.toFixed(3)}</span>
+                <div className="flex justify-between text-xs pt-1 border-t border-line-strong/50">
+                  <span className="text-ink-4">EF</span>
+                  <span className="text-ink font-semibold">{h.ef.toFixed(3)}</span>
                 </div>
               </div>
             </div>
           ))}
         </div>
         <div className="mt-3 flex items-center justify-between">
-          <p className="text-xs text-gray-500">Aerobic decoupling</p>
+          <p className="text-xs text-ink-4">Aerobic decoupling</p>
           <p className={`text-sm font-bold ${data.decoupling >= 5 ? 'text-red-400' : data.decoupling >= 3 ? 'text-yellow-400' : 'text-green-400'}`}>
             {data.decoupling >= 0 ? '+' : ''}{data.decoupling.toFixed(1)}%
-            <span className="text-[10px] font-normal text-gray-500 ml-1.5">
+            <span className="text-micro font-normal text-ink-4 ml-1.5">
               {data.decoupling < 3 ? 'Excellent' : data.decoupling < 5 ? 'Acceptable' : 'Drift detected'}
             </span>
           </p>
@@ -265,35 +265,35 @@ export default function AerobicEfficiencyChart({ activityId, showCompare }: { ac
       {/* Efficiency Graph */}
       <div>
         <div className="flex items-center justify-between mb-3">
-          <p className="text-[11px] text-gray-500 uppercase tracking-wider">Efficiency Graph</p>
+          <p className="text-mini text-ink-4 uppercase tracking-wider">Efficiency Graph</p>
           {/* Toggle buttons */}
           <div className="flex items-center gap-1.5">
             <button
               onClick={() => setShowPower(p => !p)}
-              className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors border ${
+              className={`px-2 py-0.5 rounded text-micro font-medium transition-colors border ${
                 showPower
-                  ? 'bg-orange-500/20 text-orange-400 border-orange-500/50'
-                  : 'bg-gray-800 text-gray-600 border-transparent'
+                  ? 'bg-accent/20 text-accent-hi border-accent/50'
+                  : 'bg-raised text-ink-5 border-transparent'
               }`}
             >
               W
             </button>
             <button
               onClick={() => setShowHr(h => !h)}
-              className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors border ${
+              className={`px-2 py-0.5 rounded text-micro font-medium transition-colors border ${
                 showHr
                   ? 'bg-blue-500/20 text-blue-400 border-blue-500/50'
-                  : 'bg-gray-800 text-gray-600 border-transparent'
+                  : 'bg-raised text-ink-5 border-transparent'
               }`}
             >
               ♥
             </button>
             <button
               onClick={() => setShowEf(e => !e)}
-              className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors border ${
+              className={`px-2 py-0.5 rounded text-micro font-medium transition-colors border ${
                 showEf
-                  ? 'bg-white/10 text-white border-white/40'
-                  : 'bg-gray-800 text-gray-600 border-transparent'
+                  ? 'bg-white/10 text-ink border-white/40'
+                  : 'bg-raised text-ink-5 border-transparent'
               }`}
             >
               EF
@@ -302,15 +302,15 @@ export default function AerobicEfficiencyChart({ activityId, showCompare }: { ac
           {/* Compare period selector — only shown in fitness screen */}
           {showCompare && (
             <div className="flex items-center gap-1.5">
-              <span className="text-[10px] text-gray-600">Compare vs:</span>
+              <span className="text-micro text-ink-5">Compare vs:</span>
               {COMPARE_PERIODS.map(p => (
                 <button
                   key={p.key}
                   onClick={() => setComparePeriod(prev => prev === p.key ? null : p.key)}
-                  className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors border ${
+                  className={`px-2 py-0.5 rounded text-micro font-medium transition-colors border ${
                     comparePeriod === p.key
                       ? 'bg-blue-500/20 text-blue-400 border-blue-500/50'
-                      : 'bg-gray-800 text-gray-500 hover:text-gray-300 border-transparent'
+                      : 'bg-raised text-ink-4 hover:text-ink-2 border-transparent'
                   }`}
                 >
                   {p.label}
@@ -320,7 +320,7 @@ export default function AerobicEfficiencyChart({ activityId, showCompare }: { ac
           )}
         </div>
         {chartData.length === 0 ? (
-          <div className="h-48 flex items-center justify-center text-gray-500 text-sm">No stream data</div>
+          <div className="h-48 flex items-center justify-center text-ink-4 text-sm">No stream data</div>
         ) : (
           <>
             <EnlargeableChart
@@ -331,30 +331,30 @@ export default function AerobicEfficiencyChart({ activityId, showCompare }: { ac
                   <div className="flex items-center gap-1.5">
                     <button
                       onClick={() => setShowPower(p => !p)}
-                      className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors border ${
+                      className={`px-2 py-0.5 rounded text-micro font-medium transition-colors border ${
                         showPower
-                          ? 'bg-orange-500/20 text-orange-400 border-orange-500/50'
-                          : 'bg-gray-800 text-gray-600 border-transparent'
+                          ? 'bg-accent/20 text-accent-hi border-accent/50'
+                          : 'bg-raised text-ink-5 border-transparent'
                       }`}
                     >
                       W
                     </button>
                     <button
                       onClick={() => setShowHr(h => !h)}
-                      className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors border ${
+                      className={`px-2 py-0.5 rounded text-micro font-medium transition-colors border ${
                         showHr
                           ? 'bg-blue-500/20 text-blue-400 border-blue-500/50'
-                          : 'bg-gray-800 text-gray-600 border-transparent'
+                          : 'bg-raised text-ink-5 border-transparent'
                       }`}
                     >
                       ♥
                     </button>
                     <button
                       onClick={() => setShowEf(e => !e)}
-                      className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors border ${
+                      className={`px-2 py-0.5 rounded text-micro font-medium transition-colors border ${
                         showEf
-                          ? 'bg-white/10 text-white border-white/40'
-                          : 'bg-gray-800 text-gray-600 border-transparent'
+                          ? 'bg-white/10 text-ink border-white/40'
+                          : 'bg-raised text-ink-5 border-transparent'
                       }`}
                     >
                       EF
@@ -363,15 +363,15 @@ export default function AerobicEfficiencyChart({ activityId, showCompare }: { ac
                   {/* Compare period selector — only shown in fitness screen */}
                   {showCompare && (
                     <div className="flex items-center gap-1.5">
-                      <span className="text-[10px] text-gray-600">Compare vs:</span>
+                      <span className="text-micro text-ink-5">Compare vs:</span>
                       {COMPARE_PERIODS.map(p => (
                         <button
                           key={p.key}
                           onClick={() => setComparePeriod(prev => prev === p.key ? null : p.key)}
-                          className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors border ${
+                          className={`px-2 py-0.5 rounded text-micro font-medium transition-colors border ${
                             comparePeriod === p.key
                               ? 'bg-blue-500/20 text-blue-400 border-blue-500/50'
-                              : 'bg-gray-800 text-gray-500 hover:text-gray-300 border-transparent'
+                              : 'bg-raised text-ink-4 hover:text-ink-2 border-transparent'
                           }`}
                         >
                           {p.label}
@@ -460,7 +460,7 @@ export default function AerobicEfficiencyChart({ activityId, showCompare }: { ac
                     x={halfMin}
                     stroke={CHART.axis}
                     strokeDasharray="4 3"
-                    label={{ value: 'Half', fill: '#6b7280', fontSize: 9, position: 'insideTopRight' }}
+                    label={{ value: 'Half', fill: CHART.axisText, fontSize: 9, position: 'insideTopRight' }}
                   />
                 )}
                 <Tooltip content={<CustomTooltip />} cursor={{ stroke: CHART.cursor, strokeWidth: 1 }} />
@@ -507,7 +507,7 @@ export default function AerobicEfficiencyChart({ activityId, showCompare }: { ac
                         yAxisId="w"
                         data={compareChartData}
                         dataKey="watts"
-                        stroke="#f97316"
+                        stroke={CHART.power}
                         strokeWidth={1}
                         dot={false}
                         isAnimationActive={false}
@@ -521,7 +521,7 @@ export default function AerobicEfficiencyChart({ activityId, showCompare }: { ac
                         yAxisId="hr"
                         data={compareChartData}
                         dataKey="hr"
-                        stroke="#60a5fa"
+                        stroke={CHART.hr}
                         strokeWidth={1}
                         dot={false}
                         isAnimationActive={false}
@@ -535,7 +535,7 @@ export default function AerobicEfficiencyChart({ activityId, showCompare }: { ac
                         yAxisId="ef"
                         data={compareChartData}
                         dataKey="ef"
-                        stroke="#ffffff"
+                        stroke={CHART.reference}
                         strokeWidth={1}
                         dot={false}
                         isAnimationActive={false}
@@ -550,14 +550,14 @@ export default function AerobicEfficiencyChart({ activityId, showCompare }: { ac
             </ResponsiveContainer>
               )}
             </EnlargeableChart>
-            <p className="text-[10px] text-gray-600 mt-2">
-              {showPower && <><span className="text-orange-400">—</span> Power (W) ·</>}
+            <p className="text-micro text-ink-5 mt-2">
+              {showPower && <><span className="text-accent-hi">—</span> Power (W) ·</>}
               {showHr && <><span className="text-blue-400 ml-1.5">—</span> Heart rate (bpm) ·</>}
-              {showEf && <><span className="text-white ml-1.5">—</span> EF ·</>}
+              {showEf && <><span className="text-ink ml-1.5">—</span> EF ·</>}
               {comparePeriod && compareChartData.length > 0 && (
-                <span className="text-gray-500"><span className="opacity-50">- -</span> {COMPARE_LABELS[comparePeriod]} ·</span>
+                <span className="text-ink-4"><span className="opacity-50">- -</span> {COMPARE_LABELS[comparePeriod]} ·</span>
               )}
-              <span className="text-gray-600">First half shaded</span>
+              <span className="text-ink-5">First half shaded</span>
             </p>
           </>
         )}

@@ -32,12 +32,12 @@ function ZoneTable({ zones, maxSecs, unit }: { zones: ZoneResult[]; maxSecs: num
 
         return (
           <div key={z.z} className="grid items-center gap-2 text-xs" style={{ gridTemplateColumns: '28px 80px 90px 52px 36px 1fr' }}>
-            <span className="text-gray-500 font-medium text-center">Z{z.z}</span>
-            <span className="text-gray-300 truncate">{z.name}</span>
-            <span className="text-gray-500 tabular-nums">{rangeStr} {unit}</span>
-            <span className="text-white font-semibold tabular-nums text-right">{fmtTime(z.seconds)}</span>
-            <span className="text-gray-400 tabular-nums text-right">{z.pct}%</span>
-            <div className="h-4 rounded-sm overflow-hidden bg-gray-800/60">
+            <span className="text-ink-4 font-medium text-center">Z{z.z}</span>
+            <span className="text-ink-2 truncate">{z.name}</span>
+            <span className="text-ink-4 tabular-nums">{rangeStr} {unit}</span>
+            <span className="text-ink font-semibold tabular-nums text-right">{fmtTime(z.seconds)}</span>
+            <span className="text-ink-3 tabular-nums text-right">{z.pct}%</span>
+            <div className="h-4 rounded-sm overflow-hidden bg-raised/60">
               <div
                 className="h-full rounded-sm transition-all duration-500"
                 style={{ width: `${barPct}%`, background: z.color }}
@@ -70,9 +70,9 @@ function SetMaxHrPrompt({ onSaved }: { onSaved: (maxHr: number) => void }) {
   }
 
   return (
-    <div className="rounded-xl border border-orange-500/30 bg-orange-500/5 p-4">
-      <p className="text-sm font-medium text-orange-300 mb-1">HR stream available</p>
-      <p className="text-xs text-gray-400 mb-3">Set your Max HR to calculate heart rate zones.</p>
+    <div className="rounded-xl border border-accent/30 bg-accent/5 p-4">
+      <p className="text-sm font-medium text-accent-hi mb-1">HR stream available</p>
+      <p className="text-xs text-ink-3 mb-3">Set your Max HR to calculate heart rate zones.</p>
       <div className="flex items-center gap-2">
         <input
           type="number"
@@ -81,14 +81,14 @@ function SetMaxHrPrompt({ onSaved }: { onSaved: (maxHr: number) => void }) {
           placeholder="e.g. 185"
           min={100}
           max={230}
-          className="w-28 bg-gray-900 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-orange-500"
+          className="w-28 bg-surface border border-line-strong rounded-lg px-3 py-1.5 text-sm text-ink placeholder-ink-5 focus:outline-none focus:border-accent"
           onKeyDown={e => e.key === 'Enter' && save()}
         />
-        <span className="text-xs text-gray-500">bpm</span>
+        <span className="text-xs text-ink-4">bpm</span>
         <button
           onClick={save}
           disabled={saving || !value}
-          className="px-3 py-1.5 rounded-lg bg-orange-500 hover:bg-orange-400 disabled:opacity-40 text-white text-xs font-medium transition-colors"
+          className="px-3 py-1.5 rounded-lg bg-accent hover:bg-accent-hi disabled:opacity-40 text-ink text-xs font-medium transition-colors"
         >
           {saving ? 'Saving…' : 'Save'}
         </button>
@@ -127,23 +127,23 @@ export default function ZoneDistribution({ activityId }: { activityId: string })
   useEffect(() => { load(); }, [activityId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loading) {
-    return <div className="h-40 bg-gray-800 rounded-xl animate-pulse" />;
+    return <div className="h-40 bg-raised rounded-xl animate-pulse" />;
   }
 
   // No stream data at all (activity predates backfill)
   if (!data || (!data.power && !data.hr && !data.has_hr_stream)) {
     return (
-      <div className="bg-gray-800/50 border border-gray-700 border-dashed rounded-xl p-4 flex items-center justify-between gap-4">
-        <p className="text-gray-500 text-xs">No stream data stored for this activity.</p>
+      <div className="bg-raised/50 border border-line-strong border-dashed rounded-xl p-4 flex items-center justify-between gap-4">
+        <p className="text-ink-4 text-xs">No stream data stored for this activity.</p>
         <div className="flex flex-col items-end gap-1 flex-shrink-0">
           <button
             onClick={fetchStreams}
             disabled={fetching}
-            className="px-3 py-1.5 rounded-lg bg-orange-500 hover:bg-orange-400 disabled:opacity-40 text-white text-xs font-medium transition-colors whitespace-nowrap"
+            className="px-3 py-1.5 rounded-lg bg-accent hover:bg-accent-hi disabled:opacity-40 text-ink text-xs font-medium transition-colors whitespace-nowrap"
           >
             {fetching ? 'Fetching…' : 'Fetch from Strava'}
           </button>
-          {fetchMsg && <p className="text-xs text-gray-500 text-right">{fetchMsg}</p>}
+          {fetchMsg && <p className="text-xs text-ink-4 text-right">{fetchMsg}</p>}
         </div>
       </div>
     );
@@ -158,8 +158,8 @@ export default function ZoneDistribution({ activityId }: { activityId: string })
       {data.power && (
         <div>
           <div className="flex items-center justify-between mb-2">
-            <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Power Zones</h4>
-            <span className="text-xs text-gray-600">FTP {data.ftp}W</span>
+            <h4 className="text-xs font-semibold text-ink-3 uppercase tracking-wider">Power Zones</h4>
+            <span className="text-xs text-ink-5">FTP {data.ftp}W</span>
           </div>
           <ZoneTable zones={data.power} maxSecs={powerMax} unit="W" />
         </div>
@@ -169,27 +169,27 @@ export default function ZoneDistribution({ activityId }: { activityId: string })
       {data.hr ? (
         <div>
           <div className="flex items-center justify-between mb-2">
-            <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Heart Rate Zones</h4>
-            <span className="text-xs text-gray-600">Max HR {data.max_hr} bpm</span>
+            <h4 className="text-xs font-semibold text-ink-3 uppercase tracking-wider">Heart Rate Zones</h4>
+            <span className="text-xs text-ink-5">Max HR {data.max_hr} bpm</span>
           </div>
           <ZoneTable zones={data.hr} maxSecs={hrMax} unit="bpm" />
         </div>
       ) : data.has_hr_stream && !data.max_hr ? (
         <SetMaxHrPrompt onSaved={() => load()} />
       ) : data.has_hr_stream ? (
-        <p className="text-xs text-gray-500">Unable to calculate HR zones</p>
+        <p className="text-xs text-ink-4">Unable to calculate HR zones</p>
       ) : (
-        <div className="rounded-xl border border-gray-700 bg-gray-800/50 p-4 flex items-center justify-between gap-4">
-          <p className="text-xs text-gray-400">HR stream not stored for this activity.</p>
+        <div className="rounded-xl border border-line-strong bg-raised/50 p-4 flex items-center justify-between gap-4">
+          <p className="text-xs text-ink-3">HR stream not stored for this activity.</p>
           <div className="flex flex-col items-end gap-1 flex-shrink-0">
             <button
               onClick={fetchStreams}
               disabled={fetching}
-              className="px-3 py-1.5 rounded-lg bg-orange-500 hover:bg-orange-400 disabled:opacity-40 text-white text-xs font-medium transition-colors whitespace-nowrap"
+              className="px-3 py-1.5 rounded-lg bg-accent hover:bg-accent-hi disabled:opacity-40 text-ink text-xs font-medium transition-colors whitespace-nowrap"
             >
               {fetching ? 'Fetching…' : 'Fetch from Strava'}
             </button>
-            {fetchMsg && <p className="text-xs text-gray-500 text-right">{fetchMsg}</p>}
+            {fetchMsg && <p className="text-xs text-ink-4 text-right">{fetchMsg}</p>}
           </div>
         </div>
       )}

@@ -8,6 +8,7 @@ import {
 import { useCachedFetch } from '@/lib/use-cached-fetch';
 import EnlargeableChart from '@/components/EnlargeableChart';
 import type { ReadinessResponse, ReadinessPoint } from '@/app/api/analytics/readiness/route';
+import { CHART } from '@/lib/chart-theme';
 
 type ChartPeriod = '3m' | '6m' | '1y';
 const CHART_PERIODS: { key: ChartPeriod; label: string; days: number }[] = [
@@ -43,24 +44,24 @@ interface ChartNavProps {
 function ChartNav({ period, offset, hasBack, setPeriod, setOffset }: ChartNavProps) {
   return (
     <div className="flex items-center gap-1.5">
-      <div className="flex bg-gray-800 rounded-lg p-0.5 gap-0.5">
+      <div className="flex bg-raised rounded-lg p-0.5 gap-0.5">
         {CHART_PERIODS.map(p => (
           <button key={p.key} onClick={() => { setPeriod(p.key); setOffset(() => 0); }}
-            className={`px-2 py-1 rounded-md text-[10px] font-medium transition-colors ${
-              period === p.key ? 'bg-orange-500 text-white' : 'text-gray-400 hover:text-white'
+            className={`px-2 py-1 rounded-md text-micro font-medium transition-colors ${
+              period === p.key ? 'bg-accent text-ink' : 'text-ink-3 hover:text-ink'
             }`}>
             {p.label}
           </button>
         ))}
       </div>
       <button onClick={() => setOffset(o => o + 1)} disabled={!hasBack}
-        className="p-1 rounded-lg bg-gray-800 text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+        className="p-1 rounded-lg bg-raised text-ink-3 hover:text-ink disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
         </svg>
       </button>
       <button onClick={() => setOffset(o => Math.max(0, o - 1))} disabled={offset === 0}
-        className="p-1 rounded-lg bg-gray-800 text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+        className="p-1 rounded-lg bg-raised text-ink-3 hover:text-ink disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
         </svg>
@@ -79,19 +80,19 @@ function ReadinessTooltip({ active, payload, label }: any) {
   const p = payload[0]?.payload as ReadinessPoint | undefined;
   if (!p) return null;
   return (
-    <div className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-xs shadow-lg space-y-1">
-      <p className="text-gray-400">{fmtDate(String(label))}</p>
+    <div className="bg-surface border border-line-strong rounded-lg px-3 py-2 text-xs shadow-lg space-y-1">
+      <p className="text-ink-3">{fmtDate(String(label))}</p>
       {p.hrv !== null && (
-        <p className="text-green-400 font-semibold">{p.hrv} ms <span className="text-gray-500 font-normal">HRV (rMSSD)</span></p>
+        <p className="text-green-400 font-semibold">{p.hrv} ms <span className="text-ink-4 font-normal">HRV (rMSSD)</span></p>
       )}
       {p.readiness_score !== null && (
-        <p className="text-blue-400">{p.readiness_score} <span className="text-gray-500">readiness</span></p>
+        <p className="text-blue-400">{p.readiness_score} <span className="text-ink-4">readiness</span></p>
       )}
       {p.sleep_score !== null && (
-        <p className="text-purple-400">{p.sleep_score} <span className="text-gray-500">sleep</span></p>
+        <p className="text-purple-400">{p.sleep_score} <span className="text-ink-4">sleep</span></p>
       )}
       {p.resting_hr !== null && (
-        <p className="text-red-400">{p.resting_hr} bpm <span className="text-gray-500">resting HR</span></p>
+        <p className="text-red-400">{p.resting_hr} bpm <span className="text-ink-4">resting HR</span></p>
       )}
     </div>
   );
@@ -131,34 +132,34 @@ export default function ReadinessTab() {
       {/* Summary cards */}
       {latest && hasData && (
         <div className="grid grid-cols-3 gap-3">
-          <div className="bg-gray-800/60 rounded-xl p-3 text-center">
-            <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">HRV (rMSSD)</p>
+          <div className="bg-raised/60 rounded-xl p-3 text-center">
+            <p className="text-micro text-ink-4 uppercase tracking-wider mb-1">HRV (rMSSD)</p>
             <p className="text-2xl font-bold text-green-400">{latest.hrv ?? '—'}</p>
             {zone && latest.hrv !== null && (
-              <p className={`text-[10px] mt-0.5 ${
+              <p className={`text-micro mt-0.5 ${
                 latest.hrv >= zone.upper ? 'text-green-400' :
-                latest.hrv >= zone.lower ? 'text-gray-400'  : 'text-red-400'
+                latest.hrv >= zone.lower ? 'text-ink-3'  : 'text-red-400'
               }`}>
                 {latest.hrv >= zone.upper ? 'Above zone' :
                  latest.hrv >= zone.lower ? 'Normal'      : 'Below zone'}
               </p>
             )}
           </div>
-          <div className="bg-gray-800/60 rounded-xl p-3 text-center">
-            <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Readiness</p>
+          <div className="bg-raised/60 rounded-xl p-3 text-center">
+            <p className="text-micro text-ink-4 uppercase tracking-wider mb-1">Readiness</p>
             <p className="text-2xl font-bold text-blue-400">{latest.readiness_score ?? '—'}</p>
           </div>
-          <div className="bg-gray-800/60 rounded-xl p-3 text-center">
-            <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Sleep</p>
+          <div className="bg-raised/60 rounded-xl p-3 text-center">
+            <p className="text-micro text-ink-4 uppercase tracking-wider mb-1">Sleep</p>
             <p className="text-2xl font-bold text-purple-400">{latest.sleep_score ?? '—'}</p>
           </div>
         </div>
       )}
 
       {/* Chart */}
-      <div className="bg-gray-900 rounded-xl border border-gray-800 p-4">
+      <div className="bg-surface rounded-xl border border-line p-4">
         <div className="flex items-center justify-between mb-3">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Daily HRV vs Normal Zone</p>
+          <p className="text-xs font-semibold text-ink-4 uppercase tracking-wider">Daily HRV vs Normal Zone</p>
           <ChartNav
             period={period} offset={offset}
             hasBack={canGoBack(allPoints, period, offset)}
@@ -166,19 +167,19 @@ export default function ReadinessTab() {
           />
         </div>
         {zone && (
-          <p className="text-[11px] text-gray-600 mb-3">
+          <p className="text-mini text-ink-5 mb-3">
             Normal zone: {zone.lower}–{zone.upper} ms &nbsp;·&nbsp; baseline avg {zone.avg} ms
           </p>
         )}
 
         {loading && points.length === 0 ? (
-          <div className="h-64 animate-pulse bg-gray-800 rounded-lg" />
+          <div className="h-64 animate-pulse bg-raised rounded-lg" />
         ) : !hasData ? (
           <div className="h-64 flex flex-col items-center justify-center gap-3 text-center px-6">
-            <p className="text-gray-400 text-sm font-medium">No HRV data yet</p>
-            <p className="text-gray-600 text-xs">
+            <p className="text-ink-3 text-sm font-medium">No HRV data yet</p>
+            <p className="text-ink-5 text-xs">
               Add your intervals.icu Athlete ID and API Key in{' '}
-              <a href="/settings" className="text-orange-400 underline underline-offset-2">Settings</a>{' '}
+              <a href="/settings" className="text-accent-hi underline underline-offset-2">Settings</a>{' '}
               and sync to populate this chart.
             </p>
           </div>
@@ -192,10 +193,10 @@ export default function ReadinessTab() {
           }>{(fs) => (
           <ResponsiveContainer width="100%" height={fs ? '100%' : 260}>
             <ComposedChart data={points} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke={CHART.grid} vertical={false} />
               <XAxis
                 dataKey="date"
-                tick={{ fill: '#6b7280', fontSize: 10 }}
+                tick={{ fill: CHART.axisText, fontSize: 10 }}
                 axisLine={false}
                 tickLine={false}
                 interval="preserveStartEnd"
@@ -204,7 +205,7 @@ export default function ReadinessTab() {
               {/* Left axis — HRV (ms) */}
               <YAxis
                 yAxisId="hrv"
-                tick={{ fill: '#6b7280', fontSize: 10 }}
+                tick={{ fill: CHART.axisText, fontSize: 10 }}
                 axisLine={false}
                 tickLine={false}
                 width={32}
@@ -220,11 +221,11 @@ export default function ReadinessTab() {
                 width={32}
                 domain={[0, 100]}
               />
-              <Tooltip content={<ReadinessTooltip />} cursor={{ stroke: '#374151', strokeWidth: 1 }} />
+              <Tooltip content={<ReadinessTooltip />} cursor={{ stroke: CHART.axis, strokeWidth: 1 }} />
               <Legend
                 iconSize={8}
                 formatter={value => (
-                  <span style={{ color: '#9ca3af', fontSize: 10 }}>
+                  <span style={{ color: CHART.reference, fontSize: 10 }}>
                     {value === 'hrv' ? 'HRV (rMSSD)' : 'Readiness'}
                   </span>
                 )}
@@ -236,7 +237,7 @@ export default function ReadinessTab() {
                   yAxisId="hrv"
                   y1={zone.lower}
                   y2={zone.upper}
-                  fill="#34d399"
+                  fill={CHART.pos}
                   fillOpacity={0.08}
                   strokeOpacity={0}
                 />
@@ -246,7 +247,7 @@ export default function ReadinessTab() {
                 <ReferenceLine
                   yAxisId="hrv"
                   y={zone.avg}
-                  stroke="#34d399"
+                  stroke={CHART.pos}
                   strokeOpacity={0.4}
                   strokeDasharray="4 3"
                 />
@@ -258,10 +259,10 @@ export default function ReadinessTab() {
                 type="monotone"
                 dataKey="hrv"
                 name="hrv"
-                stroke="#9ca3af"
+                stroke={CHART.reference}
                 strokeWidth={1.5}
-                dot={{ fill: '#9ca3af', r: 3, strokeWidth: 0 }}
-                activeDot={{ r: 5, fill: '#34d399' }}
+                dot={{ fill: CHART.reference, r: 3, strokeWidth: 0 }}
+                activeDot={{ r: 5, fill: CHART.pos }}
                 connectNulls={false}
                 isAnimationActive={false}
               />
@@ -275,7 +276,7 @@ export default function ReadinessTab() {
                 stroke="#3b82f6"
                 strokeWidth={1.5}
                 dot={{ fill: '#3b82f6', r: 3, strokeWidth: 0 }}
-                activeDot={{ r: 5, fill: '#60a5fa' }}
+                activeDot={{ r: 5, fill: CHART.hr }}
                 connectNulls={false}
                 isAnimationActive={false}
               />
@@ -287,8 +288,8 @@ export default function ReadinessTab() {
 
       {/* Legend explainer */}
       {hasData && (
-        <div className="grid grid-cols-3 gap-2 text-xs text-gray-500">
-          <div><span className="text-gray-300 font-medium">HRV</span> — Heart Rate Variability (rMSSD, ms). Higher = more recovered.</div>
+        <div className="grid grid-cols-3 gap-2 text-xs text-ink-4">
+          <div><span className="text-ink-2 font-medium">HRV</span> — Heart Rate Variability (rMSSD, ms). Higher = more recovered.</div>
           <div><span className="text-green-400 font-medium">Band</span> — Your normal zone (baseline avg ± 1σ). Below = stress signal.</div>
           <div><span className="text-blue-400 font-medium">Readiness</span> — composite score (0–100) from HRV, sleep & RHR.</div>
         </div>

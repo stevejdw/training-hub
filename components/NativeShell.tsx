@@ -115,14 +115,14 @@ export default function NativeShell() {
   if (!native || !locked) return null;
 
   return (
-    <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center gap-6 bg-gray-950">
+    <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center gap-6 bg-page">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src="/icon.png" alt="Training Hub" className="h-20 w-20 rounded-2xl" />
-      <p className="text-sm text-gray-400">Locked</p>
+      <p className="text-sm text-ink-3">Locked</p>
       {authFailed && (
         <button
           onClick={() => void authenticate()}
-          className="rounded-full bg-orange-500 px-8 py-3 font-semibold text-gray-950"
+          className="rounded-full bg-accent px-8 py-3 font-semibold text-page"
         >
           Unlock with Face ID
         </button>

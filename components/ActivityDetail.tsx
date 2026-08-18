@@ -11,6 +11,7 @@ import AerobicEfficiencyChart from './AerobicEfficiencyChart';
 import StreamCharts from './desktop/StreamCharts';
 import ActivityEditModal from './ActivityEditModal';
 import { useIsDesktop } from './desktop/useIsDesktop';
+import { CHART } from '@/lib/chart-theme';
 
 const COMPARE_PERIODS = [
   { key: '30d', label: '30d' },
@@ -127,9 +128,9 @@ function fmt(seconds: number): string {
 function StatRow({ label, value }: { label: string; value: string | number | null | undefined }) {
   if (value === null || value === undefined) return null;
   return (
-    <div className="flex justify-between items-baseline py-2.5 border-b border-gray-800 last:border-0">
-      <span className="text-sm text-gray-400">{label}</span>
-      <span className="text-sm font-semibold text-white">{value}</span>
+    <div className="flex justify-between items-baseline py-2.5 border-b border-line last:border-0">
+      <span className="text-sm text-ink-3">{label}</span>
+      <span className="text-sm font-semibold text-ink">{value}</span>
     </div>
   );
 }
@@ -218,16 +219,16 @@ export default function ActivityDetail(
   if (loading) {
     return (
       <div className="max-w-2xl md:max-w-5xl xl:max-w-7xl mx-auto px-4 py-8 space-y-4">
-        {[1,2,3].map(i => <div key={i} className="bg-gray-800 rounded-xl h-20 animate-pulse" />)}
+        {[1,2,3].map(i => <div key={i} className="bg-raised rounded-xl h-20 animate-pulse" />)}
       </div>
     );
   }
 
   if (error || !activity) {
     return (
-      <div className="max-w-2xl md:max-w-5xl xl:max-w-7xl mx-auto px-4 py-8 text-center text-gray-400">
+      <div className="max-w-2xl md:max-w-5xl xl:max-w-7xl mx-auto px-4 py-8 text-center text-ink-3">
         Activity not found.{' '}
-        <Link href="/activities" className="text-orange-400 hover:underline">Back to activities</Link>
+        <Link href="/activities" className="text-accent-hi hover:underline">Back to activities</Link>
       </div>
     );
   }
@@ -254,12 +255,12 @@ export default function ActivityDetail(
   // removing power/HR, deleting) lives behind this one button.
   const backLink = (
     <div className="flex items-center justify-between gap-3">
-      <Link href="/activities" className="text-sm text-gray-500 hover:text-orange-400 transition-colors">
+      <Link href="/activities" className="text-sm text-ink-4 hover:text-accent-hi transition-colors">
         ← Activities
       </Link>
       <button
         onClick={() => setEditing(true)}
-        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-700 bg-gray-800/60 hover:bg-gray-700 text-gray-300 hover:text-white text-sm font-medium transition-colors"
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-line-strong bg-raised/60 hover:bg-hover text-ink-2 hover:text-ink text-sm font-medium transition-colors"
       >
         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -290,54 +291,54 @@ export default function ActivityDetail(
               <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ background: color + '20', color }}>
                 {sportLabel(activity.sport_type)}{activity.trainer ? ' · Indoor' : ''}
               </span>
-              <span className="text-xs text-gray-500">
+              <span className="text-xs text-ink-4">
                 {date.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' })}
                 {' · '}
                 {date.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' })}
               </span>
             </div>
 
-            <h1 className="text-xl font-bold text-white mb-4 leading-tight truncate">{activity.name}</h1>
+            <h1 className="text-xl font-bold text-ink mb-4 leading-tight truncate">{activity.name}</h1>
 
             {/* Key stats strip */}
             <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
               {activity.distance > 0 && (
                 <div>
-                  <div className="text-[10px] text-gray-500 uppercase tracking-wider mb-0.5">Distance</div>
-                  <div className="text-base font-bold text-white">{(activity.distance / 1000).toFixed(2)}<span className="text-xs text-gray-400 ml-1">km</span></div>
+                  <div className="text-micro text-ink-4 uppercase tracking-wider mb-0.5">Distance</div>
+                  <div className="text-base font-bold text-ink">{(activity.distance / 1000).toFixed(2)}<span className="text-xs text-ink-3 ml-1">km</span></div>
                 </div>
               )}
               {speedKph && (
                 <div>
-                  <div className="text-[10px] text-gray-500 uppercase tracking-wider mb-0.5">Avg Speed</div>
-                  <div className="text-base font-bold text-white">{speedKph}<span className="text-xs text-gray-400 ml-1">km/h</span></div>
+                  <div className="text-micro text-ink-4 uppercase tracking-wider mb-0.5">Avg Speed</div>
+                  <div className="text-base font-bold text-ink">{speedKph}<span className="text-xs text-ink-3 ml-1">km/h</span></div>
                 </div>
               )}
               {activity.average_watts && (
                 <div>
-                  <div className="text-[10px] text-gray-500 uppercase tracking-wider mb-0.5">Avg Power</div>
-                  <div className="text-base font-bold text-white">{Math.round(activity.average_watts)}<span className="text-xs text-gray-400 ml-1">W</span></div>
+                  <div className="text-micro text-ink-4 uppercase tracking-wider mb-0.5">Avg Power</div>
+                  <div className="text-base font-bold text-ink">{Math.round(activity.average_watts)}<span className="text-xs text-ink-3 ml-1">W</span></div>
                 </div>
               )}
               <div>
-                <div className="text-[10px] text-gray-500 uppercase tracking-wider mb-0.5">Time</div>
-                <div className="text-base font-bold text-white">{fmt(activity.moving_time)}</div>
+                <div className="text-micro text-ink-4 uppercase tracking-wider mb-0.5">Time</div>
+                <div className="text-base font-bold text-ink">{fmt(activity.moving_time)}</div>
               </div>
               {activity.total_elevation_gain > 0 && (
                 <div>
-                  <div className="text-[10px] text-gray-500 uppercase tracking-wider mb-0.5">Ascent</div>
-                  <div className="text-base font-bold text-white">{Math.round(activity.total_elevation_gain)}<span className="text-xs text-gray-400 ml-1">m</span></div>
+                  <div className="text-micro text-ink-4 uppercase tracking-wider mb-0.5">Ascent</div>
+                  <div className="text-base font-bold text-ink">{Math.round(activity.total_elevation_gain)}<span className="text-xs text-ink-3 ml-1">m</span></div>
                 </div>
               )}
               {activity.gear_name && (
                 <div>
-                  <div className="text-[10px] text-gray-500 uppercase tracking-wider mb-0.5">Bike</div>
-                  <div className="text-base font-bold text-white truncate">{activity.gear_name}</div>
+                  <div className="text-micro text-ink-4 uppercase tracking-wider mb-0.5">Bike</div>
+                  <div className="text-base font-bold text-ink truncate">{activity.gear_name}</div>
                 </div>
               )}
               {activity.power_meter && (
                 <div>
-                  <div className="text-[10px] text-gray-500 uppercase tracking-wider mb-0.5">Power Meter</div>
+                  <div className="text-micro text-ink-4 uppercase tracking-wider mb-0.5">Power Meter</div>
                   <div className="text-base font-bold text-blue-400">{activity.power_meter}</div>
                 </div>
               )}
@@ -348,7 +349,7 @@ export default function ActivityDetail(
   const coachLink = (
         <Link
           href={`/chat?prompt=${encodeURIComponent(`Coach feedback on "${activity.name}" (id ${id}).`)}`}
-          className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl bg-orange-500/15 hover:bg-orange-500/25 text-orange-400 text-sm font-semibold transition-colors border border-orange-500/30"
+          className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl bg-accent/15 hover:bg-accent/25 text-accent-hi text-sm font-semibold transition-colors border border-accent/30"
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
@@ -358,7 +359,7 @@ export default function ActivityDetail(
   );
 
   const tabsNav = (
-        <div className="border-b border-gray-800">
+        <div className="border-b border-line">
           <div className="flex items-center gap-0">
             {TABS.map(t => (
               <button
@@ -366,8 +367,8 @@ export default function ActivityDetail(
                 onClick={() => setTab(t.key)}
                 className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
                   tab === t.key
-                    ? 'border-orange-500 text-white'
-                    : 'border-transparent text-gray-500 hover:text-gray-300'
+                    ? 'border-accent text-ink'
+                    : 'border-transparent text-ink-4 hover:text-ink-2'
                 }`}
               >
                 {t.label}
@@ -385,7 +386,7 @@ export default function ActivityDetail(
           <>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8">
             <div>
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Performance</p>
+              <p className="text-xs font-semibold text-ink-4 uppercase tracking-wider mb-1">Performance</p>
               <StatRow label="Moving Time"    value={fmt(activity.moving_time)} />
               <StatRow label="Elapsed Time"   value={fmt(activity.elapsed_time)} />
               <StatRow label="Distance"       value={activity.distance > 0 ? `${(activity.distance / 1000).toFixed(2)} km` : null} />
@@ -395,7 +396,7 @@ export default function ActivityDetail(
               <StatRow label="Suffer Score"   value={activity.suffer_score} />
             </div>
             <div className="mt-6 sm:mt-0">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Power & HR</p>
+              <p className="text-xs font-semibold text-ink-4 uppercase tracking-wider mb-1">Power & HR</p>
               <StatRow label="Avg Power"      value={activity.average_watts ? `${Math.round(activity.average_watts)} W` : null} />
               <StatRow label="Norm. Power"    value={np ? `${Math.round(np)} W` : null} />
               <StatRow label="Max Power"      value={activity.max_watts ? `${Math.round(activity.max_watts)} W` : null} />
@@ -411,8 +412,8 @@ export default function ActivityDetail(
         {/* Tab: Laps */}
         {tab === 'laps' && (() => {
           if (laps.length === 0) return (
-            <div className="bg-gray-800/50 border border-gray-700 border-dashed rounded-xl p-8 text-center">
-              <p className="text-gray-500 text-sm">No lap data for this activity</p>
+            <div className="bg-raised/50 border border-line-strong border-dashed rounded-xl p-8 text-center">
+              <p className="text-ink-4 text-sm">No lap data for this activity</p>
             </div>
           );
 
@@ -434,7 +435,7 @@ export default function ActivityDetail(
               <th
                 className={`px-4 py-3 font-medium cursor-pointer select-none whitespace-nowrap
                   ${align === 'left' ? 'text-left' : 'text-right'}
-                  ${active ? 'text-orange-400' : 'text-gray-500 hover:text-gray-300'}`}
+                  ${active ? 'text-accent-hi' : 'text-ink-4 hover:text-ink-2'}`}
                 onClick={() => setLapSort(s =>
                   s.key === col
                     ? { key: col, dir: s.dir === 'asc' ? 'desc' : 'asc' }
@@ -490,8 +491,8 @@ export default function ActivityDetail(
             <div className="space-y-4">
               {/* Lap performance histogram */}
               {barData.length > 0 && (
-                <div className="bg-gray-900 rounded-xl border border-gray-800 p-4">
-                  <p className="text-[11px] text-gray-500 uppercase tracking-wider mb-3">Lap Performance</p>
+                <div className="bg-surface rounded-xl border border-line p-4">
+                  <p className="text-mini text-ink-4 uppercase tracking-wider mb-3">Lap Performance</p>
                   <div className="relative" style={{ aspectRatio: String(svgW) + '/' + String(svgH) }}>
                     <svg viewBox={`0 0 ${svgW} ${svgH}`} className="w-full h-full overflow-visible">
                       {/* Horizontal grid lines */}
@@ -499,8 +500,8 @@ export default function ActivityDetail(
                         const y = pad.top + chartH - (v / yMax) * chartH;
                         return (
                           <g key={v}>
-                            <line x1={pad.left} y1={y} x2={pad.left + chartW} y2={y} stroke="#1f2937" strokeWidth={1} />
-                            <text x={pad.left - 4} y={y + 3} textAnchor="end" fill="#f97316" fontSize={10}>
+                            <line x1={pad.left} y1={y} x2={pad.left + chartW} y2={y} stroke={CHART.grid} strokeWidth={1} />
+                            <text x={pad.left - 4} y={y + 3} textAnchor="end" fill={CHART.power} fontSize={10}>
                               {v}W
                             </text>
                           </g>
@@ -511,7 +512,7 @@ export default function ActivityDetail(
                       {xTicks.map(t => {
                         const x = pad.left + (t / totalSec) * chartW;
                         return (
-                          <text key={t} x={x} y={svgH - 4} textAnchor="middle" fill="#6b7280" fontSize={9}>
+                          <text key={t} x={x} y={svgH - 4} textAnchor="middle" fill={CHART.axisText} fontSize={9}>
                             {fmtShort(t)}
                           </text>
                         );
@@ -530,7 +531,7 @@ export default function ActivityDetail(
                               y={y}
                               width={barW}
                               height={barH}
-                              fill="#f97316"
+                              fill={CHART.power}
                               opacity={0.85}
                               rx={1}
                             >
@@ -541,20 +542,20 @@ export default function ActivityDetail(
                       })}
 
                       {/* Bottom axis line */}
-                      <line x1={pad.left} y1={pad.top + chartH} x2={pad.left + chartW} y2={pad.top + chartH} stroke="#374151" strokeWidth={1} />
+                      <line x1={pad.left} y1={pad.top + chartH} x2={pad.left + chartW} y2={pad.top + chartH} stroke={CHART.axis} strokeWidth={1} />
                     </svg>
                   </div>
-                  <p className="text-[10px] text-gray-600 mt-2">
-                    <span className="text-orange-400">■</span> Avg Power (W) — bar width = lap duration, no gaps
+                  <p className="text-micro text-ink-5 mt-2">
+                    <span className="text-accent-hi">■</span> Avg Power (W) — bar width = lap duration, no gaps
                   </p>
                 </div>
               )}
 
               {/* Lap table */}
-              <div className="bg-gray-900 rounded-xl overflow-x-auto scroll-touch border border-gray-800">
+              <div className="bg-surface rounded-xl overflow-x-auto scroll-touch border border-line">
                 <table className="text-sm whitespace-nowrap w-full">
                   <thead>
-                    <tr className="border-b border-gray-800">
+                    <tr className="border-b border-line">
                       <SortTh col="index"             label="#"        align="left" />
                       <SortTh col="distance"          label="Distance" />
                       <SortTh col="moving_time"       label="Time" />
@@ -566,22 +567,22 @@ export default function ActivityDetail(
                   </thead>
                   <tbody>
                     {sortedLaps.map((lap, i) => (
-                      <tr key={lap.id} className={`border-b border-gray-800/60 ${i % 2 === 0 ? '' : 'bg-gray-800/30'}`}>
-                        <td className="px-4 py-2.5 text-gray-400">{lap.lap_index}</td>
-                        <td className="px-4 py-2.5 text-right text-gray-300">
+                      <tr key={lap.id} className={`border-b border-line/60 ${i % 2 === 0 ? '' : 'bg-raised/30'}`}>
+                        <td className="px-4 py-2.5 text-ink-3">{lap.lap_index}</td>
+                        <td className="px-4 py-2.5 text-right text-ink-2">
                           {lap.distance > 0 ? `${(lap.distance / 1000).toFixed(2)} km` : '—'}
                         </td>
-                        <td className="px-4 py-2.5 text-right text-gray-300">{fmt(lap.moving_time)}</td>
-                        <td className="px-4 py-2.5 text-right text-white font-medium">
+                        <td className="px-4 py-2.5 text-right text-ink-2">{fmt(lap.moving_time)}</td>
+                        <td className="px-4 py-2.5 text-right text-ink font-medium">
                           {lap.average_watts ? Math.round(lap.average_watts) : '—'}
                         </td>
-                        <td className="px-4 py-2.5 text-right text-gray-300">
+                        <td className="px-4 py-2.5 text-right text-ink-2">
                           {lap.normalized_power ? Math.round(lap.normalized_power) : '—'}
                         </td>
-                        <td className="px-4 py-2.5 text-right text-gray-300">
+                        <td className="px-4 py-2.5 text-right text-ink-2">
                           {lap.average_heartrate ? Math.round(lap.average_heartrate) : '—'}
                         </td>
-                        <td className="px-4 py-2.5 text-right text-gray-300">
+                        <td className="px-4 py-2.5 text-right text-ink-2">
                           {lap.max_heartrate ? Math.round(lap.max_heartrate) : '—'}
                         </td>
                       </tr>
@@ -601,20 +602,20 @@ export default function ActivityDetail(
               <div className="space-y-4">
 
                 {/* Power Curve */}
-                <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4 space-y-3">
+                <div className="bg-surface border border-line rounded-2xl p-4 space-y-3">
                   <div className="flex items-center justify-between">
-                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Power Curve</p>
+                    <p className="text-xs font-semibold text-ink-4 uppercase tracking-wider">Power Curve</p>
                     {curvePeriod !== 'none' && (
                       <button
                         onClick={() => setCurvePeriod('none')}
-                        className="text-xs text-gray-600 hover:text-gray-400 transition-colors"
+                        className="text-xs text-ink-5 hover:text-ink-3 transition-colors"
                       >
                         Clear compare
                       </button>
                     )}
                   </div>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs text-gray-600">Compare vs:</span>
+                    <span className="text-xs text-ink-5">Compare vs:</span>
                     {COMPARE_PERIODS.map(p => (
                       <button
                         key={p.key}
@@ -622,7 +623,7 @@ export default function ActivityDetail(
                         className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors border ${
                           curvePeriod === p.key
                             ? 'bg-blue-500/20 text-blue-400 border-blue-500/50'
-                            : 'bg-gray-800 text-gray-500 hover:text-gray-300 border-transparent'
+                            : 'bg-raised text-ink-4 hover:text-ink-2 border-transparent'
                         }`}
                       >
                         {p.label}
@@ -630,7 +631,7 @@ export default function ActivityDetail(
                     ))}
                   </div>
                   {curveLoading ? (
-                    <div className="h-52 bg-gray-800/60 rounded-xl animate-pulse" />
+                    <div className="h-52 bg-raised/60 rounded-xl animate-pulse" />
                   ) : curveData && curveData.activity.length > 0 ? (
                     <>
                       <PowerCurveChart
@@ -642,7 +643,7 @@ export default function ActivityDetail(
                       />
                     </>
                   ) : curveData ? (
-                    <div className="h-40 flex items-center justify-center text-gray-600 text-sm">
+                    <div className="h-40 flex items-center justify-center text-ink-5 text-sm">
                       No power stream data for this activity
                     </div>
                   ) : null}
@@ -650,10 +651,10 @@ export default function ActivityDetail(
 
                 {/* Best Efforts */}
                 <div className="flex items-center justify-between">
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Best Efforts</p>
+                  <p className="text-xs font-semibold text-ink-4 uppercase tracking-wider">Best Efforts</p>
                   <Link
                     href={`/performance?tab=power&s=${bpSeconds}`}
-                    className="text-xs text-orange-400 hover:text-orange-300 transition-colors"
+                    className="text-xs text-accent-hi hover:text-accent-hi transition-colors"
                   >
                     All activities →
                   </Link>
@@ -663,46 +664,46 @@ export default function ActivityDetail(
                   <select
                     value={bpSeconds}
                     onChange={e => setBpSeconds(Number(e.target.value))}
-                    className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-orange-500"
+                    className="bg-raised border border-line-strong rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-accent"
                   >
                     {INTERVALS.map(iv => (
                       <option key={iv.seconds} value={iv.seconds}>{iv.label}</option>
                     ))}
                   </select>
-                  <span className="text-xs text-gray-500">Top 5 non-overlapping best efforts</span>
+                  <span className="text-xs text-ink-4">Top 5 non-overlapping best efforts</span>
                 </div>
 
                 {bpLoading ? (
                   <div className="space-y-2">
-                    {[1,2,3,4,5].map(i => <div key={i} className="h-10 bg-gray-800 rounded-xl animate-pulse" />)}
+                    {[1,2,3,4,5].map(i => <div key={i} className="h-10 bg-raised rounded-xl animate-pulse" />)}
                   </div>
                 ) : bpResults && bpResults.length > 0 ? (
-                  <div className="bg-gray-900 rounded-xl border border-gray-800 overflow-x-auto scroll-touch">
+                  <div className="bg-surface rounded-xl border border-line overflow-x-auto scroll-touch">
                     <table className="text-sm w-full whitespace-nowrap">
                       <thead>
-                        <tr className="border-b border-gray-800">
-                          <th className="text-left px-4 py-3 text-gray-500 font-medium">#</th>
-                          <th className="text-right px-4 py-3 text-gray-500 font-medium">Avg Power</th>
-                          <th className="text-right px-4 py-3 text-gray-500 font-medium">Max Power</th>
-                          <th className="text-right px-4 py-3 text-gray-500 font-medium">Avg HR</th>
-                          <th className="text-right px-4 py-3 text-gray-500 font-medium">Max HR</th>
+                        <tr className="border-b border-line">
+                          <th className="text-left px-4 py-3 text-ink-4 font-medium">#</th>
+                          <th className="text-right px-4 py-3 text-ink-4 font-medium">Avg Power</th>
+                          <th className="text-right px-4 py-3 text-ink-4 font-medium">Max Power</th>
+                          <th className="text-right px-4 py-3 text-ink-4 font-medium">Avg HR</th>
+                          <th className="text-right px-4 py-3 text-ink-4 font-medium">Max HR</th>
                         </tr>
                       </thead>
                       <tbody>
                         {bpResults.map((r, i) => (
-                          <tr key={r.rank} className={`border-b border-gray-800/60 last:border-0 ${i === 0 ? 'bg-orange-500/5' : i % 2 !== 0 ? 'bg-gray-800/30' : ''}`}>
-                            <td className={`px-4 py-3 font-medium ${i === 0 ? 'text-orange-400' : 'text-gray-500'}`}>#{r.rank}</td>
-                            <td className={`px-4 py-3 text-right font-bold tabular-nums ${i === 0 ? 'text-white' : 'text-gray-200'}`}>
-                              {r.watts} <span className="text-xs font-normal text-gray-500">W</span>
+                          <tr key={r.rank} className={`border-b border-line/60 last:border-0 ${i === 0 ? 'bg-accent/5' : i % 2 !== 0 ? 'bg-raised/30' : ''}`}>
+                            <td className={`px-4 py-3 font-medium ${i === 0 ? 'text-accent-hi' : 'text-ink-4'}`}>#{r.rank}</td>
+                            <td className={`px-4 py-3 text-right font-bold tabular-nums ${i === 0 ? 'text-ink' : 'text-ink'}`}>
+                              {r.watts} <span className="text-xs font-normal text-ink-4">W</span>
                             </td>
-                            <td className="px-4 py-3 text-right tabular-nums text-gray-300">
-                              {r.max_watts} <span className="text-xs text-gray-500">W</span>
+                            <td className="px-4 py-3 text-right tabular-nums text-ink-2">
+                              {r.max_watts} <span className="text-xs text-ink-4">W</span>
                             </td>
-                            <td className="px-4 py-3 text-right tabular-nums text-gray-300">
-                              {r.avg_hr ? <>{r.avg_hr} <span className="text-xs text-gray-500">bpm</span></> : '—'}
+                            <td className="px-4 py-3 text-right tabular-nums text-ink-2">
+                              {r.avg_hr ? <>{r.avg_hr} <span className="text-xs text-ink-4">bpm</span></> : '—'}
                             </td>
-                            <td className="px-4 py-3 text-right tabular-nums text-gray-300">
-                              {r.max_hr ? <>{r.max_hr} <span className="text-xs text-gray-500">bpm</span></> : '—'}
+                            <td className="px-4 py-3 text-right tabular-nums text-ink-2">
+                              {r.max_hr ? <>{r.max_hr} <span className="text-xs text-ink-4">bpm</span></> : '—'}
                             </td>
                           </tr>
                         ))}
@@ -710,12 +711,12 @@ export default function ActivityDetail(
                     </table>
                   </div>
                 ) : (
-                  <p className="text-sm text-gray-500 py-4">No power data</p>
+                  <p className="text-sm text-ink-4 py-4">No power data</p>
                 )}
               </div>
             ) : (
-              <div className="bg-gray-800/50 border border-gray-700 border-dashed rounded-xl p-8 text-center">
-                <p className="text-gray-500 text-sm">No power data for this activity</p>
+              <div className="bg-raised/50 border border-line-strong border-dashed rounded-xl p-8 text-center">
+                <p className="text-ink-4 text-sm">No power data for this activity</p>
               </div>
             )}
 
@@ -724,7 +725,7 @@ export default function ActivityDetail(
 
             {/* ── Time in Zones section ── */}
             <div>
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Time in Zones</p>
+              <p className="text-xs font-semibold text-ink-4 uppercase tracking-wider mb-3">Time in Zones</p>
               <ZoneDistribution activityId={id} />
             </div>
           </div>
@@ -735,19 +736,19 @@ export default function ActivityDetail(
           <div>
             {segLoading ? (
               <div className="space-y-2">
-                {[1,2,3].map(i => <div key={i} className="h-16 bg-gray-800 rounded-xl animate-pulse" />)}
+                {[1,2,3].map(i => <div key={i} className="h-16 bg-raised rounded-xl animate-pulse" />)}
               </div>
             ) : segments.length === 0 ? (
-              <div className="bg-gray-800/40 rounded-xl p-6 text-center space-y-2">
-                <p className="text-gray-400 text-sm">No starred segments matched this activity.</p>
-                <p className="text-gray-500 text-xs">
+              <div className="bg-raised/40 rounded-xl p-6 text-center space-y-2">
+                <p className="text-ink-3 text-sm">No starred segments matched this activity.</p>
+                <p className="text-ink-4 text-xs">
                   Star segments on Strava, then{' '}
                   <button
                     onClick={async () => {
                       await fetch('/api/segments/starred', { method: 'POST' });
                       setSegFetched(false);
                     }}
-                    className="text-orange-400 hover:underline"
+                    className="text-accent-hi hover:underline"
                   >
                     re-sync
                   </button>
@@ -769,24 +770,24 @@ export default function ActivityDetail(
                     <Link
                       key={seg.id}
                       href={`/segments/${seg.segment_id}`}
-                      className={`block rounded-xl p-4 border transition-colors hover:border-gray-600/60 ${
+                      className={`block rounded-xl p-4 border transition-colors hover:border-line-hover/60 ${
                         isPR
                           ? 'bg-yellow-500/10 border-yellow-500/40'
-                          : 'bg-gray-800/60 border-gray-700/40'
+                          : 'bg-raised/60 border-line-strong/40'
                       }`}
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <div className="flex items-center gap-2 flex-wrap mb-1">
-                            <span className="text-sm font-semibold text-white truncate">{seg.name}</span>
+                            <span className="text-sm font-semibold text-ink truncate">{seg.name}</span>
                             {isPR && (
-                              <span className="text-[10px] bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 px-1.5 py-0.5 rounded font-bold flex-shrink-0">🏆 PR</span>
+                              <span className="text-micro bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 px-1.5 py-0.5 rounded font-bold flex-shrink-0">🏆 PR</span>
                             )}
                             {isTop3 && !isPR && (
-                              <span className="text-[10px] bg-orange-500/20 text-orange-400 border border-orange-500/30 px-1.5 py-0.5 rounded font-bold flex-shrink-0">Top {seg.kom_rank}</span>
+                              <span className="text-micro bg-accent/20 text-accent-hi border border-accent/30 px-1.5 py-0.5 rounded font-bold flex-shrink-0">Top {seg.kom_rank}</span>
                             )}
                           </div>
-                          <div className="flex items-center gap-3 flex-wrap text-xs text-gray-400">
+                          <div className="flex items-center gap-3 flex-wrap text-xs text-ink-3">
                             {seg.distance > 0 && (
                               <span>{(seg.distance / 1000).toFixed(1)} km</span>
                             )}
@@ -797,8 +798,8 @@ export default function ActivityDetail(
                           </div>
                         </div>
                         <div className="text-right flex-shrink-0 space-y-1">
-                          <p className={`text-lg font-bold tabular-nums ${isPR ? 'text-yellow-300' : 'text-white'}`}>{timeStr}</p>
-                          <div className="flex items-center gap-2 justify-end text-xs text-gray-400">
+                          <p className={`text-lg font-bold tabular-nums ${isPR ? 'text-yellow-300' : 'text-ink'}`}>{timeStr}</p>
+                          <div className="flex items-center gap-2 justify-end text-xs text-ink-3">
                             {seg.average_watts && (
                               <span>{Math.round(seg.average_watts)}W</span>
                             )}
@@ -806,7 +807,7 @@ export default function ActivityDetail(
                               <span className="text-red-400">♥ {Math.round(seg.average_heartrate)}</span>
                             )}
                           </div>
-                          <span className="text-[10px] text-orange-400 mt-1 block">History →</span>
+                          <span className="text-micro text-accent-hi mt-1 block">History →</span>
                         </div>
                       </div>
                     </Link>
@@ -838,7 +839,7 @@ export default function ActivityDetail(
               <div className="flex-shrink-0">
                 <ActivityMap
                   polyline={activity.summary_polyline}
-                  className="w-full h-64 rounded-xl overflow-hidden bg-gray-800"
+                  className="w-full h-64 rounded-xl overflow-hidden bg-raised"
                   hoverPoint={hoverPoint}
                 />
               </div>
@@ -870,7 +871,7 @@ export default function ActivityDetail(
             <div className="w-[42%] flex-shrink-0 hidden sm:block">
               <ActivityMap
                 polyline={activity.summary_polyline}
-                className="w-full h-48 rounded-xl overflow-hidden bg-gray-800"
+                className="w-full h-48 rounded-xl overflow-hidden bg-raised"
               />
             </div>
           ) : null}
@@ -884,7 +885,7 @@ export default function ActivityDetail(
           <div className="sm:hidden">
             <ActivityMap
               polyline={activity.summary_polyline}
-              className="w-full h-48 rounded-xl overflow-hidden bg-gray-800"
+              className="w-full h-48 rounded-xl overflow-hidden bg-raised"
             />
           </div>
         )}

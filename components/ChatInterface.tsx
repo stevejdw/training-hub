@@ -81,20 +81,20 @@ function MessageBubble({ message }: { message: Message }) {
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-4`}>
       {!isUser && (
-        <div className="w-8 h-8 rounded-full bg-orange-500 flex items-center justify-center text-white text-sm font-bold mr-2 flex-shrink-0 mt-1">
+        <div className="w-8 h-8 rounded-full bg-accent flex items-center justify-center text-ink text-sm font-bold mr-2 flex-shrink-0 mt-1">
           C
         </div>
       )}
       <div
         className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
           isUser
-            ? 'bg-orange-500 text-white rounded-tr-sm'
-            : 'bg-gray-800 text-gray-100 rounded-tl-sm'
+            ? 'bg-accent text-ink rounded-tr-sm'
+            : 'bg-raised text-ink rounded-tl-sm'
         }`}
       >
         {message.content.split('\n').map((line, i) => {
           const formatted = line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-          const withCode = formatted.replace(/`([^`]+)`/g, '<code class="bg-gray-700 px-1 rounded text-xs">$1</code>');
+          const withCode = formatted.replace(/`([^`]+)`/g, '<code class="bg-hover px-1 rounded text-xs">$1</code>');
           return (
             <p
               key={i}
@@ -105,7 +105,7 @@ function MessageBubble({ message }: { message: Message }) {
         })}
       </div>
       {isUser && (
-        <div className="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center text-white text-sm font-bold ml-2 flex-shrink-0 mt-1">
+        <div className="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center text-ink text-sm font-bold ml-2 flex-shrink-0 mt-1">
           S
         </div>
       )}
@@ -292,18 +292,18 @@ export default function ChatInterface() {
 
       {/* Sidebar — overlay on mobile, persistent on desktop */}
       <div
-        className={`absolute md:static left-0 top-0 h-full w-72 md:w-56 flex-shrink-0 bg-gray-900 md:bg-gray-950/50 border-r border-gray-800 z-20 flex flex-col transition-transform duration-200 md:translate-x-0 ${
+        className={`absolute md:static left-0 top-0 h-full w-72 md:w-56 flex-shrink-0 bg-surface md:bg-page/50 border-r border-line z-20 flex flex-col transition-transform duration-200 md:translate-x-0 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        <div className="flex items-center justify-between px-4 py-3 md:py-5 border-b border-gray-800 md:border-b-0 flex-shrink-0">
-          <span className="text-sm font-semibold text-gray-300 md:text-[11px] md:uppercase md:tracking-wider md:text-gray-500">
+        <div className="flex items-center justify-between px-4 py-3 md:py-5 border-b border-line md:border-b-0 flex-shrink-0">
+          <span className="text-sm font-semibold text-ink-2 md:text-mini md:uppercase md:tracking-wider md:text-ink-4">
             <span className="md:hidden">Chat history</span>
             <span className="hidden md:inline">Coach AI</span>
           </span>
           <button
             onClick={() => setSidebarOpen(false)}
-            className="md:hidden text-gray-500 hover:text-white transition-colors p-1"
+            className="md:hidden text-ink-4 hover:text-ink transition-colors p-1"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -314,7 +314,7 @@ export default function ChatInterface() {
         <div className="px-3 py-2 flex-shrink-0">
           <button
             onClick={startNewChat}
-            className="w-full text-sm text-left px-3 py-2 rounded-lg bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 border border-orange-500/30 transition-colors flex items-center gap-2"
+            className="w-full text-sm text-left px-3 py-2 rounded-lg bg-accent/10 hover:bg-accent/20 text-accent-hi border border-accent/30 transition-colors flex items-center gap-2"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
@@ -322,13 +322,13 @@ export default function ChatInterface() {
             New chat
           </button>
         </div>
-        <div className="hidden md:block px-5 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-gray-600">
+        <div className="hidden md:block px-5 pt-2 pb-1 text-micro font-semibold uppercase tracking-wider text-ink-5">
           History
         </div>
 
         <div className="flex-1 overflow-y-auto px-3 py-1 space-y-0.5">
           {sessions.length === 0 && (
-            <p className="text-xs text-gray-600 px-2 py-4 text-center">No past chats yet</p>
+            <p className="text-xs text-ink-5 px-2 py-4 text-center">No past chats yet</p>
           )}
           {sessions.map(session => (
             <div
@@ -336,17 +336,17 @@ export default function ChatInterface() {
               onClick={() => loadSession(session)}
               className={`group flex items-start gap-2 px-3 py-2.5 rounded-lg cursor-pointer transition-colors ${
                 currentId === session.id
-                  ? 'bg-gray-700 text-white'
-                  : 'hover:bg-gray-800 text-gray-400'
+                  ? 'bg-hover text-ink'
+                  : 'hover:bg-raised text-ink-3'
               }`}
             >
               <div className="flex-1 min-w-0">
                 <p className="text-sm truncate leading-tight">{session.title}</p>
-                <p className="text-xs text-gray-600 mt-0.5">{formatDate(session.createdAt)}</p>
+                <p className="text-xs text-ink-5 mt-0.5">{formatDate(session.createdAt)}</p>
               </div>
               <button
                 onClick={(e) => deleteSession(e, session.id)}
-                className="text-gray-600 hover:text-red-400 transition-colors flex-shrink-0 mt-0.5 p-1 -m-1 rounded hover:bg-gray-800/60"
+                className="text-ink-5 hover:text-red-400 transition-colors flex-shrink-0 mt-0.5 p-1 -m-1 rounded hover:bg-raised/60"
                 title="Delete chat"
                 aria-label="Delete chat"
               >
@@ -362,10 +362,10 @@ export default function ChatInterface() {
       {/* Main chat */}
       <div className="flex flex-col flex-1 min-w-0">
         {/* Top bar with sidebar toggle */}
-        <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-800 flex-shrink-0">
+        <div className="flex items-center gap-2 px-3 py-2 border-b border-line flex-shrink-0">
           <button
             onClick={() => setSidebarOpen(true)}
-            className="md:hidden text-gray-500 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-gray-800"
+            className="md:hidden text-ink-4 hover:text-ink transition-colors p-1.5 rounded-lg hover:bg-raised"
             title="Chat history"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -373,7 +373,7 @@ export default function ChatInterface() {
             </svg>
           </button>
           {currentId && (
-            <span className="text-sm text-gray-500 truncate">
+            <span className="text-sm text-ink-4 truncate">
               {sessions.find(s => s.id === currentId)?.title ?? ''}
             </span>
           )}
@@ -384,8 +384,8 @@ export default function ChatInterface() {
           {messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-center py-12">
               <div className="text-4xl mb-4">🚴</div>
-              <h2 className="text-xl font-semibold text-white mb-2">Training Coach</h2>
-              <p className="text-gray-400 text-sm max-w-md mb-8">
+              <h2 className="text-xl font-semibold text-ink mb-2">Training Coach</h2>
+              <p className="text-ink-3 text-sm max-w-md mb-8">
                 Ask me anything about your training. I have your full history loaded — activities,
                 fitness trends, power data, and more.
               </p>
@@ -395,30 +395,30 @@ export default function ChatInterface() {
                   return (
                     <div key={q.label} className="relative group">
                       {editingLabel === q.label ? (
-                        <div className="bg-gray-800 border border-orange-500/50 rounded-xl p-3 space-y-2">
-                          <p className="text-xs text-gray-400 font-medium">{q.label} — edit prompt</p>
+                        <div className="bg-raised border border-accent/50 rounded-xl p-3 space-y-2">
+                          <p className="text-xs text-ink-3 font-medium">{q.label} — edit prompt</p>
                           <textarea
                             value={editDraft}
                             onChange={e => setEditDraft(e.target.value)}
                             rows={5}
-                            className="w-full bg-gray-900 text-sm text-gray-200 rounded-lg p-2 outline-none resize-none border border-gray-700 focus:border-orange-500"
+                            className="w-full bg-surface text-sm text-ink rounded-lg p-2 outline-none resize-none border border-line-strong focus:border-accent"
                           />
                           <div className="flex gap-2 justify-end">
                             <button
                               onClick={() => resetPrompt(q.label, q.prompt)}
-                              className="text-xs text-gray-500 hover:text-gray-300 px-2 py-1 transition-colors"
+                              className="text-xs text-ink-4 hover:text-ink-2 px-2 py-1 transition-colors"
                             >
                               Reset to default
                             </button>
                             <button
                               onClick={() => setEditingLabel(null)}
-                              className="text-xs text-gray-400 hover:text-white px-3 py-1 rounded-lg bg-gray-700 transition-colors"
+                              className="text-xs text-ink-3 hover:text-ink px-3 py-1 rounded-lg bg-hover transition-colors"
                             >
                               Cancel
                             </button>
                             <button
                               onClick={saveEdit}
-                              className="text-xs text-white px-3 py-1 rounded-lg bg-orange-500 hover:bg-orange-400 transition-colors"
+                              className="text-xs text-ink px-3 py-1 rounded-lg bg-accent hover:bg-accent-hi transition-colors"
                             >
                               Save
                             </button>
@@ -428,16 +428,16 @@ export default function ChatInterface() {
                         <>
                           <button
                             onClick={() => sendMessage(prompt)}
-                            className="w-full text-left text-sm text-gray-300 bg-gray-800 hover:bg-gray-700 border border-gray-700 hover:border-orange-500 rounded-xl px-4 py-2.5 transition-colors pr-10"
+                            className="w-full text-left text-sm text-ink-2 bg-raised hover:bg-hover border border-line-strong hover:border-accent rounded-xl px-4 py-2.5 transition-colors pr-10"
                           >
                             {q.label}
                             {customPrompts[q.label] && (
-                              <span className="ml-2 text-xs text-orange-500/70">customised</span>
+                              <span className="ml-2 text-xs text-accent/70">customised</span>
                             )}
                           </button>
                           <button
                             onClick={() => openEdit(q.label, prompt)}
-                            className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 p-1.5 text-gray-500 hover:text-white transition-all rounded-lg hover:bg-gray-700"
+                            className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 p-1.5 text-ink-4 hover:text-ink transition-all rounded-lg hover:bg-hover"
                             title="Edit prompt"
                           >
                             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -455,7 +455,7 @@ export default function ChatInterface() {
             messages.map((msg, i) => <MessageBubble key={i} message={msg} />)
           )}
           {loading && messages[messages.length - 1]?.content === '' && (
-            <div className="flex items-center gap-2 text-gray-500 text-sm ml-10">
+            <div className="flex items-center gap-2 text-ink-4 text-sm ml-10">
               <div className="flex gap-1">
                 <span className="w-2 h-2 rounded-full bg-gray-500 animate-bounce [animation-delay:0ms]" />
                 <span className="w-2 h-2 rounded-full bg-gray-500 animate-bounce [animation-delay:150ms]" />
@@ -468,8 +468,8 @@ export default function ChatInterface() {
         </div>
 
         {/* Input area */}
-        <div className="border-t border-gray-800 p-4">
-          <div className="flex gap-3 items-end bg-gray-800 rounded-2xl p-2">
+        <div className="border-t border-line p-4">
+          <div className="flex gap-3 items-end bg-raised rounded-2xl p-2">
             <textarea
               ref={inputRef}
               value={input}
@@ -477,7 +477,7 @@ export default function ChatInterface() {
               onKeyDown={handleKeyDown}
               placeholder="Ask about your training…"
               rows={1}
-              className="flex-1 bg-transparent text-white placeholder-gray-500 resize-none outline-none text-sm px-2 py-1.5 max-h-32"
+              className="flex-1 bg-transparent text-ink placeholder-ink-4 resize-none outline-none text-sm px-2 py-1.5 max-h-32"
               style={{ height: 'auto' }}
               onInput={(e) => {
                 const t = e.currentTarget;
@@ -488,14 +488,14 @@ export default function ChatInterface() {
             <button
               onClick={() => sendMessage(input)}
               disabled={!input.trim() || loading}
-              className="w-9 h-9 rounded-xl bg-orange-500 hover:bg-orange-400 disabled:bg-gray-700 disabled:cursor-not-allowed flex items-center justify-center transition-colors flex-shrink-0"
+              className="w-9 h-9 rounded-xl bg-accent hover:bg-accent-hi disabled:bg-hover disabled:cursor-not-allowed flex items-center justify-center transition-colors flex-shrink-0"
             >
-              <svg className="w-4 h-4 text-white rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="w-4 h-4 text-ink rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
               </svg>
             </button>
           </div>
-          <p className="text-xs text-gray-600 text-center mt-2">Enter to send · Shift+Enter for new line</p>
+          <p className="text-xs text-ink-5 text-center mt-2">Enter to send · Shift+Enter for new line</p>
         </div>
       </div>
     </div>

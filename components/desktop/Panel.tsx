@@ -19,10 +19,10 @@ export default function Panel({
   bodyClassName?: string;
 }) {
   return (
-    <section className={`bg-gray-900 border border-gray-800 rounded-xl min-w-0 min-h-0 flex flex-col ${className}`}>
+    <section className={`bg-surface border border-line rounded-xl min-w-0 min-h-0 flex flex-col ${className}`}>
       {(title || controls) && (
         <div className="flex items-center justify-between gap-3 px-4 pt-3 pb-2 flex-shrink-0">
-          {title && <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{title}</h2>}
+          {title && <h2 className="text-xs font-semibold text-ink-4 uppercase tracking-wider">{title}</h2>}
           {controls}
         </div>
       )}

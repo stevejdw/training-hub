@@ -182,11 +182,11 @@ export default function CreatePlanModal({ onClose, onCreated }: Props) {
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 px-4 pt-[calc(1rem_+_env(safe-area-inset-top))] pb-[calc(89px_+_env(safe-area-inset-bottom))] md:pt-4 md:pb-4">
-      <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-md max-h-[calc(100vh_-_73px_-_2rem_-_env(safe-area-inset-top)_-_env(safe-area-inset-bottom))] md:max-h-[90vh] flex flex-col">
+      <div className="bg-surface border border-line-strong rounded-2xl w-full max-w-md max-h-[calc(100vh_-_73px_-_2rem_-_env(safe-area-inset-top)_-_env(safe-area-inset-bottom))] md:max-h-[90vh] flex flex-col">
         <div className="p-6 overflow-y-auto flex-1 min-h-0 space-y-5">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-white">Generate Training Plan</h2>
-          <button onClick={onClose} disabled={busy} className="text-gray-500 hover:text-white transition-colors">
+          <h2 className="text-lg font-semibold text-ink">Generate Training Plan</h2>
+          <button onClick={onClose} disabled={busy} className="text-ink-4 hover:text-ink transition-colors">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -196,27 +196,27 @@ export default function CreatePlanModal({ onClose, onCreated }: Props) {
         <div className="space-y-4">
 
           <div>
-            <label className="text-xs text-gray-400 uppercase tracking-wider block mb-1">Name</label>
+            <label className="text-xs text-ink-3 uppercase tracking-wider block mb-1">Name</label>
             <input
               value={planName}
               onChange={e => setPlanName(e.target.value)}
               disabled={busy}
               placeholder="e.g. Summer Base 2026"
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-orange-500"
+              className="w-full bg-raised border border-line-strong rounded-lg px-3 py-2 text-sm text-ink placeholder-ink-5 focus:outline-none focus:border-accent"
             />
           </div>
           <div>
-            <label className="text-xs text-gray-400 uppercase tracking-wider block mb-1">Goal (optional)</label>
+            <label className="text-xs text-ink-3 uppercase tracking-wider block mb-1">Goal (optional)</label>
             <input
               value={goal}
               onChange={e => setGoal(e.target.value)}
               disabled={busy}
               placeholder="e.g. Build base for Peaks Challenge"
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-orange-500"
+              className="w-full bg-raised border border-line-strong rounded-lg px-3 py-2 text-sm text-ink placeholder-ink-5 focus:outline-none focus:border-accent"
             />
           </div>
           <div>
-            <label className="text-xs text-gray-400 uppercase tracking-wider block mb-1">Weeks</label>
+            <label className="text-xs text-ink-3 uppercase tracking-wider block mb-1">Weeks</label>
             <div className="flex gap-2">
               {[4, 8, 12].map(w => (
                 <button
@@ -224,7 +224,7 @@ export default function CreatePlanModal({ onClose, onCreated }: Props) {
                   onClick={() => setWeeks(w)}
                   disabled={busy}
                   className={`flex-1 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                    weeks === w ? 'bg-orange-500 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'
+                    weeks === w ? 'bg-accent text-ink' : 'bg-raised text-ink-3 hover:text-ink'
                   }`}
                 >
                   {w}
@@ -233,16 +233,16 @@ export default function CreatePlanModal({ onClose, onCreated }: Props) {
             </div>
           </div>
           <div>
-            <label className="text-xs text-gray-400 uppercase tracking-wider block mb-1">Start date (week of)</label>
+            <label className="text-xs text-ink-3 uppercase tracking-wider block mb-1">Start date (week of)</label>
             <input
               type="date"
               value={planStartDate}
               onChange={e => setPlanStartDate(e.target.value)}
               disabled={busy}
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-orange-500 [color-scheme:dark]"
+              className="w-full bg-raised border border-line-strong rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-accent [color-scheme:dark]"
             />
             {planStartDate && (
-              <p className="text-[10px] text-gray-500 mt-1">
+              <p className="text-micro text-ink-4 mt-1">
                 Plan runs {planStartDate} – {addDays(planStartDate, weeks * 7 - 1)} ({weeks} weeks)
               </p>
             )}
@@ -250,10 +250,10 @@ export default function CreatePlanModal({ onClose, onCreated }: Props) {
           </div>
 
           <div>
-            <label className="text-xs text-gray-400 uppercase tracking-wider block mb-1">
+            <label className="text-xs text-ink-3 uppercase tracking-wider block mb-1">
               Weekly TSS target
               {tssSource && (
-                <span className="ml-2 normal-case tracking-normal text-[10px] text-gray-500">
+                <span className="ml-2 normal-case tracking-normal text-micro text-ink-4">
                   · {tssSource === 'configured' ? 'from your settings' : tssSource === '4-week-avg' ? 'suggested from last 4 weeks' : 'default'}
                 </span>
               )}
@@ -270,14 +270,14 @@ export default function CreatePlanModal({ onClose, onCreated }: Props) {
               }}
               disabled={busy}
               placeholder="e.g. 400"
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-orange-500"
+              className="w-full bg-raised border border-line-strong rounded-lg px-3 py-2 text-sm text-ink placeholder-ink-5 focus:outline-none focus:border-accent"
             />
             {tssDetail && (
-              <p className="text-[10px] text-gray-500 mt-1">{tssDetail}. Edit to override.</p>
+              <p className="text-micro text-ink-4 mt-1">{tssDetail}. Edit to override.</p>
             )}
           </div>
           <div>
-            <label className="text-xs text-gray-400 uppercase tracking-wider block mb-2">Training days</label>
+            <label className="text-xs text-ink-3 uppercase tracking-wider block mb-2">Training days</label>
             <div className="flex gap-1.5">
               {DOW_LABELS.map((label, i) => (
                 <button
@@ -286,8 +286,8 @@ export default function CreatePlanModal({ onClose, onCreated }: Props) {
                   disabled={busy}
                   className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                     trainingDays.includes(i)
-                      ? 'bg-orange-500 text-white'
-                      : 'bg-gray-800 text-gray-400 hover:text-white'
+                      ? 'bg-accent text-ink'
+                      : 'bg-raised text-ink-3 hover:text-ink'
                   }`}
                 >
                   {label}
@@ -298,17 +298,17 @@ export default function CreatePlanModal({ onClose, onCreated }: Props) {
 
           {/* Per-day settings */}
           <div>
-            <label className="text-xs text-gray-400 uppercase tracking-wider block mb-2">Day settings</label>
+            <label className="text-xs text-ink-3 uppercase tracking-wider block mb-2">Day settings</label>
             <div className="space-y-1.5">
               {/* Header row */}
               <div className="grid grid-cols-[56px_1fr_auto] gap-2 px-1">
-                <span className="text-[10px] text-gray-600 uppercase tracking-wider">Day</span>
-                <span className="text-[10px] text-gray-600 uppercase tracking-wider">Available time</span>
-                <span className="text-[10px] text-gray-600 uppercase tracking-wider">Group ride</span>
+                <span className="text-micro text-ink-5 uppercase tracking-wider">Day</span>
+                <span className="text-micro text-ink-5 uppercase tracking-wider">Available time</span>
+                <span className="text-micro text-ink-5 uppercase tracking-wider">Group ride</span>
               </div>
               {trainingDays.map(i => (
-                <div key={i} className="grid grid-cols-[56px_1fr_auto] gap-2 items-center bg-gray-800/50 rounded-lg px-2 py-1.5">
-                  <span className="text-xs font-medium text-gray-300">{DOW_LABELS[i]}</span>
+                <div key={i} className="grid grid-cols-[56px_1fr_auto] gap-2 items-center bg-raised/50 rounded-lg px-2 py-1.5">
+                  <span className="text-xs font-medium text-ink-2">{DOW_LABELS[i]}</span>
                   {/* Time pills */}
                   <div className="flex gap-1 flex-wrap">
                     {TIME_OPTIONS.map(opt => (
@@ -316,10 +316,10 @@ export default function CreatePlanModal({ onClose, onCreated }: Props) {
                         key={opt.minutes}
                         onClick={() => updateDaySetting(i, 'maxMinutes', opt.minutes)}
                         disabled={busy}
-                        className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${
+                        className={`px-2 py-0.5 rounded text-micro font-medium transition-colors ${
                           daySettings[i]?.maxMinutes === opt.minutes
-                            ? 'bg-orange-500 text-white'
-                            : 'bg-gray-700 text-gray-400 hover:text-white'
+                            ? 'bg-accent text-ink'
+                            : 'bg-hover text-ink-3 hover:text-ink'
                         }`}
                       >
                         {opt.label}
@@ -331,7 +331,7 @@ export default function CreatePlanModal({ onClose, onCreated }: Props) {
                     onClick={() => updateDaySetting(i, 'isGroupRide', !daySettings[i]?.isGroupRide)}
                     disabled={busy}
                     className={`relative w-9 h-5 rounded-full transition-colors duration-200 flex-shrink-0 ${
-                      daySettings[i]?.isGroupRide ? 'bg-blue-500' : 'bg-gray-700'
+                      daySettings[i]?.isGroupRide ? 'bg-blue-500' : 'bg-hover'
                     }`}
                   >
                     <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all duration-200 ${
@@ -341,11 +341,11 @@ export default function CreatePlanModal({ onClose, onCreated }: Props) {
                 </div>
               ))}
             </div>
-            <p className="text-[10px] text-gray-600 mt-1.5">Group ride days use steady-state targets, not structured intervals.</p>
+            <p className="text-micro text-ink-5 mt-1.5">Group ride days use steady-state targets, not structured intervals.</p>
           </div>
 
           <div>
-            <label className="text-xs text-gray-400 uppercase tracking-wider block mb-1">Additional instructions (optional)</label>
+            <label className="text-xs text-ink-3 uppercase tracking-wider block mb-1">Additional instructions (optional)</label>
 
             <textarea
               value={notes}
@@ -353,35 +353,35 @@ export default function CreatePlanModal({ onClose, onCreated }: Props) {
               disabled={busy}
               rows={2}
               placeholder="e.g. Focus on threshold work, available Tue/Thu/Sat/Sun"
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-orange-500 resize-none"
+              className="w-full bg-raised border border-line-strong rounded-lg px-3 py-2 text-sm text-ink placeholder-ink-5 focus:outline-none focus:border-accent resize-none"
             />
           </div>
         </div>
         </div> {/* end scrollable content */}
 
         {/* Pinned footer — always visible above the bottom nav / home indicator */}
-        <div className="px-6 pt-3 pb-6 space-y-3 border-t border-gray-800">
+        <div className="px-6 pt-3 pb-6 space-y-3 border-t border-line">
         {status === 'generating' && (
 
           <div className="space-y-2">
-            <div className="flex items-center gap-2 text-sm text-orange-400">
+            <div className="flex items-center gap-2 text-sm text-accent-hi">
               <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
               </svg>
               Generating week {Math.min(weekProgress + 1, weeks)} of {weeks}…
             </div>
-            <div className="h-1.5 w-full bg-gray-800 rounded-full overflow-hidden">
+            <div className="h-1.5 w-full bg-raised rounded-full overflow-hidden">
               <div
-                className="h-full bg-orange-500 transition-all duration-300"
+                className="h-full bg-accent transition-all duration-300"
                 style={{ width: `${(weekProgress / weeks) * 100}%` }}
               />
             </div>
-            <p className="text-[10px] text-gray-500">Each week takes ~25s. Please keep this tab open.</p>
+            <p className="text-micro text-ink-4">Each week takes ~25s. Please keep this tab open.</p>
           </div>
         )}
         {status === 'saving' && (
-          <p className="text-sm text-gray-400">Saving plan…</p>
+          <p className="text-sm text-ink-3">Saving plan…</p>
         )}
         {status === 'error' && (
           <p className="text-sm text-red-400">{errorMsg}</p>
@@ -391,14 +391,14 @@ export default function CreatePlanModal({ onClose, onCreated }: Props) {
           <button
             onClick={onClose}
             disabled={busy}
-            className="flex-1 py-2 rounded-lg bg-gray-800 text-gray-400 hover:text-white text-sm transition-colors disabled:opacity-50"
+            className="flex-1 py-2 rounded-lg bg-raised text-ink-3 hover:text-ink text-sm transition-colors disabled:opacity-50"
           >
             Cancel
           </button>
           <button
             onClick={handleGenerate}
             disabled={!canGenerate}
-            className="flex-1 py-2 rounded-lg bg-orange-500 hover:bg-orange-400 text-white text-sm font-medium transition-colors disabled:opacity-50"
+            className="flex-1 py-2 rounded-lg bg-accent hover:bg-accent-hi text-ink text-sm font-medium transition-colors disabled:opacity-50"
           >
             {status === 'generating' ? 'Generating…' : status === 'saving' ? 'Saving…' : 'Generate with AI'}
 
