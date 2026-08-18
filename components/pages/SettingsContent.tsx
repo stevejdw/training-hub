@@ -5,6 +5,7 @@ import { type ThemePreference, getThemePreference, setThemePreference } from '@/
 import { iconFor } from '@/components/nav-items';
 import { PageShell, useProfileEdit } from '@/lib/use-profile-edit';
 import TrainingPlansSettings from '@/components/training/TrainingPlansSettings';
+import SaveStatus from '@/components/ui/SaveStatus';
 
 interface HistoryStatus {
   total:       number;
@@ -42,7 +43,7 @@ function sinceLabel(iso: string | null): string {
 }
 
 export default function SettingsContent() {
-  const { profile, update, save, saving, saved } = useProfileEdit();
+  const { profile, update, updateAndSave, save, saving, saved, error } = useProfileEdit();
   const [theme, setTheme] = useState<ThemePreference>('dark');
 
   // History import state
@@ -51,12 +52,6 @@ export default function SettingsContent() {
   const [historyBusy, setHistoryBusy]       = useState(false);
   const [historyLog, setHistoryLog]         = useState<string[]>([]);
   const [historyDone, setHistoryDone]       = useState(false);
-
-  // Stream backfill state
-  const [streamBackfillRemaining, setStreamBackfillRemaining] = useState<number | null>(null);
-  const [streamBackfillBusy, setStreamBackfillBusy]           = useState(false);
-  const [streamBackfillLog, setStreamBackfillLog]             = useState<string[]>([]);
-  const [streamBackfillDone, setStreamBackfillDone]           = useState(false);
 
   // Strava recent sync state
   const [stravaSyncing, setStravaSyncing] = useState(false);
@@ -94,10 +89,6 @@ export default function SettingsContent() {
       .then((d: HistoryStatus) => setHistoryStatus(d))
       .catch(() => {})
       .finally(() => setHistoryLoading(false));
-    fetch('/api/activities/backfill/streams')
-      .then(r => r.json())
-      .then((d: { remaining: number }) => setStreamBackfillRemaining(d.remaining))
-      .catch(() => {});
   }, []);
 
   // Load wellness status + pre-fill credentials from profile on mount
@@ -132,6 +123,7 @@ export default function SettingsContent() {
 
     let before: number | undefined = historyStatus?.oldestEpoch || undefined;
     let totalSynced = 0;
+    let finished = false;
 
     try {
       // Loop: fetch batch → if hasMore, use nextBefore for next call
@@ -165,12 +157,15 @@ export default function SettingsContent() {
         if (!data.hasMore || !data.nextBefore) {
           setHistoryLog(l => [...l, `Done — ${totalSynced} activities imported total.`]);
           setHistoryDone(true);
+          finished = true;
           break;
         }
         before = data.nextBefore;
       }
 
-      if (!historyDone && totalSynced > 0) {
+      // Loop-local, not the `historyDone` state: setState is async, so reading
+      // the state here would always see `false` and wrongly report a pause.
+      if (!finished && totalSynced > 0) {
         setHistoryLog(l => [...l, `Paused after 1 000 activities. Press Import again to continue.`]);
       }
 
@@ -182,31 +177,6 @@ export default function SettingsContent() {
       setHistoryLog(l => [...l, `Failed: ${String(err)}`]);
     } finally {
       setHistoryBusy(false);
-    }
-  }
-
-  async function runStreamBackfill() {
-    if (streamBackfillBusy) return;
-    setStreamBackfillBusy(true);
-    setStreamBackfillDone(false);
-    setStreamBackfillLog([]);
-    let totalProcessed = 0;
-    try {
-      for (let pass = 0; pass < 50; pass++) {
-        const res  = await fetch('/api/activities/backfill/streams', { method: 'POST' });
-        const data = await res.json() as { processed: number; remaining: number; rateLimited?: boolean; error?: string };
-        if (data.error) { setStreamBackfillLog(l => [...l, `Error: ${data.error}`]); break; }
-        totalProcessed += data.processed;
-        setStreamBackfillRemaining(data.remaining);
-        setStreamBackfillLog(l => [...l, `Updated ${totalProcessed} activities · ${data.remaining} remaining`]);
-        if (data.rateLimited) { setStreamBackfillLog(l => [...l, 'Rate limited — try again in a few minutes']); break; }
-        if (data.remaining === 0) { setStreamBackfillDone(true); break; }
-        if (data.processed === 0) { setStreamBackfillLog(l => [...l, 'No progress — stopping']); break; }
-      }
-    } catch (err) {
-      setStreamBackfillLog(l => [...l, `Failed: ${String(err)}`]);
-    } finally {
-      setStreamBackfillBusy(false);
     }
   }
 
@@ -398,7 +368,7 @@ export default function SettingsContent() {
               return (
                 <button
                   key={id}
-                  onClick={() => { update('app_icon', id); save(); }}
+                  onClick={() => { void updateAndSave('app_icon', id); }}
                   className={`flex flex-col items-center gap-1.5 p-2 rounded-xl border-2 transition-colors ${active ? 'border-orange-500 bg-orange-500/10' : 'border-gray-700 hover:border-gray-600'}`}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -693,7 +663,7 @@ export default function SettingsContent() {
               <button
                 key={opt.id}
                 type="button"
-                onClick={async () => { update('primary_source', opt.id); await save(); }}
+                onClick={async () => { await updateAndSave('primary_source', opt.id); }}
                 disabled={saving || !opt.ready}
                 aria-pressed={active}
                 title={opt.ready ? undefined : 'Garmin activity sync is not built yet'}
@@ -749,7 +719,7 @@ export default function SettingsContent() {
           <input
             type="checkbox"
             checked={profile?.intervals_wellness_enabled !== false}
-            onChange={async e => { update('intervals_wellness_enabled', e.target.checked); await save(); }}
+            onChange={async e => { await updateAndSave('intervals_wellness_enabled', e.target.checked); }}
             disabled={saving}
             className="mt-0.5 w-4 h-4 accent-orange-500"
           />
@@ -1018,9 +988,12 @@ export default function SettingsContent() {
         >
           Sign out
         </button>
-        <button onClick={() => save()} disabled={saving} className="px-6 py-2.5 rounded-lg bg-orange-500 hover:bg-orange-400 disabled:opacity-50 text-white text-sm font-medium transition-colors">
-          {saving ? 'Saving…' : saved ? 'Saved ✓' : 'Save settings'}
-        </button>
+        <div className="flex items-center gap-3">
+          <SaveStatus error={error} onRetry={() => save()} />
+          <button onClick={() => save()} disabled={saving} className="px-6 py-2.5 rounded-lg bg-orange-500 hover:bg-orange-400 disabled:opacity-50 text-white text-sm font-medium transition-colors">
+            {saving ? 'Saving…' : saved ? 'Saved ✓' : 'Save settings'}
+          </button>
+        </div>
       </div>
     </PageShell>
   );

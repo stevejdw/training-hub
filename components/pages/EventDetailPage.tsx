@@ -18,6 +18,7 @@ import { iconFor } from '@/components/nav-items';
 import { useProfileEdit, inputCls } from '@/lib/use-profile-edit';
 import Link from 'next/link';
 import { calendarDaysFromToday } from '@/lib/calendar-days';
+import SaveStatus from '@/components/ui/SaveStatus';
 
 const DEFAULT_FLAT_WATTS    = 260;
 const DEFAULT_DESCENT_WATTS = 120;
@@ -183,7 +184,7 @@ interface Props { eventId: string }
 
 export default function EventDetailPage({ eventId }: Props) {
   const router = useRouter();
-  const { profile, setProfile, save, saving } = useProfileEdit();
+  const { profile, setProfile, save, saving, error } = useProfileEdit();
 
   const eventIdx = profile?.events.findIndex(e => (e.id ?? '') === eventId) ?? -1;
   const event    = eventIdx >= 0 ? profile!.events[eventIdx] : null;
@@ -554,6 +555,7 @@ export default function EventDetailPage({ eventId }: Props) {
         <button onClick={cancelEdit} className="px-3 py-1.5 text-sm text-gray-400 hover:text-white transition-colors">
           Cancel
         </button>
+        <SaveStatus error={error} onRetry={saveEdit} />
         <button
           onClick={saveEdit}
           disabled={saving}

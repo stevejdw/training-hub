@@ -12,6 +12,7 @@ import {
 import PageHeader from '@/components/PageHeader';
 import { iconFor } from '@/components/nav-items';
 import { useProfileEdit } from '@/lib/use-profile-edit';
+import SaveStatus from '@/components/ui/SaveStatus';
 
 interface MatchingActivity {
   id:                   number;
@@ -59,7 +60,7 @@ const COLS = 'grid-cols-[minmax(100px,1fr)_46px_50px_68px_68px_50px]';
 interface Props { eventId: string }
 
 export default function EventPacingPage({ eventId }: Props) {
-  const { profile, setProfile, save, saving } = useProfileEdit();
+  const { profile, setProfile, save, saving, error } = useProfileEdit();
 
   const eventIdx = profile?.events.findIndex(e => (e.id ?? '') === eventId) ?? -1;
   const event    = eventIdx >= 0 ? profile!.events[eventIdx] : null;
@@ -639,6 +640,7 @@ export default function EventPacingPage({ eventId }: Props) {
                     Cancel
                   </button>
                 )}
+                <SaveStatus error={error} onRetry={saveAndPersist} />
                 <button onClick={saveAndPersist} disabled={saving}
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 ${editingPacing ? 'bg-orange-500 hover:bg-orange-400 text-white' : 'bg-orange-500/20 text-orange-400 hover:bg-orange-500/30'}`}>
                   {saving ? 'Saving…' : editingPacing ? 'Save' : 'Save pacing'}

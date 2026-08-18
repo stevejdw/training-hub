@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { PowerTarget } from '@/lib/profile';
 import { iconFor } from '@/components/nav-items';
 import { PageShell, inputCls, useProfileEdit } from '@/lib/use-profile-edit';
+import SaveStatus from '@/components/ui/SaveStatus';
 
 const TIMEZONES = [
   { label: 'Sydney / Melbourne (AEST/AEDT)',  value: 'Australia/Sydney'    },
@@ -53,7 +54,7 @@ function Card({ title, children, action }: { title: string; children: React.Reac
 }
 
 export default function ProfileContent() {
-  const { profile, setProfile, update, save, saving, saved } = useProfileEdit();
+  const { profile, setProfile, update, save, saving, saved, error } = useProfileEdit();
   const [eftpData, setEftpData] = useState<EftpData | null>(null);
 
   useEffect(() => {
@@ -197,7 +198,8 @@ export default function ProfileContent() {
         </div>
       </Card>
 
-      <div className="flex justify-end">
+      <div className="flex justify-end items-center gap-3">
+        <SaveStatus error={error} onRetry={() => save()} />
         <button onClick={() => save()} disabled={saving} className="px-6 py-2.5 rounded-lg bg-orange-500 hover:bg-orange-400 disabled:opacity-50 text-white text-sm font-medium transition-colors">
           {saving ? 'Saving…' : saved ? 'Saved ✓' : 'Save profile'}
         </button>

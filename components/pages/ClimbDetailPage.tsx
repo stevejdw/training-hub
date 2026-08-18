@@ -12,6 +12,7 @@ import EnlargeableChart from '@/components/EnlargeableChart';
 import { iconFor } from '@/components/nav-items';
 import { estimateTime, fmtTime, speedForPower, powerForSpeed } from '@/lib/pacing';
 import Link from 'next/link';
+import SaveStatus from '@/components/ui/SaveStatus';
 
 interface Effort {
   id: number;
@@ -40,7 +41,7 @@ interface Props { eventId: string; climbIdx: number }
 
 export default function ClimbDetailPage({ eventId, climbIdx }: Props) {
   const router = useRouter();
-  const { profile, setProfile, save, saving } = useProfileEdit();
+  const { profile, setProfile, save, saving, error } = useProfileEdit();
 
   const event = profile?.events.find(e => (e.id ?? '') === eventId) ?? null;
   const climb = event?.pacing_strategy?.climbs?.[climbIdx] ?? null;
@@ -174,10 +175,13 @@ export default function ClimbDetailPage({ eventId, climbIdx }: Props) {
   const domainMin = Math.max(0, altMin - 20);
 
   const saveBtn = (
-    <button onClick={handleSave} disabled={saving}
-      className="px-4 py-1.5 rounded-lg bg-orange-500 hover:bg-orange-400 disabled:opacity-50 text-white text-sm font-medium transition-colors">
-      {saving ? 'Saving…' : 'Save'}
-    </button>
+    <div className="flex items-center gap-3">
+      <SaveStatus error={error} onRetry={handleSave} />
+      <button onClick={handleSave} disabled={saving}
+        className="px-4 py-1.5 rounded-lg bg-orange-500 hover:bg-orange-400 disabled:opacity-50 text-white text-sm font-medium transition-colors">
+        {saving ? 'Saving…' : 'Save'}
+      </button>
+    </div>
   );
 
   return (

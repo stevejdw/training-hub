@@ -145,7 +145,9 @@ export default function AerobicEfficiencyChart({ activityId, showCompare }: { ac
     }));
   }, [compareData]);
 
-  // Half-way point based on actual chart data midpoint, not moving_time
+  // Array midpoint, deliberately NOT moving_time/2: the API splits decoupling
+  // at Math.floor(n/2) of the raw sample array, so this keeps the shaded half
+  // aligned with the ef_h1 / ef_h2 figures shown above the chart.
   const halfMin = chartData.length > 0
     ? chartData[Math.floor(chartData.length / 2)].t
     : 0;
@@ -417,20 +419,26 @@ export default function AerobicEfficiencyChart({ activityId, showCompare }: { ac
                     tickFormatter={v => v.toFixed(2)}
                   />
                 )}
+                {/* Always-mounted hidden axis. The half-split used to hang off
+                    yAxisId="w", which unmounts with the Power toggle — turning
+                    Power off silently removed the shading the caption promised. */}
+                <YAxis yAxisId="split" hide domain={[0, 1]} />
                 {/* Shade first vs second half */}
                 {halfMin > 0 && (
                   <ReferenceArea
-                    yAxisId="w"
+                    yAxisId="split"
                     x1={0}
                     x2={halfMin}
+                    y1={0}
+                    y2={1}
                     fill="#f97316"
-                    fillOpacity={0.04}
+                    fillOpacity={0.09}
                     stroke="none"
                   />
                 )}
                 {halfMin > 0 && (
                   <ReferenceLine
-                    yAxisId="w"
+                    yAxisId="split"
                     x={halfMin}
                     stroke="#374151"
                     strokeDasharray="4 3"

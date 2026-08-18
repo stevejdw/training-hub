@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import SubTabBar from './SubTabBar';
 import LazySection from './LazySection';
@@ -25,7 +25,16 @@ function SectionHeading({ title, subtitle }: { title: string; subtitle?: string 
 export default function PerformancePage() {
   const sp = useSearchParams();
   const initialTab: Tab = sp.get('tab') === 'power' ? 'power' : 'fitness';
+  const sub = sp.get('sub');
   const [tab, setTab] = useState<Tab>(initialTab);
+
+  /* ?sub=readiness deep-links to the Readiness section. The <section> wrapper
+     renders immediately (LazySection only defers its children), so it is a
+     valid scroll target on mount. */
+  useEffect(() => {
+    if (tab !== 'fitness' || sub !== 'readiness') return;
+    document.getElementById('readiness')?.scrollIntoView({ block: 'start' });
+  }, [tab, sub]);
 
   const tabs = [
     { key: 'fitness' as const, label: 'Fitness' },
@@ -71,7 +80,7 @@ export default function PerformancePage() {
                   <AerobicEfficiencyTab />
                 </LazySection>
               </section>
-              <section className="pt-2 border-t border-gray-800/60">
+              <section id="readiness" className="pt-2 border-t border-gray-800/60">
                 <SectionHeading title="Readiness" subtitle="HRV vs Normal Zone" />
                 <LazySection>
                   <ReadinessTab />

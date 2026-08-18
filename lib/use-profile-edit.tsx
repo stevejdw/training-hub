@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import PageHeader from '@/components/PageHeader';
 import { AthleteProfile } from '@/lib/profile';
 
@@ -14,19 +14,44 @@ export function useProfileEdit() {
   const [saved,   setSaved]   = useState(false);
   const [error,   setError]   = useState<string | null>(null);
 
+  /* save() used to read `profile` straight from the render closure, so the very
+     common `update(k, v); save();` pair PUT the *pre-update* object — the change
+     appeared to stick (local state had moved) and then reverted on reload. The
+     ref always holds the latest value, so save() is correct from any closure. */
+  const profileRef = useRef<AthleteProfile | null>(null);
+
   useEffect(() => {
     fetch('/api/profile')
       .then(r => r.json())
-      .then(setProfile)
+      .then(p => { profileRef.current = p; setProfile(p); })
       .catch(e => setError(String(e)));
   }, []);
 
+  /* Derived from the ref rather than from `prev`, because React defers updater
+     functions until re-render — so a same-tick `update(a); update(b); save()`
+     would otherwise persist neither. Reading and writing the ref synchronously
+     makes sequential updates in one handler compose correctly. */
   function update<K extends keyof AthleteProfile>(key: K, value: AthleteProfile[K]) {
-    setProfile(prev => prev ? { ...prev, [key]: value } : prev);
+    const base = profileRef.current;
+    if (!base) return;
+    const next = { ...base, [key]: value };
+    profileRef.current = next;
+    setProfile(next);
+  }
+
+  /** Set one field and persist it in the same tick. Prefer this over
+   *  `update(k, v); save();` for controls that save on click. */
+  function updateAndSave<K extends keyof AthleteProfile>(key: K, value: AthleteProfile[K]) {
+    const base = profileRef.current;
+    if (!base) return;
+    const next = { ...base, [key]: value };
+    profileRef.current = next;
+    setProfile(next);
+    return save(next);
   }
 
   async function save(override?: AthleteProfile) {
-    const body = override ?? profile;
+    const body = override ?? profileRef.current ?? profile;
     if (!body) return;
     setSaving(true);
     setError(null);
@@ -46,7 +71,10 @@ export function useProfileEdit() {
     }
   }
 
-  return { profile, setProfile, update, save, saving, saved, error };
+  /* Consumers also call setProfile directly; keep the ref honest for them too. */
+  useEffect(() => { profileRef.current = profile; }, [profile]);
+
+  return { profile, setProfile, update, updateAndSave, save, saving, saved, error };
 }
 
 /** Shared input/textarea base classes for the editor pages. */

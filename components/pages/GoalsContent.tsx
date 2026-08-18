@@ -2,9 +2,10 @@
 
 import { iconFor } from '@/components/nav-items';
 import { PageShell, inputCls, useProfileEdit } from '@/lib/use-profile-edit';
+import SaveStatus from '@/components/ui/SaveStatus';
 
 export default function GoalsContent() {
-  const { profile, setProfile, save, saving, saved } = useProfileEdit();
+  const { profile, setProfile, save, saving, saved, error } = useProfileEdit();
 
   if (!profile) {
     return <PageShell title="Goals" icon={iconFor("goals")}><div className="text-gray-500 text-sm">Loading…</div></PageShell>;
@@ -64,7 +65,8 @@ export default function GoalsContent() {
         </div>
       </div>
 
-      <div className="flex justify-end">
+      <div className="flex justify-end items-center gap-3">
+        <SaveStatus error={error} onRetry={() => save()} />
         <button onClick={() => save()} disabled={saving} className="px-6 py-2.5 rounded-lg bg-orange-500 hover:bg-orange-400 disabled:opacity-50 text-white text-sm font-medium transition-colors">
           {saving ? 'Saving…' : saved ? 'Saved ✓' : 'Save goals'}
         </button>
