@@ -1,16 +1,14 @@
+import { after } from 'next/server';
 import pool from '@/lib/db';
 import { getProfile } from '@/lib/profile';
+import { ensureEfficiencyTable, warmMissingEfficiency } from '@/lib/aerobic-efficiency';
 import { NextRequest } from 'next/server';
 
 export const runtime = 'nodejs';
-// Averaging both halves of every qualifying ride costs ~500ms per ride because
-// the stored 1 Hz arrays run to tens of thousands of samples on long rides.
-// That was fine while only a few hundred rides had normalized_power; the Garmin
-// backfill made ~2,200 eligible, and 6-month and longer ranges started
-// exceeding 30s and returning nothing. Raised so the chart works today — the
-// real fix is to precompute the half-ride averages once per activity rather
-// than on every chart load (see the note on the query below).
-export const maxDuration = 120;
+// The half-ride averages are precomputed per activity (lib/aerobic-efficiency),
+// so this route reads four floats per ride instead of unnesting 1 Hz arrays.
+// It no longer needs a long budget.
+export const maxDuration = 30;
 
 const CYCLING = ['Ride', 'VirtualRide', 'GravelRide', 'MountainBikeRide'];
 
@@ -91,65 +89,37 @@ export async function GET(req: NextRequest) {
     // Half-ride power/HR averages are computed inside Postgres so only a few
     // scalar columns per ride cross the wire — never the raw watts/hr arrays
     // (which cost ~100-200KB of egress per ride).
-    // Select the qualifying rides FIRST, then unnest streams for only those.
-    //
-    // Previously the stream join and the two LATERALs sat in the same query as
-    // the activity filters, so the planner averaged 1 Hz watts/hr arrays for
-    // every cycling ride before discarding most of them. That was survivable
-    // while few rides had normalized_power; once the Garmin backfill populated
-    // it on ~2,200 rides the query went to ~24s at 90 days and ~46s at 6
-    // months — past the 30s maxDuration, which is why the longer ranges
-    // returned nothing at all.
-    //
-    // MATERIALIZED forces the candidate set to be built before any array work,
-    // so the expensive part runs on tens of rides rather than thousands.
+    // Reads precomputed half-ride averages. Deriving them here meant averaging
+    // the stored 1 Hz watts/hr arrays on every load (~500ms per ride), which
+    // pushed longer ranges past the timeout once the Garmin backfill gave ~2,200
+    // rides power data. They only change when the stream changes, so they are
+    // computed once — same approach as best_power_efforts.
+    await ensureEfficiencyTable(client);
+
     const sql = `
-      WITH candidates AS MATERIALIZED (
-        SELECT
-          a.id,
-          a.start_date,
-          a.start_date::date::text AS date,
-          a.name,
-          a.average_watts,
-          a.normalized_power,
-          a.average_heartrate,
-          a.moving_time,
-          a.summary_polyline
-        FROM activities a
-        WHERE a.sport_type = ANY($1::text[])
-          AND a.normalized_power IS NOT NULL
-          AND a.average_watts    > 0
-          AND a.average_heartrate > 60
-          AND (a.normalized_power::float / a.average_watts) < 1.10
-          AND a.moving_time >= 3600  -- exclude rides shorter than 60 minutes
-          ${interval ? `AND a.start_date >= NOW() - INTERVAL '${interval}'` : ''}
-          ${excludeClause}
-        ORDER BY a.start_date ASC
-        LIMIT 500
-      )
       SELECT
-        c.id, c.date, c.name, c.average_watts, c.normalized_power,
-        c.average_heartrate, c.moving_time, c.summary_polyline,
-        halves.pw1, halves.hr1, halves.pw2, halves.hr2
-      FROM candidates c
-      JOIN activity_streams s ON s.activity_id = c.id
-      CROSS JOIN LATERAL (
-        SELECT LEAST(array_length(s.watts, 1), array_length(s.hr, 1)) AS n
-      ) dims
-      CROSS JOIN LATERAL (
-        SELECT
-          COALESCE(AVG(t.wv) FILTER (WHERE t.ord <= dims.n / 2), 0) AS pw1,
-          COALESCE(AVG(t.hv) FILTER (WHERE t.ord <= dims.n / 2), 0) AS hr1,
-          COALESCE(AVG(t.wv) FILTER (WHERE t.ord >  dims.n / 2 AND t.ord <= dims.n), 0) AS pw2,
-          COALESCE(AVG(t.hv) FILTER (WHERE t.ord >  dims.n / 2 AND t.ord <= dims.n), 0) AS hr2
-        FROM unnest(s.watts, s.hr) WITH ORDINALITY AS t(wv, hv, ord)
-        WHERE t.wv IS NOT NULL AND t.hv IS NOT NULL AND t.hv > 30
-      ) halves
-      WHERE s.watts IS NOT NULL
-        AND s.hr    IS NOT NULL
-        AND array_length(s.watts, 1) > 60
-        AND array_length(s.hr, 1)    > 60
-      ORDER BY c.start_date ASC
+        a.id,
+        a.start_date::date::text     AS date,
+        a.name,
+        a.average_watts,
+        a.normalized_power,
+        a.average_heartrate,
+        a.moving_time,
+        a.summary_polyline,
+        e.pw1, e.hr1, e.pw2, e.hr2
+      FROM activities a
+      JOIN activity_efficiency e ON e.activity_id = a.id
+      WHERE a.sport_type = ANY($1::text[])
+        AND a.normalized_power IS NOT NULL
+        AND a.average_watts    > 0
+        AND a.average_heartrate > 60
+        AND (a.normalized_power::float / a.average_watts) < 1.10
+        AND a.moving_time >= 3600  -- exclude rides shorter than 60 minutes
+        AND e.hr1 > 0 AND e.hr2 > 0
+        ${interval ? `AND a.start_date >= NOW() - INTERVAL '${interval}'` : ''}
+        ${excludeClause}
+      ORDER BY a.start_date ASC
+      LIMIT 500
     `;
 
     const res = await client.query(sql, params);
@@ -184,6 +154,15 @@ export async function GET(req: NextRequest) {
         decoupling:   Math.round(decoupling * 10) / 10,
         hrv_low,
       };
+    });
+
+    // Newly synced rides have no precomputed row yet. Fill a bounded batch
+    // after the response so the chart never waits on it.
+    after(async () => {
+      const c = await pool.connect();
+      try { await warmMissingEfficiency(c, 25); }
+      catch (e) { console.warn('[aerobic-efficiency] warm failed', e); }
+      finally { c.release(); }
     });
 
     return Response.json({ rides, range, zone_boundaries: zoneBoundaries });

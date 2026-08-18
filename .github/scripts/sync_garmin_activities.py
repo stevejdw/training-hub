@@ -298,8 +298,15 @@ def main() -> int:
                 return 0
 
             ftp = gc.athlete_ftp(cur)
-            start = (datetime.now(timezone.utc) - timedelta(days=days)).date().isoformat()
-            end = datetime.now(timezone.utc).date().isoformat()
+            # Garmin filters get_activities_by_date by the activity's LOCAL
+            # date, but this window was computed in UTC. In Sydney (UTC+10) a
+            # ride before 10:00 local carries a local date one day ahead of the
+            # UTC date, so a morning ride sat outside the window — invisible to
+            # every run until UTC caught up, up to ~14 hours later. Pad both
+            # ends by a day; re-listing a already-synced day is idempotent.
+            now = datetime.now(timezone.utc)
+            start = (now - timedelta(days=days + 1)).date().isoformat()
+            end = (now + timedelta(days=1)).date().isoformat()
             print(f"Syncing Garmin activities {start}..{end} (FTP {ftp:.0f})")
 
             acts = g.get_activities_by_date(start, end) or []
