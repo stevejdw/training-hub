@@ -26,8 +26,13 @@ const PERIOD_LABELS: Record<PeriodKey, string> = {
   'all': 'All time',
 };
 
-interface DataPoint { label: string; power: number; }
-interface CurveResponse { curve1: DataPoint[]; curve2: DataPoint[] | null; ftp: number; }
+import type { DataPoint } from '@/components/PowerCurveChart';
+interface CurveResponse {
+  curve1: DataPoint[];
+  curve2: DataPoint[] | null;
+  ftp: number;
+  weightKg?: number | null;
+}
 
 export default function PowerCurveWidget() {
   const [p1, setP1] = useState<PeriodKey>('90d');
@@ -115,20 +120,13 @@ export default function PowerCurveWidget() {
           compareData={data.curve2}
           compareLabel={comparing && p2 !== 'none' ? PERIOD_LABELS[p2] : undefined}
           ftp={data.ftp}
+          weightKg={data.weightKg}
         />
       )}
       {!loading && !data && (
         <div className="h-52 flex items-center justify-center text-gray-600 text-sm">
           Failed to load power curve
         </div>
-      )}
-
-      {/* Legend hint */}
-      {!loading && data && comparing && p2 !== 'none' && (
-        <p className="text-[10px] text-gray-600">
-          <span className="text-orange-400">—</span> {PERIOD_LABELS[p1]} &nbsp;
-          <span className="text-gray-500">- -</span> {PERIOD_LABELS[p2]}
-        </p>
       )}
     </div>
   );

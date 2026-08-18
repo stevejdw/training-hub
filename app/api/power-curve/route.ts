@@ -6,6 +6,16 @@ import { ensureBestPowerTableForRead } from '@/lib/best-power';
 
 export type PeriodKey = string;
 
+export interface PowerCurvePoint {
+  label:   string;
+  seconds: number;
+  power:   number;
+  /** 'best' = true rolling-mean maximum from best_power_efforts.
+   *  'np'   = estimated from an activity's NP/AP because no precomputed
+   *           effort exists at this duration (only ever >= 30 min). */
+  source:  'best' | 'np';
+}
+
 function periodToClause(period: PeriodKey): string {
   if (period === 'all') return '';
   if (period.startsWith('y:')) {
@@ -57,12 +67,16 @@ async function fetchCurve(period: PeriodKey) {
       precomputed.set(Number(row.seconds), Number(row.best_watts));
     }
 
-    const points: { label: string; power: number }[] = [];
+    /* `seconds` lets the chart use a log time axis instead of plotting the
+       labels as evenly spaced categories. `source` marks the NP-derived
+       fallback below so the chart can distinguish a true rolling-mean
+       maximum from an estimate rather than drawing both as one solid line. */
+    const points: PowerCurvePoint[] = [];
 
     for (const d of CURVE_DURATIONS) {
       const val = precomputed.get(d.seconds);
       if (val != null && Number.isFinite(val) && val > 0) {
-        points.push({ label: d.label, power: val });
+        points.push({ label: d.label, seconds: d.seconds, power: val, source: 'best' });
         continue;
       }
 
@@ -77,7 +91,7 @@ async function fetchCurve(period: PeriodKey) {
             ${clause}
         `, [CYCLING_TYPES, d.seconds]);
         if (npRes.rows[0]?.best != null && npRes.rows[0].best > 0) {
-          points.push({ label: d.label, power: Number(npRes.rows[0].best) });
+          points.push({ label: d.label, seconds: d.seconds, power: Number(npRes.rows[0].best), source: 'np' });
         }
       }
     }
@@ -100,7 +114,8 @@ export async function GET(req: NextRequest) {
     ]);
     const curve2 = p2 !== 'none' ? await fetchCurve(p2) : null;
     const ftp = effectiveFtp(profile);
-    return Response.json({ curve1, curve2, ftp });
+    // Weight enables the W/kg readout in the tooltip without a second request.
+    return Response.json({ curve1, curve2, ftp, weightKg: profile?.weight_kg ?? null });
   } catch (err) {
     console.error('Power curve error:', err);
     return Response.json({ error: String(err) }, { status: 500 });

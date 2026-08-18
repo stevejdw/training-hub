@@ -638,13 +638,8 @@ export default function ActivityDetail(
                         compareData={curveData.comparison}
                         compareLabel={curvePeriod !== 'none' ? COMPARE_LABELS[curvePeriod as ComparePeriod] : undefined}
                         ftp={curveData.ftp}
+                        currentLabel="This ride"
                       />
-                      {curveData.comparison && curvePeriod !== 'none' && (
-                        <p className="text-[10px] text-gray-600">
-                          <span className="text-orange-400">—</span> This ride &nbsp;
-                          <span className="text-gray-500">- -</span> {COMPARE_LABELS[curvePeriod as ComparePeriod]}
-                        </p>
-                      )}
                     </>
                   ) : curveData ? (
                     <div className="h-40 flex items-center justify-center text-gray-600 text-sm">
