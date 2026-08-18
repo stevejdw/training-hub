@@ -31,7 +31,9 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  themeColor: '#030712',
+  // No static themeColor: it was pinned to Carbon Dark regardless of the
+  // active theme, so the iOS status bar clashed under every other one.
+  // ThemeProvider now writes <meta name="theme-color"> from --background.
   // Required for correct hit-testing in the installed iOS PWA: without
   // viewport-fit=cover, landscape safe-area insets offset the rendered
   // content from the touch layer, making the whole app unresponsive in
@@ -46,9 +48,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" data-theme="dark" className={`${geistFonts} antialiased`}>
       {/* Anti-flash: apply stored theme before first paint */}
       <head>
-        <script dangerouslySetInnerHTML={{ __html: `(function(){try{var p=localStorage.getItem('theme')||'dark';var valid={'dark':1,'light':1,'ocean':1,'ocean-light':1,'sand':1,'sand-dark':1,'cosmic':1,'forest':1,'ivory':1,'chrome':1};var t=p==='auto'?(new Date().getHours()>=7&&new Date().getHours()<19?'light':'dark'):(valid[p]?p:'dark');document.documentElement.setAttribute('data-theme',t);if(window.Capacitor&&window.Capacitor.isNativePlatform&&window.Capacitor.isNativePlatform()){document.documentElement.classList.add('native-app');}}catch(e){}})();` }} />
+        <script dangerouslySetInnerHTML={{ __html: `(function(){try{var p=localStorage.getItem('theme')||'dark';var valid={'dark':1,'light':1,'ocean':1,'ocean-light':1,'sand':1,'sand-dark':1};var t=p==='auto'?(new Date().getHours()>=7&&new Date().getHours()<19?'light':'dark'):(valid[p]?p:'dark');document.documentElement.setAttribute('data-theme',t);if(window.Capacitor&&window.Capacitor.isNativePlatform&&window.Capacitor.isNativePlatform()){document.documentElement.classList.add('native-app');}}catch(e){}})();` }} />
       </head>
-      <body className="flex flex-col bg-gray-950 text-white">
+      <body className="flex flex-col">
         <ThemeProvider />
         <NativeShell />
         {/* Top nav — desktop only */}

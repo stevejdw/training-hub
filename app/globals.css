@@ -1,233 +1,258 @@
 @import "tailwindcss";
 
-/* ── Dark theme (default) ── */
+/* ─────────────────────────────────────────────────────────────────────────
+   Theming
+   ─────────────────────────────────────────────────────────────────────────
+   Themes used to work by overriding Tailwind's own palette variables
+   (--color-gray-900, --color-orange-500, …) per [data-theme]. That made
+   `bg-gray-900` mean "card surface" and `text-orange-400` mean "accent", so
+   class names bore no relation to the colour they produced — and every chart,
+   which hard-codes hex, stayed dark under the light themes.
+
+   Each theme now declares a semantic set directly. Utilities come from the
+   @theme inline block below, which keeps them as live var() references, so a
+   theme switch is a pure CSS cascade with no JS and no re-render.
+
+   The old gray and orange palette remap is kept for now as a compat shim
+   so un-migrated components keep working; it is removed once every call site
+   is on the semantic utilities.
+   ───────────────────────────────────────────────────────────────────────── */
+
 :root,
 [data-theme="dark"] {
   --background: #030712;
   --foreground: #f9fafb;
+
+  --surface-page:   #030712;
+  --surface-card:   #111827;
+  --surface-raised: #1f2937;
+  --border-subtle:  #1f2937;
+  --border-default: #374151;
+  --text-primary:   #f9fafb;
+  --text-secondary: #d1d5db;
+  --text-muted:     #9ca3af;
+  --text-faint:     #6b7280;
+  --accent:         #f97316;
+  --accent-hi:      #fb923c;
+  --accent-fg:      #ffffff;
+
+  /* Charts. Light themes override these; dark ones inherit. */
+  --chart-grid:           #1f2937;
+  --chart-axis:           #374151;
+  --chart-axis-text:      #6b7280;
+  --chart-cursor:         #4b5563;
+  --chart-tooltip-bg:     #1f2937;
+  --chart-tooltip-border: #374151;
+  --chart-tooltip-text:   #f9fafb;
+  --chart-power:          var(--accent);
+  --chart-hr:             #60a5fa;
+  --chart-ef:             var(--accent);
+  --chart-ctl:            #60a5fa;
+  --chart-atl:            #c084fc;
+  --chart-compare:        #6b7280;
+  --chart-reference:      #9ca3af;
+  --chart-warn:           #fbbf24;
+  --chart-pos:            #34d399;
+  --chart-neg:            #f87171;
+  --chart-2:              #60a5fa;
+
   --top-nav-h: 64px;
   --bottom-nav-h: 56px;
   --desktop-sidebar-w: 232px;
 }
 
-/* ── Ocean Light theme ── */
-[data-theme="ocean-light"] {
-  --background: #f0f9ff;
-  --foreground: #0c4a6e;
-
-  /* Remap gray scale to sky-tinted light tones */
-  --color-white:    #0c4a6e;   /* text-white → sky-900 navy                */
-  --color-gray-950: #f0f9ff;   /* page bg → sky-50                         */
-  --color-gray-900: #ffffff;   /* card bg → white                          */
-  --color-gray-800: #e0f2fe;   /* secondary card → sky-100                 */
-  --color-gray-700: #bae6fd;   /* tertiary surface → sky-200               */
-  --color-gray-600: #7dd3fc;   /* borders → sky-300                        */
-  --color-gray-500: #0369a1;   /* muted text → sky-700                     */
-  --color-gray-400: #075985;   /* secondary text → sky-800                 */
-  --color-gray-300: #0c4a6e;   /* strong secondary → sky-900               */
-  --color-gray-200: #082f49;
-  --color-gray-100: #0c4a6e;
-
-  /* Accent → sky blue (same family as Ocean dark) */
-  --color-orange-500: #0ea5e9;
-  --color-orange-400: #38bdf8;
-  --color-orange-300: #7dd3fc;
-  --color-orange-200: #bae6fd;
-  --color-orange-100: #e0f2fe;
-  --color-orange-600: #0284c7;
-}
-
-/* ── Sand Dark theme ── */
-[data-theme="sand-dark"] {
-  --background: #1a100a;
-  --foreground: #fdf0e0;
-
-  /* Remap gray scale to warm dark brown tones */
-  --color-white:    #fdf0e0;   /* text-white → warm off-white              */
-  --color-gray-950: #1a100a;   /* page bg → near-black warm                */
-  --color-gray-900: #261510;   /* card bg → dark warm                      */
-  --color-gray-800: #3a200e;   /* secondary card                           */
-  --color-gray-700: #4d2d15;   /* borders                                  */
-  --color-gray-600: #66401e;   /* muted borders                            */
-  --color-gray-500: #b08060;   /* muted text — AA contrast on dark bg      */
-  --color-gray-400: #d4a870;   /* secondary text                           */
-  --color-gray-300: #f0c890;   /* strong secondary                         */
-  --color-gray-200: #fcd9a8;
-  --color-gray-100: #fdf0e0;
-
-  /* Accent → sky blue (same family as Sand light) */
-  --color-orange-500: #0ea5e9;
-  --color-orange-400: #38bdf8;
-  --color-orange-300: #7dd3fc;
-  --color-orange-200: #bae6fd;
-  --color-orange-100: #e0f2fe;
-  --color-orange-600: #0284c7;
-}
-
-/* ── Chrome theme ── */
-[data-theme="chrome"] {
-  --background: #080e1a;
-  --foreground: #dde8f0;
-
-  --color-white:    #dde8f0;
-  --color-gray-950: #080e1a;
-  --color-gray-900: #0f1827;   /* card bg */
-  --color-gray-800: #172237;   /* secondary card */
-  --color-gray-700: #1e2f48;   /* borders */
-  --color-gray-600: #264059;   /* muted borders */
-  --color-gray-500: #4d7090;   /* muted text */
-  --color-gray-400: #7093b0;   /* secondary text */
-  --color-gray-300: #9db8cf;   /* strong secondary */
-  --color-gray-200: #bdd2e4;
-  --color-gray-100: #dde8f0;
-
-  /* Accent → amber/gold (warm vs cool surface) */
-  --color-orange-500: #f59e0b;
-  --color-orange-400: #fbbf24;
-  --color-orange-300: #fcd34d;
-  --color-orange-200: #fde68a;
-  --color-orange-100: #fef3c7;
-  --color-orange-600: #d97706;
-}
-
-/* ── Sand theme ── */
-[data-theme="sand"] {
-  --background: #f8f4ef;
-  --foreground: #2c1810;
-
-  /* Remap gray scale to warm sand/linen tones */
-  --color-white:    #2c1810;   /* text-white → dark warm brown              */
-  --color-gray-950: #f8f4ef;   /* page bg → warm sand                       */
-  --color-gray-900: #ffffff;   /* card bg → white                           */
-  --color-gray-800: #f2ebe1;   /* secondary card → warm linen               */
-  --color-gray-700: #e6d8c8;   /* tertiary surface → warm beige             */
-  --color-gray-600: #d4c0a8;   /* borders → warm tan                        */
-  --color-gray-500: #9a7d65;   /* muted text → warm mid-brown               */
-  --color-gray-400: #7d5a42;   /* secondary text → deeper warm              */
-  --color-gray-300: #4a2e1a;   /* strong secondary → dark brown             */
-  --color-gray-200: #2c1810;
-  --color-gray-100: #1a0e08;
-
-  /* Accent → sky blue (cool vs warm surface) */
-  --color-orange-500: #0369a1;
-  --color-orange-400: #0284c7;
-  --color-orange-300: #38bdf8;
-  --color-orange-200: #bae6fd;
-  --color-orange-100: #e0f2fe;
-  --color-orange-600: #075985;
-}
-
-/* ── Ocean theme ── */
-[data-theme="ocean"] {
-  --background: #000d1a;
-  --foreground: #e0f2fe;
-
-  --color-white:    #e0f2fe;
-  --color-gray-950: #000d1a;
-  --color-gray-900: #00172e;
-  --color-gray-800: #002447;
-  --color-gray-700: #003a70;
-  --color-gray-600: #005299;
-  --color-gray-500: #4a9fd4;
-  --color-gray-400: #7ec8e3;
-  --color-gray-300: #b8e4f9;
-  --color-gray-200: #cceeff;
-  --color-gray-100: #e0f2fe;
-
-  /* Accent → sky blue */
-  --color-orange-500: #0ea5e9;
-  --color-orange-400: #38bdf8;
-  --color-orange-300: #7dd3fc;
-  --color-orange-200: #bae6fd;
-  --color-orange-100: #e0f2fe;
-  --color-orange-600: #0284c7;
-}
-
-/* ── Cosmic theme ── */
-[data-theme="cosmic"] {
-  --background: #0a0514;
-  --foreground: #f3e8ff;
-
-  --color-white:    #f3e8ff;
-  --color-gray-950: #0a0514;
-  --color-gray-900: #130a24;
-  --color-gray-800: #1e1035;
-  --color-gray-700: #2d1a50;
-  --color-gray-600: #3d2566;
-  --color-gray-500: #7c4daa;
-  --color-gray-400: #a78bca;
-  --color-gray-300: #c4a8e0;
-  --color-gray-200: #ddd6fe;
-  --color-gray-100: #f3e8ff;
-
-  /* Accent → violet */
-  --color-orange-500: #8b5cf6;
-  --color-orange-400: #a78bfa;
-  --color-orange-300: #c4b5fd;
-  --color-orange-200: #ddd6fe;
-  --color-orange-100: #ede9fe;
-  --color-orange-600: #7c3aed;
-}
-
-/* ── Forest theme ── */
-[data-theme="forest"] {
-  --background: #021007;
-  --foreground: #ecfdf5;
-
-  --color-white:    #ecfdf5;
-  --color-gray-950: #021007;
-  --color-gray-900: #041f0e;
-  --color-gray-800: #063318;
-  --color-gray-700: #0a4d24;
-  --color-gray-600: #0d6630;
-  --color-gray-500: #2d9b5a;
-  --color-gray-400: #6dc98c;
-  --color-gray-300: #a7e8c0;
-  --color-gray-200: #d1fae5;
-  --color-gray-100: #ecfdf5;
-
-  /* Accent → emerald */
-  --color-orange-500: #10b981;
-  --color-orange-400: #34d399;
-  --color-orange-300: #6ee7b7;
-  --color-orange-200: #a7f3d0;
-  --color-orange-100: #d1fae5;
-  --color-orange-600: #059669;
-}
-
-/* ── Ivory theme ── */
-[data-theme="ivory"] {
-  --background: #fdf8f0;
-  --foreground: #1c1917;
-
-  /* Remap gray scale to warm amber tones */
-  --color-white:    #1c1917;   /* text-white → dark stone                  */
-  --color-gray-950: #fdf8f0;   /* page bg → warm cream                     */
-  --color-gray-900: #ffffff;   /* card bg → white                          */
-  --color-gray-800: #fef3dc;   /* secondary card → warm amber-50           */
-  --color-gray-700: #f5e6c0;   /* tertiary surface → warm amber-100        */
-  --color-gray-600: #e8d5a3;   /* borders → warm amber-200                 */
-  --color-gray-500: #9a7b4b;   /* muted text → warm brown                  */
-  --color-gray-400: #7c5c2e;   /* secondary text → darker warm             */
-  --color-gray-300: #4a3318;   /* strong secondary → dark warm             */
-  --color-gray-200: #2d1f0e;   /* near-dark                                */
-  --color-gray-100: #1c1917;   /* darkest                                  */
-
-  /* Accent → amber */
-  --color-orange-500: #d97706;
-  --color-orange-400: #f59e0b;
-  --color-orange-300: #fbbf24;
-  --color-orange-200: #fde68a;
-  --color-orange-100: #fef3c7;
-  --color-orange-600: #b45309;
-}
-
-/* ── Light theme ── */
 [data-theme="light"] {
   --background: #f8fafc;
   --foreground: #0f172a;
 
-  /* Remap Tailwind gray scale so all existing classes work inverted */
+  --surface-page:   #f8fafc;
+  --surface-card:   #ffffff;
+  --surface-raised: #f1f5f9;
+  --border-subtle:  #e2e8f0;
+  --border-default: #cbd5e1;
+  --text-primary:   #0f172a;
+  --text-secondary: #334155;
+  --text-muted:     #64748b;
+  --text-faint:     #94a3b8;
+  --accent:         #ea580c;
+  --accent-hi:      #f97316;
+  --accent-fg:      #ffffff;
+
+  --chart-grid:           #e2e8f0;
+  --chart-axis:           #cbd5e1;
+  --chart-axis-text:      #64748b;
+  --chart-cursor:         #94a3b8;
+  --chart-tooltip-bg:     #ffffff;
+  --chart-tooltip-border: #cbd5e1;
+  --chart-tooltip-text:   #0f172a;
+  --chart-hr:             #2563eb;
+  --chart-ctl:            #2563eb;
+  --chart-atl:            #9333ea;
+  --chart-compare:        #94a3b8;
+  --chart-reference:      #64748b;
+  --chart-warn:           #d97706;
+  --chart-pos:            #059669;
+  --chart-neg:            #dc2626;
+  --chart-2:              #2563eb;
+}
+
+[data-theme="ocean"] {
+  --background: #000d1a;
+  --foreground: #e0f2fe;
+
+  --surface-page:   #000d1a;
+  --surface-card:   #00172e;
+  --surface-raised: #002447;
+  --border-subtle:  #002447;
+  --border-default: #003a70;
+  --text-primary:   #e0f2fe;
+  --text-secondary: #b8e4f9;
+  --text-muted:     #7ec8e3;
+  --text-faint:     #4a9fd4;
+  --accent:         #0ea5e9;
+  --accent-hi:      #38bdf8;
+  --accent-fg:      #00172e;
+
+  --chart-grid:           #002447;
+  --chart-axis:           #003a70;
+  --chart-axis-text:      #4a9fd4;
+  --chart-cursor:         #005299;
+  --chart-tooltip-bg:     #00172e;
+  --chart-tooltip-border: #003a70;
+  --chart-tooltip-text:   #e0f2fe;
+  --chart-hr:             #a78bfa;
+  --chart-ctl:            #7dd3fc;
+  --chart-atl:            #c084fc;
+  --chart-compare:        #4a9fd4;
+  --chart-reference:      #7ec8e3;
+  --chart-2:              #a78bfa;
+}
+
+[data-theme="ocean-light"] {
+  --background: #f0f9ff;
+  --foreground: #0c4a6e;
+
+  --surface-page:   #f0f9ff;
+  --surface-card:   #ffffff;
+  --surface-raised: #e0f2fe;
+  --border-subtle:  #d5eefc;
+  --border-default: #bae6fd;
+  --text-primary:   #0c4a6e;
+  --text-secondary: #075985;
+  --text-muted:     #0369a1;
+  --text-faint:     #4a90b8;
+  --accent:         #0284c7;
+  --accent-hi:      #0ea5e9;
+  --accent-fg:      #ffffff;
+
+  --chart-grid:           #d5eefc;
+  --chart-axis:           #bae6fd;
+  --chart-axis-text:      #4a90b8;
+  --chart-cursor:         #7dd3fc;
+  --chart-tooltip-bg:     #ffffff;
+  --chart-tooltip-border: #bae6fd;
+  --chart-tooltip-text:   #0c4a6e;
+  --chart-hr:             #7c3aed;
+  --chart-ctl:            #0284c7;
+  --chart-atl:            #9333ea;
+  --chart-compare:        #7dd3fc;
+  --chart-reference:      #0369a1;
+  --chart-warn:           #d97706;
+  --chart-pos:            #059669;
+  --chart-neg:            #dc2626;
+  --chart-2:              #7c3aed;
+}
+
+[data-theme="sand"] {
+  --background: #f8f4ef;
+  --foreground: #2c1810;
+
+  --surface-page:   #f8f4ef;
+  --surface-card:   #ffffff;
+  --surface-raised: #f2ebe1;
+  --border-subtle:  #ece1d3;
+  --border-default: #e6d8c8;
+  --text-primary:   #2c1810;
+  --text-secondary: #4a2e1a;
+  --text-muted:     #7d5a42;
+  --text-faint:     #9a7d65;
+  --accent:         #0369a1;
+  --accent-hi:      #0284c7;
+  --accent-fg:      #ffffff;
+
+  --chart-grid:           #ece1d3;
+  --chart-axis:           #e6d8c8;
+  --chart-axis-text:      #9a7d65;
+  --chart-cursor:         #d4c0a8;
+  --chart-tooltip-bg:     #ffffff;
+  --chart-tooltip-border: #e6d8c8;
+  --chart-tooltip-text:   #2c1810;
+  --chart-power:          #b45309;
+  --chart-ef:             #b45309;
+  --chart-hr:             #0369a1;
+  --chart-ctl:            #0369a1;
+  --chart-atl:            #9333ea;
+  --chart-compare:        #b09880;
+  --chart-reference:      #7d5a42;
+  --chart-warn:           #d97706;
+  --chart-pos:            #059669;
+  --chart-neg:            #dc2626;
+  --chart-2:              #0369a1;
+}
+
+[data-theme="sand-dark"] {
+  --background: #1a100a;
+  --foreground: #fdf0e0;
+
+  --surface-page:   #1a100a;
+  --surface-card:   #261510;
+  --surface-raised: #3a200e;
+  --border-subtle:  #3a200e;
+  --border-default: #4d2d15;
+  --text-primary:   #fdf0e0;
+  --text-secondary: #f0c890;
+  --text-muted:     #d4a870;
+  --text-faint:     #b08060;
+  --accent:         #38bdf8;
+  --accent-hi:      #7dd3fc;
+  --accent-fg:      #1a100a;
+
+  --chart-grid:           #3a200e;
+  --chart-axis:           #4d2d15;
+  --chart-axis-text:      #b08060;
+  --chart-cursor:         #66401e;
+  --chart-tooltip-bg:     #261510;
+  --chart-tooltip-border: #4d2d15;
+  --chart-tooltip-text:   #fdf0e0;
+  --chart-power:          #fbbf24;
+  --chart-ef:             #fbbf24;
+  --chart-hr:             #38bdf8;
+  --chart-ctl:            #38bdf8;
+  --chart-atl:            #c084fc;
+  --chart-compare:        #b08060;
+  --chart-reference:      #d4a870;
+  --chart-2:              #38bdf8;
+}
+
+/* Accent tint, derived so it tracks whatever --accent the theme set. */
+:root,
+[data-theme] {
+  --accent-soft:   color-mix(in srgb, var(--accent) 15%, transparent);
+  --accent-border: color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+/* ── Compat shim ──────────────────────────────────────────────────────────
+   The previous palette remap, copied verbatim so this phase is provably a
+   visual no-op while components migrate to the semantic utilities above.
+
+   Note the dark theme deliberately has no entries: it never remapped the
+   palette at all, it used Tailwind's defaults. Aliasing its grays to the new
+   semantic tokens would have shifted gray-600, gray-200/100 and text-white.
+
+   Delete this block once no component uses bare gray or orange utilities for
+   surfaces, text or accent. */
+
+[data-theme="light"] {
   --color-white:    #0f172a;   /* text-white → near-black primary text     */
   --color-gray-950: #f8fafc;   /* page background → off-white              */
   --color-gray-900: #ffffff;   /* card background → white                  */
@@ -241,12 +266,115 @@
   --color-gray-100: #0f172a;   /* near-black text → slate-900              */
 }
 
+[data-theme="ocean"] {
+  --color-white:    #e0f2fe;
+  --color-gray-950: #000d1a;
+  --color-gray-900: #00172e;
+  --color-gray-800: #002447;
+  --color-gray-700: #003a70;
+  --color-gray-600: #005299;
+  --color-gray-500: #4a9fd4;
+  --color-gray-400: #7ec8e3;
+  --color-gray-300: #b8e4f9;
+  --color-gray-200: #cceeff;
+  --color-gray-100: #e0f2fe;
+  --color-orange-500: #0ea5e9;
+  --color-orange-400: #38bdf8;
+  --color-orange-300: #7dd3fc;
+  --color-orange-200: #bae6fd;
+  --color-orange-100: #e0f2fe;
+  --color-orange-600: #0284c7;
+}
+
+[data-theme="ocean-light"] {
+  --color-white:    #0c4a6e;   /* text-white → sky-900 navy                */
+  --color-gray-950: #f0f9ff;   /* page bg → sky-50                         */
+  --color-gray-900: #ffffff;   /* card bg → white                          */
+  --color-gray-800: #e0f2fe;   /* secondary card → sky-100                 */
+  --color-gray-700: #bae6fd;   /* tertiary surface → sky-200               */
+  --color-gray-600: #7dd3fc;   /* borders → sky-300                        */
+  --color-gray-500: #0369a1;   /* muted text → sky-700                     */
+  --color-gray-400: #075985;   /* secondary text → sky-800                 */
+  --color-gray-300: #0c4a6e;   /* strong secondary → sky-900               */
+  --color-gray-200: #082f49;
+  --color-gray-100: #0c4a6e;
+  --color-orange-500: #0ea5e9;
+  --color-orange-400: #38bdf8;
+  --color-orange-300: #7dd3fc;
+  --color-orange-200: #bae6fd;
+  --color-orange-100: #e0f2fe;
+  --color-orange-600: #0284c7;
+}
+
+[data-theme="sand"] {
+  --color-white:    #2c1810;   /* text-white → dark warm brown              */
+  --color-gray-950: #f8f4ef;   /* page bg → warm sand                       */
+  --color-gray-900: #ffffff;   /* card bg → white                           */
+  --color-gray-800: #f2ebe1;   /* secondary card → warm linen               */
+  --color-gray-700: #e6d8c8;   /* tertiary surface → warm beige             */
+  --color-gray-600: #d4c0a8;   /* borders → warm tan                        */
+  --color-gray-500: #9a7d65;   /* muted text → warm mid-brown               */
+  --color-gray-400: #7d5a42;   /* secondary text → deeper warm              */
+  --color-gray-300: #4a2e1a;   /* strong secondary → dark brown             */
+  --color-gray-200: #2c1810;
+  --color-gray-100: #1a0e08;
+  --color-orange-500: #0369a1;
+  --color-orange-400: #0284c7;
+  --color-orange-300: #38bdf8;
+  --color-orange-200: #bae6fd;
+  --color-orange-100: #e0f2fe;
+  --color-orange-600: #075985;
+}
+
+[data-theme="sand-dark"] {
+  --color-white:    #fdf0e0;   /* text-white → warm off-white              */
+  --color-gray-950: #1a100a;   /* page bg → near-black warm                */
+  --color-gray-900: #261510;   /* card bg → dark warm                      */
+  --color-gray-800: #3a200e;   /* secondary card                           */
+  --color-gray-700: #4d2d15;   /* borders                                  */
+  --color-gray-600: #66401e;   /* muted borders                            */
+  --color-gray-500: #b08060;   /* muted text — AA contrast on dark bg      */
+  --color-gray-400: #d4a870;   /* secondary text                           */
+  --color-gray-300: #f0c890;   /* strong secondary                         */
+  --color-gray-200: #fcd9a8;
+  --color-gray-100: #fdf0e0;
+  --color-orange-500: #0ea5e9;
+  --color-orange-400: #38bdf8;
+  --color-orange-300: #7dd3fc;
+  --color-orange-200: #bae6fd;
+  --color-orange-100: #e0f2fe;
+  --color-orange-600: #0284c7;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+
+  --color-page:        var(--surface-page);
+  --color-surface:     var(--surface-card);
+  --color-raised:      var(--surface-raised);
+  --color-line:        var(--border-subtle);
+  --color-line-strong: var(--border-default);
+  --color-ink:         var(--text-primary);
+  --color-ink-2:       var(--text-secondary);
+  --color-ink-3:       var(--text-muted);
+  --color-ink-4:       var(--text-faint);
+  --color-accent:      var(--accent);
+  --color-accent-hi:   var(--accent-hi);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-fg:   var(--accent-fg);
+
+  /* Replaces ~420 arbitrary sizes: text-[10px]/[9px]/[8px] and text-[11px]. */
+  --text-micro: 0.625rem;
+  --text-mini:  0.6875rem;
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
+
+/* Clears the fixed mobile nav; replaces the repeated <div className="h-20" />. */
+.pb-nav { padding-bottom: calc(var(--bottom-nav-h) + 1.5rem); }
+
 
 * {
   box-sizing: border-box;

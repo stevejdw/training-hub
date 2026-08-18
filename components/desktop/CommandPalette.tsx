@@ -6,7 +6,7 @@ import { ALL_NAV_ITEMS } from '@/components/nav-items';
 import { getThemePreference, setThemePreference, type ThemePreference } from '@/components/ThemeProvider';
 import { useIsDesktop } from './useIsDesktop';
 
-const THEME_CYCLE: ThemePreference[] = ['dark', 'light', 'ocean', 'ocean-light', 'sand', 'sand-dark', 'cosmic', 'forest', 'ivory', 'chrome'];
+const THEME_CYCLE: ThemePreference[] = ['dark', 'light', 'ocean', 'ocean-light', 'sand-dark', 'sand'];
 
 // g-then-key navigation shortcuts (desktop only)
 const G_SHORTCUTS: Record<string, string> = {

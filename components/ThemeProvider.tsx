@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 
-export type AppliedTheme = 'dark' | 'light' | 'ocean' | 'ocean-light' | 'sand' | 'sand-dark' | 'cosmic' | 'forest' | 'ivory' | 'chrome';
+export type AppliedTheme = 'dark' | 'light' | 'ocean' | 'ocean-light' | 'sand' | 'sand-dark';
 export type ThemePreference = AppliedTheme | 'auto';
 
 /** Resolve the actual theme to apply given the user's preference. */
@@ -17,6 +17,26 @@ export function resolveTheme(pref: ThemePreference): AppliedTheme {
 /** Apply a preference to the DOM immediately. */
 export function applyTheme(pref: ThemePreference) {
   document.documentElement.setAttribute('data-theme', resolveTheme(pref));
+  syncThemeColorMeta();
+}
+
+/** Mirror --background into <meta name="theme-color">.
+ *
+ *  One of the few places a CSS variable genuinely has to be resolved in JS:
+ *  the meta tag takes a colour value, not a var() reference. Everything that
+ *  renders inside the page reads the variables directly instead. */
+export function syncThemeColorMeta() {
+  const bg = getComputedStyle(document.documentElement)
+    .getPropertyValue('--background')
+    .trim();
+  if (!bg) return;
+  let meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+  if (!meta) {
+    meta = document.createElement('meta');
+    meta.name = 'theme-color';
+    document.head.appendChild(meta);
+  }
+  meta.content = bg;
 }
 
 /** Persist + apply a preference. */
