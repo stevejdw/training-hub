@@ -125,7 +125,9 @@ export default function ActivityEditModal({
   ];
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 px-4 pt-[calc(1rem_+_env(safe-area-inset-top))] pb-[calc(89px_+_env(safe-area-inset-bottom))] md:pt-4 md:pb-4">
+    // Leaflet panes/controls reach z-index 1000, so the overlay has to clear
+    // that or the activity map paints over the modal.
+    <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/60 px-4 pt-[calc(1rem_+_env(safe-area-inset-top))] pb-[calc(89px_+_env(safe-area-inset-bottom))] md:pt-4 md:pb-4">
       <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-md max-h-[calc(100vh_-_73px_-_2rem_-_env(safe-area-inset-top)_-_env(safe-area-inset-bottom))] md:max-h-[90vh] flex flex-col">
         <div className="p-6 overflow-y-auto flex-1 min-h-0 space-y-5">
 
