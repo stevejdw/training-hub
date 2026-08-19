@@ -6,7 +6,6 @@ import PageHeader from '@/components/PageHeader';
 import { iconFor } from '@/components/nav-items';
 import { useIsDesktop } from '@/components/desktop/useIsDesktop';
 import DesktopDashboard from '@/components/desktop/DesktopDashboard';
-import DashboardSkeleton from '@/components/desktop/DashboardSkeleton';
 
 /** Client switcher for /home: desktop dashboard at lg+, the feed below.
  *  Waits for mount before branching so the wrong tree (and its data
@@ -16,9 +15,7 @@ export default function HomeContent() {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
-  /* Was `return null`, which blanked the whole page until hydration. The
-     skeleton matches the real grid so nothing shifts when data lands. */
-  if (!mounted) return <DashboardSkeleton desktop={isDesktop} />;
+  if (!mounted) return null;
 
   if (isDesktop) return <DesktopDashboard />;
 

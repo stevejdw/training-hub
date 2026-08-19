@@ -1,0 +1,35 @@
+'use client';
+
+import type { ReactNode } from 'react';
+
+/** Strava-style sub-tab bar — at most 2 tabs, evenly split, with an
+ *  underline indicator under the active tab. Used for second-level
+ *  navigation under each top-level menu item. */
+export default function SubTabBar<K extends string>({
+  tabs,
+  active,
+  onSelect,
+}: {
+  tabs: { key: K; label: string; icon?: ReactNode }[];
+  active: K;
+  onSelect: (key: K) => void;
+}) {
+  return (
+    <div className="flex-shrink-0 flex border-b border-line md:px-8">
+      {tabs.map(({ key, label, icon }) => (
+        <button
+          key={key}
+          onClick={() => onSelect(key)}
+          className={`flex-1 md:flex-none flex items-center justify-center md:justify-start gap-1.5 py-3 md:pr-8 text-sm font-semibold border-b-2 transition-colors -mb-px ${
+            active === key
+              ? 'border-accent text-ink'
+              : 'border-transparent text-ink-4 hover:text-ink-2'
+          }`}
+        >
+          {icon}
+          <span>{label}</span>
+        </button>
+      ))}
+    </div>
+  );
+}

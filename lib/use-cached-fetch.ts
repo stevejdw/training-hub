@@ -67,11 +67,15 @@ export function useCachedFetch<T>(
 
     fetch(url)
       .then(async r => {
+        // An expired session used to surface as a generic error on every
+        // dashboard panel; FeedPage was the only caller that redirected.
+        if (r.status === 401) { window.location.href = '/login'; return null; }
         const d = await r.json();
         if (!r.ok) throw new Error((d && (d as { error?: string }).error) || `HTTP ${r.status}`);
         return d as T;
       })
-      .then((d: T) => {
+      .then((d: T | null) => {
+        if (d === null) return;                // 401, redirecting
         if (id !== fetchIdRef.current) return; // stale
         dataRef.current = d;
         setData(d);
@@ -112,5 +116,9 @@ export function useCachedFetch<T>(
     };
   }, [doFetch]);
 
-  return { data, loading, error };
+  /* Exposed so an ErrorState can offer a retry rather than leaving the
+     user to reload the page. */
+  const refetch = useCallback(() => doFetch(), [doFetch]);
+
+  return { data, loading, error, refetch };
 }

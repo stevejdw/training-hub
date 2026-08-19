@@ -10,6 +10,8 @@ import { useCachedFetch } from '@/lib/use-cached-fetch';
 import TssRollingChart from './training/TssRollingChart';
 import { calendarDaysFromToday } from '@/lib/calendar-days';
 import { CHART } from '@/lib/chart-theme';
+import ErrorState from '@/components/ui/ErrorState';
+import { formBand } from '@/components/dashboard/FormReading';
 
 const ActivityMap = dynamic(() => import('./ActivityMap'), { ssr: false });
 
@@ -40,7 +42,7 @@ interface PowerHighlight {
 
 interface PeriodStats { rides: number; km: number; hours: number; tss: number; elevation: number }
 
-interface NextSession {
+export interface NextSession {
   id: number;
   date: string;
   title: string;
@@ -247,7 +249,8 @@ function HomeProgressWidget({ wtd, mtd, ytd }: {
   );
 }
 
-const FEED_CACHE_KEY = 'feed-data-v1';
+/** Shared with DesktopDashboard so the two layouts hit one cache. */
+export const FEED_CACHE_KEY = 'cache-feed-v2';
 
 const SESSION_TYPE_COLOR: Record<string, string> = {
   recovery:   '#34d399',
@@ -323,8 +326,10 @@ function CoachingTip() {
 }
 
 function FitnessSummary({ fitness }: { fitness?: { ctl: number; atl: number; tsb: number } }) {
-  const tsbColor = (v: number) => (v >= 5 ? '#34d399' : v <= -20 ? '#f87171' : '#facc15');
-  const tsbLabel = (v: number) => (v >= 5 ? 'Fresh' : v <= -20 ? 'Fatigued' : 'Neutral');
+  /* Was a local three-way split at +5/-20 while the desktop dashboard used a
+     different one — the same TSB could read "Fatigued" here and "Building"
+     there. Both use the shared bands now. */
+  const band = fitness ? formBand(fitness.tsb) : null;
 
   return (
     <Link href="/performance?tab=fitness" className="block group">
@@ -336,20 +341,20 @@ function FitnessSummary({ fitness }: { fitness?: { ctl: number; atl: number; tsb
           <div className="grid grid-cols-3 gap-2">
             <div className="text-center">
               <p className="text-micro text-ink-4 uppercase tracking-wider mb-0.5">CTL</p>
-              <p className="text-lg font-bold text-blue-400 leading-none">{fitness.ctl}</p>
+              <p className="text-lg font-bold leading-none" style={{ color: CHART.ctl }}>{fitness.ctl}</p>
               <p className="text-micro text-ink-4 mt-0.5">Fitness</p>
             </div>
             <div className="text-center">
               <p className="text-micro text-ink-4 uppercase tracking-wider mb-0.5">ATL</p>
-              <p className="text-lg font-bold text-purple-400 leading-none">{fitness.atl}</p>
+              <p className="text-lg font-bold leading-none" style={{ color: CHART.atl }}>{fitness.atl}</p>
               <p className="text-micro text-ink-4 mt-0.5">Fatigue</p>
             </div>
             <div className="text-center">
               <p className="text-micro text-ink-4 uppercase tracking-wider mb-0.5">TSB</p>
-              <p className="text-lg font-bold leading-none" style={{ color: tsbColor(fitness.tsb) }}>
+              <p className="text-lg font-bold leading-none" style={{ color: band?.color }}>
                 {fitness.tsb > 0 ? '+' : ''}{fitness.tsb}
               </p>
-              <p className="text-micro mt-0.5" style={{ color: tsbColor(fitness.tsb) }}>{tsbLabel(fitness.tsb)}</p>
+              <p className="text-micro mt-0.5" style={{ color: band?.color }}>{band?.label}</p>
             </div>
           </div>
         ) : (
@@ -361,41 +366,25 @@ function FitnessSummary({ fitness }: { fitness?: { ctl: number; atl: number; tsb
 }
 
 export default function FeedPage() {
-  const [data, setData] = useState<FeedData | null>(null);
-  const [loading, setLoading] = useState(true);
+  /* Was a hand-rolled localStorage cache plus two effects, keyed separately
+     from the desktop dashboard's — so the same endpoint was cached twice and
+     fetched again when the layout switched. Shares FEED_CACHE_KEY with
+     DesktopDashboard now, and useCachedFetch brings stale-while-revalidate,
+     the 401 redirect and an error state with it. */
+  const { data, loading, error, refetch } = useCachedFetch<FeedData>(
+    '/api/analytics/feed',
+    FEED_CACHE_KEY,
+  );
 
-  useEffect(() => {
-    try {
-      const cached = localStorage.getItem(FEED_CACHE_KEY);
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        // Only use cache if it contains valid feed data — guards against a
-        // poisoned cache from a previous error response (e.g. {error:"..."}).
-        if (parsed?.recentRides) {
-          setData(parsed as FeedData);
-        } else {
-          localStorage.removeItem(FEED_CACHE_KEY);
-        }
-        setLoading(false);
-      }
-    } catch { /* ignore */ }
-  }, []);
-
-  useEffect(() => {
-    fetch('/api/analytics/feed')
-      .then(r => {
-        if (r.status === 401) { window.location.href = '/login'; return null; }
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return r.json();
-      })
-      .then(d => {
-        if (!d?.recentRides) { setLoading(false); return; }
-        setData(d);
-        setLoading(false);
-        try { localStorage.setItem(FEED_CACHE_KEY, JSON.stringify(d)); } catch { /* ignore */ }
-      })
-      .catch(() => setLoading(false));
-  }, []);
+  if (error && !data) {
+    return (
+      <div className="h-full overflow-y-auto scroll-touch">
+        <div className="max-w-2xl md:max-w-5xl xl:max-w-7xl mx-auto px-4 py-4 md:px-8 md:py-8">
+          <ErrorState message="Could not load your feed." onRetry={refetch} />
+        </div>
+      </div>
+    );
+  }
 
   if (loading && !data) {
     return (
