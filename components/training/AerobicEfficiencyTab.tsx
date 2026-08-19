@@ -15,6 +15,8 @@ import EnlargeableChart from '@/components/EnlargeableChart';
 import ActivityMap from '@/components/ActivityMap';
 import Link from 'next/link';
 import { CHART } from '@/lib/chart-theme';
+import Modal from '@/components/ui/Modal';
+import { rollingMean } from '@/lib/smooth';
 
 interface Ride {
   id:          number;
@@ -178,7 +180,7 @@ function EfDotShape(props: any) {
     const pts = `${cx},${cy + size} ${cx - size},${cy - size * 0.6} ${cx + size},${cy - size * 0.6}`;
     return <polygon points={pts} fill={CHART.warn} opacity={0.85} />;
   }
-  return <circle cx={cx} cy={cy} r={4} fill={CHART.power} opacity={0.8} />;
+  return <circle cx={cx} cy={cy} r={3.5} fill={CHART.accent2} opacity={0.75} />;
 }
 
 /* ── Single Ride Modal ──────────────────────────────────────────────────── */
@@ -261,13 +263,21 @@ function RideModal({ ride, onClose }: { ride: ScatterPoint; onClose: () => void 
     if (!stream) return [];
     const n = stream.watts.length;
     const secPerSample = stream.sec_per_sample || 1;
+
+    /* Smoothed on the same terms as the activity-page EF chart. This one was
+       left raw, so the identical metric read as a spike field here and as a
+       trace there. */
+    const rawEf = Array.from({ length: n }, (_, i) =>
+      (stream.watts[i] != null && stream.hr[i] != null && stream.hr[i]! > 0)
+        ? stream.watts[i]! / stream.hr[i]!
+        : null);
+    const ef = rollingMean(rawEf, 30);
+
     const result = Array.from({ length: n }, (_, i) => ({
       t:     Math.round((i * secPerSample) / 60),   // minutes
       watts: stream.watts[i] ?? null,
       hr:    stream.hr[i]    ?? null,
-      ef:    (stream.watts[i] != null && stream.hr[i] != null && stream.hr[i]! > 0) 
-        ? stream.watts[i]! / stream.hr[i]! 
-        : null,
+      ef:    ef[i],
     }));
     chartDataRef.current = result;
     return result;
@@ -302,21 +312,19 @@ function RideModal({ ride, onClose }: { ride: ScatterPoint; onClose: () => void 
 
   const ef = (ride.np / ride.avg_hr).toFixed(3);
 
+  /* Was a hand-rolled `fixed inset-0` overlay: no focus trap, no Escape.
+     Modal is the native <dialog>, which supplies both. padded={false} keeps
+     the full-bleed map and edge-to-edge dividers below. */
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center px-4 pt-[100px] pb-[80px] md:p-4" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-      <div
-        className="relative bg-surface border border-line-strong rounded-2xl w-full max-w-2xl max-h-[calc(100vh-180px)] md:max-h-[90vh] overflow-y-auto shadow-2xl"
-        onClick={e => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-start justify-between p-4 border-b border-line">
-          <div>
-            <p className="text-xs text-ink-4">{new Date(ride.date).toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' })}</p>
-            <p className="text-sm font-semibold text-ink mt-0.5 leading-tight">{ride.name}</p>
-          </div>
-          <button onClick={onClose} aria-label="Close" className="text-ink-4 hover:text-ink-2 text-lg leading-none ml-4">✕</button>
-        </div>
+    <Modal
+      open
+      onClose={onClose}
+      size="lg"
+      padded={false}
+      title={ride.name}
+      subtitle={new Date(ride.date).toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' })}
+    >
+      <>
 
         {/* Route map */}
         {ride.summary_polyline && (
@@ -477,7 +485,7 @@ function RideModal({ ride, onClose }: { ride: ScatterPoint; onClose: () => void 
                 <Line
                   yAxisId="ef"
                   dataKey="ef"
-                  stroke={CHART.reference}
+                  stroke={CHART.ef}
                   strokeWidth={2}
                   dot={false}
                   isAnimationActive={false}
@@ -569,9 +577,8 @@ function RideModal({ ride, onClose }: { ride: ScatterPoint; onClose: () => void 
             </svg>
           </Link>
         </div>
-
-      </div>
-    </div>
+      </>
+    </Modal>
   );
 }
 
@@ -613,6 +620,20 @@ export default function AerobicEfficiencyTab() {
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allScatter, zoneFilter, zoneBounds]);
+
+  /* A 2-point OLS line is the whole trend today, which flattens every bit of
+     local shape. A 6-ride centred mean shows the actual shape of the block.
+     Computed from the already-fetched ?range=all payload — no extra request. */
+  const rollingData = useMemo(() => {
+    if (scatterData.length < 4) return [];
+    const W = 6, half = Math.floor(W / 2);
+    return scatterData.map((p, i) => {
+      const lo = Math.max(0, i - half), hi = Math.min(scatterData.length - 1, i + half);
+      let sum = 0, n = 0;
+      for (let j = lo; j <= hi; j++) { sum += scatterData[j].y; n++; }
+      return { x: p.x, rollY: sum / n };
+    });
+  }, [scatterData]);
 
   const reg = linearRegression(scatterData);
   const trendLineData: TrendPoint[] = reg && scatterData.length >= 2 ? [
@@ -786,8 +807,10 @@ export default function AerobicEfficiencyTab() {
                 tick={{ fill: CHART.axisText, fontSize: 10 }}
                 axisLine={false}
                 tickLine={false}
-                width={40}
+                width={48}
                 tickFormatter={v => v.toFixed(2)}
+                label={{ value: 'W/bpm', angle: -90, position: 'insideLeft',
+                         fill: CHART.axisText, fontSize: 10, offset: 10 }}
               />
               <Tooltip content={<EfTooltip />} cursor={{ strokeDasharray: '3 3', stroke: CHART.axis }} />
               <Scatter
@@ -799,12 +822,23 @@ export default function AerobicEfficiencyTab() {
                 onClick={handleDotClick as any}
                 style={{ cursor: 'pointer' }}
               />
+              {rollingData.length > 0 && (
+                <Line
+                  data={rollingData}
+                  dataKey="rollY"
+                  stroke={CHART.power}
+                  strokeWidth={2}
+                  dot={false}
+                  isAnimationActive={false}
+                  legendType="none"
+                />
+              )}
               {trendLineData.length === 2 && (
                 <Line
                   data={trendLineData}
                   dataKey="trendY"
-                  stroke={CHART.power}
-                  strokeWidth={2}
+                  stroke={CHART.reference}
+                  strokeWidth={1.5}
                   strokeDasharray="6 4"
                   dot={false}
                   isAnimationActive={false}
@@ -817,10 +851,11 @@ export default function AerobicEfficiencyTab() {
         )}
 
         <p className="text-micro text-ink-5 mt-2 leading-relaxed">
-          <span className="text-accent-hi">●</span> Each dot = one steady ride ·
-          <span className="text-accent-hi ml-1.5">- - -</span> Linear trend
+          <span style={{ color: CHART.accent2 }}>●</span> Each dot = one steady ride ·
+          <span className="ml-1.5" style={{ color: CHART.power }}>—</span> 6-ride average ·
+          <span className="ml-1.5" style={{ color: CHART.reference }}>- - -</span> Linear trend
           {hvLowCount > 0 && (
-            <span className="ml-1.5"><span className="text-yellow-400">▼</span> Low HRV day ({hvLowCount})</span>
+            <span className="ml-1.5"><span style={{ color: CHART.warn }}>▼</span> Low HRV day ({hvLowCount})</span>
           )}
         </p>
       </div>

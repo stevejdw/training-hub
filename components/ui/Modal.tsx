@@ -25,6 +25,7 @@ export default function Modal({
   footer,
   size = 'md',
   dismissOnBackdrop = true,
+  padded = true,
 }: {
   open: boolean;
   onClose: () => void;
@@ -34,6 +35,8 @@ export default function Modal({
   footer?: ReactNode;
   size?: ModalSize;
   dismissOnBackdrop?: boolean;
+  /** false for content with full-bleed sections (maps, edge-to-edge dividers). */
+  padded?: boolean;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
 
@@ -80,7 +83,7 @@ export default function Modal({
                 </button>
               </div>
             )}
-            <div className="flex-1 min-h-0 overflow-y-auto scroll-touch px-5 py-4">{children}</div>
+            <div className={`flex-1 min-h-0 overflow-y-auto scroll-touch ${padded ? 'px-5 py-4' : ''}`}>{children}</div>
             {footer && (
               <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-line flex-shrink-0">
                 {footer}
