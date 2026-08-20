@@ -54,7 +54,6 @@ export default function Nav() {
 
   // Desktop: all items except 'more' and 'settings' (settings is the right icon)
   const desktopCenterItems = ALL_NAV_ITEMS.filter(i => i.key !== 'more' && i.key !== 'settings');
-  const settingsItem = ALL_NAV_ITEMS.find(i => i.key === 'settings')!;
 
   return (
     <>
@@ -70,7 +69,7 @@ export default function Nav() {
           <Image src={`/app-icon-${appIcon}.png`} alt="Training Hub" width={36} height={36} className="rounded-lg" />
         </Link>
 
-        <nav className="flex gap-1 items-center min-w-0">
+        <nav className="flex gap-1 items-center min-w-0 flex-1 justify-center">
           {desktopCenterItems.map(({ key, href, label, icon, matchPrefixes }) => {
             const active = isActive(matchPrefixes, pathname);
             return (
@@ -89,15 +88,10 @@ export default function Nav() {
           })}
         </nav>
 
-        {/* Settings icon — pinned right */}
-        <Link
-          href="/settings"
-          className={`flex-shrink-0 p-2 rounded-lg transition-colors ${
-            isActive(['/settings'], pathname) ? 'text-accent' : 'text-ink-3 hover:text-ink hover:bg-raised'
-          }`}
-        >
-          {settingsItem.icon}
-        </Link>
+        {/* Balances the logo so the nav stays optically centred. The gear that
+            used to sit here now comes from PageHeader / DesktopPage, one row
+            down — two stacked gears would be worse than one. */}
+        <div className="w-9 flex-shrink-0" aria-hidden />
       </header>
 
       {/* ── Mobile: fixed bottom tab bar ── */}

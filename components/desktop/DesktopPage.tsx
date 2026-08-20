@@ -1,6 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
+import SettingsGear from '@/components/SettingsGear';
 
 /** Standard desktop page chrome: full-width title row + content region.
  *
@@ -23,7 +24,10 @@ export default function DesktopPage({
     <div className="h-full flex flex-col">
       <div className="flex items-center justify-between gap-4 px-4 lg:px-8 pt-4 lg:pt-6 pb-4 flex-shrink-0">
         <h1 className="text-xl font-bold text-ink">{title}</h1>
-        {actions}
+        <div className="flex items-center gap-3">
+          {actions}
+          <SettingsGear />
+        </div>
       </div>
       <div className={`flex-1 min-h-0 px-4 lg:px-8 pb-6 ${
         scroll === 'lg' ? 'overflow-y-auto lg:overflow-hidden'

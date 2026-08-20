@@ -3,15 +3,20 @@
 import Image from 'next/image';
 import type { ReactNode } from 'react';
 import { useAppIcon } from '@/components/ProfileProvider';
+import SettingsGear from '@/components/SettingsGear';
 
 export default function PageHeader({
   icon,
   title,
   right,
+  showSettings = true,
 }: {
   icon: ReactNode;
   title: string;
   right?: ReactNode;
+  /** Off only on headers whose right slot is a save action — navigating away
+   *  mid-edit loses work. */
+  showSettings?: boolean;
 }) {
   const appIcon = useAppIcon();
 
@@ -22,8 +27,9 @@ export default function PageHeader({
         <Image src={`/app-icon-${appIcon}.png`} alt="Training Hub" width={30} height={30} className="rounded-md" />
       </div>
 
-      {/* Centred icon + title */}
-      <div className="flex items-center gap-2.5">
+      {/* Centred icon + title. Capped so the right cluster can't overlap it
+          on a 375px screen. */}
+      <div className="flex items-center gap-2.5 max-w-[calc(100%-9rem)]">
         <span className="text-accent-hi [&_svg]:w-6 [&_svg]:h-6 md:[&_svg]:w-7 md:[&_svg]:h-7 flex-shrink-0">
           {icon}
         </span>
@@ -31,11 +37,12 @@ export default function PageHeader({
           {title}
         </h1>
       </div>
-      {right && (
-        <div className="absolute right-4 md:right-8 flex items-center">
-          {right}
-        </div>
-      )}
+      {/* The gear is appended after `right`, never replacing it — four pages
+          already use that slot. */}
+      <div className="absolute right-4 md:right-8 flex items-center gap-2">
+        {right}
+        {showSettings && <SettingsGear />}
+      </div>
     </div>
   );
 }

@@ -187,7 +187,7 @@ export default function ClimbDetailPage({ eventId, climbIdx }: Props) {
 
   return (
     <div className="h-full flex flex-col">
-      <PageHeader icon={iconFor('events')} title={climb.name} right={saveBtn} />
+      <PageHeader icon={iconFor('events')} title={climb.name} right={saveBtn} showSettings={false} />
 
       <div className="flex-shrink-0 px-4 md:px-8 py-2 border-b border-line/60">
         <Link href={`/events/${eventId}`} className="text-sm text-ink-4 hover:text-accent-hi transition-colors">

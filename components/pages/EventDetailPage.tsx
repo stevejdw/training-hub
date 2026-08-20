@@ -569,7 +569,7 @@ export default function EventDetailPage({ eventId }: Props) {
 
     return (
       <div className="h-full flex flex-col">
-        <PageHeader icon={iconFor('events')} title="Edit Event" right={editActions} />
+        <PageHeader icon={iconFor('events')} title="Edit Event" right={editActions} showSettings={false} />
         <div className="flex-shrink-0 px-4 md:px-8 py-2 border-b border-line/60">
           <button onClick={cancelEdit} className="text-sm text-ink-4 hover:text-accent-hi transition-colors">← Back</button>
         </div>

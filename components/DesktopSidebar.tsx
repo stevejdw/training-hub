@@ -20,7 +20,6 @@ export default function DesktopSidebar() {
 
   // Everything except More (redundant when all items are visible); Settings pinned at the bottom.
   const mainItems = ALL_NAV_ITEMS.filter(i => i.key !== 'more' && i.key !== 'settings');
-  const settingsItem = ALL_NAV_ITEMS.find(i => i.key === 'settings')!;
 
   const linkClass = (active: boolean) =>
     `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
@@ -34,7 +33,7 @@ export default function DesktopSidebar() {
         <span className="text-sm font-semibold text-ink tracking-wide">Training Hub</span>
       </Link>
 
-      <nav className="flex-1 flex flex-col gap-0.5 px-3 py-2 overflow-y-auto">
+      <nav className="flex-1 flex flex-col gap-0.5 px-3 py-2 pb-3 overflow-y-auto">
         {mainItems.map(({ key, href, label, icon, matchPrefixes }) => (
           <Link key={key} href={href} className={linkClass(isActive(matchPrefixes, pathname))}>
             {icon}
@@ -42,13 +41,6 @@ export default function DesktopSidebar() {
           </Link>
         ))}
       </nav>
-
-      <div className="px-3 py-3 border-t border-line">
-        <Link href={settingsItem.href} className={linkClass(isActive(settingsItem.matchPrefixes, pathname))}>
-          {settingsItem.icon}
-          <span>{settingsItem.label}</span>
-        </Link>
-      </div>
     </aside>
   );
 }

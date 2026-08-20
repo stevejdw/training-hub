@@ -85,12 +85,14 @@ export function PageShell({
   title,
   icon,
   right,
+  showSettings,
   width = 'narrow',
   children,
 }: {
   title: string;
   icon: React.ReactNode;
   right?: React.ReactNode;
+  showSettings?: boolean;
   /** 'narrow' caps at 5xl; 'wide' goes to 7xl on xl screens, matching the
    *  analytics pages. Page width used to depend on which wrapper a page
    *  happened to use. */
@@ -99,7 +101,7 @@ export function PageShell({
 }) {
   return (
     <div className="h-full flex flex-col">
-      <PageHeader icon={icon} title={title} right={right} />
+      <PageHeader icon={icon} title={title} right={right} showSettings={showSettings} />
       <div className="flex-1 overflow-y-auto scroll-touch">
         {/* pb-nav derives the bottom clearance from --bottom-nav-h instead of
             the <div className="h-20" /> spacer this used to end with. */}
