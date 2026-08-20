@@ -14,6 +14,10 @@ interface EnlargeableChartProps {
   controls?: ReactNode;
   /** Extra classes for the inline wrapper. */
   className?: string;
+  /** Aspect ratio for the fullscreen plot. Defaults to a responsive ramp that
+   *  keeps a sane shape at every width; override for charts whose natural
+   *  proportion differs (a power curve reads better wide). */
+  aspect?: string;
 }
 
 /**
@@ -24,7 +28,11 @@ interface EnlargeableChartProps {
  * the browser's top layer — above every stacking context and reliably
  * interactive in any orientation (portrait and landscape).
  */
-export default function EnlargeableChart({ children, title, subtitle, controls, className }: EnlargeableChartProps) {
+const DEFAULT_ASPECT = 'aspect-[5/4] sm:aspect-[16/9] lg:aspect-[21/9]';
+
+export default function EnlargeableChart({
+  children, title, subtitle, controls, className, aspect = DEFAULT_ASPECT,
+}: EnlargeableChartProps) {
   const [open, setOpen] = useState(false);
   const dialogRef = useRef<HTMLDialogElement>(null);
 
@@ -87,8 +95,16 @@ export default function EnlargeableChart({ children, title, subtitle, controls, 
                 </button>
               </div>
             </div>
-            <div className="flex-1 min-h-0 overflow-hidden">
-              {children(true)}
+            {/* The chart used to be handed the whole remaining viewport
+                height — a 160px chart stretched to ~700px, ballooning the
+                plot area and flattening the line. Constraining by aspect and
+                centring keeps the proportions; max-h-full means the ratio
+                gives way before the layout overflows. Call sites still pass
+                height="100%" and simply fill this box. */}
+            <div className="flex-1 min-h-0 flex items-center justify-center overflow-hidden">
+              <div className={`w-full max-h-full ${aspect}`}>
+                {children(true)}
+              </div>
             </div>
           </div>
         )}
