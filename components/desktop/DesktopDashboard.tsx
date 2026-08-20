@@ -10,10 +10,8 @@ import { TssWeekChart } from '@/components/training/FitnessTab';
 import ReadinessResponseWidget from '@/components/ReadinessResponseWidget';
 import DesktopPage from './DesktopPage';
 import Panel from './Panel';
-import { CHART } from '@/lib/chart-theme';
 import ErrorState from '@/components/ui/ErrorState';
-import TodayHero from '@/components/dashboard/TodayHero';
-import { formBand } from '@/components/dashboard/FormReading';
+import DashboardTop from '@/components/dashboard/DashboardTop';
 
 function fmtTime(s: number) {
   const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
@@ -26,15 +24,6 @@ function fmtDay(iso: string) {
 
 
 
-function StatTile({ label, value, sub, color }: { label: string; value: string; sub?: string; color?: string }) {
-  return (
-    <div className="bg-surface border border-line rounded-xl p-3 text-center min-w-0">
-      <p className="text-micro text-ink-4 uppercase tracking-wider mb-1">{label}</p>
-      <p className="text-2xl font-bold" style={color ? { color } : undefined}>{value}</p>
-      {sub && <p className="text-micro text-ink-4 mt-0.5">{sub}</p>}
-    </div>
-  );
-}
 
 /** Multi-panel dashboard shown on /home at lg+. All data comes from
  *  existing endpoints; the mobile FeedPage is untouched. */
@@ -109,6 +98,7 @@ export default function DesktopDashboard() {
                     <th className="py-1.5 pr-3 font-semibold text-right">Distance</th>
                     <th className="py-1.5 pr-3 font-semibold text-right">Time</th>
                     <th className="py-1.5 pr-3 font-semibold text-right">NP</th>
+                    <th className="py-1.5 pr-3 font-semibold text-right hidden lg:table-cell">IF</th>
                     <th className="py-1.5 pr-3 font-semibold text-right">TSS</th>
                     <th className="py-1.5 font-semibold text-right">Elev</th>
                   </tr>
@@ -128,6 +118,9 @@ export default function DesktopDashboard() {
                       <td className="py-2 pr-3 text-right text-ink-2 tabular-nums">
                         {r.normalized_power ?? r.average_watts ?? '—'}{(r.normalized_power ?? r.average_watts) ? ' W' : ''}
                       </td>
+                      <td className="py-2 pr-3 text-right text-ink-2 tabular-nums hidden lg:table-cell">
+                        {r.intensity_factor != null ? Number(r.intensity_factor).toFixed(2) : '—'}
+                      </td>
                       <td className="py-2 pr-3 text-right text-accent-hi tabular-nums">{r.tss != null ? Math.round(r.tss) : '—'}</td>
                       <td className="py-2 text-right text-ink-2 tabular-nums">{Math.round(r.total_elevation_gain)} m</td>
                     </tr>
@@ -140,34 +133,11 @@ export default function DesktopDashboard() {
 
         {/* ── Right: form snapshot, readiness, weekly TSS, what's next ── */}
         <div className="col-span-4 h-full min-h-0 overflow-y-auto space-y-4">
-          <TodayHero session={feed?.nextSession} />
-
-          <div className="grid grid-cols-3 gap-2">
-            <StatTile label="Fitness" value={fitness ? String(fitness.ctl) : '—'} sub="CTL" color={CHART.hr} />
-            <StatTile label="Fatigue" value={fitness ? String(fitness.atl) : '—'} sub="ATL" color={CHART.atl} />
-            <StatTile
-              label="Form"
-              value={fitness ? `${fitness.tsb > 0 ? '+' : ''}${fitness.tsb}` : '—'}
-              sub={fitness ? formBand(fitness.tsb).label : 'TSB'}
-              color={fitness ? formBand(fitness.tsb).color : undefined}
-            />
-          </div>
-
-          {/* What the number means. It used to be a bare signed integer. */}
-          {fitness && (
-            <p className="text-micro text-ink-4 -mt-2 px-0.5">{formBand(fitness.tsb).hint}</p>
-          )}
+          <DashboardTop feed={feed} />
 
           <ReadinessResponseWidget />
           <TssWeekChart />
 
-          {feed?.nextEvent && (
-            <Link href={`/events/${feed.nextEvent.id}`} className="block bg-surface border border-accent/40 rounded-xl p-4 hover:border-accent/70 transition-colors">
-              <p className="text-xs font-semibold text-accent-hi uppercase tracking-wider mb-1">Next event</p>
-              <p className="text-sm font-medium text-ink">{feed.nextEvent.name}</p>
-              <p className="text-xs text-ink-3 mt-1">{feed.nextEvent.daysAway} days away</p>
-            </Link>
-          )}
         </div>
       </div>
     </DesktopPage>

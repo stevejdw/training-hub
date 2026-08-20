@@ -26,10 +26,11 @@ export default function DashboardSkeleton({ desktop }: { desktop: boolean }) {
           <div className="flex-[2] bg-raised rounded-xl animate-pulse" />
         </div>
         <div className="col-span-4 space-y-4 min-h-0">
-          <div className="grid grid-cols-3 gap-2">
-            <div className="h-20 bg-raised rounded-xl animate-pulse" />
-            <div className="h-20 bg-raised rounded-xl animate-pulse" />
-            <div className="h-20 bg-raised rounded-xl animate-pulse" />
+          {/* Mirrors DashboardTop: state strip, today hero, event bar. */}
+          <div className="space-y-3">
+            <div className="h-[78px] bg-raised rounded-2xl animate-pulse" />
+            <div className="h-[72px] bg-raised rounded-2xl animate-pulse" />
+            <div className="h-[44px] bg-raised rounded-xl animate-pulse" />
           </div>
           <div className="h-48 bg-raised rounded-xl animate-pulse" />
           <div className="h-40 bg-raised rounded-xl animate-pulse" />

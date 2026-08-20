@@ -12,6 +12,7 @@ import { calendarDaysFromToday } from '@/lib/calendar-days';
 import { CHART } from '@/lib/chart-theme';
 import ErrorState from '@/components/ui/ErrorState';
 import { formBand } from '@/components/dashboard/FormReading';
+import DashboardTop from '@/components/dashboard/DashboardTop';
 
 const ActivityMap = dynamic(() => import('./ActivityMap'), { ssr: false });
 
@@ -30,6 +31,7 @@ export interface RecentRide {
   trainer: boolean;
   summary_polyline: string | null;
   average_speed: number | null;
+  intensity_factor: number | null;
 }
 
 interface PowerHighlight {
@@ -221,12 +223,13 @@ function HomeProgressWidget({ wtd, mtd, ytd }: {
         </div>
 
         {/* Stats row */}
-        <div className="grid grid-cols-4 gap-1 mb-1">
+        <div className="grid grid-cols-5 gap-1 mb-1">
           {[
             { label: 'Time',       value: stats ? fmtHours(stats.hours) : '—' },
             { label: 'Distance',   value: stats ? fmtKm(stats.km)       : '—' },
+            { label: 'TSS',        value: stats ? Math.round(stats.tss).toLocaleString() : '—' },
             { label: 'Elev Gain',  value: stats ? `${Math.round(stats.elevation).toLocaleString()} m` : '—' },
-            { label: 'Activities', value: stats ? String(stats.rides)   : '—' },
+            { label: 'Rides',      value: stats ? String(stats.rides)   : '—' },
           ].map(({ label, value }) => (
             <div key={label}>
               <p className="text-micro text-ink-4">{label}</p>
@@ -336,46 +339,6 @@ function CoachingTip() {
   );
 }
 
-function FitnessSummary({ fitness }: { fitness?: { ctl: number; atl: number; tsb: number } }) {
-  /* Was a local three-way split at +5/-20 while the desktop dashboard used a
-     different one — the same TSB could read "Fatigued" here and "Building"
-     there. Both use the shared bands now. */
-  const band = fitness ? formBand(fitness.tsb) : null;
-
-  return (
-    <Link href="/performance?tab=fitness" className="block group">
-      <div className="bg-raised/60 rounded-2xl border border-transparent hover:border-line-strong hover:bg-raised/80 transition-colors h-full px-3 pt-2.5 pb-3">
-        <p className="text-micro font-semibold text-ink-4 uppercase tracking-wider group-hover:text-accent-hi transition-colors mb-2">
-          Fitness →
-        </p>
-        {fitness ? (
-          <div className="grid grid-cols-3 gap-2">
-            <div className="text-center">
-              <p className="text-micro text-ink-4 uppercase tracking-wider mb-0.5">CTL</p>
-              <p className="text-lg font-bold leading-none" style={{ color: CHART.ctl }}>{fitness.ctl}</p>
-              <p className="text-micro text-ink-4 mt-0.5">Fitness</p>
-            </div>
-            <div className="text-center">
-              <p className="text-micro text-ink-4 uppercase tracking-wider mb-0.5">ATL</p>
-              <p className="text-lg font-bold leading-none" style={{ color: CHART.atl }}>{fitness.atl}</p>
-              <p className="text-micro text-ink-4 mt-0.5">Fatigue</p>
-            </div>
-            <div className="text-center">
-              <p className="text-micro text-ink-4 uppercase tracking-wider mb-0.5">TSB</p>
-              <p className="text-lg font-bold leading-none" style={{ color: band?.color }}>
-                {fitness.tsb > 0 ? '+' : ''}{fitness.tsb}
-              </p>
-              <p className="text-micro mt-0.5" style={{ color: band?.color }}>{band?.label}</p>
-            </div>
-          </div>
-        ) : (
-          <div className="h-12 bg-hover/40 rounded animate-pulse" />
-        )}
-      </div>
-    </Link>
-  );
-}
-
 export default function FeedPage() {
   /* Was a hand-rolled localStorage cache plus two effects, keyed separately
      from the desktop dashboard's — so the same endpoint was cached twice and
@@ -433,127 +396,20 @@ export default function FeedPage() {
 
   return (
     <div className="h-full overflow-y-auto scroll-touch">
-      <div className="max-w-2xl md:max-w-5xl xl:max-w-7xl mx-auto px-4 py-4 md:px-8 md:py-8 space-y-3 pb-8">
+      <div className="max-w-2xl mx-auto px-4 py-4 space-y-3 pb-nav">
 
-        {/* ── MOBILE LAYOUT ── */}
-        <div className="block md:hidden space-y-3">
+        {/* How am I → what today → what's coming. Shared with the desktop
+            dashboard so the two orderings cannot drift apart again. */}
+        <DashboardTop feed={data} />
 
-          {/* Mobile: Next Session + Event side by side (session card only when a plan is active) */}
-          {(nextSession || nextEvent) && (
-            <div className="flex gap-3 items-stretch">
-              {nextSession && (
-                <Link
-                  href="/training?tab=plan"
-                  className="flex-1 min-w-0 rounded-2xl p-3 border transition-colors group bg-raised/70 border-line-strong/60 hover:border-line-hover"
-                >
-                  <p className="text-micro font-semibold text-ink-4 uppercase tracking-wider mb-1.5">Next Session</p>
-                  <div className="flex items-center gap-1.5 mb-1">
-                    <span
-                      className="px-1.5 py-0.5 rounded text-micro font-semibold flex-shrink-0 capitalize"
-                      style={{ background: sessionColor + '22', color: sessionColor }}
-                    >
-                      {nextSession.type}
-                    </span>
-                    <span className="text-micro text-ink-4">{sessionDateLabel(nextSession.date)}</span>
-                  </div>
-                  <p className="text-xs font-bold text-ink group-hover:text-accent-hi transition-colors leading-snug line-clamp-2">
-                    {nextSession.title}
-                  </p>
-                  <div className="flex items-center gap-2 mt-1 text-micro text-ink-4">
-                    {nextSession.duration_min && <span>{nextSession.duration_min} min</span>}
-                    {nextSession.tss_target && <span>{nextSession.tss_target} TSS</span>}
-                  </div>
-                </Link>
-              )}
+        <CoachingTip />
 
-              {nextEvent && (
-                <Link
-                  href={`/events/${nextEvent.id}`}
-                  className={`rounded-2xl p-2.5 bg-accent/10 border border-accent/25 hover:border-accent/60 hover:bg-accent/15 transition-colors flex flex-col items-center justify-center text-center gap-0.5 ${
-                    nextSession ? 'flex-shrink-0 w-20' : 'flex-1'
-                  }`}
-                >
-                  <p className="text-micro font-semibold text-accent-hi uppercase tracking-wider">Event</p>
-                  <p className="text-xl font-black text-accent-hi leading-none">{nextEvent.daysAway}</p>
-                  <p className="text-micro text-accent-hi/70">days</p>
-                  <p className="text-micro text-ink-3 font-medium mt-0.5 leading-tight line-clamp-2">{nextEvent.name}</p>
-                </Link>
-              )}
-            </div>
-          )}
+        <HomeProgressWidget wtd={wtd} mtd={mtd} ytd={ytd} />
 
-          {/* Mobile: Coaching Insight */}
-          <CoachingTip />
 
-          {/* Mobile: Progress widget */}
-          <HomeProgressWidget wtd={wtd} mtd={mtd} ytd={ytd} />
-        </div>
-
-        {/* ── DESKTOP LAYOUT ── */}
-        {/* Desktop: Coaching Insight */}
-        <div className="hidden md:block">
-          <CoachingTip />
-        </div>
-
-        <div className={`hidden md:grid gap-3 ${nextSession ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}>
-
-          {/* Desktop: Next Training Session (only when a plan is active) */}
-          {nextSession && (
-            <Link
-              href="/training?tab=plan"
-              className="rounded-2xl p-4 border transition-colors group bg-raised/70 border-line-strong/60 hover:border-line-hover"
-            >
-              <p className="text-micro font-semibold text-ink-4 uppercase tracking-wider mb-2">Next Session</p>
-              <div className="flex items-center gap-2 mb-1.5">
-                <span
-                  className="px-2 py-0.5 rounded text-micro font-semibold flex-shrink-0 capitalize"
-                  style={{ background: sessionColor + '22', color: sessionColor }}
-                >
-                  {nextSession.type}
-                </span>
-                <span className="text-mini text-ink-4">{sessionDateLabel(nextSession.date)}</span>
-              </div>
-              <p className="text-sm font-bold text-ink group-hover:text-accent-hi transition-colors leading-snug">
-                {nextSession.title}
-              </p>
-              <div className="flex items-center gap-3 mt-1.5 text-mini text-ink-4">
-                {nextSession.duration_min && <span>{nextSession.duration_min} min</span>}
-                {nextSession.tss_target && <span>{nextSession.tss_target} TSS</span>}
-              </div>
-              {nextSession.description && (
-                <p className="text-xs text-ink-4 mt-1.5 line-clamp-2 leading-relaxed">
-                  {nextSession.description}
-                </p>
-              )}
-            </Link>
-          )}
-
-          {/* Desktop: Progress widget */}
-          <HomeProgressWidget wtd={wtd} mtd={mtd} ytd={ytd} />
-
-          {/* Desktop: Next Event */}
-          {nextEvent ? (
-            <Link
-              href={`/events/${nextEvent.id}`}
-              className="rounded-2xl p-4 bg-accent/10 border border-accent/25 hover:border-accent/60 hover:bg-accent/15 transition-colors flex flex-col items-center justify-center text-center gap-0.5"
-            >
-              <p className="text-micro font-semibold text-accent-hi uppercase tracking-wider">Event</p>
-              <p className="text-2xl font-black text-accent-hi leading-none">{nextEvent.daysAway}</p>
-              <p className="text-micro text-accent-hi/70">days</p>
-              <p className="text-micro text-ink-3 font-medium mt-1 leading-tight line-clamp-2">{nextEvent.name}</p>
-            </Link>
-          ) : (
-            <div className="rounded-2xl p-4 bg-raised/40 border border-line flex flex-col items-center justify-center text-center">
-              <p className="text-micro font-semibold text-ink-4 uppercase tracking-wider">Event</p>
-              <p className="text-sm text-ink-5 mt-2">No upcoming events</p>
-            </div>
-          )}
-        </div>
-
-        {/* Row: Fitness Summary + Weekly TSS side by side */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <FitnessSummary fitness={data?.fitness} />
-
+        {/* Weekly TSS — full width now that TrainingStateStrip has taken over
+            from FitnessSummary at the top of the page. */}
+        <div>
           <div className="bg-raised/60 rounded-2xl border border-line-strong/40 overflow-hidden h-full">
             <div className="px-3 pt-2.5 pb-1">
               <Link href="/training?tab=progress#weekly-tss" className="inline-flex items-center group">
@@ -582,7 +438,7 @@ export default function FeedPage() {
                 )}
               </span>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               {powerHighlights.map(p => (
                 <div
                   key={p.seconds}
@@ -668,6 +524,10 @@ export default function FeedPage() {
                       )}
                       {np && (
                         <span className="text-ink-2">{Math.round(np)}<span className="text-xs text-ink-4 ml-0.5">W</span></span>
+                      )}
+                      {/* Selected in SQL and never rendered until now. */}
+                      {ride.intensity_factor != null && ride.intensity_factor > 0 && (
+                        <span className="text-ink-3 text-xs">IF {Number(ride.intensity_factor).toFixed(2)}</span>
                       )}
                       {ride.tss && (
                         <span className="text-accent-hi text-xs font-medium">{Math.round(ride.tss)} TSS</span>

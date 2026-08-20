@@ -57,6 +57,10 @@ export default function TodayHero({ session }: { session: NextSession | null | u
             {whenLabel(session.date)}{session.type ? ` · ${session.type}` : ''}
           </p>
           <p className="text-base font-semibold text-ink mt-0.5 truncate">{session.title}</p>
+          {/* Already fetched; was only ever rendered in the 768–1023 band. */}
+          {session.description && (
+            <p className="text-xs text-ink-4 mt-1 line-clamp-2 leading-relaxed">{session.description}</p>
+          )}
         </div>
         <div className="flex items-center gap-4 flex-shrink-0 text-right">
           {session.duration_min != null && (
