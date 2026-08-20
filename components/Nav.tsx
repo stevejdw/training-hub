@@ -62,26 +62,28 @@ export default function Nav() {
       <DesktopSidebar />
 
       {/* ── Tablet band (768–1023px): top horizontal nav ── */}
-      <header className="tablet-header hidden md:flex lg:hidden h-16 border-b border-line bg-page items-center flex-shrink-0 relative">
-        {/* Logo — pinned left */}
-        <Link href="/home" className="absolute left-6 flex-shrink-0">
+      {/* justify-between, not absolute + mx-auto: at exactly 768px the eight
+          centred items overflowed under the absolutely-positioned logo and
+          gear. Labels drop below 900px so the icons always fit. */}
+      <header className="tablet-header hidden md:flex lg:hidden h-16 border-b border-line bg-page items-center justify-between gap-3 px-6 flex-shrink-0 relative">
+        <Link href="/home" className="flex-shrink-0">
           <Image src={`/app-icon-${appIcon}.png`} alt="Training Hub" width={36} height={36} className="rounded-lg" />
         </Link>
 
-        {/* Centred nav items */}
-        <nav className="flex gap-1 items-center mx-auto">
+        <nav className="flex gap-1 items-center min-w-0">
           {desktopCenterItems.map(({ key, href, label, icon, matchPrefixes }) => {
             const active = isActive(matchPrefixes, pathname);
             return (
               <Link
                 key={key}
                 href={href}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                  active ? 'bg-accent text-ink' : 'text-ink-3 hover:text-ink hover:bg-raised'
+                title={label}
+                className={`flex items-center gap-2 px-2.5 min-[900px]:px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  active ? 'bg-accent text-accent-fg' : 'text-ink-3 hover:text-ink hover:bg-raised'
                 }`}
               >
                 {icon}
-                <span>{label}</span>
+                <span className="hidden min-[900px]:inline whitespace-nowrap">{label}</span>
               </Link>
             );
           })}
@@ -90,7 +92,7 @@ export default function Nav() {
         {/* Settings icon — pinned right */}
         <Link
           href="/settings"
-          className={`absolute right-6 p-2 rounded-lg transition-colors ${
+          className={`flex-shrink-0 p-2 rounded-lg transition-colors ${
             isActive(['/settings'], pathname) ? 'text-accent' : 'text-ink-3 hover:text-ink hover:bg-raised'
           }`}
         >

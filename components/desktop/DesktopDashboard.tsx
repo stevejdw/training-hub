@@ -47,20 +47,23 @@ export default function DesktopDashboard() {
   return (
     <DesktopPage
       title="Dashboard"
-      scroll={false}
+      scroll="lg"
       actions={
         <Link href="/activities" className="text-sm text-accent-hi hover:text-accent-hi font-medium transition-colors">
           All activities →
         </Link>
       }
     >
-      <div className="h-full grid grid-cols-12 gap-4">
+      {/* Stacks below lg for the tablet band; the explicit panel heights stop
+          Recharts' ResponsiveContainer collapsing to zero outside an h-full
+          grid track. */}
+      <div className="h-full grid grid-cols-1 lg:grid-cols-12 gap-4">
 
         {/* ── Left: fitness chart + recent activities ── */}
-        <div className="col-span-8 h-full min-h-0 flex flex-col gap-4">
+        <div className="lg:col-span-8 lg:h-full min-h-0 flex flex-col gap-4">
           <Panel
             title="Fitness — ATL · CTL · Form (TSB)"
-            className="flex-[3]"
+            className="h-[340px] lg:h-auto lg:flex-[3]"
             controls={
               <div className="flex gap-1">
                 {FITNESS_RANGES.map(({ d, label }) => (
@@ -84,7 +87,7 @@ export default function DesktopDashboard() {
               : <FitnessChart data={fitnessData} loading={fitnessLoading && fitnessData.length === 0} days={days} setDays={setDays} height="100%" />}
           </Panel>
 
-          <Panel title="Recent activities" className="flex-[2]" bodyClassName="overflow-y-auto">
+          <Panel title="Recent activities" className="h-[380px] lg:h-auto lg:flex-[2]" bodyClassName="overflow-y-auto">
             {feedError && rides.length === 0 ? (
               <ErrorState message="Could not load recent activities." onRetry={refetchFeed} />
             ) : rides.length === 0 ? (
@@ -97,10 +100,10 @@ export default function DesktopDashboard() {
                     <th className="py-1.5 pr-3 font-semibold">Name</th>
                     <th className="py-1.5 pr-3 font-semibold text-right">Distance</th>
                     <th className="py-1.5 pr-3 font-semibold text-right">Time</th>
-                    <th className="py-1.5 pr-3 font-semibold text-right">NP</th>
+                    <th className="py-1.5 pr-3 font-semibold text-right hidden lg:table-cell">NP</th>
                     <th className="py-1.5 pr-3 font-semibold text-right hidden lg:table-cell">IF</th>
                     <th className="py-1.5 pr-3 font-semibold text-right">TSS</th>
-                    <th className="py-1.5 font-semibold text-right">Elev</th>
+                    <th className="py-1.5 font-semibold text-right hidden lg:table-cell">Elev</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -115,14 +118,14 @@ export default function DesktopDashboard() {
                       </td>
                       <td className="py-2 pr-3 text-right text-ink-2 tabular-nums">{(r.distance / 1000).toFixed(1)} km</td>
                       <td className="py-2 pr-3 text-right text-ink-2 tabular-nums">{fmtTime(r.moving_time)}</td>
-                      <td className="py-2 pr-3 text-right text-ink-2 tabular-nums">
+                      <td className="py-2 pr-3 text-right text-ink-2 tabular-nums hidden lg:table-cell">
                         {r.normalized_power ?? r.average_watts ?? '—'}{(r.normalized_power ?? r.average_watts) ? ' W' : ''}
                       </td>
                       <td className="py-2 pr-3 text-right text-ink-2 tabular-nums hidden lg:table-cell">
                         {r.intensity_factor != null ? Number(r.intensity_factor).toFixed(2) : '—'}
                       </td>
                       <td className="py-2 pr-3 text-right text-accent-hi tabular-nums">{r.tss != null ? Math.round(r.tss) : '—'}</td>
-                      <td className="py-2 text-right text-ink-2 tabular-nums">{Math.round(r.total_elevation_gain)} m</td>
+                      <td className="py-2 text-right text-ink-2 tabular-nums hidden lg:table-cell">{Math.round(r.total_elevation_gain)} m</td>
                     </tr>
                   ))}
                 </tbody>
@@ -132,7 +135,7 @@ export default function DesktopDashboard() {
         </div>
 
         {/* ── Right: form snapshot, readiness, weekly TSS, what's next ── */}
-        <div className="col-span-4 h-full min-h-0 overflow-y-auto space-y-4">
+        <div className="lg:col-span-4 lg:h-full min-h-0 lg:overflow-y-auto space-y-4">
           <DashboardTop feed={feed} />
 
           <ReadinessResponseWidget />

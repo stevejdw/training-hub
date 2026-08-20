@@ -4,7 +4,7 @@ import { Suspense, useEffect, useState } from 'react';
 import FeedPage from '@/components/FeedPage';
 import PageHeader from '@/components/PageHeader';
 import { iconFor } from '@/components/nav-items';
-import { useIsDesktop } from '@/components/desktop/useIsDesktop';
+import { useLayoutMode } from '@/components/desktop/useIsDesktop';
 import DesktopDashboard from '@/components/desktop/DesktopDashboard';
 import DashboardSkeleton from '@/components/desktop/DashboardSkeleton';
 
@@ -12,7 +12,8 @@ import DashboardSkeleton from '@/components/desktop/DashboardSkeleton';
  *  Waits for mount before branching so the wrong tree (and its data
  *  fetches) never mounts during hydration. */
 export default function HomeContent() {
-  const isDesktop = useIsDesktop();
+  const mode = useLayoutMode();
+  const isDesktop = mode !== 'mobile';
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
@@ -20,6 +21,10 @@ export default function HomeContent() {
      skeleton matches the real grid so nothing shifts when data lands. */
   if (!mounted) return <DashboardSkeleton desktop={isDesktop} />;
 
+  /* Tablet gets the real dashboard too. It previously fell through to
+     FeedPage's `hidden md:grid` branch — a third layout to maintain, and
+     since both FeedPage branches mounted below 1024px it fetched the
+     coaching insight twice. */
   if (isDesktop) return <DesktopDashboard />;
 
   return (
