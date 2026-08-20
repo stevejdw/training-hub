@@ -43,3 +43,11 @@ next-env.d.ts
 
 # Local design assets — not part of the app
 Images/
+
+# iCloud Drive conflict copies ("Card 2.tsx"). This repo lives in iCloud,
+# which duplicates files while they are being written. See CLAUDE.md.
+* [2-9].ts
+* [2-9].tsx
+* [2-9].css
+* [2-9].json
+* [2-9].js

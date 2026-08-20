@@ -62,7 +62,7 @@ export default function Nav() {
       <DesktopSidebar />
 
       {/* ── Tablet band (768–1023px): top horizontal nav ── */}
-      <header className="hidden md:flex lg:hidden h-16 border-b border-line bg-page items-center flex-shrink-0 relative">
+      <header className="tablet-header hidden md:flex lg:hidden h-16 border-b border-line bg-page items-center flex-shrink-0 relative">
         {/* Logo — pinned left */}
         <Link href="/home" className="absolute left-6 flex-shrink-0">
           <Image src={`/app-icon-${appIcon}.png`} alt="Training Hub" width={36} height={36} className="rounded-lg" />

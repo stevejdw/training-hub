@@ -60,7 +60,7 @@
   --chart-2:              #60a5fa;
 
   --top-nav-h: 64px;
-  --bottom-nav-h: 56px;
+  --bottom-nav-h: 73px;   /* must match the h-[73px] inner div in Nav.tsx */
   --desktop-sidebar-w: 232px;
 }
 
@@ -324,10 +324,40 @@ body {
     top: 0;
     left: 0;
     right: 0;
-    bottom: 56px;
+    bottom: var(--bottom-nav-h);
     height: auto;
     overflow: hidden;
   }
+}
+
+/* A rotated phone is still a phone. Safari and the installed PWA rotate
+   regardless of the manifest, and a sideways iPhone (852×393) is wider than
+   the md breakpoint — without this the chrome would flip to the tablet shell
+   while useLayoutMode() correctly still reports 'mobile'. Mirrors the
+   min-height clauses in components/desktop/useIsDesktop.ts — deliberately
+   no `pointer: coarse` here, so the CSS and the hook agree exactly on a short
+   desktop window too. */
+@media (max-height: 499px) {
+  .content-area {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: var(--bottom-nav-h);
+    height: auto;
+    overflow: hidden;
+    margin-left: 0;
+  }
+}
+
+/* …and the chrome has to agree. Nav's shells are selected by width-only
+   Tailwind variants (md:hidden, lg:flex), so on a short-but-wide viewport the
+   bottom bar would hide while .content-area still reserved space for it.
+   These three overrides are the CSS half of the same rule. */
+@media (max-height: 499px) {
+  .mobile-bottom-nav { display: block; }
+  .tablet-header     { display: none; }
+  .desktop-sidebar   { display: none; }
 }
 
 /* ── Desktop shell (lg+): fixed left sidebar replaces the top header ── */

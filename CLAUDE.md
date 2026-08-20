@@ -35,3 +35,17 @@ After pushing to main, **verify the new deployment exists** before reporting suc
 - SQL still prefers `icu_tss` from `daily_wellness` when available, falling back to Strava TSS. This is forward-compatible if intervals.icu TSS data becomes available.
 - Currently `icu_tss` is always null (wellness API doesn't return TSS), so Strava TSS is used.
 - readiness route handles intervals.icu auto-sync independently via its own `autoSyncWellness()`.
+
+---
+
+# Repo lives in iCloud Drive
+
+`~/Library/Mobile Documents/com~apple~CloudDocs/...` — iCloud creates conflict
+copies (`Card 2.tsx`, `Nav 3.tsx`) while files are being written. 28 of them
+were once committed this way.
+
+- **Do not use `git add -A`.** Use `git add -u` plus explicit paths.
+- The `* [2-9].*` patterns in `.gitignore` catch them, but check
+  `git status --short` before committing regardless.
+- iCloud has also caused Turbopack to panic with `Next.js package not found`;
+  `rm -rf .next` and restart the dev server when that happens.
