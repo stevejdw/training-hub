@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useSyncExternalStore } from 'react';
 
 export type AppliedTheme = 'dark' | 'light' | 'ocean' | 'ocean-light' | 'sand' | 'sand-dark';
 export type ThemePreference = AppliedTheme | 'auto';
@@ -39,10 +39,38 @@ export function syncThemeColorMeta() {
   meta.content = bg;
 }
 
+/** Fired whenever the preference changes in this tab. The preference lives
+ *  in localStorage rather than React state, so anything rendering it (the
+ *  Settings hub summary, the picker) needs a way to hear about a change made
+ *  somewhere else in the tree. */
+const THEME_EVENT = 'theme-preference-changed';
+
 /** Persist + apply a preference. */
 export function setThemePreference(pref: ThemePreference) {
   localStorage.setItem('theme', pref);
   applyTheme(pref);
+  window.dispatchEvent(new CustomEvent(THEME_EVENT));
+}
+
+function subscribeThemePreference(onChange: () => void): () => void {
+  window.addEventListener(THEME_EVENT, onChange);
+  window.addEventListener('storage', onChange);
+  return () => {
+    window.removeEventListener(THEME_EVENT, onChange);
+    window.removeEventListener('storage', onChange);
+  };
+}
+
+/** Subscribe to the stored preference. `useSyncExternalStore` rather than a
+ *  mount effect: localStorage isn't readable during SSR, and this keeps the
+ *  server snapshot ('dark', matching the `data-theme` the layout renders)
+ *  separate from the client one without a cascading re-render. */
+export function useThemePreference(): ThemePreference {
+  return useSyncExternalStore(
+    subscribeThemePreference,
+    getThemePreference,
+    () => 'dark' as ThemePreference,
+  );
 }
 
 /** Read the stored preference (defaults to 'dark'). */
