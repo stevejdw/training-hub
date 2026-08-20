@@ -166,7 +166,18 @@ export async function GET() {
     });
     return Response.json({
       recentRides: ridesRes.rows,
-      nextEvent: nextEvent ? { ...nextEvent, daysAway } : null,
+      /* Projected, not spread. The full EventGoal carries `route` (a cached
+         polyline plus elevation profile) and `pacing_strategy`, neither of
+         which the dashboard renders — and this is the highest-frequency
+         payload in the app. */
+      nextEvent: nextEvent ? {
+        id:       nextEvent.id,
+        name:     nextEvent.name,
+        date:     nextEvent.date,
+        goal:     nextEvent.goal,
+        location: nextEvent.location ?? null,
+        daysAway,
+      } : null,
       nextSession,
       fitness,
       powerHighlights,

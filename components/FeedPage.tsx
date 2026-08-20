@@ -52,9 +52,20 @@ export interface NextSession {
   description: string | null;
 }
 
+/** Mirrors the projection in app/api/analytics/feed/route.ts — the route no
+ *  longer spreads the whole EventGoal. */
+export interface NextEvent {
+  id:       string;
+  name:     string;
+  date:     string;
+  goal:     string;
+  location: string | null;
+  daysAway: number;
+}
+
 export interface FeedData {
   recentRides: RecentRide[];
-  nextEvent: { id: string; name: string; date: string; goal: string; daysAway: number } | null;
+  nextEvent: NextEvent | null;
   nextSession: NextSession | null;
   fitness: { ctl: number; atl: number; tsb: number };
   powerHighlights: PowerHighlight[];
@@ -250,7 +261,7 @@ function HomeProgressWidget({ wtd, mtd, ytd }: {
 }
 
 /** Shared with DesktopDashboard so the two layouts hit one cache. */
-export const FEED_CACHE_KEY = 'cache-feed-v2';
+export const FEED_CACHE_KEY = 'cache-feed-v3';   /* v3: nextEvent projected */
 
 const SESSION_TYPE_COLOR: Record<string, string> = {
   recovery:   '#34d399',
