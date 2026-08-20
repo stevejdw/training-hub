@@ -182,10 +182,9 @@ export default function ProgressTab() {
   return (
     <div className="space-y-4">
 
-      {/* Heading */}
-      <h2 className="text-sm font-semibold text-ink">Progress</h2>
-
-      {/* Controls: sport dropdown + metric pills (scrollable row) */}
+      {/* Controls: sport dropdown + metric pills (scrollable row).
+          The "Progress" heading that used to sit above this said the same
+          thing as the sub-tab already highlighted at the top of the screen. */}
       <div className="flex items-center gap-2">
         <SportDropdown
           selected={selected}
@@ -213,9 +212,26 @@ export default function ProgressTab() {
       {/* Chart panel */}
       <div className="bg-raised/60 rounded-xl p-4 space-y-3">
 
-        {/* Total header */}
+        {/* Total header. The period selector and the ‹ › stepper used to sit
+            in two separate blocks *below* the chart they drive, with the date
+            range printed a third time between them. Both now sit above it. */}
         <div>
-          <p className="text-micro text-ink-4 uppercase tracking-wider">Total {m.label}</p>
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-micro text-ink-4 uppercase tracking-wider">Total {m.label}</p>
+            <div className="flex bg-raised rounded-lg p-0.5 gap-0.5 flex-shrink-0">
+              {PERIODS.map(p => (
+                <button
+                  key={p.key}
+                  onClick={() => { setPeriod(p.key); setOffset(0); }}
+                  className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                    period === p.key ? 'bg-accent text-ink' : 'text-ink-3 hover:text-ink'
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          </div>
           {loading ? (
             <div className="h-9 w-36 bg-hover/50 rounded animate-pulse mt-1" />
           ) : (
@@ -231,7 +247,30 @@ export default function ProgressTab() {
               )}
             </div>
           )}
-          <p className="text-xs text-ink-4 mt-0.5">{dateRange}</p>
+          <div className="flex items-center gap-1 -ml-1.5 mt-0.5">
+            <button
+              onClick={() => setOffset(o => o - 1)}
+              className="p-1 rounded-lg text-ink-4 hover:text-ink hover:bg-raised transition-colors"
+              aria-label="Previous period"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+            <span className="text-xs text-ink-3 tabular-nums">{dateRange}</span>
+            <button
+              onClick={() => setOffset(o => Math.min(0, o + 1))}
+              disabled={offset >= 0}
+              className={`p-1 rounded-lg transition-colors ${
+                offset >= 0 ? 'text-ink-5 cursor-not-allowed' : 'text-ink-4 hover:text-ink hover:bg-raised'
+              }`}
+              aria-label="Next period"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          </div>
           {deltaPct !== null && priorTotal > 0 && (
             <p className="text-micro text-ink-5 mt-0.5">
               vs. prior period ({m.fmt(priorTotal)}{m.unit ? ` ${m.unit}` : ''})
@@ -340,47 +379,6 @@ export default function ProgressTab() {
           </ResponsiveContainer>
           )}</EnlargeableChart>
         )}
-      </div>
-
-      {/* Period selector */}
-      <div className="flex bg-raised rounded-xl p-1 gap-1">
-        {PERIODS.map(p => (
-          <button
-            key={p.key}
-            onClick={() => { setPeriod(p.key); setOffset(0); }}
-            className={`flex-1 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-              period === p.key ? 'bg-accent text-ink' : 'text-ink-3 hover:text-ink'
-            }`}
-          >
-            {p.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Navigation arrows */}
-      <div className="flex items-center justify-between">
-        <button
-          onClick={() => setOffset(o => o - 1)}
-          className="p-2 rounded-lg text-ink-3 hover:text-ink hover:bg-raised transition-colors"
-          aria-label="Previous period"
-        >
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-          </svg>
-        </button>
-        <span className="text-sm text-ink font-medium tabular-nums">{dateRange}</span>
-        <button
-          onClick={() => setOffset(o => Math.min(0, o + 1))}
-          disabled={offset >= 0}
-          className={`p-2 rounded-lg transition-colors ${
-            offset >= 0 ? 'text-ink-5 cursor-not-allowed' : 'text-ink-3 hover:text-ink hover:bg-raised'
-          }`}
-          aria-label="Next period"
-        >
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-          </svg>
-        </button>
       </div>
 
       {/* Weekly TSS — above calendar */}

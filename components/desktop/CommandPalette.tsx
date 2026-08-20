@@ -10,7 +10,7 @@ const THEME_CYCLE: ThemePreference[] = ['dark', 'light', 'ocean', 'ocean-light',
 
 // g-then-key navigation shortcuts (desktop only)
 const G_SHORTCUTS: Record<string, string> = {
-  h: '/home', a: '/activities', p: '/performance',
+  h: '/home', a: '/activities', p: '/training?tab=power',
   t: '/training', e: '/events', c: '/chat',
 };
 

@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 
-/** /fitness is legacy — fitness lives under Performance now. */
+/** /fitness is legacy — fitness lives under Training now. */
 export default function LegacyFitnessPage() {
-  redirect('/performance?tab=fitness');
+  redirect('/training?tab=fitness');
 }

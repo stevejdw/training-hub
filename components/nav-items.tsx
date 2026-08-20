@@ -30,23 +30,9 @@ const activitiesIcon = (
   </svg>
 );
 
-const performanceIcon = (
-  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-  </svg>
-);
-
 const trainingIcon = (
-  // Training (Progress) — line graph
   <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M3 17l6-6 4 4 8-8M14 7h7v7" />
-  </svg>
-);
-
-const trainingPlansIcon = (
-  // Calendar / planner
-  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
   </svg>
 );
 
@@ -96,8 +82,7 @@ const moreIcon = (
 export const ALL_NAV_ITEMS: NavItem[] = [
   { key: 'home',           href: '/home',           label: 'Home',           matchPrefixes: ['/home', '/feed'],           icon: homeIcon,         pinned: 'first' },
   { key: 'activities',     href: '/activities',     label: 'Activities',     matchPrefixes: ['/activities'],              icon: activitiesIcon },
-  { key: 'performance',    href: '/performance',    label: 'Performance',    matchPrefixes: ['/performance', '/fitness'], icon: performanceIcon },
-  { key: 'training',       href: '/training',       label: 'Training',       matchPrefixes: ['/training'],                icon: trainingIcon },
+  { key: 'training',       href: '/training',       label: 'Training',       matchPrefixes: ['/training', '/performance', '/fitness'], icon: trainingIcon },
   { key: 'events',         href: '/events',         label: 'Events',         matchPrefixes: ['/events'],                  icon: eventsIcon },
   { key: 'goals',          href: '/goals',          label: 'Goals',          matchPrefixes: ['/goals'],                   icon: goalsIcon },
   { key: 'chat',           href: '/chat',           label: 'Coach AI',       matchPrefixes: ['/chat'],                    icon: chatIcon },
@@ -108,15 +93,33 @@ export const ALL_NAV_ITEMS: NavItem[] = [
 
 export const STORAGE_KEY    = 'nav-bar-config';
 export const NAV_EVENT      = 'nav-config-changed';
-export const DEFAULT_MIDDLE = ['activities', 'performance', 'training'];
+export const DEFAULT_MIDDLE = ['activities', 'training', 'events'];
 
 export const STORAGE_KEY_DESKTOP    = 'nav-bar-config-desktop';
 export const NAV_EVENT_DESKTOP      = 'nav-config-desktop-changed';
-export const DEFAULT_MIDDLE_DESKTOP = ['activities', 'performance', 'training', 'events', 'goals', 'chat'];
+export const DEFAULT_MIDDLE_DESKTOP = ['activities', 'training', 'events', 'goals', 'chat', 'profile'];
 
 /** Maximum number of middle slots a user can configure. */
 export const MAX_MIDDLE        = 6;
 export const MAX_MIDDLE_MOBILE = 3;
+
+/** Performance merged into Training. A bar saved before that names both
+ *  collapses to one slot, so top the result back up from the defaults rather
+ *  than leaving the user a tab short of what they had. */
+function migrateKeys(keys: string[], defaults: string[]): string[] {
+  const out: string[] = [];
+  for (const k of keys) {
+    const mapped = k === 'performance' ? 'training' : k;
+    if (typeof mapped === 'string' && !out.includes(mapped)) out.push(mapped);
+  }
+  if (out.length < keys.length) {
+    for (const d of defaults) {
+      if (out.length >= keys.length) break;
+      if (!out.includes(d)) out.push(d);
+    }
+  }
+  return out;
+}
 
 const middleKeys = new Set(ALL_NAV_ITEMS.filter(i => !i.pinned).map(i => i.key));
 
@@ -129,7 +132,7 @@ export function loadMiddle(): string[] {
     const arr = JSON.parse(raw);
     if (!Array.isArray(arr)) return DEFAULT_MIDDLE;
     const seen = new Set<string>();
-    const cleaned = (arr as unknown[])
+    const cleaned = migrateKeys(arr as string[], DEFAULT_MIDDLE)
       .filter((k): k is string => typeof k === 'string' && middleKeys.has(k))
       .filter(k => seen.has(k) ? false : (seen.add(k), true))
       .slice(0, MAX_MIDDLE);
@@ -157,7 +160,7 @@ export function loadMiddleDesktop(): string[] {
     const arr = JSON.parse(raw);
     if (!Array.isArray(arr)) return DEFAULT_MIDDLE_DESKTOP;
     const seen = new Set<string>();
-    const cleaned = (arr as unknown[])
+    const cleaned = migrateKeys(arr as string[], DEFAULT_MIDDLE_DESKTOP)
       .filter((k): k is string => typeof k === 'string' && middleKeys.has(k))
       .filter(k => seen.has(k) ? false : (seen.add(k), true))
       .slice(0, MAX_MIDDLE);

@@ -1,25 +1,18 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { SPORT_FILTER_LABELS, SportFilter, sportLabel, sportColor } from '@/lib/sport-types';
 import { useCachedFetch } from '@/lib/use-cached-fetch';
+import ActivityCard from '@/components/ActivityCard';
+import SettingsGear from '@/components/SettingsGear';
 
 interface ActivitiesResponse {
   activities: Activity[];
   total: number;
   page: number;
   pages: number;
-}
-
-function timeAgo(iso: string): string {
-  const diff = (Date.now() - new Date(iso).getTime()) / 1000; // seconds
-  if (diff < 60)         return 'just now';
-  if (diff < 3600)       return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400)      return `${Math.floor(diff / 3600)}h ago`;
-  if (diff < 86400 * 7)  return `${Math.floor(diff / 86400)}d ago`;
-  return new Date(iso).toLocaleDateString();
 }
 
 interface Activity {
@@ -120,8 +113,21 @@ export default function ActivitiesList() {
   const [sortBy,  setSortBy]  = useState<SortCol>('start_date');
   const [sortDir, setSortDir] = useState<SortDir>('DESC');
 
-  // Pagination
+  // Pagination. The table pages; the mobile card list appends instead —
+  // `extra` holds everything loaded past the first page, and `loadedPages`
+  // is how far the infinite scroll has got. Both are cleared by resetList()
+  // rather than by an effect watching the query, so a filter change can't
+  // briefly show the old rides under the new filter.
   const [page, setPage]   = useState(1);
+  const [extra, setExtra] = useState<Activity[]>([]);
+  const [loadedPages, setLoadedPages] = useState(1);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  function resetList() {
+    setPage(1);
+    setExtra([]);
+    setLoadedPages(1);
+  }
 
   // Gear filter
   const [gearList,    setGearList]    = useState<GearItem[]>([]);
@@ -149,12 +155,12 @@ export default function ActivitiesList() {
 
   function toggleGear(id: string) {
     setSelectedGear(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
-    setPage(1);
+    resetList();
   }
 
   function togglePowerMeter(pm: string) {
     setSelectedPowerMeters(prev => prev.includes(pm) ? prev.filter(x => x !== pm) : [...prev, pm]);
-    setPage(1);
+    resetList();
   }
 
   // Close dropdown on outside click
@@ -218,7 +224,7 @@ export default function ActivitiesList() {
 
   function toggleType(f: SportFilter) {
     setSelected(prev => prev.includes(f) ? prev.filter(x => x !== f) : [...prev, f]);
-    setPage(1);
+    resetList();
   }
 
   function clearAll() {
@@ -231,7 +237,7 @@ export default function ActivitiesList() {
     setMaxMins('');
     setMinKm('');
     setMaxKm('');
-    setPage(1);
+    resetList();
   }
 
   function handleSort(col: SortCol) {
@@ -241,7 +247,7 @@ export default function ActivitiesList() {
       setSortBy(col);
       setSortDir('DESC');
     }
-    setPage(1);
+    resetList();
   }
 
   const hasActiveFilters = selected.length > 0 || selectedGear.length > 0 || selectedPowerMeters.length > 0 || dateFrom || dateTo || minMins || maxMins || minKm || maxKm;
@@ -269,9 +275,48 @@ export default function ActivitiesList() {
     30 * 60 * 1000,
   );
 
-  const activities = data?.activities ?? [];
+  // Memoised: it's a dependency of loadMore, and a fresh [] on every
+  // render would rebuild the observer callback each time.
+  const activities = useMemo(() => data?.activities ?? [], [data]);
   const pages = data?.pages ?? 1;
   const total = data?.total ?? 0;
+
+  /* The card list shows page 1 plus everything infinite scroll has appended.
+     The table keeps paging, so both can share one query. */
+  const cardItems = [...activities, ...extra];
+  const hasMore   = loadedPages < pages;
+
+  const loadMore = useCallback(async () => {
+    if (loadingMore || loadedPages >= pages) return;
+    setLoadingMore(true);
+    const next = loadedPages + 1;
+    try {
+      const q = new URLSearchParams(queryString);
+      q.set('page', String(next));
+      const d = await fetch(`/api/activities?${q.toString()}`).then(r => r.json()) as ActivitiesResponse;
+      // Filter by id: a ride added by a sync between two page fetches shifts
+      // the window and would otherwise repeat a row.
+      setExtra(prev => {
+        const seen = new Set([...activities, ...prev].map(a => a.id));
+        return [...prev, ...(d.activities ?? []).filter(a => !seen.has(a.id))];
+      });
+      setLoadedPages(next);
+    } catch {
+      /* Leave loadedPages alone so the sentinel retries on the next scroll. */
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [loadingMore, loadedPages, pages, queryString, activities]);
+
+  /* A scroll handler on the list rather than an IntersectionObserver on a
+     sentinel: the list lives in its own scroll container, and a plain
+     distance-to-bottom check behaves identically whether the container or
+     the page is what's moving. Fires one page ahead of the end so the next
+     batch is usually there before you reach it. */
+  function onListScroll(e: React.UIEvent<HTMLDivElement>) {
+    const el = e.currentTarget;
+    if (el.scrollHeight - el.scrollTop - el.clientHeight < 600) void loadMore();
+  }
 
   return (
     <div className="h-full flex flex-col md:max-w-5xl xl:max-w-7xl md:mx-auto md:w-full">
@@ -296,7 +341,7 @@ export default function ActivitiesList() {
             ))}
             {selected.length > 0 && (
               <button
-                onClick={() => { setSelected([]); setPage(1); }}
+                onClick={() => { setSelected([]); resetList(); }}
                 className="px-2 py-1.5 rounded-lg text-xs text-ink-4 hover:text-ink transition-colors whitespace-nowrap flex-shrink-0"
               >
                 ✕
@@ -325,8 +370,8 @@ export default function ActivitiesList() {
               </svg>
             </button>
 
-            {/* Column picker */}
-            <div className="relative">
+            {/* Column picker — the table's, so mobile has no use for it */}
+            <div className="relative hidden md:block">
               <button
                 onClick={() => setColPickerOpen(v => !v)}
                 title="Show/hide columns"
@@ -367,6 +412,11 @@ export default function ActivitiesList() {
               )}
             </div>
 
+            {/* Gear — mobile only; above md the page header carries it. */}
+            <div className="md:hidden">
+              <SettingsGear className="w-8 h-8" />
+            </div>
+
           </div>
         </div>
 
@@ -380,14 +430,14 @@ export default function ActivitiesList() {
                 <input
                   type="date"
                   value={dateFrom}
-                  onChange={e => { setDateFrom(e.target.value); setPage(1); }}
+                  onChange={e => { setDateFrom(e.target.value); resetList(); }}
                   className="flex-1 bg-raised border border-line-strong rounded-lg px-2 py-1.5 text-sm text-ink-2 focus:outline-none focus:border-accent"
                   placeholder="From"
                 />
                 <input
                   type="date"
                   value={dateTo}
-                  onChange={e => { setDateTo(e.target.value); setPage(1); }}
+                  onChange={e => { setDateTo(e.target.value); resetList(); }}
                   className="flex-1 bg-raised border border-line-strong rounded-lg px-2 py-1.5 text-sm text-ink-2 focus:outline-none focus:border-accent"
                   placeholder="To"
                 />
@@ -401,7 +451,7 @@ export default function ActivitiesList() {
                 <input
                   type="number"
                   value={minMins}
-                  onChange={e => { setMinMins(e.target.value); setPage(1); }}
+                  onChange={e => { setMinMins(e.target.value); resetList(); }}
                   className="w-20 bg-raised border border-line-strong rounded-lg px-2 py-1.5 text-sm text-ink-2 focus:outline-none focus:border-accent"
                   placeholder="Min"
                   min="0"
@@ -410,7 +460,7 @@ export default function ActivitiesList() {
                 <input
                   type="number"
                   value={maxMins}
-                  onChange={e => { setMaxMins(e.target.value); setPage(1); }}
+                  onChange={e => { setMaxMins(e.target.value); resetList(); }}
                   className="w-20 bg-raised border border-line-strong rounded-lg px-2 py-1.5 text-sm text-ink-2 focus:outline-none focus:border-accent"
                   placeholder="Max"
                   min="0"
@@ -425,7 +475,7 @@ export default function ActivitiesList() {
                 <input
                   type="number"
                   value={minKm}
-                  onChange={e => { setMinKm(e.target.value); setPage(1); }}
+                  onChange={e => { setMinKm(e.target.value); resetList(); }}
                   className="w-20 bg-raised border border-line-strong rounded-lg px-2 py-1.5 text-sm text-ink-2 focus:outline-none focus:border-accent"
                   placeholder="Min"
                   min="0"
@@ -434,7 +484,7 @@ export default function ActivitiesList() {
                 <input
                   type="number"
                   value={maxKm}
-                  onChange={e => { setMaxKm(e.target.value); setPage(1); }}
+                  onChange={e => { setMaxKm(e.target.value); resetList(); }}
                   className="w-20 bg-raised border border-line-strong rounded-lg px-2 py-1.5 text-sm text-ink-2 focus:outline-none focus:border-accent"
                   placeholder="Max"
                   min="0"
@@ -532,7 +582,7 @@ export default function ActivitiesList() {
                       {selectedGear.length > 0 && (
                         <div className="border-t border-line px-3 py-1.5">
                           <button
-                            onClick={() => { setSelectedGear([]); setPage(1); }}
+                            onClick={() => { setSelectedGear([]); resetList(); }}
                             className="text-xs text-ink-4 hover:text-accent-hi transition-colors"
                           >
                             Clear gear
@@ -586,8 +636,37 @@ export default function ActivitiesList() {
         )}
       </div>
 
-      {/* Table */}
-      <div className="flex-1 overflow-auto scroll-touch">
+      {/* Mobile: cards. A 600px-wide table on a 375px screen meant sideways
+          scrolling and truncated names; this is the same card the Home feed
+          uses, with infinite scroll instead of 67 pages of Prev/Next. */}
+      <div
+        onScroll={onListScroll}
+        className="md:hidden flex-1 overflow-y-auto scroll-touch px-3 py-3 space-y-3 pb-nav"
+      >
+        {loading && cardItems.length === 0
+          ? Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="h-28 rounded-2xl bg-raised/50 animate-pulse" />
+            ))
+          : cardItems.map(a => <ActivityCard key={a.id} ride={a} />)}
+
+        {!loading && cardItems.length === 0 && (
+          <div className="flex h-32 items-center justify-center text-sm text-ink-4">
+            No activities match your filters
+          </div>
+        )}
+
+        {loadingMore && (
+          <div className="py-3 text-center text-xs text-ink-4">Loading more…</div>
+        )}
+        {!hasMore && cardItems.length > 0 && (
+          <div className="py-3 text-center text-xs text-ink-5">
+            {total.toLocaleString()} activities · that&apos;s all of them
+          </div>
+        )}
+      </div>
+
+      {/* Desktop: table */}
+      <div className="hidden md:block flex-1 overflow-auto scroll-touch">
         <table className="min-w-[600px] w-full text-sm">
           <thead className="sticky top-0 bg-surface border-b border-line">
             <tr>
@@ -723,9 +802,9 @@ export default function ActivitiesList() {
         )}
       </div>
 
-      {/* Pagination */}
+      {/* Pagination — desktop only; mobile scrolls. */}
       {pages > 1 && (
-        <div className="border-t border-line px-4 py-3 flex items-center justify-between flex-shrink-0">
+        <div className="hidden md:flex border-t border-line px-4 py-3 items-center justify-between flex-shrink-0">
           <button
             onClick={() => setPage(p => Math.max(1, p - 1))}
             disabled={page === 1}

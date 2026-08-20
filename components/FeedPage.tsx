@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { ResponsiveContainer, LineChart, Line } from 'recharts';
-import { sportLabel, sportColor } from '@/lib/sport-types';
 import { useCachedFetch } from '@/lib/use-cached-fetch';
 import TssRollingChart from './training/TssRollingChart';
 import { calendarDaysFromToday } from '@/lib/calendar-days';
@@ -13,6 +12,7 @@ import { CHART } from '@/lib/chart-theme';
 import ErrorState from '@/components/ui/ErrorState';
 import { formBand } from '@/components/dashboard/FormReading';
 import DashboardTop from '@/components/dashboard/DashboardTop';
+import ActivityCard from '@/components/ActivityCard';
 
 const ActivityMap = dynamic(() => import('./ActivityMap'), { ssr: false });
 
@@ -77,26 +77,6 @@ export interface FeedData {
   ytd: PeriodStats | null;
   eftp: number;
   vo2max: number | null;
-}
-
-function fmt(s: number) {
-  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
-  return h > 0 ? `${h}h ${m.toString().padStart(2, '0')}m` : `${m}m`;
-}
-
-function relDate(iso: string) {
-  const d = new Date(iso);
-  const diffH = (Date.now() - d.getTime()) / 3600000;
-  if (diffH < 1)  return 'Just now';
-  if (diffH < 24) return `${Math.floor(diffH)}h ago`;
-  const diffD = Math.floor(diffH / 24);
-  if (diffD === 1) return 'Yesterday';
-  if (diffD < 7)  return `${diffD} days ago`;
-  return d.toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' });
-}
-
-function timeOfDay(iso: string) {
-  return new Date(iso).toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit', hour12: true });
 }
 
 function LazyMap({ polyline }: { polyline: string }) {
@@ -475,77 +455,20 @@ export default function FeedPage() {
           </div>
 
           <div className="space-y-3">
-            {recentRides.map(ride => {
-              const color    = sportColor(ride.sport_type);
-              const np       = ride.normalized_power ?? ride.average_watts;
-              const speedKph = ride.average_speed ? (ride.average_speed * 3.6).toFixed(1) : null;
-
-              return (
-                <Link
-                  key={ride.id}
-                  href={`/activities/${ride.id}`}
-                  className="block bg-raised/60 rounded-2xl overflow-hidden border border-line-strong/40 hover:border-line-hover/60 transition-colors group"
-                >
-                  <div className="px-4 pt-4 pb-3">
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span
-                            className="px-2 py-0.5 rounded text-micro font-semibold flex-shrink-0"
-                            style={{ background: color + '22', color }}
-                          >
-                            {sportLabel(ride.sport_type)}{ride.trainer ? ' · Indoor' : ''}
-                          </span>
-                          <span className="text-mini text-ink-4 truncate">
-                            {relDate(ride.start_date)} · {timeOfDay(ride.start_date)}
-                          </span>
-                        </div>
-                        <h3 className="text-base font-bold text-ink group-hover:text-accent-hi transition-colors truncate leading-tight">
-                          {ride.name}
-                        </h3>
-                      </div>
-                      <svg className="w-4 h-4 text-ink-5 group-hover:text-accent-hi transition-colors flex-shrink-0 mt-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                      </svg>
-                    </div>
-
-                    <div className="flex items-center gap-3 flex-wrap text-sm">
-                      {ride.distance > 0 && (
-                        <span className="font-semibold text-ink">
-                          {(ride.distance / 1000).toFixed(1)}<span className="text-xs text-ink-4 ml-0.5">km</span>
-                        </span>
-                      )}
-                      {speedKph && (
-                        <span className="text-ink-3">{speedKph}<span className="text-xs ml-0.5">km/h</span></span>
-                      )}
-                      <span className="text-ink-3">{fmt(ride.moving_time)}</span>
-                      {ride.total_elevation_gain > 0 && (
-                        <span className="text-ink-3">{Math.round(ride.total_elevation_gain)}<span className="text-xs ml-0.5">m</span></span>
-                      )}
-                      {np && (
-                        <span className="text-ink-2">{Math.round(np)}<span className="text-xs text-ink-4 ml-0.5">W</span></span>
-                      )}
-                      {/* Selected in SQL and never rendered until now. */}
-                      {ride.intensity_factor != null && ride.intensity_factor > 0 && (
-                        <span className="text-ink-3 text-xs">IF {Number(ride.intensity_factor).toFixed(2)}</span>
-                      )}
-                      {ride.tss && (
-                        <span className="text-accent-hi text-xs font-medium">{Math.round(ride.tss)} TSS</span>
-                      )}
-                      {ride.average_heartrate && (
-                        <span className="text-red-400 text-xs">♥ {Math.round(ride.average_heartrate)}</span>
-                      )}
-                    </div>
+            {/* Shared with the Activities list — this card used to be
+                written out inline here and nowhere else, while Activities
+                showed the same rides as table rows. */}
+            {recentRides.map(ride => (
+              <ActivityCard
+                key={ride.id}
+                ride={ride}
+                footer={ride.summary_polyline ? (
+                  <div className="px-3 pb-3">
+                    <LazyMap polyline={ride.summary_polyline} />
                   </div>
-
-                  {ride.summary_polyline && (
-                    <div className="px-3 pb-3">
-                      <LazyMap polyline={ride.summary_polyline} />
-                    </div>
-                  )}
-                </Link>
-              );
-            })}
+                ) : undefined}
+              />
+            ))}
 
             {recentRides.length === 0 && (
               <div className="text-center py-10 text-ink-4 text-sm">No recent rides found.</div>

@@ -1,8 +1,8 @@
 'use client';
 
+import SettingsGear from '@/components/SettingsGear';
+
 /** Desktop sub-navigation rail.
- *
- *  This markup was byte-identical in TrainingPage and PerformancePage.
  *
  *  The active state uses text-accent-fg rather than text-ink: text-ink is the
  *  theme's body colour, which is near-black in the light themes and was being
@@ -38,6 +38,12 @@ export default function SideRail<K extends string>({
           {label}
         </button>
       ))}
+
+      {/* The gear reaches every other desktop surface through PageHeader, but
+          a railed page has no PageHeader — so it had none at all. */}
+      <div className="mt-auto pt-4">
+        <SettingsGear />
+      </div>
     </nav>
   );
 }

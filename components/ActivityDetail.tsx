@@ -653,7 +653,7 @@ export default function ActivityDetail(
                 <div className="flex items-center justify-between">
                   <p className="text-xs font-semibold text-ink-4 uppercase tracking-wider">Best Efforts</p>
                   <Link
-                    href={`/performance?tab=power&s=${bpSeconds}`}
+                    href={`/training?tab=power&s=${bpSeconds}`}
                     className="text-xs text-accent-hi hover:text-accent-hi transition-colors"
                   >
                     All activities →

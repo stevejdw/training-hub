@@ -29,7 +29,7 @@ export default function TrainingStateStrip({
 
   return (
     <Link
-      href="/performance?tab=fitness"
+      href="/training?tab=fitness"
       className="block bg-surface border border-line rounded-2xl px-4 py-3 hover:border-line-hover transition-colors"
     >
       <div className="flex items-center gap-4">

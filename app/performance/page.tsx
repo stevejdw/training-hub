@@ -1,21 +1,19 @@
-import { Suspense } from 'react';
-import PerformancePage from '@/components/PerformancePage';
-import PageHeader from '@/components/PageHeader';
-import { iconFor } from '@/components/nav-items';
+import { redirect } from 'next/navigation';
 
-export const metadata = { title: 'Performance | Training Hub' };
-
-export default function Page() {
-  return (
-    <div className="h-full flex flex-col">
-      <div className="md:hidden">
-        <PageHeader icon={iconFor('performance')} title="Performance" />
-      </div>
-      <div className="flex-1 min-h-0">
-        <Suspense>
-          <PerformancePage />
-        </Suspense>
-      </div>
-    </div>
-  );
+/** Performance merged into Training. Deep links from activity detail, the
+ *  readiness widget and the dashboard strip still point here, so carry the
+ *  query string across rather than dropping people on the default tab. */
+export default async function LegacyPerformancePage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const sp = await searchParams;
+  const qs = new URLSearchParams();
+  for (const [k, v] of Object.entries(sp)) {
+    if (typeof v === 'string') qs.set(k, v);
+    else if (Array.isArray(v) && v[0]) qs.set(k, v[0]);
+  }
+  if (!qs.get('tab')) qs.set('tab', 'fitness');
+  redirect(`/training?${qs.toString()}`);
 }

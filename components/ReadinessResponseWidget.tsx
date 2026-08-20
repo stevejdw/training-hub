@@ -112,7 +112,7 @@ export default function ReadinessResponseWidget() {
   const statusCfg       = STATUS_CONFIG[status] ?? STATUS_CONFIG.neutral;
 
   return (
-    <Link href="/performance?tab=fitness&sub=readiness" className="block group">
+    <Link href="/training?tab=fitness&sub=readiness" className="block group">
       <div className="bg-raised/60 rounded-2xl p-4 border border-line-strong/40 group-hover:border-line-hover/60 group-hover:bg-raised/80 transition-colors">
         <div className="flex items-center justify-between mb-3">
           <p className="text-micro font-semibold text-ink-4 uppercase tracking-wider group-hover:text-accent-hi transition-colors">Readiness & Response →</p>

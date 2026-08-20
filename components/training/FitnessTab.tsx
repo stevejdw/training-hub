@@ -10,6 +10,7 @@ import { useCachedFetch } from '@/lib/use-cached-fetch';
 import EnlargeableChart from '@/components/EnlargeableChart';
 import FitnessChart, { type FitnessPoint } from './FitnessChart';
 import { CHART } from '@/lib/chart-theme';
+import { formBand } from '@/components/dashboard/FormReading';
 interface EftpPoint  { date: string; eftp: number }
 interface Vo2Point   { date: string; vo2max: number }
 interface EftpHistoryResponse { eftpPoints: EftpPoint[]; vo2Points: Vo2Point[]; weight: number | null }
@@ -328,9 +329,11 @@ export default function FitnessTab() {
     return d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
   };
 
-  const latest   = data[data.length - 1];
-  const tsbColor = (v: number) => v >= 5 ? '#34d399' : v <= -20 ? '#f87171' : '#facc15';
-  const tsbLabel = (v: number) => v >= 5 ? 'Fresh' : v <= -20 ? 'Fatigued' : 'Neutral';
+  const latest = data[data.length - 1];
+  /* formBand, not a local three-band scale. This file used to call -21.8
+     "Fatigued" while the dashboard called the same number "Building" — same
+     metric, two vocabularies and two sets of thresholds. One table now. */
+  const band = latest ? formBand(latest.tsb) : null;
 
   const fmtDate = (s: string) => {
     const d = new Date(s);
@@ -353,18 +356,21 @@ export default function FitnessTab() {
           </div>
           <div className="bg-raised/60 rounded-xl p-3 text-center">
             <p className="text-micro text-ink-4 uppercase tracking-wider mb-1">Form (TSB)</p>
-            <p className="text-2xl font-bold" style={{ color: tsbColor(latest.tsb) }}>
+            <p className="text-2xl font-bold" style={{ color: band!.color }}>
               {latest.tsb > 0 ? '+' : ''}{latest.tsb}
             </p>
-            <p className="text-micro mt-0.5" style={{ color: tsbColor(latest.tsb) }}>
-              {tsbLabel(latest.tsb)}
+            <p className="text-micro mt-0.5" style={{ color: band!.color }}>
+              {band!.label}
             </p>
           </div>
         </div>
       )}
 
-      {/* Range selector — 'all' uses a sentinel value (-1) for "All time" */}
-      <div className="flex gap-1.5 flex-wrap">
+      {/* Range selector — 'all' uses a sentinel value (-1) for "All time".
+          Scrolls rather than wraps: five chips wrapped to a second line on a
+          375px screen, pushing the chart further down a page that already
+          had too little of it above the fold. */}
+      <div className="flex gap-1.5 overflow-x-auto scrollbar-none -mx-4 px-4">
         {[
           { d: 30,   label: '30 days'  },
           { d: 90,   label: '90 days'  },
@@ -375,7 +381,7 @@ export default function FitnessTab() {
           <button
             key={d}
             onClick={() => setDays(d)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+            className={`flex-shrink-0 whitespace-nowrap px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
               days === d
                 ? 'bg-accent/20 text-accent-hi border border-accent/50'
                 : 'bg-raised text-ink-4 hover:text-ink-2'
