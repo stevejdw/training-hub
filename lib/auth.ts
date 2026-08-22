@@ -2,9 +2,47 @@ import { SignJWT, jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
 import type { NextRequest } from 'next/server';
 
-const SECRET = new TextEncoder().encode(
-  process.env.AUTH_SECRET ?? process.env.STRAVA_CLIENT_SECRET ?? 'fallback-dev-secret-do-not-use-in-prod'
-);
+/**
+ * The key the session JWT is signed and verified with.
+ *
+ * This used to fall through to a literal `'fallback-dev-secret-...'` string.
+ * While the repository was private that was merely untidy; now that it is
+ * public, that literal is a published signing key — anyone could mint a valid
+ * session cookie for any deployment that happened to be missing the
+ * environment variable. So in production a missing secret is a hard failure
+ * rather than a silent downgrade: fail closed, never fall back.
+ *
+ * STRAVA_CLIENT_SECRET stays in the chain because AUTH_SECRET is currently
+ * only set on Production, and preview deployments (which also run with
+ * NODE_ENV=production) would otherwise refuse every request. Both are real
+ * secrets; the literal is not.
+ *
+ * Resolved lazily and memoised rather than at module scope, so a
+ * misconfiguration surfaces as failing requests instead of a build that dies
+ * during route collection.
+ */
+const DEV_ONLY_SECRET = 'fallback-dev-secret-do-not-use-in-prod';
+
+let cachedSecret: Uint8Array | null = null;
+
+function secret(): Uint8Array {
+  if (cachedSecret) return cachedSecret;
+
+  const configured = process.env.AUTH_SECRET ?? process.env.STRAVA_CLIENT_SECRET;
+  if (!configured) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error(
+        'AUTH_SECRET is not set. Sessions cannot be signed safely without it — ' +
+          'refusing to fall back to a development key in production.',
+      );
+    }
+    cachedSecret = new TextEncoder().encode(DEV_ONLY_SECRET);
+    return cachedSecret;
+  }
+
+  cachedSecret = new TextEncoder().encode(configured);
+  return cachedSecret;
+}
 
 const COOKIE_NAME = 'session';
 const SESSION_DURATION = 60 * 60 * 24 * 30; // 30 days in seconds
@@ -26,7 +64,7 @@ export async function createSessionCookie(user: SessionUser): Promise<string> {
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime(`${SESSION_DURATION}s`)
-    .sign(SECRET);
+    .sign(secret());
 
   const maxAge = SESSION_DURATION;
   // Build the cookie manually to avoid depending on Next.js 16 cookie API shape
@@ -50,7 +88,7 @@ export async function getSessionFromRequest(req: NextRequest): Promise<SessionUs
   const cookie = req.cookies.get(COOKIE_NAME);
   if (!cookie?.value) return null;
   try {
-    const { payload } = await jwtVerify(cookie.value, SECRET);
+    const { payload } = await jwtVerify(cookie.value, secret());
     return payload as unknown as SessionUser;
   } catch {
     return null;
@@ -71,7 +109,7 @@ export async function getSession(): Promise<SessionUser | null> {
   const cookie = cookieStore.get(COOKIE_NAME);
   if (!cookie?.value) return null;
   try {
-    const { payload } = await jwtVerify(cookie.value, SECRET);
+    const { payload } = await jwtVerify(cookie.value, secret());
     return payload as unknown as SessionUser;
   } catch {
     return null;
