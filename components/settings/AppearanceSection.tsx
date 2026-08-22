@@ -5,6 +5,7 @@ import { type ThemePreference, setThemePreference, useThemePreference } from '@/
 import {
   APP_ICONS,
   type AppIconId,
+  inspectBridge,
   isNativeApp,
   nativeBuildInfo,
   probeNativeAppIcon,
@@ -15,7 +16,7 @@ import type { SettingsCtx } from './types';
 import { Group } from './ui';
 
 /** Bumped by hand when a build needs to be identifiable on-device. */
-const BUILD_STAMP = '2026-08-22e';
+const BUILD_STAMP = '2026-08-22f';
 
 export const THEME_FAMILIES = [
   {
@@ -66,11 +67,35 @@ export default function AppearanceSection({ ctx }: { ctx: SettingsCtx }) {
 
   useEffect(() => {
     let cancelled = false;
+
+    /* Phase 1 fires immediately and depends on nothing asynchronous. Reading
+       Capacitor's registry off `window` is synchronous, so this reports even
+       when the network is stalled — which is exactly the state that silenced
+       every previous attempt. */
+    const bridge = inspectBridge();
+    setProbe(
+      bridge.hasAppIcon
+        ? 'plugin present in this build'
+        : bridge.nativePlatform
+          ? 'plugin MISSING from this build'
+          : 'not the installed app',
+    );
+    void fetch('/api/diag', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        what: 'app-icon',
+        phase: 'open',
+        stamp: BUILD_STAMP,
+        bridge,
+        ua: typeof navigator === 'undefined' ? null : navigator.userAgent,
+      }),
+    }).catch(() => {});
+
+    /* Phase 2 adds what only the bridge can answer. It may never resolve, so
+       nothing above depends on it. */
     (async () => {
-      if (!isNativeApp()) {
-        if (!cancelled) setProbe('running in a browser, not the installed app');
-        return;
-      }
+      if (!isNativeApp()) return;
       const [r, build] = await Promise.all([probeNativeAppIcon(), nativeBuildInfo()]);
       if (cancelled) return;
       const shell = build ? `app ${build}` : 'app version unknown';
@@ -78,28 +103,24 @@ export default function AppearanceSection({ ctx }: { ctx: SettingsCtx }) {
         r.state === 'ok'
           ? `plugin OK · alternates ${r.supported ? 'supported' : 'NOT supported'} · currently ${r.icon}`
           : r.state === 'timeout'
-            ? 'plugin did NOT answer (missing from this build)'
+            ? 'plugin did NOT answer'
             : r.state === 'browser'
               ? 'not the installed app'
               : 'plugin not available';
       setProbe(`${shell} · ${plugin}`);
-
-      /* Report to the server as well as the screen. The native shell cannot be
-         inspected from a laptop, and relaying this by hand off a phone has been
-         the slowest part of diagnosing it. Fire and forget. */
       void fetch('/api/diag', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           what: 'app-icon',
+          phase: 'probe',
           stamp: BUILD_STAMP,
           build,
           probe: r,
-          native: isNativeApp(),
-          ua: typeof navigator === 'undefined' ? null : navigator.userAgent,
         }),
       }).catch(() => {});
     })();
+
     return () => {
       cancelled = true;
     };

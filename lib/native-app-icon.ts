@@ -18,6 +18,55 @@ interface AppIconPlugin {
   set(options: { icon: AppIconId }): Promise<{ icon: AppIconId }>;
 }
 
+interface CapacitorGlobal {
+  isNativePlatform?: () => boolean;
+  Plugins?: Record<string, unknown>;
+  PluginHeaders?: { name: string }[];
+  getPlatform?: () => string;
+}
+
+function capacitor(): CapacitorGlobal | undefined {
+  if (typeof window === 'undefined') return undefined;
+  return (window as { Capacitor?: CapacitorGlobal }).Capacitor;
+}
+
+/**
+ * Everything the page can learn about the native bridge WITHOUT a dynamic
+ * import.
+ *
+ * The previous diagnostics never reported, because both probes began with
+ * `await import(...)`, and an import is a network fetch for a JS chunk. On a
+ * stalled connection that hangs forever, so the timeouts guarding the bridge
+ * calls downstream never got a chance to fire and nothing was ever sent.
+ *
+ * Capacitor already publishes its registry on `window` at injection time.
+ * Reading it is synchronous and needs no network, so it works precisely when
+ * the app is least able to talk to anything — which is when we most need to
+ * know what the shell is.
+ */
+export function inspectBridge(): {
+  present: boolean;
+  nativePlatform: boolean;
+  platform: string | null;
+  plugins: string[];
+  headers: string[];
+  hasAppIcon: boolean;
+} {
+  const c = capacitor();
+  const plugins = c?.Plugins ? Object.keys(c.Plugins).sort() : [];
+  const headers = Array.isArray(c?.PluginHeaders)
+    ? c.PluginHeaders.map(h => h?.name).filter(Boolean).sort()
+    : [];
+  return {
+    present: !!c,
+    nativePlatform: c?.isNativePlatform?.() === true,
+    platform: c?.getPlatform?.() ?? null,
+    plugins,
+    headers,
+    hasAppIcon: plugins.includes('AppIcon') || headers.includes('AppIcon'),
+  };
+}
+
 export function isNativeApp(): boolean {
   return (
     typeof window !== 'undefined' &&
