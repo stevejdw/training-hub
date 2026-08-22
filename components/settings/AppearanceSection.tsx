@@ -50,12 +50,29 @@ export default function AppearanceSection({ ctx }: { ctx: SettingsCtx }) {
     // or not the native swap succeeds.
     await updateAndSave('app_icon', id);
     const res = await setNativeAppIcon(id);
-    if (res.error)        setIconNote(res.error);
-    else if (!res.applied) setIconNote(
-      native
-        ? 'This device does not allow changing the app icon.'
-        : 'Home-screen icon changes apply in the installed app. In a browser this only changes the icon shown inside the app.',
-    );
+    if (res.applied) return;
+
+    switch (res.reason) {
+      case 'stale-build':
+        setIconNote(
+          'The installed app is an older build that does not include icon ' +
+            'switching yet. Install the latest TestFlight build — the rest of ' +
+            'the app updates over the air, but this part ships in the binary.',
+        );
+        break;
+      case 'unsupported':
+        setIconNote('This device does not allow changing the app icon.');
+        break;
+      case 'browser':
+        setIconNote(
+          native
+            ? 'This device does not allow changing the app icon.'
+            : 'Home-screen icon changes apply in the installed app. In a browser this only changes the icon shown inside the app.',
+        );
+        break;
+      default:
+        setIconNote(res.detail ?? 'Could not change the app icon.');
+    }
   }
 
   const activeIcon = (profile.app_icon ?? 'speed') as AppIconId;

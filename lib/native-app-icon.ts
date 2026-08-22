@@ -52,15 +52,60 @@ async function plugin(): Promise<AppIconPlugin | null> {
  * without alternate-icon support, so callers can still persist the preference
  * for the in-app logo and say something honest about it.
  */
-export async function setNativeAppIcon(
-  icon: AppIconId,
-): Promise<{ applied: boolean; error?: string }> {
+export type IconFailure =
+  /** Running in a plain browser, not the installed app. */
+  | 'browser'
+  /** Installed binary predates AppIconPlugin — the web half updates from
+   *  Vercel instantly, the native half only ships in a new TestFlight build,
+   *  so the two drift apart and the picker appears to do nothing. */
+  | 'stale-build'
+  /** Device or OS refuses alternate icons. */
+  | 'unsupported'
+  | 'error';
+
+export interface IconResult {
+  applied: boolean;
+  reason?: IconFailure;
+  detail?: string;
+}
+
+/** Capacitor raises this when the JS calls a plugin the installed native
+ *  binary does not contain. It is the signature of an out-of-date build, not
+ *  of a broken call, and it is worth naming explicitly — otherwise the only
+ *  symptom is a picker that silently does nothing. */
+function isUnimplemented(e: unknown): boolean {
+  const code = (e as { code?: string })?.code;
+  if (code === 'UNIMPLEMENTED') return true;
+  const msg = e instanceof Error ? e.message : String(e);
+  return /not implemented|unimplemented/i.test(msg);
+}
+
+export async function setNativeAppIcon(icon: AppIconId): Promise<IconResult> {
   const p = await plugin();
-  if (!p) return { applied: false };
+  if (!p) return { applied: false, reason: 'browser' };
   try {
     await p.set({ icon });
     return { applied: true };
   } catch (e) {
-    return { applied: false, error: e instanceof Error ? e.message : String(e) };
+    if (isUnimplemented(e)) return { applied: false, reason: 'stale-build' };
+    const detail = e instanceof Error ? e.message : String(e);
+    if (/not supported/i.test(detail)) {
+      return { applied: false, reason: 'unsupported', detail };
+    }
+    return { applied: false, reason: 'error', detail };
+  }
+}
+
+/** What the installed binary reports about itself. Returns null when the
+ *  plugin is absent, which is itself the answer: this build is out of date. */
+export async function probeNativeAppIcon(): Promise<
+  { supported: boolean; icon: AppIconId } | null
+> {
+  const p = await plugin();
+  if (!p) return null;
+  try {
+    return await p.get();
+  } catch {
+    return null;
   }
 }
