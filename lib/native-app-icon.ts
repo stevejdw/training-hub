@@ -77,9 +77,32 @@ export function isNativeApp(): boolean {
 
 let cached: AppIconPlugin | null = null;
 
+/**
+ * Resolve the plugin without going near a dynamic import.
+ *
+ * This is what actually broke the icon picker. `await import('@capacitor/core')`
+ * is a network fetch for a JS chunk, and on device that fetch stalls rather
+ * than failing — so the promise never settled, `set()` was never reached, and
+ * nothing downstream ran: no icon change, no error, no message. A tap simply
+ * vanished. Diagnostics confirmed it from the device: the bridge reports
+ * `hasAppIcon: true` with AppIcon in both Plugins and PluginHeaders, while the
+ * half of the report that awaited an import never arrived at all.
+ *
+ * The native bridge injects its plugin proxies onto `window.Capacitor.Plugins`
+ * before the page runs. Reading one is synchronous and needs no network, so it
+ * works even when chunk loading does not. registerPlugin stays only as a
+ * fallback for a bridge that somehow has not published the proxy.
+ */
 async function plugin(): Promise<AppIconPlugin | null> {
   if (!isNativeApp()) return null;
   if (cached) return cached;
+
+  const direct = capacitor()?.Plugins?.AppIcon as AppIconPlugin | undefined;
+  if (direct) {
+    cached = direct;
+    return cached;
+  }
+
   try {
     const { registerPlugin } = await import('@capacitor/core');
     cached = registerPlugin<AppIconPlugin>('AppIcon');
@@ -133,7 +156,12 @@ export async function setNativeAppIcon(icon: AppIconId): Promise<IconResult> {
   const p = await plugin();
   if (!p) return { applied: false, reason: 'browser' };
   try {
-    await p.set({ icon });
+    /* Bounded: a bridge call that never answers is the failure mode that made
+       this invisible for a week. Silence must surface as a message. */
+    const r = await withTimeout(p.set({ icon }), 4000);
+    if (r === 'timeout') {
+      return { applied: false, reason: 'error', detail: 'The app did not respond.' };
+    }
     return { applied: true };
   } catch (e) {
     if (isUnimplemented(e)) return { applied: false, reason: 'stale-build' };
@@ -186,8 +214,15 @@ export async function probeNativeAppIcon(): Promise<IconProbe> {
 export async function nativeBuildInfo(): Promise<string | null> {
   if (!isNativeApp()) return null;
   try {
-    const { App } = await import('@capacitor/app');
-    const r = await withTimeout(App.getInfo(), 3000);
+    /* Same rule as the icon plugin: take the injected proxy off window rather
+       than importing a chunk that may never arrive. */
+    const direct = capacitor()?.Plugins?.App as
+      | { getInfo?: () => Promise<{ version: string; build: string }> }
+      | undefined;
+    const getInfo = direct?.getInfo
+      ? direct.getInfo.bind(direct)
+      : (await import('@capacitor/app')).App.getInfo;
+    const r = await withTimeout(getInfo(), 3000);
     if (r === 'timeout') return null;
     return `${r.version} (${r.build})`;
   } catch {

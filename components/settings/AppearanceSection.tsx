@@ -16,7 +16,7 @@ import type { SettingsCtx } from './types';
 import { Group } from './ui';
 
 /** Bumped by hand when a build needs to be identifiable on-device. */
-const BUILD_STAMP = '2026-08-22f';
+const BUILD_STAMP = '2026-08-23a';
 
 export const THEME_FAMILIES = [
   {
