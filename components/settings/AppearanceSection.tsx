@@ -6,6 +6,7 @@ import {
   APP_ICONS,
   type AppIconId,
   isNativeApp,
+  nativeBuildInfo,
   probeNativeAppIcon,
   setNativeAppIcon,
 } from '@/lib/native-app-icon';
@@ -14,7 +15,7 @@ import type { SettingsCtx } from './types';
 import { Group } from './ui';
 
 /** Bumped by hand when a build needs to be identifiable on-device. */
-const BUILD_STAMP = '2026-08-22c';
+const BUILD_STAMP = '2026-08-22d';
 
 export const THEME_FAMILIES = [
   {
@@ -70,13 +71,18 @@ export default function AppearanceSection({ ctx }: { ctx: SettingsCtx }) {
         if (!cancelled) setProbe('running in a browser, not the installed app');
         return;
       }
-      const r = await probeNativeAppIcon();
+      const [r, build] = await Promise.all([probeNativeAppIcon(), nativeBuildInfo()]);
       if (cancelled) return;
-      setProbe(
-        r === null
-          ? 'plugin NOT found in this build — install a newer TestFlight build'
-          : `plugin OK · alternates ${r.supported ? 'supported' : 'NOT supported'} · currently ${r.icon}`,
-      );
+      const shell = build ? `app ${build}` : 'app version unknown';
+      const plugin =
+        r.state === 'ok'
+          ? `plugin OK · alternates ${r.supported ? 'supported' : 'NOT supported'} · currently ${r.icon}`
+          : r.state === 'timeout'
+            ? 'plugin did NOT answer (missing from this build)'
+            : r.state === 'browser'
+              ? 'not the installed app'
+              : 'plugin not available';
+      setProbe(`${shell} · ${plugin}`);
     })();
     return () => {
       cancelled = true;

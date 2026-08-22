@@ -96,15 +96,51 @@ export async function setNativeAppIcon(icon: AppIconId): Promise<IconResult> {
   }
 }
 
-/** What the installed binary reports about itself. Returns null when the
- *  plugin is absent, which is itself the answer: this build is out of date. */
-export async function probeNativeAppIcon(): Promise<
-  { supported: boolean; icon: AppIconId } | null
-> {
+/** Capacitor answers a call to a plugin the native side does not know about by
+ *  simply never answering — the promise neither resolves nor rejects. That is
+ *  indistinguishable from a slow call, and it is what left the diagnostics line
+ *  reading "checking…" forever. Race every bridge call against a deadline so a
+ *  silent bridge reports itself as one. */
+function withTimeout<T>(work: Promise<T>, ms: number): Promise<T | 'timeout'> {
+  return Promise.race([
+    work,
+    new Promise<'timeout'>(resolve => setTimeout(() => resolve('timeout'), ms)),
+  ]);
+}
+
+export type IconProbe =
+  | { state: 'ok'; supported: boolean; icon: AppIconId }
+  /** Bridge accepted the call and never answered — plugin missing natively. */
+  | { state: 'timeout' }
+  /** Not the installed app at all. */
+  | { state: 'browser' }
+  | { state: 'absent' };
+
+export async function probeNativeAppIcon(): Promise<IconProbe> {
+  if (!isNativeApp()) return { state: 'browser' };
   const p = await plugin();
-  if (!p) return null;
+  if (!p) return { state: 'absent' };
   try {
-    return await p.get();
+    const r = await withTimeout(p.get(), 3000);
+    if (r === 'timeout') return { state: 'timeout' };
+    return { state: 'ok', supported: r.supported, icon: r.icon };
+  } catch {
+    return { state: 'absent' };
+  }
+}
+
+/** Version and build of the *installed binary*, via @capacitor/app — a plugin
+ *  that ships in the npm package and is therefore in packageClassList, so it
+ *  works even when an app-target plugin does not. Without this there is no way
+ *  to tell which TestFlight build is actually running: the web layer updates
+ *  over the air and says nothing about the shell hosting it. */
+export async function nativeBuildInfo(): Promise<string | null> {
+  if (!isNativeApp()) return null;
+  try {
+    const { App } = await import('@capacitor/app');
+    const r = await withTimeout(App.getInfo(), 3000);
+    if (r === 'timeout') return null;
+    return `${r.version} (${r.build})`;
   } catch {
     return null;
   }
