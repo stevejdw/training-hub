@@ -1,11 +1,20 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { type ThemePreference, setThemePreference, useThemePreference } from '@/components/ThemeProvider';
-import { APP_ICONS, type AppIconId, isNativeApp, setNativeAppIcon } from '@/lib/native-app-icon';
+import {
+  APP_ICONS,
+  type AppIconId,
+  isNativeApp,
+  probeNativeAppIcon,
+  setNativeAppIcon,
+} from '@/lib/native-app-icon';
 import { CHART } from '@/lib/chart-theme';
 import type { SettingsCtx } from './types';
 import { Group } from './ui';
+
+/** Bumped by hand when a build needs to be identifiable on-device. */
+const BUILD_STAMP = '2026-08-22c';
 
 export const THEME_FAMILIES = [
   {
@@ -42,6 +51,37 @@ export default function AppearanceSection({ ctx }: { ctx: SettingsCtx }) {
      from a tap on the Settings hub, never during SSR or hydration. */
   const [native] = useState(() => isNativeApp());
   const [iconNote, setIconNote] = useState<string | null>(null);
+
+  /* Diagnostic line, shown on open rather than only after a tap.
+     The icon picker has failed silently in several distinct ways — plugin
+     missing from the installed binary, plugin present but not registered with
+     the bridge, device refusing alternate icons — and every one of them looked
+     identical from the outside: tap, nothing happens. This asks the installed
+     build what it can actually do, so the answer is on screen before anyone
+     touches anything. BUILD_STAMP doubles as proof the web layer is fresh:
+     it ships from Vercel, so if it does not match the latest deploy the app is
+     running cached JS and nothing else on this screen can be trusted. */
+  const [probe, setProbe] = useState<string>('checking…');
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!isNativeApp()) {
+        if (!cancelled) setProbe('running in a browser, not the installed app');
+        return;
+      }
+      const r = await probeNativeAppIcon();
+      if (cancelled) return;
+      setProbe(
+        r === null
+          ? 'plugin NOT found in this build — install a newer TestFlight build'
+          : `plugin OK · alternates ${r.supported ? 'supported' : 'NOT supported'} · currently ${r.icon}`,
+      );
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
 
   async function chooseIcon(id: AppIconId) {
@@ -138,12 +178,12 @@ export default function AppearanceSection({ ctx }: { ctx: SettingsCtx }) {
 
       <Group
         title="App icon"
-        footer={
+        footer={`${
           iconNote ??
           (native
             ? 'Changes the home-screen icon straight away. iOS shows its own confirmation when it does.'
             : 'Changes the icon inside the app. The home-screen icon follows in the installed app.')
-        }
+        } — diagnostics: ${probe} · js ${BUILD_STAMP}`}
       >
         <div className="grid grid-cols-4 gap-2 p-3">
           {APP_ICONS.map(({ id, label }) => {
