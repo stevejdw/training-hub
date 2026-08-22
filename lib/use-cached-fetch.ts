@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useRef, useCallback } from 'react';
 
+const LOGIN_PATH = '/login';
+
 const DEFAULT_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
 
 /**
@@ -69,7 +71,19 @@ export function useCachedFetch<T>(
       .then(async r => {
         // An expired session used to surface as a generic error on every
         // dashboard panel; FeedPage was the only caller that redirected.
-        if (r.status === 401) { window.location.href = '/login'; return null; }
+        if (r.status === 401) {
+          /* Never redirect to /login from /login. ProfileProvider sits in the
+             root layout, so it mounts on the login page too; with no session
+             its /api/profile read 401s, this redirected, the page reloaded,
+             and it 401'd again — an unbounded full-page reload loop, one
+             /login + /api/profile + manifest + icon per turn, as fast as the
+             network allowed. /api/profile reads the athlete blob, so the cost
+             landed on the Neon egress budget as well as on Vercel. */
+          if (window.location.pathname !== LOGIN_PATH) {
+            window.location.href = LOGIN_PATH;
+          }
+          return null;
+        }
         const d = await r.json();
         if (!r.ok) throw new Error((d && (d as { error?: string }).error) || `HTTP ${r.status}`);
         return d as T;
