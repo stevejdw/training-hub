@@ -15,7 +15,7 @@ import type { SettingsCtx } from './types';
 import { Group } from './ui';
 
 /** Bumped by hand when a build needs to be identifiable on-device. */
-const BUILD_STAMP = '2026-08-22d';
+const BUILD_STAMP = '2026-08-22e';
 
 export const THEME_FAMILIES = [
   {
@@ -83,6 +83,22 @@ export default function AppearanceSection({ ctx }: { ctx: SettingsCtx }) {
               ? 'not the installed app'
               : 'plugin not available';
       setProbe(`${shell} · ${plugin}`);
+
+      /* Report to the server as well as the screen. The native shell cannot be
+         inspected from a laptop, and relaying this by hand off a phone has been
+         the slowest part of diagnosing it. Fire and forget. */
+      void fetch('/api/diag', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          what: 'app-icon',
+          stamp: BUILD_STAMP,
+          build,
+          probe: r,
+          native: isNativeApp(),
+          ua: typeof navigator === 'undefined' ? null : navigator.userAgent,
+        }),
+      }).catch(() => {});
     })();
     return () => {
       cancelled = true;
