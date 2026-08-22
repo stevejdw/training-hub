@@ -30,43 +30,6 @@ function capacitor(): CapacitorGlobal | undefined {
   return (window as { Capacitor?: CapacitorGlobal }).Capacitor;
 }
 
-/**
- * Everything the page can learn about the native bridge WITHOUT a dynamic
- * import.
- *
- * The previous diagnostics never reported, because both probes began with
- * `await import(...)`, and an import is a network fetch for a JS chunk. On a
- * stalled connection that hangs forever, so the timeouts guarding the bridge
- * calls downstream never got a chance to fire and nothing was ever sent.
- *
- * Capacitor already publishes its registry on `window` at injection time.
- * Reading it is synchronous and needs no network, so it works precisely when
- * the app is least able to talk to anything — which is when we most need to
- * know what the shell is.
- */
-export function inspectBridge(): {
-  present: boolean;
-  nativePlatform: boolean;
-  platform: string | null;
-  plugins: string[];
-  headers: string[];
-  hasAppIcon: boolean;
-} {
-  const c = capacitor();
-  const plugins = c?.Plugins ? Object.keys(c.Plugins).sort() : [];
-  const headers = Array.isArray(c?.PluginHeaders)
-    ? c.PluginHeaders.map(h => h?.name).filter(Boolean).sort()
-    : [];
-  return {
-    present: !!c,
-    nativePlatform: c?.isNativePlatform?.() === true,
-    platform: c?.getPlatform?.() ?? null,
-    plugins,
-    headers,
-    hasAppIcon: plugins.includes('AppIcon') || headers.includes('AppIcon'),
-  };
-}
-
 export function isNativeApp(): boolean {
   return (
     typeof window !== 'undefined' &&
@@ -185,47 +148,3 @@ function withTimeout<T>(work: Promise<T>, ms: number): Promise<T | 'timeout'> {
   ]);
 }
 
-export type IconProbe =
-  | { state: 'ok'; supported: boolean; icon: AppIconId }
-  /** Bridge accepted the call and never answered — plugin missing natively. */
-  | { state: 'timeout' }
-  /** Not the installed app at all. */
-  | { state: 'browser' }
-  | { state: 'absent' };
-
-export async function probeNativeAppIcon(): Promise<IconProbe> {
-  if (!isNativeApp()) return { state: 'browser' };
-  const p = await plugin();
-  if (!p) return { state: 'absent' };
-  try {
-    const r = await withTimeout(p.get(), 3000);
-    if (r === 'timeout') return { state: 'timeout' };
-    return { state: 'ok', supported: r.supported, icon: r.icon };
-  } catch {
-    return { state: 'absent' };
-  }
-}
-
-/** Version and build of the *installed binary*, via @capacitor/app — a plugin
- *  that ships in the npm package and is therefore in packageClassList, so it
- *  works even when an app-target plugin does not. Without this there is no way
- *  to tell which TestFlight build is actually running: the web layer updates
- *  over the air and says nothing about the shell hosting it. */
-export async function nativeBuildInfo(): Promise<string | null> {
-  if (!isNativeApp()) return null;
-  try {
-    /* Same rule as the icon plugin: take the injected proxy off window rather
-       than importing a chunk that may never arrive. */
-    const direct = capacitor()?.Plugins?.App as
-      | { getInfo?: () => Promise<{ version: string; build: string }> }
-      | undefined;
-    const getInfo = direct?.getInfo
-      ? direct.getInfo.bind(direct)
-      : (await import('@capacitor/app')).App.getInfo;
-    const r = await withTimeout(getInfo(), 3000);
-    if (r === 'timeout') return null;
-    return `${r.version} (${r.build})`;
-  } catch {
-    return null;
-  }
-}

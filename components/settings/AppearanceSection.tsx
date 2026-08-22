@@ -1,22 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { type ThemePreference, setThemePreference, useThemePreference } from '@/components/ThemeProvider';
-import {
-  APP_ICONS,
-  type AppIconId,
-  inspectBridge,
-  isNativeApp,
-  nativeBuildInfo,
-  probeNativeAppIcon,
-  setNativeAppIcon,
-} from '@/lib/native-app-icon';
+import { APP_ICONS, type AppIconId, isNativeApp, setNativeAppIcon } from '@/lib/native-app-icon';
 import { CHART } from '@/lib/chart-theme';
 import type { SettingsCtx } from './types';
 import { Group } from './ui';
-
-/** Bumped by hand when a build needs to be identifiable on-device. */
-const BUILD_STAMP = '2026-08-23a';
 
 export const THEME_FAMILIES = [
   {
@@ -54,77 +43,6 @@ export default function AppearanceSection({ ctx }: { ctx: SettingsCtx }) {
   const [native] = useState(() => isNativeApp());
   const [iconNote, setIconNote] = useState<string | null>(null);
 
-  /* Diagnostic line, shown on open rather than only after a tap.
-     The icon picker has failed silently in several distinct ways — plugin
-     missing from the installed binary, plugin present but not registered with
-     the bridge, device refusing alternate icons — and every one of them looked
-     identical from the outside: tap, nothing happens. This asks the installed
-     build what it can actually do, so the answer is on screen before anyone
-     touches anything. BUILD_STAMP doubles as proof the web layer is fresh:
-     it ships from Vercel, so if it does not match the latest deploy the app is
-     running cached JS and nothing else on this screen can be trusted. */
-  const [probe, setProbe] = useState<string>('checking…');
-
-  useEffect(() => {
-    let cancelled = false;
-
-    /* Phase 1 fires immediately and depends on nothing asynchronous. Reading
-       Capacitor's registry off `window` is synchronous, so this reports even
-       when the network is stalled — which is exactly the state that silenced
-       every previous attempt. */
-    const bridge = inspectBridge();
-    setProbe(
-      bridge.hasAppIcon
-        ? 'plugin present in this build'
-        : bridge.nativePlatform
-          ? 'plugin MISSING from this build'
-          : 'not the installed app',
-    );
-    void fetch('/api/diag', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        what: 'app-icon',
-        phase: 'open',
-        stamp: BUILD_STAMP,
-        bridge,
-        ua: typeof navigator === 'undefined' ? null : navigator.userAgent,
-      }),
-    }).catch(() => {});
-
-    /* Phase 2 adds what only the bridge can answer. It may never resolve, so
-       nothing above depends on it. */
-    (async () => {
-      if (!isNativeApp()) return;
-      const [r, build] = await Promise.all([probeNativeAppIcon(), nativeBuildInfo()]);
-      if (cancelled) return;
-      const shell = build ? `app ${build}` : 'app version unknown';
-      const plugin =
-        r.state === 'ok'
-          ? `plugin OK · alternates ${r.supported ? 'supported' : 'NOT supported'} · currently ${r.icon}`
-          : r.state === 'timeout'
-            ? 'plugin did NOT answer'
-            : r.state === 'browser'
-              ? 'not the installed app'
-              : 'plugin not available';
-      setProbe(`${shell} · ${plugin}`);
-      void fetch('/api/diag', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          what: 'app-icon',
-          phase: 'probe',
-          stamp: BUILD_STAMP,
-          build,
-          probe: r,
-        }),
-      }).catch(() => {});
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
 
   async function chooseIcon(id: AppIconId) {
@@ -221,12 +139,12 @@ export default function AppearanceSection({ ctx }: { ctx: SettingsCtx }) {
 
       <Group
         title="App icon"
-        footer={`${
+        footer={
           iconNote ??
           (native
             ? 'Changes the home-screen icon straight away. iOS shows its own confirmation when it does.'
             : 'Changes the icon inside the app. The home-screen icon follows in the installed app.')
-        } — diagnostics: ${probe} · js ${BUILD_STAMP}`}
+        }
       >
         <div className="grid grid-cols-4 gap-2 p-3">
           {APP_ICONS.map(({ id, label }) => {
