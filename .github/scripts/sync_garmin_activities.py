@@ -280,6 +280,9 @@ def ensure_gear_schema(cur) -> None:
     # ride and the wrong one for today's.
     cur.execute("ALTER TABLE gear ADD COLUMN IF NOT EXISTS date_begin DATE")
     cur.execute("ALTER TABLE gear ADD COLUMN IF NOT EXISTS date_end DATE")
+    # What Garmin last called this bike. Kept so an in-app rename can be told
+    # apart from a name that simply still matches Garmin's.
+    cur.execute("ALTER TABLE gear ADD COLUMN IF NOT EXISTS garmin_name TEXT")
     cur.execute(
         "CREATE UNIQUE INDEX IF NOT EXISTS gear_garmin_uuid_key "
         "ON gear (garmin_uuid) WHERE garmin_uuid IS NOT NULL"
@@ -375,30 +378,51 @@ def gear_date(value):
 
 
 def sync_gear_status(cur, local_id, entry) -> None:
-    """Mirror Garmin's service window and retirement onto a bound gear row.
+    """Mirror Garmin's name, service window and retirement onto a bound row.
 
-    Both are Garmin's to own now: the `retired` flag arrived from Strava and
-    the two had already drifted apart, and Strava has no concept of the dates
-    at all. Retirement is only ever added, never cleared — some of the older
-    bikes were marked in Strava and nowhere else."""
+    All three are Garmin's to own now: the `retired` flag arrived from Strava
+    and the two had drifted apart, and Strava has no concept of the dates or
+    of what the bike is currently called. Two carve-outs:
+
+      • retirement is only ever added, never cleared — some of the older bikes
+        were marked in Strava and nowhere else;
+      • a nickname edited in the app survives. `garmin_name` records what
+        Garmin last called the bike, so a nickname that still matches it (or
+        never diverged from `name`) is just an un-customised label and gets
+        refreshed, while a deliberate rename is left alone.
+    """
     begin, end = gear_date(entry.get("dateBegin")), gear_date(entry.get("dateEnd"))
     retired = (entry.get("gearStatusName") or "").lower() == "retired"
+    names = gear_names(entry)
+    gname = names[0] if names else None
     cur.execute(
         """
         UPDATE gear
-           SET date_begin = COALESCE(%s, date_begin),
-               date_end   = COALESCE(%s, date_end),
-               retired    = retired OR %s
+           SET name        = COALESCE(%s, name),
+               nickname    = CASE
+                               WHEN %s IS NULL THEN nickname
+                               WHEN nickname IS NULL
+                                 OR nickname = name
+                                 OR nickname = garmin_name THEN %s
+                               ELSE nickname
+                             END,
+               garmin_name = COALESCE(%s, garmin_name),
+               date_begin  = COALESCE(%s, date_begin),
+               date_end    = COALESCE(%s, date_end),
+               retired     = retired OR %s
          WHERE id = %s
-           AND (date_begin IS DISTINCT FROM COALESCE(%s, date_begin)
-             OR date_end   IS DISTINCT FROM COALESCE(%s, date_end)
+           AND (garmin_name IS DISTINCT FROM COALESCE(%s, garmin_name)
+             OR date_begin  IS DISTINCT FROM COALESCE(%s, date_begin)
+             OR date_end    IS DISTINCT FROM COALESCE(%s, date_end)
              OR (%s AND retired IS DISTINCT FROM TRUE))
         """,
-        (begin, end, retired, local_id, begin, end, retired),
+        (gname, gname, gname, gname, begin, end, retired, local_id,
+         gname, begin, end, retired),
     )
     if cur.rowcount:
         window = f"{begin or '?'} to {end or 'now'}"
-        print(f"  gear updated: {local_id} ({window}{', retired' if retired else ''})")
+        print(f"  gear updated: {local_id} {gname or ''} ({window}"
+              f"{', retired' if retired else ''})")
 
 
 def bind_gear(cur, uuid, local_id, label) -> bool:
