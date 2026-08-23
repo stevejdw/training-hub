@@ -24,11 +24,16 @@ interface GearOption {
   name: string | null;
   nickname: string | null;
   retired: boolean | null;
+  /** Garmin's service window for the bike; either end may be open. */
+  date_begin: string | null;
+  date_end: string | null;
 }
 
 interface Props {
   activityId: string;
   name: string;
+  /** ISO start of the ride — decides which bikes were in service for it. */
+  startDate: string;
   gearId: string | null;
   hasPower: boolean;
   hasHr: boolean;
@@ -42,13 +47,13 @@ interface Props {
 }
 
 export default function ActivityEditModal({
-  activityId, name, gearId, hasPower, hasHr,
+  activityId, name, startDate, gearId, hasPower, hasHr,
   onClose, onSaved, onDataRemoved, onActivityDeleted,
 }: Props) {
   const [nameDraft, setNameDraft] = useState(name);
   const [gearDraft, setGearDraft] = useState<string>(gearId ?? '');
   const [gear, setGear]           = useState<GearOption[]>([]);
-  const [showRetired, setShowRetired] = useState(false);
+  const [showAllGear, setShowAllGear] = useState(false);
   const [saving, setSaving]       = useState(false);
   const [error,  setError]        = useState<string | null>(null);
 
@@ -69,11 +74,22 @@ export default function ActivityEditModal({
   }, [onClose]);
 
   const gearLabel = (g: GearOption) => (g.nickname || g.name || g.id) + (g.retired ? ' (retired)' : '');
-  // Retired bikes are the majority of the fleet and almost never the answer,
-  // but an old ride still has to be assignable to the bike that did it — so
-  // they are one checkbox away, and the one already on this ride always shows.
-  const retiredCount = gear.filter(g => g.retired).length;
-  const gearOptions = gear.filter(g => !g.retired || showRetired || g.id === gearDraft);
+
+  // Offer the bikes that were actually in service on the day of this ride,
+  // not the whole fleet. A bike retired in 2023 is still the right answer for
+  // a 2022 ride and the wrong one for today's, which the retired flag alone
+  // cannot express. Dates come from Garmin; a bike missing them (nothing has
+  // synced it yet) is always offered rather than silently dropped.
+  const rideDay = startDate.slice(0, 10);
+  const inServiceOnRideDay = (g: GearOption) =>
+    (!g.date_begin || g.date_begin.slice(0, 10) <= rideDay) &&
+    (!g.date_end || rideDay <= g.date_end.slice(0, 10));
+  // The bike already on the ride always stays selectable, whatever the dates
+  // say — otherwise saving a rename would silently clear the gear.
+  const gearOptions = gear.filter(
+    g => showAllGear || g.id === gearDraft || inServiceOnRideDay(g)
+  );
+  const hiddenCount = gear.length - gearOptions.length;
   const busy = saving || deleting;
   const dirty = nameDraft.trim() !== name || (gearDraft || null) !== (gearId ?? null);
 
@@ -171,20 +187,21 @@ export default function ActivityEditModal({
                 <option key={g.id} value={g.id}>{gearLabel(g)}</option>
               ))}
             </select>
-            {retiredCount > 0 && (
+            {(hiddenCount > 0 || showAllGear) && (
               <label className="mt-1.5 flex items-center gap-2 text-mini text-ink-4 cursor-pointer">
                 <input
                   type="checkbox"
-                  checked={showRetired}
-                  onChange={e => setShowRetired(e.target.checked)}
+                  checked={showAllGear}
+                  onChange={e => setShowAllGear(e.target.checked)}
                   disabled={busy}
                   className="accent-accent"
                 />
-                Include {retiredCount} retired bikes
+                Show all bikes{hiddenCount > 0 ? ` (${hiddenCount} not in service then)` : ''}
               </label>
             )}
             <p className="mt-1 text-mini text-ink-5">
-              Renaming a bike itself is done in Settings — this only changes which bike this ride used.
+              Only bikes in service on the day of this ride are listed. Bikes and their dates
+              mirror Garmin; renaming one is done from the gear filter on Activities.
             </p>
           </div>
 

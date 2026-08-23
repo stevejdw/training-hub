@@ -274,6 +274,12 @@ def ensure_gear_schema(cur) -> None:
     """`gear.id` holds Strava's gear id, so a Garmin UUID needs its own column.
     The repo has no migration tooling — DDL is idempotent and runs inline."""
     cur.execute("ALTER TABLE gear ADD COLUMN IF NOT EXISTS garmin_uuid TEXT")
+    # Garmin knows when each bike entered and left service. That window, not
+    # the retired flag, is what decides whether a bike can be picked for a
+    # given ride: a bike retired in 2023 is still the right answer for a 2022
+    # ride and the wrong one for today's.
+    cur.execute("ALTER TABLE gear ADD COLUMN IF NOT EXISTS date_begin DATE")
+    cur.execute("ALTER TABLE gear ADD COLUMN IF NOT EXISTS date_end DATE")
     cur.execute(
         "CREATE UNIQUE INDEX IF NOT EXISTS gear_garmin_uuid_key "
         "ON gear (garmin_uuid) WHERE garmin_uuid IS NOT NULL"
@@ -358,22 +364,41 @@ def match_gear_by_name(cur, names, exact_only=False):
     return None
 
 
-def mark_retired(cur, local_id, entry) -> None:
-    """Carry Garmin's retirement across, one way only.
+def gear_date(value):
+    """Garmin sends '2023-08-19T02:01:34.0'; only the day matters here."""
+    if not value or not isinstance(value, str):
+        return None
+    try:
+        return datetime.strptime(value[:10], "%Y-%m-%d").date()
+    except ValueError:
+        return None
 
-    The `retired` flag arrived from Strava, and the two disagree — a bike
-    retired in Garmin can still look current in Strava. The app hides retired
-    gear, so the flag going stale means a fleet of dead bikes in every picker.
-    Retirement is only ever added, never cleared: Strava is the only place
-    some of the older bikes were ever marked."""
-    if (entry.get("gearStatusName") or "").lower() != "retired":
-        return
+
+def sync_gear_status(cur, local_id, entry) -> None:
+    """Mirror Garmin's service window and retirement onto a bound gear row.
+
+    Both are Garmin's to own now: the `retired` flag arrived from Strava and
+    the two had already drifted apart, and Strava has no concept of the dates
+    at all. Retirement is only ever added, never cleared — some of the older
+    bikes were marked in Strava and nowhere else."""
+    begin, end = gear_date(entry.get("dateBegin")), gear_date(entry.get("dateEnd"))
+    retired = (entry.get("gearStatusName") or "").lower() == "retired"
     cur.execute(
-        "UPDATE gear SET retired = TRUE WHERE id = %s AND retired IS DISTINCT FROM TRUE",
-        (local_id,),
+        """
+        UPDATE gear
+           SET date_begin = COALESCE(%s, date_begin),
+               date_end   = COALESCE(%s, date_end),
+               retired    = retired OR %s
+         WHERE id = %s
+           AND (date_begin IS DISTINCT FROM COALESCE(%s, date_begin)
+             OR date_end   IS DISTINCT FROM COALESCE(%s, date_end)
+             OR (%s AND retired IS DISTINCT FROM TRUE))
+        """,
+        (begin, end, retired, local_id, begin, end, retired),
     )
     if cur.rowcount:
-        print(f"  gear retired: {local_id}")
+        window = f"{begin or '?'} to {end or 'now'}"
+        print(f"  gear updated: {local_id} ({window}{', retired' if retired else ''})")
 
 
 def bind_gear(cur, uuid, local_id, label) -> bool:
@@ -414,7 +439,7 @@ def sync_gear_fleet(g, cur) -> int:
         cur.execute("SELECT id FROM gear WHERE garmin_uuid = %s", (uuid,))
         row = cur.fetchone()
         if row:
-            mark_retired(cur, row[0], entry)
+            sync_gear_status(cur, row[0], entry)
             continue
         pending.append((uuid, names, entry))
 
@@ -424,7 +449,7 @@ def sync_gear_fleet(g, cur) -> int:
             uuid, names, entry = item
             local_id = match_gear_by_name(cur, names, exact_only=exact_only)
             if local_id and bind_gear(cur, uuid, local_id, names[0]):
-                mark_retired(cur, local_id, entry)
+                sync_gear_status(cur, local_id, entry)
                 pending.remove(item)
                 bound += 1
     # Whatever is left is either gear the app has never seen or a bike whose
@@ -470,11 +495,12 @@ def resolve_gear_id(cur, entry):
     name = names[0] if names else "Garmin gear"
     cur.execute(
         """
-        INSERT INTO gear (id, name, nickname, retired, garmin_uuid, synced_at)
-        VALUES (%s, %s, %s, %s, %s, NOW())
+        INSERT INTO gear (id, name, nickname, retired, garmin_uuid, date_begin, date_end, synced_at)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())
         ON CONFLICT (id) DO UPDATE SET garmin_uuid = EXCLUDED.garmin_uuid, synced_at = NOW()
         """,
-        (new_id, name, name, (entry.get("gearStatusName") or "").lower() == "retired", uuid),
+        (new_id, name, name, (entry.get("gearStatusName") or "").lower() == "retired", uuid,
+         gear_date(entry.get("dateBegin")), gear_date(entry.get("dateEnd"))),
     )
     print(f"  gear created: {name} ({new_id})")
     return new_id

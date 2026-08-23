@@ -274,6 +274,7 @@ export default function ActivityDetail(
     <ActivityEditModal
       activityId={id}
       name={activity.name}
+      startDate={activity.start_date}
       gearId={activity.gear_id}
       hasPower={hasPower}
       hasHr={hasHr}
