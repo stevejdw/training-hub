@@ -4,6 +4,7 @@ import './globals.css';
 import Nav from '@/components/Nav';
 import ThemeProvider from '@/components/ThemeProvider';
 import NativeShell from '@/components/NativeShell';
+import ViewportLock from '@/components/ViewportLock';
 import ProfileProvider from '@/components/ProfileProvider';
 import CommandPalette from '@/components/desktop/CommandPalette';
 
@@ -32,6 +33,13 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
+  // Zoom is pinned. The mobile shell is fixed-position — a scaled visual
+  // viewport puts the bottom tab bar off-screen and leaves the user stranded
+  // on the current page. WKWebView (the Capacitor shell) and the installed
+  // PWA honour these; Safari ignores them, which is what ViewportLock and
+  // the 16px form-control rule in globals.css are there for.
+  maximumScale: 1,
+  userScalable: false,
   // No static themeColor: it was pinned to Carbon Dark regardless of the
   // active theme, so the iOS status bar clashed under every other one.
   // ThemeProvider now writes <meta name="theme-color"> from --background.
@@ -57,6 +65,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="flex flex-col">
         <ThemeProvider />
         <NativeShell />
+        <ViewportLock />
         {/* One shared /api/profile read; Nav, PageHeader and the sidebar all
             used to fetch it separately just to resolve the app icon. */}
         <ProfileProvider>

@@ -298,6 +298,34 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+/* ── iOS zoom lock ──────────────────────────────────────────────────────
+   Two separate ways the page used to zoom on iOS, both of which stranded
+   the user: the bottom nav is position:fixed, so once the visual viewport
+   is scaled it sits off-screen with no way to reach it.
+
+   1. Focus zoom. Safari/WKWebView zoom the whole page whenever a focused
+      form control computes to under 16px. Every input in this app is
+      text-sm (14px) or text-xs (12px), and ActivityEditModal autofocuses
+      its name field — so opening the edit sheet zoomed the app instantly.
+      Forcing 16px on touch devices is the only fix Safari honours; do not
+      lower these back to text-sm.
+   2. Double-tap zoom. touch-action: manipulation drops the 300ms
+      double-tap gesture while leaving pan and any in-page pinch handlers
+      (Leaflet's map zoom uses touch events, not this) alone.
+   ViewportLock adds the JS half: it blocks Safari's pinch gesture events
+   and snaps the scale back if anything zooms the page anyway. */
+body {
+  touch-action: manipulation;
+}
+
+@media (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
 html {
   height: 100%;
   overscroll-behavior: none;
