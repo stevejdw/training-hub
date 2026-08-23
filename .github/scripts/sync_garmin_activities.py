@@ -298,44 +298,121 @@ def gear_names(entry):
 
 
 def name_tokens(s):
-    """Words worth matching on: 'Factor Ostro Vam' -> {factor, ostro, vam}.
-    Digits and two-letter fragments are dropped because 'SL' and '5' recur
-    across half the fleet and would match everything."""
-    return {
-        t for t in re.split(r"[^a-z0-9]+", (s or "").lower())
-        if len(t) >= 3 and not t.isdigit()
-    }
+    """(words, numbers) for a gear name. 'Gen 3 Levo' -> ({gen, levo}, {3}).
+
+    They are scored differently on purpose. Words carry the identity and have
+    to be contained one way or the other; numbers are the model year or size
+    that one side usually omits — 'Crux 5' against 'Specialized Crux' — so a
+    missing one cannot veto a match, but a shared one breaks a tie between
+    'Turbo Levo' and 'Gen 3 Levo'. Single characters are dropped: they come
+    from splitting 'S-Works' and 'EX-e' and match everything."""
+    parts = [t for t in re.split(r"[^a-z0-9]+", (s or "").lower()) if len(t) >= 2 or t.isdigit()]
+    words = {t for t in parts if not t.isdigit() and len(t) >= 2}
+    numbers = {t for t in parts if t.isdigit()}
+    return words, numbers
 
 
-def match_gear_by_name(cur, names):
-    """Local gear id whose name/nickname identifies the same bike, or None.
+def match_gear_by_name(cur, names, exact_only=False):
+    """Local gear id naming the same bike as this Garmin gear, or None.
 
-    Two passes, because Garmin and Strava rarely agree on the exact string:
-    an exact (case-insensitive) hit first, then the row sharing the most
-    words — 'Specialized Crux' finds 'Crux 5'. A tie is refused rather than
-    guessed: welding two bikes' histories together is not worth a heuristic.
+    Garmin and Strava rarely agree on the exact string — 'Specialized Levo SL'
+    against 'Levo SL', 'Stumpjumper' against 'Stumpjumper Evo' — so after an
+    exact hit, a row matches when its words are contained in the Garmin name's
+    words or vice versa. Plain word overlap is not enough: most of this fleet
+    is a Levo of some kind, and overlap alone lets 'Specialized Levo SL' land
+    on 'Levo 4'. Ties are broken by how much matched, and anything still
+    ambiguous is refused rather than guessed — a wrong binding silently tags
+    every future ride with the wrong bike, while no binding just leaves the
+    gear to be set by hand, which is the situation today.
+
+    Only rows not already bound to some other Garmin UUID are considered.
     """
     cur.execute("SELECT id, name, nickname FROM gear WHERE garmin_uuid IS NULL")
     rows = cur.fetchall()
 
-    lowered = [n.lower() for n in names]
+    lowered = [n.strip().lower() for n in names]
     for gid, gname, nick in rows:
         for candidate in (gname, nick):
             if candidate and candidate.strip().lower() in lowered:
                 return gid
+    if exact_only:
+        return None
 
-    best, best_score, tied = None, 0, False
-    for gid, gname, nick in rows:
-        local = name_tokens(gname) | name_tokens(nick)
-        score = max((len(local & name_tokens(n)) for n in names), default=0)
-        if score > best_score:
-            best, best_score, tied = gid, score, False
-        elif score == best_score and score > 0 and gid != best:
-            tied = True
-    return None if (tied or best_score == 0) else best
+    for name in names:
+        gwords, gnums = name_tokens(name)
+        if not gwords:
+            continue
+        hits = []
+        for gid, gname, nick in rows:
+            lwords, lnums = name_tokens(gname)
+            nwords, nnums = name_tokens(nick)
+            lwords, lnums = lwords | nwords, lnums | nnums
+            if lwords and (lwords <= gwords or gwords <= lwords):
+                hits.append((len(lwords & gwords) + len(lnums & gnums), gid))
+        if not hits:
+            continue
+        top = max(score for score, _ in hits)
+        winners = {gid for score, gid in hits if score == top}
+        if len(winners) == 1:
+            return winners.pop()
+    return None
 
 
-def resolve_gear_id(cur, entry, current_gear_id):
+def bind_gear(cur, uuid, local_id, label) -> bool:
+    cur.execute(
+        "UPDATE gear SET garmin_uuid = %s WHERE id = %s AND garmin_uuid IS NULL",
+        (uuid, local_id),
+    )
+    if cur.rowcount:
+        print(f"  gear bound: garmin {label} -> {local_id}")
+    return bool(cur.rowcount)
+
+
+def sync_gear_fleet(g, cur) -> int:
+    """Bind the whole Garmin gear list to the `gear` rows Strava created.
+
+    Done fleet-wide rather than one activity at a time so that every exact
+    name match is claimed before any fuzzy one gets a look. Per-bike order
+    otherwise decides the outcome: the retired 'Factor' entry reaches 'Factor
+    One' by containment and takes it, and the entry actually named 'Factor
+    ONE' then finds nothing left to match.
+
+    Two API calls, and it settles after the first run — a bound row is
+    skipped from then on.
+    """
+    try:
+        pk = (g.get_user_profile() or {}).get("id")
+        entries = (g.get_gear(pk) or []) if pk else []
+    except Exception as e:
+        print(f"  gear fleet unavailable: {e}")
+        return 0
+
+    pending = []
+    for entry in entries:
+        uuid = (entry.get("uuid") or "").strip()
+        names = gear_names(entry)
+        if not uuid or not names:
+            continue
+        cur.execute("SELECT 1 FROM gear WHERE garmin_uuid = %s", (uuid,))
+        if cur.fetchone():
+            continue
+        pending.append((uuid, names))
+
+    bound = 0
+    for exact_only in (True, False):
+        for uuid, names in list(pending):
+            local_id = match_gear_by_name(cur, names, exact_only=exact_only)
+            if local_id and bind_gear(cur, uuid, local_id, names[0]):
+                pending.remove((uuid, names))
+                bound += 1
+    # Whatever is left is either gear the app has never seen or a bike whose
+    # names were too far apart to be sure about. Both are left alone: a row is
+    # minted for it the first time an activity actually uses it, so retired
+    # gear nobody rode never clutters the picker.
+    return bound
+
+
+def resolve_gear_id(cur, entry):
     """Local `gear.id` for a Garmin gear entry, creating the row if needed.
 
     Garmin identifies gear by UUID and Strava by 'b<number>', and the same
@@ -344,15 +421,13 @@ def resolve_gear_id(cur, entry, current_gear_id):
 
       1. a binding already recorded on the gear row;
       2. a name match (see match_gear_by_name);
-      3. the gear the activity is already tagged with — direct evidence from
-         Strava or from an in-app edit. Ranked below names because it rests on
-         a single ride: one mis-tagged activity would otherwise bind the wrong
-         bike permanently;
-      4. otherwise it is genuinely new gear: mint a row keyed 'g<uuid>', which
-         cannot collide with Strava's 'b'/'g<digits>' ids.
+      3. otherwise treat it as gear the app has never seen and mint a row
+         keyed 'g<uuid>', which cannot collide with Strava's ids.
 
     Only an unclaimed gear row is bound, so a UUID can never steal a bike
-    already mapped to a different one.
+    already mapped to a different one. A bike that ends up duplicated because
+    the two names were too far apart is visible in the gear list and fixable
+    with one UPDATE; a UUID bound to the wrong bike is neither.
     """
     uuid = (entry.get("uuid") or "").strip()
     if not uuid:
@@ -365,19 +440,8 @@ def resolve_gear_id(cur, entry, current_gear_id):
 
     names = gear_names(entry)
     local_id = match_gear_by_name(cur, names) if names else None
-    if not local_id and current_gear_id:
-        cur.execute(
-            "SELECT id FROM gear WHERE id = %s AND garmin_uuid IS NULL", (current_gear_id,)
-        )
-        r = cur.fetchone()
-        local_id = r[0] if r else None
 
-    if local_id:
-        cur.execute(
-            "UPDATE gear SET garmin_uuid = %s WHERE id = %s AND garmin_uuid IS NULL",
-            (uuid, local_id),
-        )
-        print(f"  gear bound: garmin {names[0] if names else uuid} -> {local_id}")
+    if local_id and bind_gear(cur, uuid, local_id, names[0] if names else uuid):
         return local_id
 
     new_id = f"g{uuid}"
@@ -408,7 +472,7 @@ def pick_gear_entry(entries, sport):
     return entries[0]
 
 
-def apply_gear(g, cur, internal_id, garmin_id, sport, current_gear_id) -> bool:
+def apply_gear(g, cur, internal_id, garmin_id, sport) -> bool:
     """Tag one activity with the gear Garmin recorded. Returns True if written.
 
     Costs one API call per activity, so callers only invoke it for rows that
@@ -423,7 +487,7 @@ def apply_gear(g, cur, internal_id, garmin_id, sport, current_gear_id) -> bool:
     if not entry:
         return False
 
-    gear_id = resolve_gear_id(cur, entry, current_gear_id)
+    gear_id = resolve_gear_id(cur, entry)
     if not gear_id:
         return False
 
@@ -433,38 +497,6 @@ def apply_gear(g, cur, internal_id, garmin_id, sport, current_gear_id) -> bool:
         (gear_id, internal_id),
     )
     return cur.rowcount > 0
-
-
-def learn_gear_bindings(g, conn, cur, limit=10) -> int:
-    """Bind Garmin UUIDs to bikes using rides that are already tagged.
-
-    Most of the fleet came from Strava and is already on the right rides, so
-    the cheapest way to map a UUID is to ask Garmin what it used for one ride
-    per unmapped bike — a handful of calls, once, instead of guessing at names
-    every time. Runs before the backfill so those rides land on the existing
-    bike rather than minting a second copy of it."""
-    cur.execute(
-        """
-        SELECT DISTINCT ON (a.gear_id) a.gear_id, a.garmin_id, a.sport_type
-          FROM activities a JOIN gear ge ON ge.id = a.gear_id
-         WHERE a.garmin_id IS NOT NULL AND ge.garmin_uuid IS NULL
-         ORDER BY a.gear_id, a.start_date DESC
-         LIMIT %s
-        """,
-        (limit,),
-    )
-    bound = 0
-    for gear_id, garmin_id, sport in cur.fetchall():
-        try:
-            entries = g.get_activity_gear(int(garmin_id)) or []
-            entry = pick_gear_entry(entries, sport)
-            if entry and resolve_gear_id(cur, entry, gear_id):
-                bound += 1
-            conn.commit()
-        except Exception as e:
-            conn.rollback()
-            print(f"  gear binding failed for {gear_id}: {e}")
-    return bound
 
 
 def backfill_gear(g, conn, cur, limit) -> int:
@@ -490,7 +522,7 @@ def backfill_gear(g, conn, cur, limit) -> int:
     filled = 0
     for internal_id, garmin_id, sport in cur.fetchall():
         try:
-            if apply_gear(g, cur, int(internal_id), int(garmin_id), sport, None):
+            if apply_gear(g, cur, int(internal_id), int(garmin_id), sport):
                 filled += 1
             conn.commit()
         except Exception as e:
@@ -539,6 +571,8 @@ def main() -> int:
                 return 0
 
             ensure_gear_schema(cur)
+            sync_gear_fleet(g, cur)
+            conn.commit()
             ftp = gc.athlete_ftp(cur)
             # Garmin filters get_activities_by_date by the activity's LOCAL
             # date, but this window was computed in UTC. In Sydney (UTC+10) a
@@ -577,8 +611,7 @@ def main() -> int:
                             # summary never carries it — so only ask for rows
                             # that still have none.
                             if r[1] is None and apply_gear(
-                                g, cur, internal, int(a["activityId"]),
-                                sport_type(a), None,
+                                g, cur, internal, int(a["activityId"]), sport_type(a),
                             ):
                                 geared += 1
                         print(f"  {outcome:<10} {a.get('startTimeLocal')}  {a.get('activityName')}")
@@ -587,8 +620,6 @@ def main() -> int:
                     conn.rollback()
                     print(f"  FAILED {a.get('activityId')}: {e}")
 
-            if gear_backfill > 0:
-                learn_gear_bindings(g, conn, cur)
             geared += backfill_gear(g, conn, cur, gear_backfill)
 
             dupes = assert_no_cross_provider_duplicates(cur)
