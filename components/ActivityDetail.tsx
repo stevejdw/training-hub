@@ -334,7 +334,9 @@ export default function ActivityDetail(
               {activity.gear_name && (
                 <div>
                   <div className="text-micro text-ink-4 uppercase tracking-wider mb-0.5">Bike</div>
-                  <div className="text-base font-bold text-ink truncate">{activity.gear_name}</div>
+                  {/* Wraps rather than truncates: gear names mirror Garmin now,
+                      and 'Specialized Tarmac SL7' does not fit one grid cell. */}
+                  <div className="text-base font-bold text-ink leading-tight break-words" title={activity.gear_name}>{activity.gear_name}</div>
                 </div>
               )}
               {activity.power_meter && (
