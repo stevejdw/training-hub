@@ -1,12 +1,18 @@
 name: Sync Strava to Neon
 
+# No schedule, deliberately. Exactly one provider writes activities, and that
+# is currently Garmin, so sync_strava.py's own gate (strava_ingest_enabled)
+# returns early and this job writes nothing — it was booting a runner four
+# times a day to print one line and exit. The comment it replaced justified
+# the cadence on billed Actions minutes, which stopped being a consideration
+# when the repo went public on 2026-08-22.
+#
+# The workflow stays because Strava is the documented fallback if Garmin's
+# unofficial API breaks (see lib/sync-sources.ts). Switching back means:
+# Settings -> Data sources -> Strava, then restore a cron here, because the
+# webhook alone only covers rides from that moment on and nothing backfills
+# the gap. Until then, run it by hand when you need a one-off catch-up.
 on:
-  schedule:
-    # Hourly at :00. Was every 30 minutes, which doubled the billed Actions
-    # minutes (each job is rounded up to a whole minute, and this one runs for
-    # ~12 seconds) to halve a freshness window that nothing depends on — rides
-    # land once a day, and Garmin activities already sync hourly at :42.
-    - cron: '35 */6 * * *'
   workflow_dispatch:
 
 jobs:

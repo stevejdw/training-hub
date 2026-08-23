@@ -7,21 +7,11 @@ on:
         description: 'Max activities per run (each uses 2 Strava calls: laps + streams)'
         required: false
         default: '30'
-  schedule:
-    # Every 4 hours. Each run processes ~30 activities (60 API calls, under the
-    # 100/15-min ceiling so no mid-run sleeps), and the script stops itself once
-    # the daily cap of 950 calls is reached.
-    #
-    # That daily cap — shared with full-streams — is what limits progress, not
-    # the schedule. The old 15-minute cron did real work for the first few runs
-    # each day and then no-opped ~44 times ("Processed 0 activities... re-run
-    # tomorrow"), costing ~48 billed Actions minutes a day, because every job is
-    # rounded up to a whole minute however briefly it runs. Six runs here plus
-    # six in full-streams is ~720 calls, which uses the daily quota with headroom
-    # left for the app and the hourly sync.
-    # Offset by 10 min from the sync (:00) and full-streams (:05) jobs so the
-    # scheduled workflows don't all hit Strava's token endpoint at once.
-    - cron: '50 3 * * *'
+  # No schedule. These are Strava backfills, and the script gates itself on
+  # strava_ingest_enabled — with Garmin primary it prints one line and exits,
+  # so the daily run was booting a runner to do nothing. Same reasoning as
+  # sync.yml; restore a cron there and here together if Strava ever becomes
+  # the primary source again.
 
 jobs:
   backfill:
