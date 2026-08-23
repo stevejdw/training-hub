@@ -52,7 +52,10 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           APP_SECRETS_KEY: ${{ secrets.APP_SECRETS_KEY }}
-        run: python .github/scripts/sync_garmin_activities.py 3
+        # `0` disables the gear backfill here: this job fires on every push
+        # from the watch, and the backlog is drained by the 6-hourly job. New
+        # rides still get their gear looked up as they arrive.
+        run: python .github/scripts/sync_garmin_activities.py 3 0
 
       # Streams, laps and route for whatever the step above just inserted.
       - name: Fill activity details
