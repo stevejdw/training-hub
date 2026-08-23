@@ -125,7 +125,8 @@ def probe_gear(garmin) -> None:
             print(
                 f"  {item.get('uuid')}  {(item.get('displayName') or '-'):<24} "
                 f"{(item.get('customMakeModel') or '-'):<28} "
-                f"{item.get('gearTypeName')}/{item.get('gearStatusName')}"
+                f"{item.get('gearTypeName')}/{item.get('gearStatusName'):<8} "
+                f"begin={item.get('dateBegin')} end={item.get('dateEnd')}"
             )
     except Exception as e:
         print(f"  FAILED: {e}")
