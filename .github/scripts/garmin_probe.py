@@ -114,10 +114,34 @@ def probe(garmin) -> None:
         show(f"VO2max ({d})", vo2 or "(no data)")
 
 
+def probe_gear(garmin) -> None:
+    """Gear payload shape, so the activity sync can map Garmin gear onto the
+    `gear` rows Strava already created rather than duplicating every bike."""
+    print("\nGear on the last 5 activities:")
+    try:
+        activities = garmin.get_activities(0, 5)
+    except Exception as e:
+        print(f"  FAILED listing activities: {e}")
+        return
+    for a in activities or []:
+        aid = a.get("activityId")
+        try:
+            gear = garmin.get_activity_gear(aid)
+        except Exception as e:
+            print(f"  {aid}: FAILED: {e}")
+            continue
+        if not gear:
+            print(f"  {aid}  {a.get('activityName')}: (no gear)")
+            continue
+        for g in gear:
+            print(f"  {aid}  {a.get('activityName')}: {g}")
+
+
 def main() -> int:
     try:
         with gc.garmin_session() as (garmin, _conn, _cur):
             probe(garmin)
+            probe_gear(garmin)
     except gc.ReauthRequired as e:
         gc.bail_on_reauth(e)
 
