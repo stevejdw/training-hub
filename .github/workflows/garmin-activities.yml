@@ -14,6 +14,10 @@ on:
         description: 'Days of history to sync (larger to backfill)'
         required: false
         default: '14'
+      gear_backfill:
+        description: 'Older rides to look gear up for (one API call each)'
+        required: false
+        default: '25'
 
 jobs:
   activities:
@@ -39,7 +43,7 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           APP_SECRETS_KEY: ${{ secrets.APP_SECRETS_KEY }}
-        run: python .github/scripts/sync_garmin_activities.py ${{ github.event.inputs.days || '14' }}
+        run: python .github/scripts/sync_garmin_activities.py ${{ github.event.inputs.days || '14' }} ${{ github.event.inputs.gear_backfill || '25' }}
 
       # Adopt names the athlete set in Strava. Reads names only — Garmin stays
       # the source of truth for every measurement.
