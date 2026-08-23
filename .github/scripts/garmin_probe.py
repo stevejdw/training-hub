@@ -117,6 +117,19 @@ def probe(garmin) -> None:
 def probe_gear(garmin) -> None:
     """Gear payload shape, so the activity sync can map Garmin gear onto the
     `gear` rows Strava already created rather than duplicating every bike."""
+    print("\nGear fleet:")
+    try:
+        pk = (garmin.get_user_profile() or {}).get("id") or (
+            garmin.get_userprofile_settings() or {}).get("id")
+        for item in garmin.get_gear(pk) or []:
+            print(
+                f"  {item.get('uuid')}  {(item.get('displayName') or '-'):<24} "
+                f"{(item.get('customMakeModel') or '-'):<28} "
+                f"{item.get('gearTypeName')}/{item.get('gearStatusName')}"
+            )
+    except Exception as e:
+        print(f"  FAILED: {e}")
+
     print("\nGear on the last 5 activities:")
     try:
         activities = garmin.get_activities(0, 5)
