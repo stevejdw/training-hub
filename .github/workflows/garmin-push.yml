@@ -7,16 +7,24 @@ name: Garmin push sync
 on:
   repository_dispatch:
     types: [garmin-activity]
-  # Hourly backstop. The dispatch above is the fast path, but it depends on
-  # GH_DISPATCH_TOKEN being present in the app's environment — when it is
-  # missing or expires, the app can only log the failure, and the ride then
-  # waits for the 6-hourly garmin-activities poll. This job is that poll's
-  # short-window twin (activities + details + names in one pass), so the
-  # worst case is about an hour rather than most of a day. Offset to :40,
-  # clear of the other Garmin jobs, so they never contend for the token
-  # bundle's advisory lock.
+  # Quarter-hourly poll — the only path that reaches Garmin without Strava
+  # in it at all, and therefore the one that has to be trusted.
+  #
+  # Garmin's unofficial API has no push: notifications live in the Connect
+  # Developer Program, which is closed to individuals (see the header of
+  # .github/scripts/garmin_common.py). Polling is consequently the only
+  # genuinely direct trigger available, so its interval *is* the worst-case
+  # freshness. Fifteen minutes is the compromise: fast enough that a ride is
+  # in the hub before the kettle boils, slow enough (~96 logins a day on one
+  # account) not to invite rate limiting on an API with no published quota
+  # and no appeal process if it locks us out. If Garmin starts returning
+  # 429s, widen this before touching anything else.
+  #
+  # The runs take ~60s, so the :00 slot clears the 6-hourly garmin-activities
+  # job at :10 and its deeper 14-day window with minutes to spare — they
+  # share this concurrency group and would otherwise cancel each other.
   schedule:
-    - cron: '40 * * * *'
+    - cron: '*/15 * * * *'
   workflow_dispatch:
 
 jobs:
