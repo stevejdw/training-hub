@@ -78,12 +78,17 @@ export default function ActivityEditModal({
   // Offer the bikes that were actually in service on the day of this ride,
   // not the whole fleet. A bike retired in 2023 is still the right answer for
   // a 2022 ride and the wrong one for today's, which the retired flag alone
-  // cannot express. Dates come from Garmin; a bike missing them (nothing has
-  // synced it yet) is always offered rather than silently dropped.
+  // cannot express. Dates come from Garmin; a bike it has never seen falls
+  // back to the retired flag rather than being dropped outright, so gear that
+  // only ever existed in Strava stays pickable.
   const rideDay = startDate.slice(0, 10);
-  const inServiceOnRideDay = (g: GearOption) =>
-    (!g.date_begin || g.date_begin.slice(0, 10) <= rideDay) &&
-    (!g.date_end || rideDay <= g.date_end.slice(0, 10));
+  const inServiceOnRideDay = (g: GearOption) => {
+    if (!g.date_begin && !g.date_end) return !g.retired;
+    return (
+      (!g.date_begin || g.date_begin.slice(0, 10) <= rideDay) &&
+      (!g.date_end || rideDay <= g.date_end.slice(0, 10))
+    );
+  };
   // The bike already on the ride always stays selectable, whatever the dates
   // say — otherwise saving a rename would silently clear the gear.
   const gearOptions = gear.filter(
