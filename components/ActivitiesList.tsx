@@ -137,6 +137,10 @@ export default function ActivitiesList() {
     return g ? g.split(',').filter(Boolean) : [];
   });
   const [gearDropdownOpen, setGearDropdownOpen] = useState(false);
+  // Most of the fleet is retired — old bikes would otherwise crowd out the
+  // three or four actually being ridden. Still reachable via the toggle, and
+  // a retired bike stays listed while it is part of the current filter.
+  const [showRetiredGear, setShowRetiredGear] = useState(false);
 
   // Power meter filter
   const [powerMeterList,     setPowerMeterList]     = useState<PowerMeterItem[]>([]);
@@ -152,6 +156,11 @@ export default function ActivitiesList() {
       })
       .catch(() => { /* non-fatal */ });
   }, []);
+
+  const retiredGearCount = gearList.filter(g => g.retired).length;
+  const visibleGear = gearList.filter(
+    g => !g.retired || showRetiredGear || selectedGear.includes(g.id)
+  );
 
   function toggleGear(id: string) {
     setSelectedGear(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
@@ -519,7 +528,7 @@ export default function ActivitiesList() {
 
                   {gearDropdownOpen && (
                     <div className="absolute z-30 mt-1 w-full sm:w-72 bg-surface border border-line-strong rounded-lg shadow-2xl py-1 max-h-72 overflow-y-auto">
-                      {gearList.map(g => {
+                      {visibleGear.map(g => {
                         const label = g.nickname || g.name || g.id;
                         const isOn  = selectedGear.includes(g.id);
                         return (
@@ -564,6 +573,14 @@ export default function ActivitiesList() {
                           </div>
                         );
                       })}
+                      {retiredGearCount > 0 && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setShowRetiredGear(v => !v); }}
+                          className="w-full text-left px-3 py-2 text-xs text-ink-4 hover:text-ink-2 hover:bg-raised border-t border-line transition-colors"
+                        >
+                          {showRetiredGear ? 'Hide retired bikes' : `Show ${retiredGearCount} retired bikes`}
+                        </button>
+                      )}
                       {noGearCount > 0 && (
                         <div
                           className={`flex items-center gap-2 px-3 py-2 text-sm hover:bg-raised cursor-pointer border-t border-line ${selectedGear.includes('__none__') ? 'text-ink' : 'text-ink-2'}`}

@@ -48,6 +48,7 @@ export default function ActivityEditModal({
   const [nameDraft, setNameDraft] = useState(name);
   const [gearDraft, setGearDraft] = useState<string>(gearId ?? '');
   const [gear, setGear]           = useState<GearOption[]>([]);
+  const [showRetired, setShowRetired] = useState(false);
   const [saving, setSaving]       = useState(false);
   const [error,  setError]        = useState<string | null>(null);
 
@@ -68,6 +69,11 @@ export default function ActivityEditModal({
   }, [onClose]);
 
   const gearLabel = (g: GearOption) => (g.nickname || g.name || g.id) + (g.retired ? ' (retired)' : '');
+  // Retired bikes are the majority of the fleet and almost never the answer,
+  // but an old ride still has to be assignable to the bike that did it — so
+  // they are one checkbox away, and the one already on this ride always shows.
+  const retiredCount = gear.filter(g => g.retired).length;
+  const gearOptions = gear.filter(g => !g.retired || showRetired || g.id === gearDraft);
   const busy = saving || deleting;
   const dirty = nameDraft.trim() !== name || (gearDraft || null) !== (gearId ?? null);
 
@@ -161,10 +167,22 @@ export default function ActivityEditModal({
               className="w-full bg-raised border border-line-strong rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-accent disabled:opacity-50"
             >
               <option value="">No gear</option>
-              {gear.map(g => (
+              {gearOptions.map(g => (
                 <option key={g.id} value={g.id}>{gearLabel(g)}</option>
               ))}
             </select>
+            {retiredCount > 0 && (
+              <label className="mt-1.5 flex items-center gap-2 text-mini text-ink-4 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={showRetired}
+                  onChange={e => setShowRetired(e.target.checked)}
+                  disabled={busy}
+                  className="accent-accent"
+                />
+                Include {retiredCount} retired bikes
+              </label>
+            )}
             <p className="mt-1 text-mini text-ink-5">
               Renaming a bike itself is done in Settings — this only changes which bike this ride used.
             </p>

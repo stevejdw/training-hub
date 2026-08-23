@@ -358,6 +358,24 @@ def match_gear_by_name(cur, names, exact_only=False):
     return None
 
 
+def mark_retired(cur, local_id, entry) -> None:
+    """Carry Garmin's retirement across, one way only.
+
+    The `retired` flag arrived from Strava, and the two disagree — a bike
+    retired in Garmin can still look current in Strava. The app hides retired
+    gear, so the flag going stale means a fleet of dead bikes in every picker.
+    Retirement is only ever added, never cleared: Strava is the only place
+    some of the older bikes were ever marked."""
+    if (entry.get("gearStatusName") or "").lower() != "retired":
+        return
+    cur.execute(
+        "UPDATE gear SET retired = TRUE WHERE id = %s AND retired IS DISTINCT FROM TRUE",
+        (local_id,),
+    )
+    if cur.rowcount:
+        print(f"  gear retired: {local_id}")
+
+
 def bind_gear(cur, uuid, local_id, label) -> bool:
     cur.execute(
         "UPDATE gear SET garmin_uuid = %s WHERE id = %s AND garmin_uuid IS NULL",
@@ -393,17 +411,21 @@ def sync_gear_fleet(g, cur) -> int:
         names = gear_names(entry)
         if not uuid or not names:
             continue
-        cur.execute("SELECT 1 FROM gear WHERE garmin_uuid = %s", (uuid,))
-        if cur.fetchone():
+        cur.execute("SELECT id FROM gear WHERE garmin_uuid = %s", (uuid,))
+        row = cur.fetchone()
+        if row:
+            mark_retired(cur, row[0], entry)
             continue
-        pending.append((uuid, names))
+        pending.append((uuid, names, entry))
 
     bound = 0
     for exact_only in (True, False):
-        for uuid, names in list(pending):
+        for item in list(pending):
+            uuid, names, entry = item
             local_id = match_gear_by_name(cur, names, exact_only=exact_only)
             if local_id and bind_gear(cur, uuid, local_id, names[0]):
-                pending.remove((uuid, names))
+                mark_retired(cur, local_id, entry)
+                pending.remove(item)
                 bound += 1
     # Whatever is left is either gear the app has never seen or a bike whose
     # names were too far apart to be sure about. Both are left alone: a row is
