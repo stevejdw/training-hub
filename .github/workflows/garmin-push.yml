@@ -7,6 +7,16 @@ name: Garmin push sync
 on:
   repository_dispatch:
     types: [garmin-activity]
+  # Hourly backstop. The dispatch above is the fast path, but it depends on
+  # GH_DISPATCH_TOKEN being present in the app's environment — when it is
+  # missing or expires, the app can only log the failure, and the ride then
+  # waits for the 6-hourly garmin-activities poll. This job is that poll's
+  # short-window twin (activities + details + names in one pass), so the
+  # worst case is about an hour rather than most of a day. Offset to :40,
+  # clear of the other Garmin jobs, so they never contend for the token
+  # bundle's advisory lock.
+  schedule:
+    - cron: '40 * * * *'
   workflow_dispatch:
 
 jobs:
