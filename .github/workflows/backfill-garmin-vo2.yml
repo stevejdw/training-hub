@@ -1,0 +1,38 @@
+name: Backfill Garmin VO2max
+
+# Manual only. This is a one-off gap-fill, not something to poll — the
+# scheduled garmin-wellness.yml keeps VO2max current from here on.
+on:
+  workflow_dispatch:
+    inputs:
+      days:
+        description: 'Days of history to pull from Garmin Connect'
+        required: false
+        default: '730'
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Shares the token bundle's advisory lock with the other Garmin jobs.
+    concurrency:
+      group: garmin-wellness
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+
+      # Same pins as garmin-wellness.yml — bump them together, after a
+      # garmin-probe.yml run.
+      - name: Install dependencies
+        run: pip install 'garminconnect==0.3.10' 'psycopg2-binary==2.9.12' 'cryptography==50.0.0'
+
+      - name: Backfill VO2max
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          APP_SECRETS_KEY: ${{ secrets.APP_SECRETS_KEY }}
+        run: python .github/scripts/backfill_garmin_vo2.py ${{ github.event.inputs.days || '730' }}
