@@ -52,6 +52,18 @@ def _entry_values(entry: dict) -> tuple[float | None, float | None]:
     )
 
 
+def _entry_date(entry: dict) -> str | None:
+    """calendarDate lives inside generic/cycling, never at the top level.
+
+    Reading it off the entry gave None for every record, so the first run
+    skipped all 27 chunks and reported a clean zero."""
+    for key in ("generic", "cycling", "heatAltitudeAcclimation"):
+        day = (entry.get(key) or {}).get("calendarDate")
+        if day:
+            return day
+    return None
+
+
 def fetch_range(g, start: str, end: str) -> dict[str, tuple]:
     """{date: (vo2max, vo2max_cycling)} for a date range, one request.
 
@@ -67,21 +79,23 @@ def fetch_range(g, start: str, end: str) -> dict[str, tuple]:
         return fetch_per_day(g, start, end)
 
     for entry in data or []:
-        day = entry.get("calendarDate")
+        day = _entry_date(entry)
         if not day:
             continue
         vo2, cyc = _entry_values(entry)
         if vo2 is not None or cyc is not None:
             out[day] = (vo2, cyc)
 
-    # An empty 200 is not proof the days are empty. Garmin answers the range
-    # form happily and returns [] whenever start != end, so a silent zero here
-    # looks identical to "no VO2max recorded" — and the first run of this
-    # script wrote nothing for two years on exactly that. Treat empty as
-    # unsupported and pay for the per-day walk.
+    # An empty result is ambiguous: Garmin returns [] both for a stretch with
+    # no VO2max readings and for a range it won't serve. Spot-check the
+    # midpoint with the single-day form before paying for a per-day walk over
+    # a window that is genuinely empty.
     if not out:
-        print(f"  range {start}..{end} returned nothing — falling back to per-day")
-        return fetch_per_day(g, start, end)
+        mid = (date.fromisoformat(start)
+               + (date.fromisoformat(end) - date.fromisoformat(start)) / 2).isoformat()
+        if fetch_per_day(g, mid, mid):
+            print(f"  range {start}..{end} empty but {mid} has data — walking per-day")
+            return fetch_per_day(g, start, end)
     return out
 
 
