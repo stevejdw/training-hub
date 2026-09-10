@@ -9,11 +9,15 @@ on:
         description: 'Days of history to pull from Garmin Connect'
         required: false
         default: '730'
+      probe:
+        description: 'Diagnostic only: dump raw payloads for this date range (YYYY-MM-DD YYYY-MM-DD) instead of writing'
+        required: false
+        default: ''
 
 jobs:
   backfill:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 45
     # Shares the token bundle's advisory lock with the other Garmin jobs.
     concurrency:
       group: garmin-wellness
@@ -35,4 +39,9 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           APP_SECRETS_KEY: ${{ secrets.APP_SECRETS_KEY }}
-        run: python .github/scripts/backfill_garmin_vo2.py ${{ github.event.inputs.days || '730' }}
+        run: |
+          if [ -n "${{ github.event.inputs.probe }}" ]; then
+            python .github/scripts/backfill_garmin_vo2.py --probe ${{ github.event.inputs.probe }}
+          else
+            python .github/scripts/backfill_garmin_vo2.py ${{ github.event.inputs.days || '730' }}
+          fi

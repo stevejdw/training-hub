@@ -23,7 +23,9 @@ big `days` input:
 Usage:  python backfill_garmin_vo2.py [days]      (default 730)
 """
 
+import json
 import sys
+import time
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -33,7 +35,8 @@ import garmin_common as gc  # noqa: E402
 from sync_garmin_wellness import ensure_schema  # noqa: E402
 
 DEFAULT_DAYS = 730
-CHUNK_DAYS = 28  # Garmin 500s on very long ranges; 28 is comfortably inside.
+CHUNK_DAYS = 28   # Garmin 500s on very long ranges; 28 is comfortably inside.
+PER_DAY_SLEEP = 0.35  # Unofficial API — pace the per-day fallback.
 
 
 def _num(v):
@@ -70,6 +73,15 @@ def fetch_range(g, start: str, end: str) -> dict[str, tuple]:
         vo2, cyc = _entry_values(entry)
         if vo2 is not None or cyc is not None:
             out[day] = (vo2, cyc)
+
+    # An empty 200 is not proof the days are empty. Garmin answers the range
+    # form happily and returns [] whenever start != end, so a silent zero here
+    # looks identical to "no VO2max recorded" — and the first run of this
+    # script wrote nothing for two years on exactly that. Treat empty as
+    # unsupported and pay for the per-day walk.
+    if not out:
+        print(f"  range {start}..{end} returned nothing — falling back to per-day")
+        return fetch_per_day(g, start, end)
     return out
 
 
@@ -86,8 +98,27 @@ def fetch_per_day(g, start: str, end: str) -> dict[str, tuple]:
                     out[day] = (vo2, cyc)
         except Exception as e:
             print(f"    {day}: {e}")
+        time.sleep(PER_DAY_SLEEP)
         d += timedelta(days=1)
     return out
+
+
+def probe(g, start: str, end: str) -> None:
+    """Dump raw payloads for the range and single-day forms, and exit.
+
+    Kept because the failure that motivated it is invisible: both forms return
+    200, and only the bodies differ."""
+    print(f"RANGE {start}..{end}:")
+    try:
+        print(json.dumps(g.connectapi(f"/metrics-service/metrics/maxmet/daily/{start}/{end}"), indent=1)[:1200])
+    except Exception as e:
+        print(f"  failed: {e}")
+    for day in (start, end):
+        print(f"\nSINGLE {day}:")
+        try:
+            print(json.dumps(g.get_max_metrics(day), indent=1)[:1200])
+        except Exception as e:
+            print(f"  failed: {e}")
 
 
 def write(cur, day: str, vo2, cyc) -> None:
@@ -111,6 +142,14 @@ def write(cur, day: str, vo2, cyc) -> None:
 
 
 def main() -> int:
+    if len(sys.argv) > 3 and sys.argv[1] == "--probe":
+        try:
+            with gc.garmin_session() as (g, conn, cur):
+                probe(g, sys.argv[2], sys.argv[3])
+        except gc.ReauthRequired as e:
+            gc.bail_on_reauth(e)
+        return 0
+
     days = int(sys.argv[1]) if len(sys.argv) > 1 else DEFAULT_DAYS
     today = date.today()
     start = today - timedelta(days=days)
