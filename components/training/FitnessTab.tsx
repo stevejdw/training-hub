@@ -12,8 +12,8 @@ import FitnessChart, { type FitnessPoint } from './FitnessChart';
 import { CHART } from '@/lib/chart-theme';
 import { formBand } from '@/components/dashboard/FormReading';
 interface EftpPoint  { date: string; eftp: number }
-interface Vo2Point   { date: string; vo2max: number }
-interface EftpHistoryResponse { eftpPoints: EftpPoint[]; vo2Points: Vo2Point[]; weight: number | null }
+interface Vo2Point   { date: string; vo2max: number; source?: 'garmin' | 'estimated' }
+interface EftpHistoryResponse { eftpPoints: EftpPoint[]; vo2Points: Vo2Point[]; weight: number | null; vo2GarminFrom?: string | null }
 
 type ChartPeriod = '3m' | '6m' | '1y';
 const CHART_PERIODS: { key: ChartPeriod; label: string; days: number }[] = [
@@ -306,7 +306,7 @@ export default function FitnessTab() {
 
   const { data: eftpData, loading: eftpLoading } = useCachedFetch<EftpHistoryResponse>(
     '/api/analytics/eftp-history',
-    'cache-eftp-history-v7',
+    'cache-eftp-history-v8',
   );
 
   const [eftpPeriod, setEftpPeriod] = useState<ChartPeriod>('6m');
@@ -316,6 +316,7 @@ export default function FitnessTab() {
 
   const allEftpPoints = eftpData?.eftpPoints ?? [];
   const allVo2Points  = eftpData?.vo2Points  ?? [];
+  const vo2GarminFrom = eftpData?.vo2GarminFrom ?? null;
 
   const windowEftp = getWindow(allEftpPoints, eftpPeriod, eftpOffset);
   const eftpPoints = reduceEftpPoints(windowEftp);
@@ -442,13 +443,18 @@ export default function FitnessTab() {
           </ResponsiveContainer>
           )}</EnlargeableChart>
         )}
+        <p className="text-micro text-ink-5 mt-2">
+          Best power over a rolling 42 days, converted with the Coggan multipliers
+          (5 min ×0.78, 10 min ×0.87, 20 min ×0.95, 60 min ×1.00) and the highest kept.
+          Independent of the FTP set in your profile.
+        </p>
       </div>
 
       {/* VO₂ Max trend — only when weight is configured */}
       {eftpData?.weight != null && (
         <div className="bg-surface rounded-xl border border-line p-4">
           <div className="flex items-center justify-between mb-4">
-            <p className="text-xs font-semibold text-ink-4 uppercase tracking-wider">VO₂ Max (estimated)</p>
+            <p className="text-xs font-semibold text-ink-4 uppercase tracking-wider">VO₂ Max</p>
             <ChartNav
               period={vo2Period} offset={vo2Offset}
               hasBack={canGoBack(allVo2Points, vo2Period, vo2Offset)}
@@ -460,7 +466,7 @@ export default function FitnessTab() {
           ) : !vo2Points.length ? (
             <div className="h-48 flex items-center justify-center text-ink-4 text-sm">No data for this period</div>
           ) : (
-            <EnlargeableChart title="VO₂ Max (estimated)" controls={
+            <EnlargeableChart title="VO₂ Max" controls={
               <ChartNav
                 period={vo2Period} offset={vo2Offset}
                 hasBack={canGoBack(allVo2Points, vo2Period, vo2Offset)}
@@ -481,7 +487,11 @@ export default function FitnessTab() {
             </ResponsiveContainer>
             )}</EnlargeableChart>
           )}
-          <p className="text-micro text-ink-5 mt-2">Per-ride estimate via Coggan formula: NP × 0.95 ÷ weight × 10.8 + 7</p>
+          <p className="text-micro text-ink-5 mt-2">
+            {vo2GarminFrom
+              ? <>Garmin cycling VO₂ max from {fmtDate(vo2GarminFrom)}. Earlier points are estimated from best 5-min power (10.8 × W/kg + 7).</>
+              : <>Estimated from best 5-min power (10.8 × W/kg + 7) — no Garmin VO₂ max synced yet.</>}
+          </p>
         </div>
       )}
 
