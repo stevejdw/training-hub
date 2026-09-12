@@ -25,6 +25,9 @@ export interface SyncHealthRow {
   stale:     boolean;
 }
 
+/** Providers that report only when something happens, never on a schedule. */
+const EVENT_DRIVEN = new Set(['garmin-doorbell']);
+
 export async function GET() {
   const client = await pool.connect();
   try {
@@ -43,7 +46,13 @@ export async function GET() {
         lastError: r.last_error,
         failures:  r.consecutive_failures,
         detail:    r.detail,
-        stale:     !r.last_ok_at || Date.now() - r.last_ok_at.getTime() > STALE_AFTER_MS,
+        // The doorbell is event-driven, not scheduled: it only reports in when
+        // a ride finishes, so elapsed time says nothing about its health. Two
+        // rest days would light it amber while it was working perfectly.
+        // Consecutive failures are the only signal that means anything here.
+        stale:     EVENT_DRIVEN.has(r.provider)
+          ? r.consecutive_failures > 0
+          : !r.last_ok_at || Date.now() - r.last_ok_at.getTime() > STALE_AFTER_MS,
       }));
     } catch {
       // Table not created yet — no sync has reported in.
