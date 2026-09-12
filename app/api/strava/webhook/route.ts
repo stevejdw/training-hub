@@ -50,11 +50,15 @@ export async function POST(req: Request) {
             strava_id:   body.object_id,
             aspect_type: body.aspect_type,
           });
-          console.log(
-            r.ok
-              ? `Webhook: triggered Garmin sync for Strava activity ${body.object_id}`
-              : `Webhook: could not trigger Garmin sync (${r.reason}) — the scheduled poll will catch it`
-          );
+          if (r.ok) {
+            console.log(`Webhook: triggered Garmin sync (${r.via}) for Strava activity ${body.object_id}`);
+          } else {
+            // console.error, not log: the scheduled poll does eventually catch
+            // the ride, which is exactly why a broken doorbell can sit
+            // unnoticed for weeks. dispatchGarminSync also records this to
+            // sync_health so Settings shows it.
+            console.error(`Webhook: could not trigger Garmin sync — ${r.reason}`);
+          }
           return;
         }
         await syncActivity(body.object_id);
